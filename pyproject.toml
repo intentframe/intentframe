@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intentframe"
+version = "0.1.0"
+description = "Security gateway for AI agents — every action goes through a policy pipeline before touching the real world"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [
+    { name = "IntentFrame Contributors" },
+]
+keywords = ["ai", "agents", "security", "guardrails", "policy", "oversight"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+dependencies = [
+    "fastapi",
+    "httpx>=0.28.1",
+    "keyring; sys_platform == 'darwin'",
+    "openai-agents>=0.7.0",
+    "pydantic>=2.12.5",
+    "pyobjc-framework-EventKit>=11.0; sys_platform == 'darwin'",
+    "pyobjc-framework-Contacts>=11.0; sys_platform == 'darwin'",
+    "pyyaml>=6.0.3",
+    "structlog>=25.5.0",
+    "tenacity>=9.1.4",
+    "trafilatura>=1.12.0",
+    "uvicorn[standard]",
+    "aiosqlite>=0.21",
+    "sse-starlette>=2.0",
+    "websockets>=14.0",
+    "bashlex>=0.18",
+    "pymupdf",
+    "jarvis-pa",
+    "email-sync-service",
+    "intentframe-credentials",
+    "jarvis-telegram",
+    "prompt-toolkit>=3.0",
+    "rich>=13.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.setuptools.packages.find]
+include = [
+    "action_registry*",
+    "intentframe_core*",
+    "intentframe_components*",
+    "intentframe_server*",
+    "intentframe_actor*",
+    "intentframe_dashboard*",
+    "executor*",
+    "executor_client*",
+    "resource_registry*",
+    "policy_registry*",
+    "command_shield*",
+    "supervisor*",
+    "intentframe_gateway*",
+    "intentframe_cli*",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+intentframe = "supervisor.main:main"
+intentframe-backend = "supervisor.main:backend_main"
+intentframe-gateway-cli = "intentframe_cli.main:main"
+intentframe-gateway-backend = "intentframe_gateway.entry:backend_main"
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+[tool.uv.workspace]
+members = ["jarvis_pa", "external_data_ingestion", "intentframe_credentials", "jarvis_telegram"]
+
+[tool.uv.sources]
+jarvis-pa = { workspace = true }
+email-sync-service = { workspace = true }
+intentframe-credentials = { workspace = true }
+jarvis-telegram = { workspace = true }
+
+[tool.uv]
+default-groups = ["dev"]
+override-dependencies = [
+    "requests>=2.31",
+]

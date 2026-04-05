@@ -1,0 +1,12 @@
+# Email sync E2E test credentials
+# Password must be in the credential vault under:
+#   namespace: email.<address>  key: password
+#
+# Run the vault dev server first:
+#   uv run python -m intentframe_credentials.dev_server
+#
+# Then run tests:
+#   uv run pytest external_data_ingestion/tests/test_backfill_e2e.py -v -s
+#
+
+email: "example@example.com"

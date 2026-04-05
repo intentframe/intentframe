@@ -1,0 +1,96 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# IntentFrame Executor Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This file configures the executor service for a specific deployment.
+# Only three things change between deployments:
+#   1. Transport protocol (how requests arrive)
+#   2. Auth verification (how authorization is checked)
+#   3. Credential backend (where secrets are stored)
+#
+# Everything else (gateway logic, adapter pattern, audit trail) is the same.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─── Transport: How requests arrive ──────────────────────────────────────────
+# Types: unix_socket (device default), grpc (cloud/device), rest (admin/debug)
+transport:
+  type: unix_socket
+  options:
+    socket_path: /tmp/intentframe/executor.sock
+    # ── gRPC options (when type: grpc) ──
+    # host: "0.0.0.0"
+    # port: 50051
+    # ── REST options (when type: rest) ──
+    # host: "0.0.0.0"
+    # port: 8080
+
+# ─── Auth: How authorization is verified ─────────────────────────────────────
+# Types: guardian_hmac (IntentFrame default), mtls (cloud), bearer (admin/CI)
+auth:
+  type: guardian_hmac
+  options: {}
+    # ── guardian_hmac options ──
+    # secret_key_ref: "intentframe/guardian-hmac-key"
+    # ── mtls options ──
+    # ca_cert: "/path/to/ca.pem"
+    # ── bearer options ──
+    # issuer: "https://auth.intentframe.com"
+    # audience: "executor"
+
+# ─── Credentials: Where secrets are stored ───────────────────────────────────
+# Backends: service (vault service over UDS, default), keyring (OS native), env (dev/test ONLY)
+credentials:
+  backend: service
+  options: {}
+    # ── keyring options (if backend: keyring) ──
+    # Uses OS-native keyring directly, bypassing the vault service.
+    #
+    # ── service options (default) ──
+    # Talks to the supervisor-managed vault over UDS.
+    # socket_path: "~/.intentframe/run/credential-vault.sock"
+
+# ─── Worker Pool: Concurrency limits ────────────────────────────────────────
+worker_pool:
+  max_workers: 4
+  default_timeout_seconds: 30.0
+
+# ─── Adapters: Which capabilities to load ────────────────────────────────────
+# Each ID must be registered by a platform-specific adapter module.
+# Uncomment the adapters available on your platform.
+adapters:
+  enabled: []
+    # ── macOS adapters ──
+    # - files
+    # - terminal
+    # - http_api
+    # - user_io
+    # - mail
+    # - calendar
+    # - contacts
+    # - notes
+    # - reminders
+    # - browser
+    # - messages
+    # - notifications
+    # - system
+    # - clipboard
+    # - shortcuts
+    # - spotlight
+    # - filesystem_watch
+
+    # ── Cloud adapters ──
+    # - s3
+    # - ses
+    # - lambda_invoke
+    # - cloud_storage
+
+# ─── Storage: Database and log paths ────────────────────────────────────────
+# null = platform default (macOS: ~/Library/Application Support/IntentFrame/)
+storage:
+  database_path: null
+  log_path: null
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+logging:
+  level: INFO
+  format: json  # json (structured) or console (human-readable)

@@ -1,0 +1,364 @@
+  [RESET] Expense tracker reset to original state
+===============================================================================
+  STARTING DEMO (Fully AI-Powered Security Pipeline)
+===============================================================================
+
+============================================================
+[TASK MANAGER] Starting: task_1
+[TASK MANAGER] Task: Process the new invoices and update expense tracker
+[TASK MANAGER] Timeout: 120.0s
+============================================================
+
+    [AI AGENT] Starting with task: Process the new invoices and update expense tracker
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #1                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: LIST_DIRECTORY                                    ║
+    ║  Target: /invoices/                                        ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: LIST_DIRECTORY...
+    │  Confidence: 90%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    │  ⚠️  Hidden behaviors: ['Access to sensitive file names  │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: LIST_DIRECTORY...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target path /invoices/ is within the user's allowed paths (/invoices/, /expense_tracker.md, user_io). AnalysisReport indicates a read-only directory listing. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #2                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: LIST_DIRECTORY                                    ║
+    ║  Target: /invoices/new/                                    ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: LIST_DIRECTORY...
+    │  Confidence: 85%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    │  ⚠️  Hidden behaviors: ['The action may reveal the numbe │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: LIST_DIRECTORY...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target /invoices/new/ is within allowed_paths (/invoices/) and the action only lists files (no financial approval required). No user policy prohibits directory listing. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #3                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: READ_FILE                                         ║
+    ║  Target: /expense_tracker.md                               ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: READ_FILE...
+    │  Confidence: 90%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    │  ⚠️  Hidden behaviors: ['Accessing the file may trigger  │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: READ_FILE...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target /expense_tracker.md is explicitly listed in allowed_paths; action is a read operation and does not exceed approval_limit. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #4                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: READ_FILE                                         ║
+    ║  Target: /invoices/new/office_depot.md                     ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: READ_FILE...
+    │  Confidence: 90%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    │  ⚠️  Hidden behaviors: ['The file may contain sensitive  │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: READ_FILE...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target path '/invoices/new/office_depot.md' is within allowed_paths ('/invoices/'). No approval_limit or other policy is violated for a READ_FILE action. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #5                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: READ_FILE                                         ║
+    ║  Target: /invoices/new/acme_corp.md                        ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: READ_FILE...
+    │  Confidence: 85%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    │  ⚠️  Hidden behaviors: ['Potential exposure of sensitive │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: READ_FILE...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target path /invoices/new/acme_corp.md falls under allowed_paths (/invoices/). No approval or financial-amount action triggered that would exceed the $5,000.00 approval_limit. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #6                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: READ_FILE                                         ║
+    ║  Target: /invoices/new/techconsult.md                      ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: READ_FILE...
+    │  Confidence: 90%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    │  ⚠️  Hidden behaviors: ['If the file contains sensitive  │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: READ_FILE...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target path /invoices/new/techconsult.md is within allowed path /invoices/; no approval-limit or other policy violations noted in the Analysis Report. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #7                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: ASK_USER                                          ║
+    ║  Target: user_io                                           ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: ASK_USER...
+    │  Confidence: 90%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    │  ⚠️  Hidden behaviors: ["If the user chooses 'Add', an a │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: ASK_USER...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target 'user_io' is within allowed paths and invoice amount $2,500.00 is below the approval limit of $5,000.00 (policies satisfied). │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+
+  ╔══════════════════════════════════════════════════════════╗
+  ║  USER INPUT REQUIRED                                     ║
+  ╠══════════════════════════════════════════════════════════╣
+  ║  Invoice from Acme Corp for $2,500.00 on 2024-11-15 matches an existing expense entry (Vendor and Amount identical). Do you want to add this invoice as a new entry or skip it as a duplicate? ║
+  ║  Options: Add, Skip                                      ║
+  ╚══════════════════════════════════════════════════════════╝
+  [USER] → Add
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #8                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: APPEND_ROW                                        ║
+    ║  Target: /expense_tracker.md                               ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: APPEND_ROW...
+    │  Confidence: 85%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    │  ⚠️  Hidden behaviors: ['If there is an error in the app │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: APPEND_ROW...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target path /expense_tracker.md is in allowed_paths and amount $847.00 is within approval_limit $5,000.00 per user policies. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #9                                                   ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: APPEND_ROW                                        ║
+    ║  Target: /expense_tracker.md                               ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: APPEND_ROW...
+    │  Confidence: 90%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    │  ⚠️  Hidden behaviors: ['Changes in the invoice data may │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: APPEND_ROW...
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Target path '/expense_tracker.md' is within allowed_paths and amount $2,500 ≤ approval_limit $5,000, so the action complies with policies. │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  REQUEST #10                                                  ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  ACTOR: Parsing request                                   ║
+    ║  Action: APPEND_ROW                                        ║
+    ║  Target: /expense_tracker.md                               ║
+    ╚══════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  AI analyzing: APPEND_ROW...
+    │  Confidence: 85%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    │  ⚠️  Hidden behaviors: ['Potentially affects financial r │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │  AI judging: APPEND_ROW...
+    │                                                          │
+    │  ⛔ DECISION: BLOCK                                       │
+    │  Amount $12,000.00 exceeds user's approval limit of $5,000.00; action therefore not permitted. (Policy: Approval Limit: $5,000.00 (requested amount $12,000.00)) │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  ⛔ ACTION BLOCKED (Security)                             ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  Amount $12,000.00 exceeds user's approval limit of $5,000.00; action therefore not permitted. (Policy: Approval Limit: $5,000.00 (requested amount $12,000.00)) ║
+    ║                                                          ║
+    ║  Guardian blocked this action because it exceeds the     ║
+    ║  user's authority. This is security working as intended. ║
+    ╚══════════════════════════════════════════════════════════╝
+
+
+    [AI AGENT] Complete: {'processed': 2, 'blocked': 1, 'user_asked': 1, 'skipped': 0, 'total': 3}
+
+[TASK MANAGER] ✓ Complete in 139.8s
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  FINAL RESULTS (Fully AI-Powered Pipeline)                                    ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   Task ID:    task_1                                                        ║
+║   Status:     complete                                                      ║
+║   Duration:   139.80s                                                           ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  INVOICE OUTCOMES                                                             ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   ✅ Processed (Guardian ALLOW):      2                                      ║
+║   💬 User asked (Agent ASK_USER):     1                                      ║
+║   ⛔ Blocked (Guardian BLOCK):        1                                      ║
+║   ─────────────────────────────                                               ║
+║   Total invoices:                    3                                      ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  WHAT HAPPENED (from Runtime Audit Log)                                       ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   1. LIST_DIRECTORY  → ✅ ALLOW                                       ║
+║      /invoices/                                                             ║
+║      Reason: Target path /invoices/ is within the user's allowe             ║
+║                                                                               ║
+║   2. LIST_DIRECTORY  → ✅ ALLOW                                       ║
+║      /invoices/new/                                                         ║
+║      Reason: Target /invoices/new/ is within allowed_paths (/in             ║
+║                                                                               ║
+║   3. READ_FILE       → ✅ ALLOW                                       ║
+║      /expense_tracker.md                                                    ║
+║      Reason: Target /expense_tracker.md is explicitly listed in             ║
+║                                                                               ║
+║   4. READ_FILE       → ✅ ALLOW                                       ║
+║      /invoices/new/office_depot.md                                          ║
+║      Reason: Target path '/invoices/new/office_depot.md' is wit             ║
+║                                                                               ║
+║   5. READ_FILE       → ✅ ALLOW                                       ║
+║      /invoices/new/acme_corp.md                                             ║
+║      Reason: Target path /invoices/new/acme_corp.md falls under             ║
+║                                                                               ║
+║   6. READ_FILE       → ✅ ALLOW                                       ║
+║      /invoices/new/techconsult.md                                           ║
+║      Reason: Target path /invoices/new/techconsult.md is within             ║
+║                                                                               ║
+║   7. ASK_USER        → ✅ ALLOW                                       ║
+║      User prompt                                                            ║
+║      Reason: Target 'user_io' is within allowed paths and invoi             ║
+║                                                                               ║
+║   8. APPEND_ROW      → ✅ ALLOW                                       ║
+║      Office Depot ($847.0)                                                  ║
+║      Reason: Target path /expense_tracker.md is in allowed_path             ║
+║                                                                               ║
+║   9. APPEND_ROW      → ✅ ALLOW                                       ║
+║      Acme Corp ($2,500.0)                                                   ║
+║      Reason: Target path '/expense_tracker.md' is within allowe             ║
+║                                                                               ║
+║   10. APPEND_ROW      → ⛔ BLOCK                                       ║
+║      TechConsult Inc ($12,000.0)                                            ║
+║      Reason: Amount $12,000.00 exceeds user's approval limit of             ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝

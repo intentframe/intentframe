@@ -1,0 +1,57 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Demo Executor Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Used when running the multi-process demo:
+#   EXECUTOR_CONFIG=demo/config/executor.yaml python -m supervisor.main start
+#
+# Only two things differ from the reference config:
+#   1. filesystem — mounts for demo data
+#   2. adapters  — only the two the demo actually needs
+# ═══════════════════════════════════════════════════════════════════════════════
+
+platform: auto
+
+transport:
+  type: unix_socket
+  options:
+    socket_path: /tmp/intentframe/executor.sock
+
+auth:
+  type: guardian_hmac
+  options:
+    secret_key: "intentframe_demo_secret_key_do_not_use_in_production"
+
+credentials:
+  backend: service
+  options: {}
+
+worker_pool:
+  max_workers: 4
+  default_timeout_seconds: 30.0
+
+# ─── Demo filesystem mounts ──────────────────────────────────────────────────
+# Mirrors the workspace created in demo/main.py _create_registry()
+filesystem:
+  base_path: demo
+  mounts:
+    - virtual_path: "/invoices/"
+      real_path: "demo_data"
+      file_filter: "*.md"
+    - virtual_path: "/expense_tracker.md"
+      real_path: "demo_data/expense_tracker.md"
+      writable: true
+
+# ─── Demo adapters ───────────────────────────────────────────────────────────
+adapters:
+  enabled:
+    - files
+    - user_io
+
+storage:
+  database_path: null
+  log_path: null
+
+logging:
+  level: INFO
+  format: console

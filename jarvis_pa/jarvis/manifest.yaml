@@ -1,0 +1,43 @@
+name: jarvis
+version: 0.1.0
+author: intentframe
+description: >
+  Personal assistant for macOS. Reasons via LLM, manages memory/skills,
+  executes tasks through IntentFrame adapters.
+
+entry_point: main.py
+runner: python
+dependencies:
+  - openai-agents
+  - openai
+  - sqlite-vec
+  - pyyaml
+
+capabilities:
+  agent_type: PersonalAssistant
+  declared_actions:
+    - READ_FILE
+    - WRITE_FILE
+    - LIST_DIRECTORY
+    - DELETE_FILE
+    - RUN_COMMAND
+    - SEND_EMAIL
+    - READ_EMAIL
+    - SEARCH_EMAIL
+    - CREATE_EVENT
+    - LIST_EVENTS
+    - CREATE_REMINDER
+    - LIST_REMINDERS
+    - CREATE_NOTE
+    - LIST_NOTES
+    - SEND_MESSAGE
+    - OPEN_URL
+    - SEARCH_WEB
+    - GET_PAGE_CONTENT
+    - GET_CLIPBOARD
+    - SET_CLIPBOARD
+    - SEARCH_SPOTLIGHT
+    - SHOW_NOTIFICATION
+    - ASK_USER
+  required_resources:
+    - ~/.jarvis/

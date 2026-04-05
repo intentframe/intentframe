@@ -1,0 +1,484 @@
+"""
+IntentFrame Runtime - Stateless Security Gateway
+
+The Runtime receives pre-built IntentFrames (from Actor SDK over HTTP)
+and runs them through the security pipeline:
+
+    command_shield → context enrichment → AnalysisEngine → Guardian → Executor → Result
+
+For RUN_COMMAND intents, command_shield.analyze() runs first:
+- CATASTROPHIC: reject immediately, never enters the pipeline.
+- NEEDS_REVIEW: structural signals are passed to the Analysis Engine
+  so the AI has richer context.  Never fast-paths.
+- SAFE: normal pipeline flow.
+
+Runtime knows nothing about Actor.  Actor is an external SDK that agent
+developers use.  Runtime just receives signed IntentFrames.
+
+Guardian makes SECURITY decisions only:
+- ALLOW: Action is authorized → Execute
+- BLOCK: Policy violation → Reject
+
+Guardian does NOT make business logic decisions.
+If Agent wants to ask user about business logic (duplicates, etc.),
+Agent sends ASK_USER intent, which Guardian validates as safe.
+If an action is blocked, the agent (the domain expert) decides
+what to do next — ask the user, retry differently, or skip.
+"""
+
+import asyncio
+import logging
+from typing import Optional
+
+from action_registry.types import ActionType
+from command_shield import Verdict, analyze as shield_analyze
+from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
+from intentframe_core.enums import Decision
+from intentframe_core.types import (
+    UserContext,
+    ExecutionResult,
+    IntentFrame,
+    AgentCapabilities,
+    RuntimeContext,
+)
+from intentframe_components.analysis import AnalysisEngine
+from intentframe_components.guardian import Guardian
+from intentframe_components.executor import Executor
+from intentframe_components.onboarding import OnboardingEngine
+from policy_registry.client import PolicyRegistryClient
+from resource_registry.client import ResourceRegistryClient
+
+logger = logging.getLogger(__name__)
+
+
+class IntentFrameRuntime:
+    """
+    Stateless security gateway.
+
+    Two main operations:
+
+    1. HANDSHAKE (once per agent session):
+        Agent capabilities + UserContext → OnboardingEngine → RuntimeContext
+
+    2. INTENT PROCESSING (per action):
+        IntentFrame → AnalysisEngine → Guardian → Executor → Result
+
+    Runtime does NOT parse raw requests.  That is Actor's job (external SDK).
+    Runtime only receives clean, signed IntentFrames.
+    """
+
+    def __init__(
+        self,
+        analysis_engine: AnalysisEngine,
+        guardian: Guardian,
+        executor: Executor,
+        onboarding_engine: Optional[OnboardingEngine] = None,
+        policy_client: Optional[PolicyRegistryClient] = None,
+        resource_client: Optional[ResourceRegistryClient] = None,
+        verbose: bool = True,
+    ):
+        self.analysis_engine = analysis_engine
+        self.guardian = guardian
+        self.executor = executor
+        self.onboarding_engine = onboarding_engine
+        self._policy_client = policy_client or PolicyRegistryClient()
+        self._resource_client = resource_client or ResourceRegistryClient()
+        self.verbose = verbose
+        self.audit_log: list = []
+        self._request_counter = 0
+        self._lock = asyncio.Lock()
+    
+    def _resolve_user_context(self, user_context: UserContext) -> UserContext:
+        """Look up the user's real policies from the policy registry.
+
+        The agent only sends user_id — the server is the authority
+        on allowed actions and their constraints.
+        """
+        try:
+            policy = self._policy_client.get_user_policy(user_context.user_id)
+            return UserContext(
+                user_id=policy.user_id,
+                allowed_actions=policy.allowed_actions,
+                intent_limits=policy.intent_limits,
+                domain_constraints=policy.domain_constraints,
+                metadata=policy.metadata,
+            )
+        except KeyError:
+            logger.warning(
+                "No policy found for user '%s' — using defaults",
+                user_context.user_id,
+            )
+            return user_context
+
+    @staticmethod
+    def _extract_safe_actions(user_context: UserContext) -> set[str]:
+        """Extract the set of action types marked ``safe`` in user policy."""
+        return {
+            action
+            for action, perm in user_context.allowed_actions.items()
+            if perm.safe
+        }
+
+    def _resolve_workspace(self, workspace_id: str) -> tuple[list[str], dict[str, str]]:
+        """Fetch the ClientView from the Resource Registry.
+
+        Returns (virtual_paths, path_permissions) or empty defaults
+        if the workspace doesn't exist yet.
+        """
+        try:
+            view = self._resource_client.client_view(workspace_id)
+            return view.virtual_paths, view.permissions
+        except (KeyError, Exception) as exc:
+            logger.debug("No workspace '%s' in resource registry: %s", workspace_id, exc)
+            return [], {}
+
+    async def handshake(
+        self, 
+        capabilities: AgentCapabilities, 
+        user_context: UserContext
+    ) -> RuntimeContext:
+        """
+        Perform handshake between agent and IntentFrame runtime.
+        
+        This is called ONCE when an agent connects, before any requests.
+        
+        Flow:
+        1. Agent (via Actor SDK) provides capabilities and user_id
+        2. Runtime looks up the user's real policies from the policy registry
+        3. AI Onboarding Engine generates RuntimeContext with:
+           - User's limits and policies (server-authoritative)
+           - AI-generated guardrails specific to this agent
+           - Warnings about agent capabilities
+        4. Context is returned to Actor, which passes it to the agent
+        
+        Args:
+            capabilities: What the agent does (from agent developer)
+            user_context: Minimal context from agent (only user_id is trusted)
+            
+        Returns:
+            RuntimeContext with everything agent needs to work effectively
+        """
+        user_context = self._resolve_user_context(user_context)
+        virtual_paths, path_permissions = self._resolve_workspace(user_context.user_id)
+
+        if not self.onboarding_engine:
+            if self.verbose:
+                print(f"\n    [HANDSHAKE] No Onboarding Engine - using basic context")
+
+            context = RuntimeContext(
+                user_id=user_context.user_id,
+                allowed_actions=user_context.allowed_actions,
+                metadata=user_context.metadata,
+                guardrails=[],
+                available_actions=capabilities.action_types,
+                onboarded_agent_type=capabilities.agent_type,
+                virtual_paths=virtual_paths,
+                path_permissions=path_permissions,
+            )
+        else:
+            num_actions = len(user_context.allowed_actions)
+            if self.verbose:
+                print(f"\n    ╔══════════════════════════════════════════════════════════╗")
+                print(f"    ║  HANDSHAKE: Agent → IntentFrame Runtime                   ║")
+                print(f"    ╠══════════════════════════════════════════════════════════╣")
+                print(f"    ║  Agent: {capabilities.agent_type:<50} ║")
+                print(f"    ║  User: {user_context.user_id:<51} ║")
+                print(f"    ║  Allowed Actions: {num_actions:<40} ║")
+                print(f"    ╚══════════════════════════════════════════════════════════╝")
+            
+            context = await self.onboarding_engine.onboard(capabilities, user_context)
+            context.virtual_paths = virtual_paths
+            context.path_permissions = path_permissions
+
+            if self.verbose:
+                print(f"\n    ╔══════════════════════════════════════════════════════════╗")
+                print(f"    ║  HANDSHAKE COMPLETE                                       ║")
+                print(f"    ╠══════════════════════════════════════════════════════════╣")
+                print(f"    ║  Allowed Actions: {len(context.allowed_actions):<40} ║")
+                print(f"    ║  Guardrails: {len(context.guardrails):<45} ║")
+                if context.warnings:
+                    print(f"    ║  Warnings: {len(context.warnings):<47} ║")
+                print(f"    ║  Confidence: {context.onboarding_confidence:.0%}                                         ║")
+                print(f"    ╚══════════════════════════════════════════════════════════╝")
+                
+                # Show guardrails
+                if context.guardrails:
+                    print(f"\n    AI-Generated Guardrails:")
+                    for i, guardrail in enumerate(context.guardrails, 1):
+                        # Wrap guardrail text
+                        words = guardrail.split()
+                        lines = []
+                        current_line = f"    {i}. "
+                        for word in words:
+                            if len(current_line) + len(word) + 1 <= 70:
+                                current_line = current_line + " " + word if not current_line.endswith(". ") else current_line + word
+                            else:
+                                lines.append(current_line)
+                                current_line = "       " + word
+                        if current_line.strip():
+                            lines.append(current_line)
+                        for line in lines:
+                            print(line)
+                
+                if context.warnings:
+                    print(f"\n    ⚠️  Warnings:")
+                    for warning in context.warnings:
+                        print(f"       - {warning}")
+        
+        return context
+    
+    def clear_audit_log(self):
+        """Clear audit log for new session"""
+        self.audit_log = []
+        self._request_counter = 0
+    
+    def get_audit_log(self) -> list:
+        """Return audit log of all decisions"""
+        return self.audit_log
+    
+    async def process_intent(
+        self,
+        intent: IntentFrame,
+        user_context: UserContext,
+    ) -> ExecutionResult:
+        """
+        Process a pre-built IntentFrame through the security pipeline.
+
+        Actor (external SDK) has already parsed the raw request into an
+        IntentFrame and sent it here over HTTP.  Runtime only does:
+        Analysis → Guardian → Executor.
+        """
+        user_context = self._resolve_user_context(user_context)
+        async with self._lock:
+            return await self._process_intent_impl(intent, user_context)
+
+    async def _process_intent_impl(
+        self,
+        intent: IntentFrame,
+        user_context: UserContext,
+    ) -> ExecutionResult:
+        """Internal implementation of intent processing."""
+        self._request_counter += 1
+        req_num = self._request_counter
+
+        if self.verbose:
+            reason = intent.reason or ""
+
+            print(f"\n    ╔══════════════════════════════════════════════════════════╗")
+            print(f"    ║  INTENT #{req_num:<51} ║")
+            print(f"    ╠══════════════════════════════════════════════════════════╣")
+            print(f"    ║  Agent: {intent.agent_id:<50} ║")
+            print(f"    ║  Action: {intent.action.value:<49} ║")
+            print(f"    ║  Target: {str(intent.target)[:49]:<49} ║")
+            if reason:
+                print(f"    ╟──────────────────────────────────────────────────────────╢")
+                print(f"    ║  Agent Reason:                                            ║")
+                words = reason.split()
+                lines: list[str] = []
+                current_line = ""
+                for word in words:
+                    if len(current_line) + len(word) + 1 <= 52:
+                        current_line = current_line + " " + word if current_line else word
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                if current_line:
+                    lines.append(current_line)
+                for line in lines:
+                    print(f"    ║    {line:<54} ║")
+            print(f"    ╚══════════════════════════════════════════════════════════╝")
+        
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 2: COMMAND SHIELD - Deterministic structural pre-check
+        # ═══════════════════════════════════════════════════════════════
+        terminal_command_signals: tuple = ()
+        if intent.action.value == ActionType.RUN_COMMAND.value:
+            command = intent.target or (intent.data or {}).get("command", "")
+            if command:
+                report = shield_analyze(command)
+
+                if self.verbose:
+                    print(f"    ┌──────────────────────────────────────────────────────────┐")
+                    print(f"    │  COMMAND SHIELD: Deterministic structural analysis        │")
+                    print(f"    │  Verdict: {report.verdict.value:<47} │")
+                    if report.signals:
+                        print(f"    │  Signals: {len(report.signals):<48} │")
+                    print(f"    └──────────────────────────────────────────────────────────┘")
+
+                if report.verdict == Verdict.CATASTROPHIC:
+                    reason = "; ".join(
+                        s.description for s in report.signals[:3]
+                    ) or "catastrophic command detected"
+
+                    if self.verbose:
+                        print(f"")
+                        print(f"    ╔══════════════════════════════════════════════════════════╗")
+                        print(f"    ║  COMMAND SHIELD: CATASTROPHIC — REJECTED                 ║")
+                        print(f"    ╠══════════════════════════════════════════════════════════╣")
+                        print(f"    ║  {reason[:56]:<56} ║")
+                        print(f"    ╚══════════════════════════════════════════════════════════╝")
+                        print(f"")
+
+                    audit_entry = {
+                        "action": intent.action.value,
+                        "target": intent.target,
+                        "data": intent.data,
+                        "reason": intent.reason,
+                        "decision": "BLOCK",
+                        "message": f"command_shield: {reason}",
+                        "decision_path": "command_shield",
+                        "executed": False,
+                    }
+                    self.audit_log.append(audit_entry)
+
+                    return ExecutionResult(
+                        success=False,
+                        error=f"Blocked by command_shield: {reason}",
+                        data={
+                            "decision": "BLOCK",
+                            "reason": reason,
+                            "layer": "command_shield",
+                        },
+                    )
+
+                if report.verdict == Verdict.NEEDS_REVIEW:
+                    terminal_command_signals = report.signals
+
+        # ═══════════════════════════════════════════════════════════════
+        # CONTEXT ENRICHMENT — deterministic metadata from system sources
+        # ═══════════════════════════════════════════════════════════════
+        intent = await enrich_email_intent(intent)
+
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 3: ANALYSIS ENGINE - Understand the intent
+        # ═══════════════════════════════════════════════════════════════
+        if self.verbose:
+            print(f"    ┌──────────────────────────────────────────────────────────┐")
+            print(f"    │  ANALYSIS ENGINE: Understanding intent                   │")
+        
+        safe_actions = self._extract_safe_actions(user_context)
+        analysis = await self.analysis_engine.analyze(
+            intent,
+            safe_actions=safe_actions,
+            terminal_command_signals=terminal_command_signals,
+        )
+        
+        if self.verbose:
+            print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
+            print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
+            if analysis.hidden_behaviors:
+                print(f"    │  ⚠️  Hidden behaviors: {str(analysis.hidden_behaviors)[:33]:<33} │")
+            print(f"    └──────────────────────────────────────────────────────────┘")
+        
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 4: GUARDIAN - Validate SECURITY (not business logic!)
+        # ═══════════════════════════════════════════════════════════════
+        if self.verbose:
+            print(f"    ┌──────────────────────────────────────────────────────────┐")
+            print(f"    │  GUARDIAN: Security validation                           │")
+            print(f"    │  (Checks authority, NOT business logic)                  │")
+        
+        validation = await self.guardian.validate(intent, analysis, user_context)
+        
+        # ═══════════════════════════════════════════════════════════════
+        # DECISION: ALLOW / BLOCK
+        # ═══════════════════════════════════════════════════════════════
+        
+        is_fast_path = "fast-path" in (validation.message or "").lower()
+
+        # Build audit entry
+        audit_entry = {
+            "action": intent.action.value,
+            "target": intent.target,
+            "data": intent.data,
+            "reason": intent.reason,
+            "decision": validation.decision.value,
+            "message": validation.message,
+            "decision_path": "fast_path" if is_fast_path else "ai_path",
+            "risk_level": str(analysis.risk_factors) if analysis.risk_factors else None,
+            "confidence": analysis.confidence,
+        }
+        
+        if validation.decision == Decision.ALLOW:
+            # ───────────────────────────────────────────────────────────
+            # ALLOW - Execute the action
+            # ───────────────────────────────────────────────────────────
+            if self.verbose:
+                print(f"    │                                                          │")
+                print(f"    │  ✅ DECISION: ALLOW                                       │")
+                print(f"    │  {validation.message:<56} │")
+                print(f"    └──────────────────────────────────────────────────────────┘")
+            
+            # Layer 5: Executor
+            if self.verbose:
+                print(f"    ┌──────────────────────────────────────────────────────────┐")
+                print(f"    │  EXECUTOR: Performing action                             │")
+            
+            intent_to_execute = validation.modified_intent or intent
+            result = self.executor.execute(intent_to_execute)
+            
+            if self.verbose:
+                status = 'Success' if result.success else 'Failed'
+                print(f"    │  Result: {status:<49} │")
+                action_name = intent.action.value
+                if action_name in ("ASK_USER", "GET_CONFIRMATION", "SHOW_OPTIONS"):
+                    prompt = (intent.data or {}).get("prompt", "")
+                    if prompt:
+                        prompt_short = prompt[:52] + "…" if len(prompt) > 52 else prompt
+                        print(f"    │  Prompt: {prompt_short:<49} │")
+                    if result.success and result.data:
+                        resp = result.data.get("response") or result.data.get("selection") or ""
+                        if resp:
+                            resp_short = resp[:52] + "…" if len(resp) > 52 else resp
+                            print(f"    │  User:   {resp_short:<49} │")
+                elif action_name == "SHOW_MESSAGE":
+                    msg = (intent.data or {}).get("message", "")
+                    if msg:
+                        msg_short = msg[:52] + "…" if len(msg) > 52 else msg
+                        print(f"    │  Shown:  {msg_short:<49} │")
+                print(f"    └──────────────────────────────────────────────────────────┘")
+            
+            # Log the outcome
+            audit_entry["executed"] = result.success
+            action_name = intent.action.value
+            if result.success and result.data and action_name in (
+                "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
+            ):
+                audit_entry["user_prompt"] = (intent.data or {}).get("prompt", "")
+                audit_entry["user_response"] = result.data
+            self.audit_log.append(audit_entry)
+            
+            return result
+
+        else:  # BLOCK
+            # ───────────────────────────────────────────────────────────
+            # BLOCK - Policy violation, action rejected
+            # ───────────────────────────────────────────────────────────
+            if self.verbose:
+                print(f"    │                                                          │")
+                print(f"    │  ⛔ DECISION: BLOCK                                       │")
+                print(f"    │  {validation.message:<56} │")
+                print(f"    └──────────────────────────────────────────────────────────┘")
+                
+                # Show block notification
+                print(f"")
+                print(f"    ╔══════════════════════════════════════════════════════════╗")
+                print(f"    ║  ⛔ ACTION BLOCKED (Security)                             ║")
+                print(f"    ╠══════════════════════════════════════════════════════════╣")
+                print(f"    ║  {validation.message:<56} ║")
+                print(f"    ║                                                          ║")
+                print(f"    ║  Guardian blocked this action because it violates        ║")
+                print(f"    ║  user policy. The agent decides what to do next.         ║")
+                print(f"    ╚══════════════════════════════════════════════════════════╝")
+                print(f"")
+            
+            # Log the block
+            audit_entry["executed"] = False
+            self.audit_log.append(audit_entry)
+            
+            return ExecutionResult(
+                success=False,
+                error=f"Blocked: {validation.message}",
+                data={"decision": "BLOCK", "reason": validation.message}
+            )

@@ -1,0 +1,134 @@
+[
+  {
+    "id": "RCE-001",
+    "regex": "curl\\s+[^|]*\\|\\s*(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Pipes URL content to shell",
+    "source": "hardstop-patterns",
+    "category": "remote_code_execution"
+  },
+  {
+    "id": "RCE-002",
+    "regex": "wget\\s+.*\\|\\s*(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Pipes download to shell",
+    "source": "hardstop-patterns",
+    "category": "remote_code_execution"
+  },
+  {
+    "id": "RCE-003",
+    "regex": "curl\\s+[^|]*\\|\\s*python",
+    "verdict": "CATASTROPHIC",
+    "description": "Pipes URL content to Python",
+    "source": "hardstop-patterns",
+    "category": "remote_code_execution"
+  },
+
+  {
+    "id": "ENC-001",
+    "regex": "base64\\s+-d.*\\|\\s*(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Executes base64-encoded payload",
+    "source": "hardstop-patterns",
+    "category": "encoded_execution"
+  },
+  {
+    "id": "ENC-002",
+    "regex": "echo\\s+[A-Za-z0-9+/=]+\\s*\\|\\s*base64\\s+-d\\s*\\|\\s*(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Executes encoded payload",
+    "source": "hardstop-patterns",
+    "category": "encoded_execution"
+  },
+  {
+    "id": "ENC-003",
+    "regex": "eval\\s+.*\\$\\(.*base64",
+    "verdict": "CATASTROPHIC",
+    "description": "Eval with base64 decode",
+    "source": "hardstop-patterns",
+    "category": "encoded_execution"
+  },
+  {
+    "id": "ENC-004",
+    "regex": "python.*-c.*exec.*decode",
+    "verdict": "CATASTROPHIC",
+    "description": "Python encoded execution",
+    "source": "hardstop-patterns",
+    "category": "encoded_execution"
+  },
+
+  {
+    "id": "RSHELL-001",
+    "regex": "bash\\s+-i\\s+>&\\s*/dev/tcp/",
+    "verdict": "CATASTROPHIC",
+    "description": "Reverse shell — remote access backdoor",
+    "source": "hardstop-patterns",
+    "category": "reverse_shell"
+  },
+  {
+    "id": "RSHELL-002",
+    "regex": "nc\\s+(-[^\\s]*\\s+)*-e\\s+/bin/(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Reverse shell via netcat",
+    "source": "hardstop-patterns",
+    "category": "reverse_shell"
+  },
+  {
+    "id": "RSHELL-003",
+    "regex": "/dev/tcp/[^\\s]+",
+    "verdict": "CATASTROPHIC",
+    "description": "Network connection via /dev/tcp",
+    "source": "hardstop-patterns",
+    "category": "reverse_shell"
+  },
+  {
+    "id": "RSHELL-004",
+    "regex": "mkfifo.*nc.*sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Reverse shell via named pipe",
+    "source": "hardstop-patterns",
+    "category": "reverse_shell"
+  },
+  {
+    "id": "RSHELL-005",
+    "regex": "python.*socket.*connect.*exec",
+    "verdict": "CATASTROPHIC",
+    "description": "Python reverse shell",
+    "source": "hardstop-patterns",
+    "category": "reverse_shell"
+  },
+  {
+    "id": "RSHELL-006",
+    "regex": "perl.*socket.*exec",
+    "verdict": "CATASTROPHIC",
+    "description": "Perl reverse shell",
+    "source": "hardstop-patterns",
+    "category": "reverse_shell"
+  },
+
+  {
+    "id": "CMDSUB-001",
+    "regex": "\\bcd\\s+[^;&|]*(\\$\\(|`)",
+    "verdict": "NEEDS_REVIEW",
+    "description": "cd with command substitution (potential code execution)",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+
+  {
+    "id": "DCG-SSH-REMOTE-RM",
+    "regex": "ssh\\s+(?:\\S+\\s+)*(?:-[A-Za-z]+\\s+)*\\S+[@:]?\\S*\\s+['\"]?.*\\brm\\s+-[a-zA-Z]*r[a-zA-Z]*f",
+    "verdict": "CATASTROPHIC",
+    "description": "Remote recursive delete via SSH",
+    "source": "dcg",
+    "category": "remote_destruction"
+  },
+  {
+    "id": "DCG-SSH-REMOTE-SUDO-RM",
+    "regex": "ssh\\s+(?:\\S+\\s+)*\\S+[@:]?\\S*\\s+['\"]?.*\\bsudo\\s+rm\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Remote sudo rm via SSH",
+    "source": "dcg",
+    "category": "remote_destruction"
+  }
+]

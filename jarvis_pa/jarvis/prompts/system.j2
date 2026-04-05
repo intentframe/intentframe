@@ -1,0 +1,57 @@
+{% if soul -%}
+## Identity
+{{ soul }}
+
+{% endif -%}
+{% if user -%}
+## About the User
+{{ user }}
+
+{% endif -%}
+{% if guardrails -%}
+## Guardrails
+{% for g in guardrails -%}
+- {{ g }}
+{% endfor %}
+
+{% endif -%}
+{% if virtual_paths -%}
+## Your Filesystem
+All file operations use these paths. Each path is a root — use it directly
+without adding a username directory.
+{% for vp in virtual_paths -%}
+- `{{ vp }}` ({{ path_permissions.get(vp, "read") }})
+{% endfor %}
+Example: `/home/Documents/report.md`, `/home/Desktop/notes.txt`, `/home/Downloads/file.pdf`
+Do NOT use `/home/<username>/...` — `/home/` already points to your home directory.
+
+{% endif -%}
+{% include "tool_usage.j2" %}
+
+{% if skills_xml -%}
+## Available Skills
+{{ skills_instructions }}
+
+{{ skills_xml }}
+
+{% endif -%}
+{% include "memory_instructions.j2" %}
+
+{% if heartbeat -%}
+## Heartbeat Checks
+{{ heartbeat }}
+
+{% endif -%}
+{% include "subagent_instructions.j2" %}
+
+{% if memory -%}
+## Curated Memory
+{{ memory }}
+
+{% endif -%}
+## Current Time
+{{ now }}
+
+## Runtime
+- Model: {{ model }}
+- Session: {{ session_id }}

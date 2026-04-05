@@ -1,0 +1,63 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Jarvis PA — Executor Configuration
+#
+# Jarvis-specific executor config with all adapters Jarvis needs enabled.
+# Usage:
+#   EXECUTOR_CONFIG=jarvis_pa/executor.yaml python -m supervisor.main start
+# ═══════════════════════════════════════════════════════════════════════════════
+
+transport:
+  type: unix_socket
+  options:
+    socket_path: /tmp/intentframe/executor.sock
+
+auth:
+  type: guardian_hmac
+  options:
+    secret_key: "intentframe_demo_secret_key_do_not_use_in_production"
+
+credentials:
+  backend: service
+  options: {}
+
+worker_pool:
+  max_workers: 4
+  default_timeout_seconds: 30.0
+
+# ─── Adapters Jarvis uses ─────────────────────────────────────────────────────
+adapters:
+  enabled:
+    - files
+    - terminal
+    - user_io
+    - mail
+    - calendar
+    - contacts
+    - notes
+    - reminders
+    - browser
+    - messages
+    - notifications
+    - system
+    - clipboard
+    - spotlight
+    - http_api
+
+# ─── Virtual Filesystem Mounts ───────────────────────────────────────────────
+# Agent sees /home/ — never learns the real path (/Users/username/, C:\Users\...).
+# The VFS translates /home/ → ~ at runtime via expand_path().
+# Cloud-synced folders (iCloud, Dropbox, Google Drive) appear as local
+# directories under /home/ so no cloud API is needed.
+filesystem:
+  mounts:
+    - virtual_path: /home/
+      real_path: ~/
+      writable: true
+
+storage:
+  database_path: null
+  log_path: null
+
+logging:
+  level: INFO
+  format: console

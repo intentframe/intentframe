@@ -1,0 +1,30 @@
+# IntentFrame Executor - Core Dependencies
+# ==========================================
+# These are required for the abstraction skeleton.
+# Platform-specific dependencies are installed separately.
+
+# ── CORE (always required) ─────────────────────────────────────────────────
+
+pydantic>=2.0                 # Request/response validation, config schema
+structlog>=25.0.0             # Structured audit logging
+tenacity>=9.0.0               # Retry with backoff for adapters
+pyyaml>=6.0                   # Config file parsing
+
+# ── OPTIONAL: Transport (install per deployment) ──────────────────────────
+# grpcio>=1.60.0              # gRPC transport
+# grpcio-tools>=1.60.0        # Protobuf compilation
+# uvicorn>=0.30.0             # REST transport (ASGI server)
+# starlette>=0.40.0           # REST transport (HTTP framework)
+
+# ── OPTIONAL: Auth (install per deployment) ───────────────────────────────
+# PyJWT>=2.8.0                # JWT/bearer token auth
+
+# ── macOS platform server client (required for TCC-gated adapters) ────────
+httpx>=0.27.0                    # UDS HTTP client for native platform server
+
+# ── OPTIONAL: macOS adapters ──────────────────────────────────────────────
+# keyring>=25.0.0                  # macOS Keychain credential access
+# watchdog>=4.0.0                  # Filesystem event monitoring
+
+# ── OPTIONAL: Cloud adapters ─────────────────────────────────────────────
+# hvac>=2.0.0                 # HashiCorp Vault client

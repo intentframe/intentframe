@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.intentframe.platform-server</string>
+    <key>CFBundleName</key>
+    <string>IntentFrame Platform Server</string>
+    <key>CFBundleExecutable</key>
+    <string>macos-appkit-server</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+
+    <!-- TCC usage descriptions — these make the permission dialogs appear -->
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>IntentFrame needs calendar access to create, read, and manage your events.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>IntentFrame needs reminders access to create and manage your reminders.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>IntentFrame needs contacts access to look up and manage your contacts.</string>
+    <key>NSUserNotificationsUsageDescription</key>
+    <string>IntentFrame needs notification access to alert you about important events and actions.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>IntentFrame needs automation access to control System Events (dark mode, appearance settings).</string>
+</dict>
+</plist>

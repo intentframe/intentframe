@@ -1,0 +1,400 @@
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  KEY PRINCIPLE: Separation of Concerns                                        │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│   ┌─────────────────────────────────────────────────────────────────────┐    │
+│   │  AGENT = BUSINESS LOGIC                                             │    │
+│   │  • Detects potential duplicates                                     │    │
+│   │  • Decides when to ask user                                         │    │
+│   │  • Categorizes expenses                                             │    │
+│   │  • Makes workflow decisions                                         │    │
+│   └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│   ┌─────────────────────────────────────────────────────────────────────┐    │
+│   │  GUARDIAN = SECURITY                                                │    │
+│   │  • Validates user has authority (spending limits)                   │    │
+│   │  • Validates paths are allowed                                      │    │
+│   │  • Validates prompts are safe (no phishing)                         │    │
+│   │  • Does NOT do business logic!                                      │    │
+│   └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+    
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  THE THREE SCENARIOS                                                          │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  SCENARIO 1: Guardian ALLOWS                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │  Invoice: Office Depot - $847                                           │  │
+│  │  Guardian: Within $5,000 limit ✓ Path allowed ✓                         │  │
+│  │  Result:  ✅ ALLOW → Recorded                                            │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+│  SCENARIO 2: Agent ASKS USER (Business Logic)                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │  Invoice: Acme Corp - $2,500                                            │  │
+│  │  Agent:   Reads tracker, detects similar entry (Oct 15)                 │  │
+│  │           AGENT decides to ask user (business logic!)                   │  │
+│  │           Sends ASK_USER intent                                         │  │
+│  │  Guardian: Validates prompt is safe (not phishing) ✓ → ALLOW            │  │
+│  │  Result:  User confirms → Recorded                                      │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+│  SCENARIO 3: Guardian BLOCKS (Security)                                       │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │  Invoice: TechConsult Inc - $12,000                                     │  │
+│  │  Guardian: $12,000 > $5,000 limit ⛔                                     │  │
+│  │  Result:  ⛔ BLOCKED (exceeds user authority)                            │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+    
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  ARCHITECTURE                                                                 │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│   ┌─────────────┐         ┌─────────────┐         ┌───────────────────────┐  │
+│   │    TASK     │ spawn   │             │  I/O    │     INTENTFRAME       │  │
+│   │   MANAGER   │────────>│    AGENT    │────────>│       RUNTIME         │  │
+│   │             │<────────│             │<────────│  (Security Gateway)   │  │
+│   └─────────────┘ result  └─────────────┘         └───────────┬───────────┘  │
+│                           (business logic)                    │              │
+│                                                               ▼              │
+│                                               ┌───────────────────────────┐  │
+│                                               │       RESOURCES           │  │
+│                                               │  • FileSystem             │  │
+│                                               │  • UserIOService          │  │
+│                                               └───────────────────────────┘  │
+│                                                                               │
+│   Agent: READ tracker → THINK (duplicate?) → ASK_USER → APPEND_ROW           │
+│   Guardian: Is path allowed? Is amount within limit? Is prompt safe?         │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+    
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  USER CONTEXT                                                                 │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│   User ID:         finance_001                                                │
+│   Approval Limit:  $5,000 (Guardian enforces this - SECURITY)                 │
+│   Allowed Paths:   /invoices/, /expense_tracker.md                           │
+│                                                                               │
+│   Existing Data:   Acme Corp - $2,500 (2024-10-15) in tracker                 │
+│                    Agent will READ this and DETECT potential duplicate        │
+│                    (This is AGENT business logic, not Guardian!)              │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+    
+===============================================================================
+  STARTING DEMO
+===============================================================================
+
+============================================================
+[TASK MANAGER] Starting: task_1
+[TASK MANAGER] Task: Process the new invoices and update expense tracker
+[TASK MANAGER] Timeout: 30.0s, Max steps: 30
+============================================================
+
+[TASK MANAGER] Step 1: Agent requests I/O
+[TASK MANAGER] Status: listing: invoice 1/?
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: LIST_DIRECTORY                                    │
+    │  Target: /invoices/new/                                    │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 99%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Read access approved                                     │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+[TASK MANAGER] Step 2: Agent requests I/O
+[TASK MANAGER] Status: Reading existing entries for duplicate check
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: READ_FILE                                         │
+    │  Target: /expense_tracker.md                              │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 99%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Read access approved                                     │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+    [AGENT] Loaded 1 existing entries for duplicate checking
+
+[TASK MANAGER] Step 3: Agent requests I/O
+[TASK MANAGER] Status: reading_invoice: invoice 1/3
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: READ_FILE                                         │
+    │  Target: /invoices/new/office_depot.md                    │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 99%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Read access approved                                     │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+[TASK MANAGER] Step 4: Agent requests I/O
+[TASK MANAGER] Status: processing: invoice 1/3
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: APPEND_ROW                                        │
+    │  Target: /expense_tracker.md                              │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 95%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Approved                                                 │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+[TASK MANAGER] Step 5: Agent requests I/O
+[TASK MANAGER] Status: reading_invoice: invoice 2/3
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: READ_FILE                                         │
+    │  Target: /invoices/new/acme_corp.md                       │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 99%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Read access approved                                     │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+    [AGENT] THINKING: This might be a duplicate, I should ask the user
+
+[TASK MANAGER] Step 6: Agent requests I/O
+[TASK MANAGER] Status: Asking user about potential duplicate
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: ASK_USER                                          │
+    │  Target: user_io                                           │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 95%                                        │
+    │  Reversibility: IRREVERSIBLE                              │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  User prompt approved (safe)                              │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+
+  ╔══════════════════════════════════════════════════════════╗
+  ║  USER INPUT REQUIRED                                     ║
+  ╠══════════════════════════════════════════════════════════╣
+  ║  I found a similar existing entry:
+  Existing: Acme Corp - $2,500 (2024-10-15)
+  New:      Acme Corp - $2,500 (2024-11-15)
+
+Is this new invoice a duplicate? ║
+  ║  Options: No, add as new invoice, Yes, skip this duplicate ║
+  ╚══════════════════════════════════════════════════════════╝
+  [USER] → No, add as new invoice
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+    [AGENT] User responded: No, add as new invoice
+    [AGENT] User confirms it's new - proceeding to record
+
+[TASK MANAGER] Step 7: Agent requests I/O
+[TASK MANAGER] Status: processing: invoice 2/3
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: APPEND_ROW                                        │
+    │  Target: /expense_tracker.md                              │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 95%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Approved                                                 │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+[TASK MANAGER] Step 8: Agent requests I/O
+[TASK MANAGER] Status: reading_invoice: invoice 3/3
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: READ_FILE                                         │
+    │  Target: /invoices/new/techconsult.md                     │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 99%                                        │
+    │  Reversibility: FULLY_REVERSIBLE                          │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ✅ DECISION: ALLOW                                       │
+    │  Read access approved                                     │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  EXECUTOR: Performing action                             │
+    │  Result: Success                                           │
+    └──────────────────────────────────────────────────────────┘
+
+[TASK MANAGER] Step 9: Agent requests I/O
+[TASK MANAGER] Status: processing: invoice 3/3
+
+    ┌──────────────────────────────────────────────────────────┐
+    │  ACTOR: Parsing request                                   │
+    │  Action: APPEND_ROW                                        │
+    │  Target: /expense_tracker.md                              │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  ANALYSIS ENGINE: Understanding intent                   │
+    │  Confidence: 95%                                        │
+    │  Reversibility: PARTIALLY_REVERSIBLE                      │
+    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │  GUARDIAN: Security validation                           │
+    │  (Checks authority, NOT business logic)                  │
+    │                                                          │
+    │  ⛔ DECISION: BLOCK                                       │
+    │  $12,000 exceeds approval limit $5,000.0                  │
+    └──────────────────────────────────────────────────────────┘
+
+    ╔══════════════════════════════════════════════════════════╗
+    ║  ⛔ ACTION BLOCKED (Security)                             ║
+    ╠══════════════════════════════════════════════════════════╣
+    ║  $12,000 exceeds approval limit $5,000.0                  ║
+    ║                                                          ║
+    ║  Guardian blocked this action because it exceeds the     ║
+    ║  user's authority. This is security working as intended. ║
+    ╚══════════════════════════════════════════════════════════╝
+
+    [AGENT] Action blocked by Guardian (security)
+
+[TASK MANAGER] ✓ Complete in 0.0s (9 steps)
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  FINAL RESULTS                                                                ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   Task ID:    task_1                                                        ║
+║   Status:     complete                                                      ║
+║   Duration:   0.00s                                                           ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  INVOICE OUTCOMES                                                             ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   ✅ Processed (Guardian ALLOW):      2                                      ║
+║   💬 User asked (Agent ASK_USER):     1                                      ║
+║   ⛔ Blocked (Guardian BLOCK):        1                                      ║
+║   ─────────────────────────────                                               ║
+║   Total invoices:                    3                                      ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  WHAT HAPPENED                                                                ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   1. Office Depot ($847)                                                      ║
+║      Guardian: Within limit, path OK → ✅ ALLOW                                ║
+║      → Recorded to expense tracker                                            ║
+║                                                                               ║
+║   2. Acme Corp ($2,500)                                                       ║
+║      Agent: READ tracker, DETECTED similar entry (business logic!)            ║
+║      Agent: DECIDED to ask user → sent ASK_USER intent                        ║
+║      Guardian: Prompt is safe (not phishing) → ✅ ALLOW                        ║
+║      User: Confirmed "add as new"                                             ║
+║      Guardian: Amount OK → ✅ ALLOW                                            ║
+║      → Recorded to expense tracker                                            ║
+║                                                                               ║
+║   3. TechConsult Inc ($12,000)                                                ║
+║      Guardian: $12,000 > $5,000 limit → ⛔ BLOCK                               ║
+║      → Not recorded (security - exceeds user authority)                       ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  KEY INSIGHTS                                                                 ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║   • Agent did BUSINESS LOGIC: Read tracker, detected duplicate, asked user    ║
+║   • Guardian did SECURITY: Validated paths, amounts, prompt safety            ║
+║   • Guardian did NOT detect duplicates - that's Agent's business logic!       ║
+║   • ASK_USER goes through IntentFrame - Guardian validates it's safe          ║
+║   • UserIOService is just another resource, accessed via Executor             ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝

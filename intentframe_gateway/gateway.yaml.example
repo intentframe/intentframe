@@ -1,0 +1,22 @@
+# IntentFrame Gateway — non-sensitive configuration
+#
+# Copy to ~/.intentframe/gateway.yaml and edit.
+# Values here are injected as env vars into all child processes at startup.
+#
+# Precedence (highest wins):
+#   credential vault  (secrets: API keys, tokens)
+#   this file         (non-sensitive: user_id, allowed_user_id, custom vars)
+#   hardcoded defaults (source code)
+#
+# Manage via CLI:  env list | env set <key> <value> | env delete <key>
+# Or edit this file directly (works without the gateway running).
+
+identity:
+  user_id: jarvis_default          # → JARVIS_USER_ID
+
+telegram:
+  allowed_user_id: "0123456789"     # → JARVIS_TELEGRAM_ALLOWED_USER_ID
+
+# Explicit env var passthrough — literal names, injected as-is.
+# env:
+#   MY_CUSTOM_VAR: some_value

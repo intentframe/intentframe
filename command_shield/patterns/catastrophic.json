@@ -1,0 +1,339 @@
+[
+  {
+    "id": "IF-SUDO-001",
+    "regex": "\\bsudo\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Privilege escalation — runs command as superuser",
+    "source": "intentframe",
+    "category": "privilege_escalation"
+  },
+  {
+    "id": "IF-DEVWRITE-001",
+    "regex": ">\\s*/dev/(?!null|stdout|stderr|fd/)",
+    "verdict": "CATASTROPHIC",
+    "description": "Direct write to device file — bypasses filesystem",
+    "source": "intentframe",
+    "category": "device_write"
+  },
+
+  {
+    "id": "DEL-001",
+    "regex": "(?<!echo\\s)(?<!echo ')(?<!echo \\\")rm\\s+(-[^\\s]*\\s+)*(/home/|~/)",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes home directory",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+  {
+    "id": "DEL-002",
+    "regex": "(?<!echo\\s)(?<!echo ')(?<!echo \\\")rm\\s+(-[^\\s]*\\s+)*~(/[^/\\s]+)?(\\s|$|>|;|&|\\|)",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes home directory or subdirectory",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+  {
+    "id": "DEL-003",
+    "regex": "(?<!echo\\s)(?<!echo ')(?<!echo \\\")rm\\s+(-[^\\s]*\\s+)*/(\\*|\\s|$|>|;|&|\\|)",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes root filesystem",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+  {
+    "id": "DEL-004",
+    "regex": "(?<!echo\\s)rm\\s+(-[^\\s]*\\s+)*\\$HOME",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes home directory via $HOME",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+  {
+    "id": "DEL-005",
+    "regex": "(?<!echo\\s)rm\\s+(-[^\\s]*\\s+)*\\$\\{HOME\\}",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes home directory via ${HOME}",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+  {
+    "id": "DEL-006",
+    "regex": "(?<!echo\\s)rm\\s+(-[^\\s]*\\s+)*/home/\\$USER",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes user home via $USER",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+  {
+    "id": "DEL-007",
+    "regex": "(?<!echo\\s)rm\\s+(-[^\\s]*\\s+)*/home/\\$\\{USER\\}",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes user home via ${USER}",
+    "source": "hardstop-patterns",
+    "category": "deletion"
+  },
+
+  {
+    "id": "FORK-001",
+    "regex": ":\\(\\)\\s*\\{\\s*:\\|:&\\s*\\}\\s*;\\s*:",
+    "verdict": "CATASTROPHIC",
+    "description": "Fork bomb — will crash system",
+    "source": "hardstop-patterns",
+    "category": "system_damage"
+  },
+
+  {
+    "id": "SYSD-001",
+    "regex": "chmod\\s+(-[^\\s]*\\s+)*777\\s+/",
+    "verdict": "CATASTROPHIC",
+    "description": "Sets world-writable on system root",
+    "source": "hardstop-patterns",
+    "category": "system_damage"
+  },
+  {
+    "id": "SYSD-002",
+    "regex": "chmod\\s+(-[^\\s]*\\s+)*-R\\s+777",
+    "verdict": "CATASTROPHIC",
+    "description": "Recursively sets world-writable",
+    "source": "hardstop-patterns",
+    "category": "system_damage"
+  },
+  {
+    "id": "SYSD-003",
+    "regex": "chown\\s+(-[^\\s]*\\s+)*-R\\s+.*\\s+/(?!home)",
+    "verdict": "CATASTROPHIC",
+    "description": "Recursive chown on system directories",
+    "source": "hardstop-patterns",
+    "category": "system_damage"
+  },
+
+  {
+    "id": "SUDO-001",
+    "regex": "sudo\\s+rm\\s+(-[^\\s]*\\s+)*(/|/home|/etc|/usr|/var)",
+    "verdict": "CATASTROPHIC",
+    "description": "Sudo delete on system paths",
+    "source": "hardstop-patterns",
+    "category": "privileged_operations"
+  },
+  {
+    "id": "SUDO-002",
+    "regex": "sudo\\s+chmod\\s+(-[^\\s]*\\s+)*777",
+    "verdict": "CATASTROPHIC",
+    "description": "Sudo world-writable permission",
+    "source": "hardstop-patterns",
+    "category": "privileged_operations"
+  },
+  {
+    "id": "SUDO-003",
+    "regex": "sudo\\s+dd\\s+",
+    "verdict": "CATASTROPHIC",
+    "description": "Sudo disk write",
+    "source": "hardstop-patterns",
+    "category": "privileged_operations"
+  },
+
+  {
+    "id": "DISK-001",
+    "regex": "dd\\s+.*of=/dev/",
+    "verdict": "CATASTROPHIC",
+    "description": "Overwrites disk device directly",
+    "source": "hardstop-patterns+dcg",
+    "category": "disk_destruction"
+  },
+  {
+    "id": "DISK-002",
+    "regex": "mkfs(\\.[a-z0-9]+)?\\s+",
+    "verdict": "CATASTROPHIC",
+    "description": "Formats filesystem",
+    "source": "hardstop-patterns+dcg",
+    "category": "disk_destruction"
+  },
+  {
+    "id": "DISK-003",
+    "regex": "shred\\s+.*(/dev/|/home/|~/)",
+    "verdict": "CATASTROPHIC",
+    "description": "Shreds disk or home directory",
+    "source": "hardstop-patterns",
+    "category": "disk_destruction"
+  },
+  {
+    "id": "DISK-004",
+    "regex": "wipefs\\s+",
+    "verdict": "CATASTROPHIC",
+    "description": "Wipes filesystem signatures",
+    "source": "dcg",
+    "category": "disk_destruction"
+  },
+
+  {
+    "id": "DCG-CHMOD-RECURSIVE-ROOT",
+    "regex": "chmod\\s+(?:.*(?:-[rR]|--recursive)).*\\s+/(?:$|bin|boot|dev|etc|lib|lib64|opt|proc|root|run|sbin|srv|sys|usr|var)\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Recursive chmod on system directories",
+    "source": "dcg",
+    "category": "permissions"
+  },
+  {
+    "id": "DCG-CHMOD-SETUID",
+    "regex": "chmod\\s+.*u\\+s|chmod\\s+[4-7]\\d{3}",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Sets setuid bit — potential privilege escalation",
+    "source": "dcg",
+    "category": "permissions"
+  },
+
+  {
+    "id": "DCG-SHUTDOWN",
+    "regex": "\\bshutdown\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "System shutdown",
+    "source": "dcg",
+    "category": "system_control"
+  },
+  {
+    "id": "DCG-REBOOT",
+    "regex": "\\breboot\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "System reboot",
+    "source": "dcg",
+    "category": "system_control"
+  },
+  {
+    "id": "DCG-INIT-HALT",
+    "regex": "\\binit\\s+[06]\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "System halt or reboot via init",
+    "source": "dcg",
+    "category": "system_control"
+  },
+
+  {
+    "id": "DCG-GIT-RESET-HARD",
+    "regex": "git\\s+(?:\\S+\\s+)*reset\\s+--hard",
+    "verdict": "CATASTROPHIC",
+    "description": "Discards all uncommitted changes permanently",
+    "source": "dcg",
+    "category": "git_destruction"
+  },
+  {
+    "id": "DCG-GIT-CLEAN-FORCE",
+    "regex": "git\\s+(?:\\S+\\s+)*clean\\s+(?:-[a-z]*f|--force\\b)",
+    "verdict": "CATASTROPHIC",
+    "description": "Force-deletes untracked files",
+    "source": "dcg",
+    "category": "git_destruction"
+  },
+  {
+    "id": "DCG-GIT-PUSH-FORCE",
+    "regex": "git\\s+(?:\\S+\\s+)*push\\s+.*--force(?![-a-z])",
+    "verdict": "CATASTROPHIC",
+    "description": "Force push — overwrites remote history",
+    "source": "dcg",
+    "category": "git_destruction"
+  },
+  {
+    "id": "DCG-GIT-PUSH-FORCE-SHORT",
+    "regex": "git\\s+(?:\\S+\\s+)*push\\s+.*-f\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Force push (short flag) — overwrites remote history",
+    "source": "dcg",
+    "category": "git_destruction"
+  },
+  {
+    "id": "DCG-GIT-STASH-CLEAR",
+    "regex": "git\\s+(?:\\S+\\s+)*stash\\s+clear",
+    "verdict": "CATASTROPHIC",
+    "description": "Drops all stashed changes permanently",
+    "source": "dcg",
+    "category": "git_destruction"
+  },
+
+  {
+    "id": "WRAP-001",
+    "regex": "\\b(ba)?sh\\s+-c\\s+[\"'].*\\brm\\s+(-[^\\s]*\\s+)*-r",
+    "verdict": "CATASTROPHIC",
+    "description": "Shell wrapper hiding recursive delete",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-002",
+    "regex": "\\b(ba)?sh\\s+-c\\s+[\"'].*\\bdd\\s+.*of=/dev/",
+    "verdict": "CATASTROPHIC",
+    "description": "Shell wrapper hiding disk write",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-003",
+    "regex": "\\b(ba)?sh\\s+-c\\s+[\"'].*\\bmkfs",
+    "verdict": "CATASTROPHIC",
+    "description": "Shell wrapper hiding filesystem format",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-004",
+    "regex": "\\b(ba)?sh\\s+-c\\s+[\"'].*\\bcurl.*\\|\\s*(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Shell wrapper hiding curl pipe to shell",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-005",
+    "regex": "\\b(ba)?sh\\s+-c\\s+[\"'].*\\bwget.*\\|\\s*(ba)?sh",
+    "verdict": "CATASTROPHIC",
+    "description": "Shell wrapper hiding wget pipe to shell",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-006",
+    "regex": "\\bsudo\\s+(ba)?sh\\s+-c\\s+[\"'].*\\brm\\s+(-[^\\s]*\\s+)*-r",
+    "verdict": "CATASTROPHIC",
+    "description": "Sudo shell wrapper hiding recursive delete",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-007",
+    "regex": "\\bsudo\\s+(ba)?sh\\s+-c\\s+[\"'].*\\bchmod\\s+(-[^\\s]*\\s+)*777",
+    "verdict": "CATASTROPHIC",
+    "description": "Sudo shell wrapper hiding chmod 777",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-008",
+    "regex": "\\benv\\s+.*\\brm\\s+(-[^\\s]*\\s+)*-r",
+    "verdict": "CATASTROPHIC",
+    "description": "Env wrapper with recursive delete",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-009",
+    "regex": "\\bxargs\\s+.*\\brm\\s+(-[^\\s]*\\s+)*-r",
+    "verdict": "CATASTROPHIC",
+    "description": "xargs piping to recursive delete",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-010",
+    "regex": "\\bfind\\s+.*-exec\\s+rm\\s+(-[^\\s]*\\s+)*-r",
+    "verdict": "CATASTROPHIC",
+    "description": "find -exec with recursive delete",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  },
+  {
+    "id": "WRAP-011",
+    "regex": "\\bfind\\s+(~|/home|/|/etc|/usr|/var)\\s+.*-delete",
+    "verdict": "CATASTROPHIC",
+    "description": "find -delete on system/home paths",
+    "source": "hardstop-patterns",
+    "category": "shell_wrapper"
+  }
+]

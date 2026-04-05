@@ -1,0 +1,224 @@
+[
+  {
+    "id": "MAC-DISK-001",
+    "regex": "\\bdiskutil\\s+eraseDisk\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Erases entire macOS disk",
+    "source": "hardstop-patterns",
+    "category": "macos_disk"
+  },
+  {
+    "id": "MAC-DISK-002",
+    "regex": "\\bdiskutil\\s+eraseVolume\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Erases macOS volume",
+    "source": "hardstop-patterns",
+    "category": "macos_disk"
+  },
+  {
+    "id": "MAC-DISK-003",
+    "regex": "\\bdiskutil\\s+partitionDisk\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Repartitions macOS disk (data loss)",
+    "source": "hardstop-patterns",
+    "category": "macos_disk"
+  },
+  {
+    "id": "MAC-DISK-004",
+    "regex": "\\bdiskutil\\s+apfs\\s+deleteContainer\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes APFS container",
+    "source": "hardstop-patterns",
+    "category": "macos_disk"
+  },
+  {
+    "id": "MAC-DISK-005",
+    "regex": "\\bdiskutil\\s+secureErase\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Secure erases macOS disk",
+    "source": "hardstop-patterns",
+    "category": "macos_disk"
+  },
+  {
+    "id": "MAC-DISK-006",
+    "regex": "\\bdiskutil\\s+zeroDisk\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Writes zeros to macOS disk",
+    "source": "hardstop-patterns",
+    "category": "macos_disk"
+  },
+
+  {
+    "id": "MAC-KEY-001",
+    "regex": "\\bsecurity\\s+delete-keychain\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes macOS keychain",
+    "source": "hardstop-patterns",
+    "category": "macos_keychain"
+  },
+  {
+    "id": "MAC-KEY-002",
+    "regex": "\\bsecurity\\s+dump-keychain\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Dumps macOS keychain contents",
+    "source": "hardstop-patterns",
+    "category": "macos_keychain"
+  },
+  {
+    "id": "MAC-KEY-003",
+    "regex": "\\bsecurity\\s+find-generic-password\\s+.*-w\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Extracts password from macOS keychain",
+    "source": "hardstop-patterns",
+    "category": "macos_keychain"
+  },
+  {
+    "id": "MAC-KEY-004",
+    "regex": "\\bsecurity\\s+find-internet-password\\s+.*-w\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Extracts internet password from keychain",
+    "source": "hardstop-patterns",
+    "category": "macos_keychain"
+  },
+  {
+    "id": "MAC-KEY-005",
+    "regex": "\\bsecurity\\s+export\\s+.*-k\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Exports macOS keychain",
+    "source": "hardstop-patterns",
+    "category": "macos_keychain"
+  },
+
+  {
+    "id": "MAC-TM-001",
+    "regex": "\\btmutil\\s+delete\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes Time Machine backup",
+    "source": "hardstop-patterns",
+    "category": "macos_timemachine"
+  },
+  {
+    "id": "MAC-TM-002",
+    "regex": "\\btmutil\\s+disable\\b",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Disables Time Machine",
+    "source": "hardstop-patterns",
+    "category": "macos_timemachine"
+  },
+  {
+    "id": "MAC-TM-003",
+    "regex": "\\btmutil\\s+deletelocalsnapshots\\b",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Deletes local Time Machine snapshots",
+    "source": "hardstop-patterns",
+    "category": "macos_timemachine"
+  },
+  {
+    "id": "MAC-TM-004",
+    "regex": "\\brm\\s+.*Backups\\.backupdb",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes Time Machine backup data",
+    "source": "hardstop-patterns",
+    "category": "macos_timemachine"
+  },
+
+  {
+    "id": "MAC-DS-001",
+    "regex": "\\bdscl\\s+\\.\\s+-delete\\s+/Users/",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes macOS user account",
+    "source": "hardstop-patterns",
+    "category": "macos_directory_services"
+  },
+  {
+    "id": "MAC-DS-002",
+    "regex": "\\bdscl\\s+\\.\\s+-delete\\s+/Groups/",
+    "verdict": "CATASTROPHIC",
+    "description": "Deletes macOS group",
+    "source": "hardstop-patterns",
+    "category": "macos_directory_services"
+  },
+  {
+    "id": "MAC-DS-003",
+    "regex": "\\bdscl\\s+\\.\\s+-append\\s+/Groups/admin\\s+",
+    "verdict": "CATASTROPHIC",
+    "description": "Adds user to admin group",
+    "source": "hardstop-patterns",
+    "category": "macos_directory_services"
+  },
+
+  {
+    "id": "MAC-SEC-001",
+    "regex": "\\bspctl\\s+--master-disable\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Disables macOS Gatekeeper",
+    "source": "hardstop-patterns",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "MAC-SEC-002",
+    "regex": "\\bcsrutil\\s+disable\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Disables System Integrity Protection",
+    "source": "hardstop-patterns",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "MAC-SEC-003",
+    "regex": "\\bsystemsetup\\s+-setremotelogin\\s+on\\b",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Enables SSH/remote login",
+    "source": "hardstop-patterns",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "MAC-SEC-004",
+    "regex": "\\bnvram\\s+boot-args",
+    "verdict": "CATASTROPHIC",
+    "description": "Modifies macOS boot arguments",
+    "source": "hardstop-patterns",
+    "category": "macos_system_security"
+  },
+
+  {
+    "id": "MAC-PRIV-001",
+    "regex": "\\bsqlite3\\s+.*TCC\\.db",
+    "verdict": "CATASTROPHIC",
+    "description": "Direct access to macOS privacy database",
+    "source": "hardstop-patterns",
+    "category": "macos_privacy"
+  },
+  {
+    "id": "MAC-PRIV-002",
+    "regex": "\\btccutil\\s+reset\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Resets macOS privacy permissions",
+    "source": "hardstop-patterns",
+    "category": "macos_privacy"
+  },
+
+  {
+    "id": "MAC-APP-001",
+    "regex": "\\brm\\s+.*~/Library/Application\\\\ Support/",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Deletes macOS application data",
+    "source": "hardstop-patterns",
+    "category": "macos_appdata"
+  },
+  {
+    "id": "MAC-APP-002",
+    "regex": "\\brm\\s+(-[^\\s]*\\s+)*-r.*~/Library/Preferences/",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Recursively deletes macOS preferences",
+    "source": "hardstop-patterns",
+    "category": "macos_appdata"
+  },
+  {
+    "id": "MAC-APP-003",
+    "regex": "\\bdefaults\\s+delete\\s+(com\\.apple\\.|NSGlobalDomain)",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Deletes system preferences",
+    "source": "hardstop-patterns",
+    "category": "macos_appdata"
+  }
+]

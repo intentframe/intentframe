@@ -1,0 +1,77 @@
+[
+  {
+    "id": "MAC-PERSIST-001",
+    "regex": "\\blaunchctl\\s+load\\s+.*/Library/LaunchDaemons/",
+    "verdict": "CATASTROPHIC",
+    "description": "Loads system daemon (persistence mechanism)",
+    "source": "hardstop-patterns",
+    "category": "macos_persistence"
+  },
+  {
+    "id": "MAC-PERSIST-002",
+    "regex": "\\blaunchctl\\s+unload\\s+.*com\\.apple\\.",
+    "verdict": "CATASTROPHIC",
+    "description": "Unloads Apple system service",
+    "source": "hardstop-patterns",
+    "category": "macos_persistence"
+  },
+  {
+    "id": "MAC-PERSIST-003",
+    "regex": "\\bcp\\s+.*\\.plist\\s+.*/Library/LaunchDaemons/",
+    "verdict": "CATASTROPHIC",
+    "description": "Installs system daemon (persistence)",
+    "source": "hardstop-patterns",
+    "category": "macos_persistence"
+  },
+  {
+    "id": "MAC-PERSIST-004",
+    "regex": "\\bcp\\s+.*\\.plist\\s+.*/Library/LaunchAgents/",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Installs launch agent (persistence)",
+    "source": "hardstop-patterns",
+    "category": "macos_persistence"
+  },
+  {
+    "id": "MAC-PERSIST-005",
+    "regex": "\\bmv\\s+.*\\.plist\\s+.*/Library/Launch",
+    "verdict": "CATASTROPHIC",
+    "description": "Moves plist to launch directory (persistence)",
+    "source": "hardstop-patterns",
+    "category": "macos_persistence"
+  },
+
+  {
+    "id": "CRON-001",
+    "regex": "crontab\\s+-r",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Removes all cron jobs",
+    "source": "hardstop-patterns",
+    "category": "scheduled_persistence"
+  },
+  {
+    "id": "CRON-002",
+    "regex": "echo.*\\|\\s*crontab",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Pipes to crontab (potential persistence)",
+    "source": "hardstop-patterns",
+    "category": "scheduled_persistence"
+  },
+
+  {
+    "id": "DCG-SYSTEMCTL-STOP-CRITICAL",
+    "regex": "systemctl\\s+(?:stop|disable|mask)\\s+(?:ssh|sshd|network|networking|firewalld|ufw|docker|containerd)",
+    "verdict": "CATASTROPHIC",
+    "description": "Stops or disables critical system service",
+    "source": "dcg",
+    "category": "service_disruption"
+  },
+
+  {
+    "id": "HIST-001",
+    "regex": ">\\s*~/\\.bash_history",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Clears bash history (anti-forensics)",
+    "source": "hardstop-patterns",
+    "category": "history_manipulation"
+  }
+]

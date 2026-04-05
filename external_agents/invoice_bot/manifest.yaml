@@ -1,0 +1,41 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Invoice Bot — Agent Package Manifest
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This manifest declares everything IntentFrame needs to know about the agent
+# before installing it: identity, entry point, and declared capabilities.
+#
+# Like AndroidManifest.xml — the agent cannot access anything it doesn't
+# declare here. Guardian uses this to scope permissions at install time.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: invoice_bot
+version: 2.0.0
+author: intentframe-demo
+description: >
+  Processes invoice files from a directory, extracts vendor/amount/date,
+  detects duplicates, and adds valid invoices to an expense tracker.
+  Asks user for clarification on business decisions like duplicates.
+
+entry_point: agent.py
+runner: python
+dependencies:
+  - openai-agents
+options:
+  verbose: true
+
+capabilities:
+  agent_type: invoice_processor
+  declared_actions:
+    - READ_FILE
+    - LIST_DIRECTORY
+    - ASK_USER
+    - GET_CONFIRMATION
+    - SHOW_MESSAGE
+    - APPEND_ROW
+    - PAY_INVOICE
+    - SEND_EMAIL
+  required_resources:
+    - /invoices/
+    - /expense_tracker.md
+  max_financial_limit: 5000.0
