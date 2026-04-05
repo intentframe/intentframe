@@ -113,6 +113,16 @@ AI Agent: "I want to do X"
 
 ---
 
+## Jarvis Policies
+
+Jarvis (the local personal-assistant stack) ships with a default set of allowed and blocked actions, path constraints, and intent limits. These defaults are seeded at gateway startup from hardcoded values in `intentframe_gateway/bootstrap.py` and `jarvis_pa/seed_policies.py`.
+
+There is currently no file-based or CLI-based way to customise policies without editing those source files directly and re-running bootstrap. The gateway exposes a read-only `/policies` endpoint; writes are not routed through it.
+
+A full policy-editing surface — via a web app, the CLI, or a macOS app — is planned for a future release.
+
+---
+
 ## Requirements
 
 - Python 3.14+
