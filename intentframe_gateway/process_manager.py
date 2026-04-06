@@ -72,6 +72,7 @@ class ProcessManager:
             module="jarvis.server.app:app",
             socket_path=socket_path,
             extra_env=env,
+            startup_timeout=90.0,
         )
 
     # ── EDI ────────────────────────────────────────────────────────
