@@ -173,7 +173,7 @@ class AIAnalysisEngine(AnalysisEngine):
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-5-mini-2025-08-07",
         verbose: bool = True,
     ):
         self.model = model
