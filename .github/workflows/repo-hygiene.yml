@@ -1,0 +1,32 @@
+name: Repo Hygiene
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  no-forbidden-files:
+    name: Block forbidden paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure .vscode/ is not tracked
+        run: |
+          FORBIDDEN=(".vscode/" ".idea/" ".env" ".aienv")
+          failed=0
+          for pattern in "${FORBIDDEN[@]}"; do
+            matches=$(git ls-tree -r HEAD --name-only | grep "^${pattern}" || true)
+            if [[ -n "$matches" ]]; then
+              echo "::error::Forbidden path '${pattern}' found in the tree:"
+              echo "$matches"
+              failed=1
+            fi
+          done
+          if [[ "$failed" -eq 1 ]]; then
+            echo ""
+            echo "One or more forbidden paths are tracked. Remove them and update .gitignore."
+            exit 1
+          fi
+          echo "All clear — no forbidden paths tracked."
