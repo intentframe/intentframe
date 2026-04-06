@@ -346,8 +346,8 @@ def test_guardian_pipeline():
     from policy_registry.models import ActionPermission
     from policy_registry.constraints import FileConstraints, ApiConstraints
 
-    analysis_engine = AIAnalysisEngine(model="gpt-5-mini-2025-08-07", verbose=False)
-    guardian = AIGuardian(model="gpt-5-mini-2025-08-07", verbose=True)
+    analysis_engine = AIAnalysisEngine(model="gpt-4o-mini", verbose=False)
+    guardian = AIGuardian(model="gpt-4o-mini", verbose=True)
 
     async def run_pipeline(intent, ctx):
         report = await analysis_engine.analyze(intent)

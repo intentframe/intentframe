@@ -38,8 +38,8 @@ def test_ai_pipeline():
         return
     
     # Create AI components
-    analysis_engine = AIAnalysisEngine(model="gpt-5-mini-2025-08-07", verbose=True)
-    guardian = AIGuardian(model="gpt-5-mini-2025-08-07", verbose=True)
+    analysis_engine = AIAnalysisEngine(model="gpt-4o-mini", verbose=True)
+    guardian = AIGuardian(model="gpt-4o-mini", verbose=True)
     
     user_context = UserContext(
         user_id="finance_001",
