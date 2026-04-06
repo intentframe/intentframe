@@ -17,7 +17,10 @@ Fast-path optimisation:
     on this analysis to protect the user.
 """
 
-from pydantic import BaseModel, Field
+from enum import IntEnum
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
 
 from agents import Agent, Runner
 
@@ -31,61 +34,86 @@ from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
 
 
 # ============================================================
+# AE Output Field Limits
+# ============================================================
+# OpenAI structured output enforces these via JSON Schema maxLength /
+# maxItems.  The model writes complete text within the budget — no
+# post-hoc truncation needed.  These limits are generous: legitimate
+# AE output rarely exceeds half the cap.  They exist to structurally
+# bound the surface available for a transitive injection payload.
+
+class AEFieldLimit(IntEnum):
+    STATED_INTENT = 400
+    ACTUAL_BEHAVIOR = 600
+    RISK_REASON = 400
+    SCOPE_ANALYSIS = 400
+    RECOMMENDATION = 600
+    HIDDEN_BEHAVIOR_ITEM = 300
+    HIDDEN_BEHAVIORS_MAX_ITEMS = 10
+    SEMANTIC_DOMAIN_ITEM = 80
+    SEMANTIC_DOMAINS_MAX_ITEMS = 15
+
+
+# ============================================================
 # Structured Output for AI Analysis
 # ============================================================
 
+_BoundedBehavior = Annotated[str, StringConstraints(max_length=AEFieldLimit.HIDDEN_BEHAVIOR_ITEM)]
+_BoundedDomain = Annotated[str, StringConstraints(max_length=AEFieldLimit.SEMANTIC_DOMAIN_ITEM)]
+
+
 class AIAnalysisOutput(BaseModel):
     """Structured output from the AI Analysis Agent"""
-    
-    # What was stated vs what will actually happen
+
     stated_intent: str = Field(
-        description="Brief description of what the agent claims to want to do"
+        max_length=AEFieldLimit.STATED_INTENT,
+        description="One sentence: what the agent claims to want to do",
     )
     actual_behavior: str = Field(
-        description="What this action will ACTUALLY do in the real world"
+        max_length=AEFieldLimit.ACTUAL_BEHAVIOR,
+        description="What this action will ACTUALLY do in the real world",
     )
-    
-    # Risk assessment
+
     risk_level: str = Field(
-        description="Risk level: LOW, MEDIUM, HIGH, or CRITICAL"
+        description="Risk level: LOW, MEDIUM, HIGH, or CRITICAL",
     )
     risk_reason: str = Field(
-        description="Brief explanation of why this risk level was assigned"
+        max_length=AEFieldLimit.RISK_REASON,
+        description="Brief explanation of why this risk level was assigned",
     )
-    
-    # Reversibility
+
     reversibility: str = Field(
-        description="How reversible is this action: FULLY_REVERSIBLE, PARTIALLY_REVERSIBLE, TIME_LIMITED, IRREVERSIBLE, or UNKNOWN"
+        description="How reversible is this action: FULLY_REVERSIBLE, PARTIALLY_REVERSIBLE, TIME_LIMITED, IRREVERSIBLE, or UNKNOWN",
     )
-    
-    # Hidden behaviors
-    hidden_behaviors: list[str] = Field(
+
+    hidden_behaviors: list[_BoundedBehavior] = Field(
         default_factory=list,
-        description="Any hidden or non-obvious behaviors this action might cause"
+        max_length=AEFieldLimit.HIDDEN_BEHAVIORS_MAX_ITEMS,
+        description="Any hidden or non-obvious behaviors this action might cause",
     )
-    
-    # Scope analysis
+
     scope_analysis: str = Field(
-        description="What resources/data will this action affect?"
+        max_length=AEFieldLimit.SCOPE_ANALYSIS,
+        description="What resources/data will this action affect?",
     )
     scope_mismatch: bool = Field(
         default=False,
-        description="Does the actual scope exceed what was stated/expected?"
-    )
-    
-    # Semantic domain classification
-    semantic_domains: list[str] = Field(
-        default_factory=list,
-        description="Human-level domains this action falls under: spending, communication, deletion, data_access, scheduling, etc. Empty list if none apply clearly."
+        description="Does the actual scope exceed what was stated/expected?",
     )
 
-    # Confidence and recommendation
+    semantic_domains: list[_BoundedDomain] = Field(
+        default_factory=list,
+        max_length=AEFieldLimit.SEMANTIC_DOMAINS_MAX_ITEMS,
+        description="Human-level domains this action falls under: spending, communication, deletion, data_access, scheduling, etc. Empty list if none apply clearly.",
+    )
+
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Confidence in this analysis (0.0 to 1.0)"
+        description="Confidence in this analysis (0.0 to 1.0)",
     )
     recommendation: str = Field(
-        description="Neutral summary of the analysis (no allow/block language)"
+        max_length=AEFieldLimit.RECOMMENDATION,
+        description="One-sentence neutral summary of the analysis (no allow/block language)",
     )
 
 
@@ -425,14 +453,33 @@ Be thorough but concise. Your output feeds the Guardian for policy decisions."""
             closing_instruction="Analyze what this action will REALLY do.",
         )
     
+    _FIELD_BOUNDS: dict[str, int] = {
+        "stated_intent": AEFieldLimit.STATED_INTENT,
+        "actual_behavior": AEFieldLimit.ACTUAL_BEHAVIOR,
+        "risk_reason": AEFieldLimit.RISK_REASON,
+        "scope_analysis": AEFieldLimit.SCOPE_ANALYSIS,
+        "recommendation": AEFieldLimit.RECOMMENDATION,
+    }
+    _LIST_BOUNDS: dict[str, tuple[int, int]] = {
+        "hidden_behaviors": (AEFieldLimit.HIDDEN_BEHAVIORS_MAX_ITEMS, AEFieldLimit.HIDDEN_BEHAVIOR_ITEM),
+        "semantic_domains": (AEFieldLimit.SEMANTIC_DOMAINS_MAX_ITEMS, AEFieldLimit.SEMANTIC_DOMAIN_ITEM),
+    }
+
     def _convert_to_report(
         self,
         intent: IntentFrame,
         ai_output: AIAnalysisOutput,
         terminal_command_signals: tuple = (),
     ) -> AnalysisReport:
-        """Convert AI output to AnalysisReport format."""
-        
+        """Convert AI output to AnalysisReport format.
+
+        Includes a deterministic backstop: if any field exceeds the
+        schema-defined bound (which should never happen when OpenAI
+        structured output is enforcing maxLength), the report is flagged
+        with ae_output_anomaly so Guardian treats it as elevated risk.
+        """
+        anomaly = self._detect_overflow(ai_output)
+
         risk_level_map = {
             "LOW": RiskLevel.LOW,
             "MEDIUM": RiskLevel.MEDIUM,
@@ -440,7 +487,7 @@ Be thorough but concise. Your output feeds the Guardian for policy decisions."""
             "CRITICAL": RiskLevel.CRITICAL,
         }
         risk_level = risk_level_map.get(ai_output.risk_level.upper(), RiskLevel.MEDIUM)
-        
+
         reversibility_map = {
             "FULLY_REVERSIBLE": Reversibility.FULLY_REVERSIBLE,
             "PARTIALLY_REVERSIBLE": Reversibility.PARTIALLY_REVERSIBLE,
@@ -449,8 +496,8 @@ Be thorough but concise. Your output feeds the Guardian for policy decisions."""
             "UNKNOWN": Reversibility.UNKNOWN,
         }
         reversibility = reversibility_map.get(
-            ai_output.reversibility.upper(), 
-            Reversibility.UNKNOWN
+            ai_output.reversibility.upper(),
+            Reversibility.UNKNOWN,
         )
 
         serialized_signals = [
@@ -462,13 +509,13 @@ Be thorough but concise. Your output feeds the Guardian for policy decisions."""
             }
             for s in terminal_command_signals
         ]
-        
+
         return AnalysisReport(
             stated_intent=ai_output.stated_intent,
             actual_behaviors=[{
                 "action": intent.action.value,
                 "actual_behavior": ai_output.actual_behavior,
-                "matches_intent": not ai_output.scope_mismatch
+                "matches_intent": not ai_output.scope_mismatch,
             }],
             requested_scope=[intent.target],
             actual_scope=[ai_output.scope_analysis],
@@ -483,4 +530,18 @@ Be thorough but concise. Your output feeds the Guardian for policy decisions."""
             confidence=ai_output.confidence,
             recommendation=ai_output.recommendation,
             terminal_command_signals=serialized_signals,
+            ae_output_anomaly=anomaly,
         )
+
+    def _detect_overflow(self, ai_output: AIAnalysisOutput) -> bool:
+        """Return True if any AI output field exceeds its schema bound."""
+        for field_name, limit in self._FIELD_BOUNDS.items():
+            if len(getattr(ai_output, field_name, "")) > limit:
+                return True
+        for field_name, (max_items, per_item_limit) in self._LIST_BOUNDS.items():
+            items = getattr(ai_output, field_name, [])
+            if len(items) > max_items:
+                return True
+            if any(len(item) > per_item_limit for item in items):
+                return True
+        return False

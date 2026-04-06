@@ -66,6 +66,8 @@ class AnalysisReport(BaseModel):
 
     terminal_command_signals: List[Dict[str, str]] = Field(default_factory=list)
 
+    ae_output_anomaly: bool = False
+
 
 class ValidationResult(BaseModel):
     """

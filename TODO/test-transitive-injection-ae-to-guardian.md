@@ -1,8 +1,15 @@
-# TODO: Tests for Transitive Prompt Injection (AE → Guardian)
+# ~~TODO~~ DONE: Tests for Transitive Prompt Injection (AE → Guardian)
 
 **Risk level:** LOW  
 **Priority:** Medium (after covering external agent injection first)  
 **Category:** Security / Test Coverage  
+**Status:** ✅ Implemented — 2026-04-06  
+
+### Implementation summary
+
+- **Category A** (deterministic): `tests/test_transitive_injection.py` — 64 tests covering poisoned field placement, prompt structure survival, enum sanitization, combined attack vectors, injection containment, schema length bounds, overflow detection backstop, Guardian anomaly risk flagging, and JSON Schema constraint verification.
+- **Category B** (live LLM): `demo/tests/test_transitive_injection_live.py` — 12 red-team tests using `gpt-4o-mini`, covering deterministic gate holds, Guardian AI resilience against poisoned AE output, and full two-hop chain attacks.
+- **AE output field bounds:** `AEFieldLimit` IntEnum in `intentframe_components/analysis/engine.py` enforces `maxLength`/`maxItems` at schema level (OpenAI structured output), with a deterministic `_detect_overflow()` backstop that flags `ae_output_anomaly` on `AnalysisReport`. Guardian's `_has_risk_flags()` treats the anomaly as elevated risk.  
 
 ---
 
@@ -197,10 +204,10 @@ async def test_full_transitive_injection_chain_is_blocked():
 
 ---
 
-## Where to Put These Tests
+## Where These Tests Live
 
-- **Category A** (deterministic): `tests/test_transitive_injection.py` — runs without API keys, part of standard CI
-- **Category B** (live LLM): `demo/tests/test_transitive_injection_live.py` — marked as red-team tests, requires `OPENAI_API_KEY`, excluded from standard CI with a pytest mark
+- **Category A** (deterministic): `tests/test_transitive_injection.py` — 64 tests, runs without API keys, part of standard CI ✅
+- **Category B** (live LLM): `demo/tests/test_transitive_injection_live.py` — 12 tests, requires `OPENAI_API_KEY`, excluded from standard CI with `@pytest.mark.skipif` ✅
 
 ---
 
