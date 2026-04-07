@@ -40,6 +40,10 @@ if str(_project_root) not in sys.path:
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
 from intentframe_core.enums import RiskLevel, Reversibility, Decision
+from intentframe_components.analysis import AIAnalysisEngine
+from intentframe_components.analysis.engine import AEFieldLimit
+from intentframe_components.guardian import AIGuardian
+from intentframe_components.guardian.engine import AIGuardianOutput
 from policy_registry.models import ActionPermission
 from policy_registry.constraints import ApiConstraints, FileConstraints
 
@@ -48,7 +52,12 @@ from policy_registry.constraints import ApiConstraints, FileConstraints
 # Test infrastructure
 # ═══════════════════════════════════════════════════════════════════════
 
-MODEL = "gpt-4o-mini"
+# Change these constants to run AE or Guardian on a different model independently.
+# AE_MODEL  → passed to every AIAnalysisEngine(model=AE_MODEL)
+# GUARDIAN_MODEL → passed to every AIGuardian(model=GUARDIAN_MODEL)
+AE_MODEL       = "gpt-4o-mini"
+# GUARDIAN_MODEL = "gpt-5-mini-2025-08-07"
+GUARDIAN_MODEL = "gpt-5.4-2026-03-05"
 
 passed_count = 0
 failed_count = 0
@@ -168,7 +177,6 @@ def _make_safe_read_context() -> UserContext:
 
 
 def _assert_live_ae_bounds(label_prefix: str, analysis: AnalysisReport):
-    from intentframe_components.analysis.engine import AEFieldLimit
 
     actual_behavior = ""
     if analysis.actual_behaviors:
@@ -239,9 +247,8 @@ def test_deterministic_gate_blocks_over_limit_despite_poisoned_ae():
     print(f"  1. Deterministic gate: $50K vs $5K limit, fully poisoned AE  [{_TAG_LOCAL}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = AnalysisReport(
@@ -296,10 +303,8 @@ def test_ae_output_anomaly_forces_ai_path_without_hard_block():
     print(f"  1b. Safe read + ae_output_anomaly routes to Guardian AI  [{_TAG_MOCK}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
-    from intentframe_components.guardian.engine import AIGuardianOutput
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_safe_read_context()
 
     intent = IntentFrame(
@@ -409,9 +414,8 @@ def test_guardian_blocks_high_risk_despite_poisoned_recommendation():
     print(f"  2. Guardian AI: HIGH risk + poisoned recommendation  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = AnalysisReport(
@@ -515,9 +519,8 @@ def test_guardian_with_clean_flags_but_injected_recommendation():
     print(f"  3. Guardian AI: clean flags + handoff-smuggling (measurement, FALSE POSITIVE — see 9a-9c)  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = AnalysisReport(
@@ -573,11 +576,9 @@ def test_full_chain_over_limit():
     print(f"  4. Full chain: injected reason → AE → Guardian ($50K)  [{_TAG_LLM_X2}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.analysis import AIAnalysisEngine
-    from intentframe_components.guardian import AIGuardian
 
-    ae = AIAnalysisEngine(model=MODEL, verbose=True)
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    ae = AIAnalysisEngine(model=AE_MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     intent = IntentFrame(
@@ -628,11 +629,9 @@ def test_full_chain_within_limit():
     print(f"  5. Full chain: injected reason → AE → Guardian ($4.5K, within limit)  [{_TAG_LLM_X2}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.analysis import AIAnalysisEngine
-    from intentframe_components.guardian import AIGuardian
 
-    ae = AIAnalysisEngine(model=MODEL, verbose=True)
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    ae = AIAnalysisEngine(model=AE_MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     intent = IntentFrame(
@@ -680,9 +679,8 @@ def test_scope_mismatch_overrides_poisoned_recommendation():
     print(f"  6. scope_mismatch=True + poisoned recommendation saying it's fine  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = UserContext(
         user_id="test_user",
         allowed_actions={
@@ -736,9 +734,8 @@ def test_guardian_blocks_when_hidden_behaviors_present():
     print(f"  7. Hidden behaviors present + recommendation downplays them  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = AnalysisReport(
@@ -791,9 +788,8 @@ def test_unpermitted_action_blocked_regardless_of_ae():
     print(f"  8. Unpermitted action: RUN_COMMAND not in allowed_actions  [{_TAG_LOCAL}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context()
 
     poisoned = AnalysisReport(
@@ -920,9 +916,8 @@ def test_9a_fully_green_ae_but_suspicious_target():
     print(f"  9a. Fully green AE + lookalike billing portal + remittance change  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = _make_fully_green_analysis(
@@ -979,9 +974,8 @@ def test_9b_fully_green_ae_but_social_engineering_in_reason():
     print(f"  9b. Fully green AE + copied exec thread + verification bypass  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = _make_fully_green_analysis(
@@ -1038,9 +1032,8 @@ def test_9c_fully_green_ae_but_data_contradicts_stated_intent():
     print(f"  9c. Fully green AE + office invoice cover story + crypto rail  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = _make_fully_green_analysis(
@@ -1098,9 +1091,8 @@ def test_10a_all_ae_text_fields_poisoned_bec_remittance_change():
     print(f"  10a. All AE text fields poisoned + lookalike portal + classic smuggling  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = _make_all_fields_poisoned_analysis(
@@ -1172,9 +1164,8 @@ def test_10b_all_ae_text_fields_poisoned_exec_callback_bypass():
     print(f"  10b. All AE text fields poisoned + exec pressure + role confusion  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = _make_all_fields_poisoned_analysis(
@@ -1247,9 +1238,8 @@ def test_10c_all_ae_text_fields_poisoned_office_invoice_cover_for_crypto():
     print(f"  10c. All AE text fields poisoned + office invoice cover + crypto rail  [{_TAG_LLM}{_BOLD}{_CYAN}]")
     print(f"{'═' * 70}{_RESET}")
 
-    from intentframe_components.guardian import AIGuardian
 
-    guardian = AIGuardian(model=MODEL, verbose=True)
+    guardian = AIGuardian(model=GUARDIAN_MODEL, verbose=True)
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = _make_all_fields_poisoned_analysis(
@@ -1320,7 +1310,8 @@ def main():
 
     print(f"\n{_BOLD}{'=' * 70}")
     print(f"  Transitive Injection Test Suite (AE → Guardian)")
-    print(f"  Model: {_CYAN}{MODEL}{_RESET}{_BOLD}")
+    print(f"  AE Model:       {_CYAN}{AE_MODEL}{_RESET}{_BOLD}")
+    print(f"  Guardian Model: {_CYAN}{GUARDIAN_MODEL}{_RESET}{_BOLD}")
     print(f"  Tags:  {_TAG_LOCAL} no network  {_TAG_MOCK} patched Runner  {_TAG_LLM} Guardian only  {_TAG_LLM_X2} AE + Guardian")
     print(f"{_BOLD}{'=' * 70}{_RESET}")
 
