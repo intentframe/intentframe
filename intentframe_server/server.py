@@ -56,11 +56,14 @@ def _create_runtime() -> IntentFrameRuntime:
 
     executor = ExecutorHTTPClient(socket_path=executor_socket)
 
+    skip_onboarding = os.environ.get("INTENTFRAME_SKIP_ONBOARDING", "0") == "1"
+    onboarding = None if skip_onboarding else AIOnboardingEngine(verbose=verbose)
+
     return IntentFrameRuntime(
         analysis_engine=AIAnalysisEngine(verbose=verbose),
         guardian=AIGuardian(verbose=verbose),
         executor=executor,
-        onboarding_engine=AIOnboardingEngine(verbose=verbose),
+        onboarding_engine=onboarding,
         verbose=verbose,
     )
 
