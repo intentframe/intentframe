@@ -155,9 +155,19 @@ async def run_normal_mode(client: GatewayClient, health_data: dict) -> None:
         print_missing_optional(cred_data.get("credentials", []))
     except Exception:
         pass
-    console.print(
-        "[bold green]Jarvis is ready.[/] Type a message, or [cyan]help[/] for commands.\n"
+
+    jarvis_healthy = (
+        health_data.get("services", {}).get("jarvis", {}).get("healthy", False)
     )
+    if jarvis_healthy:
+        console.print(
+            "[bold green]Jarvis is ready.[/] Type a message, or [cyan]help[/] for commands.\n"
+        )
+    else:
+        console.print(
+            "[red bold]Jarvis is not running.[/] "
+            "Try [cyan]start jarvis[/] or restart the gateway.\n"
+        )
     session = make_session()
 
     while True:

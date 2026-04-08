@@ -31,7 +31,7 @@ def test_ai_analysis():
         return
     
     # Create AI Analysis Engine
-    engine = AIAnalysisEngine(model="gpt-5-mini-2025-08-07", verbose=True)
+    engine = AIAnalysisEngine(model="gpt-4o-mini", verbose=True)
     
     # Test cases
     test_intents = [

@@ -1,0 +1,52 @@
+# Executor config for invoice attack tests.
+#
+# Uses a dedicated sandbox directory under demo_data so each run can expose
+# only the current attack's invoice files while the executor process stays up.
+# Populate demo/demo_data/attack_invoices_sandbox/ before each attack (see
+# demo/tests/invoice_attack_pipeline.py).
+#
+# Start supervisor from repo root:
+#   EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+
+platform: auto
+
+transport:
+  type: unix_socket
+  options:
+    socket_path: ~/.intentframe/run/executor.sock
+
+auth:
+  type: guardian_hmac
+  options:
+    secret_key: "intentframe_demo_secret_key_do_not_use_in_production"
+
+credentials:
+  backend: service
+  options: {}
+
+worker_pool:
+  max_workers: 4
+  default_timeout_seconds: 30.0
+
+filesystem:
+  base_path: demo
+  mounts:
+    - virtual_path: "/invoices/"
+      real_path: "demo_data/attack_invoices_sandbox"
+      file_filter: "*.md"
+    - virtual_path: "/expense_tracker.md"
+      real_path: "demo_data/expense_tracker.md"
+      writable: true
+
+adapters:
+  enabled:
+    - files
+    - user_io
+
+storage:
+  database_path: null
+  log_path: null
+
+logging:
+  level: INFO
+  format: console

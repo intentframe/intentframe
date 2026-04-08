@@ -34,48 +34,56 @@ Not all AE output fields are equal. Some are already deterministically safe:
 | `scope_mismatch: bool` | Pydantic Boolean — can only be True or False | None needed |
 | `confidence: float` | Pydantic `ge=0.0, le=1.0` — structurally constrained | None needed |
 | `reversibility: Reversibility` | Mapped through `reversibility_map` in `_convert_to_report()` — known enum | None needed |
-| `semantic_domains: List[str]` | Free-text list of strings — LLM-generated content | See below |
-| `stated_intent: str` | Free-text string — LLM-generated | See below |
-| `hidden_behaviors: List[str]` | Free-text string list — LLM-generated | See below |
-| `recommendation: str` | Free-text string — LLM-generated | See below |
+| `semantic_domains: List[str]` | Free-text list of strings — LLM-generated content | **Bounded** (see below) |
+| `stated_intent: str` | Free-text string — LLM-generated | **Bounded** (see below) |
+| `hidden_behaviors: List[str]` | Free-text string list — LLM-generated | **Bounded** (see below) |
+| `recommendation: str` | Free-text string — LLM-generated | **Bounded** (see below) |
 
 The four free-text fields are the only ones worth thinking about. The enum-mapped fields are already pipeline-controlled in the strict sense.
 
 ---
 
-## Improvement 1: Length Constraints on Free-Text Fields in `_convert_to_report()`
+## ~~Improvement 1~~ DONE: Schema-Level Field Bounds on `AIAnalysisOutput`
 
-**File:** `intentframe_components/analysis/engine.py` → `_convert_to_report()`  
-**Change:** Truncate free-text fields to reasonable maximums before the `AnalysisReport` is constructed.
+**Status:** ✅ Implemented  
+**Date:** 2026-04-06  
+**Files changed:** `intentframe_components/analysis/engine.py`, `intentframe_core/types.py`, `intentframe_components/guardian/engine.py`  
+**Tests:** `tests/test_transitive_injection.py` — 36 new tests (4 test classes, 64 total)
 
-**Rationale:** Legitimate AE output for these fields is always short:
-- `stated_intent`: "Send email to alice@example.com" — typically 20–60 chars
-- `recommendation`: "Standard email send operation." — typically 20–80 chars
-- Individual `hidden_behaviors` items: "Action will CC admin@company.com" — typically 20–100 chars
+### What was implemented (better than the original proposal)
 
-A 500-char `recommendation` is either a bug or a signal that something unusual happened. Truncation is a zero-cost side-effect defense — it limits the space available for a payload without affecting legitimate use.
+The original proposal suggested post-generation truncation in `_convert_to_report()`. This was rejected because truncation produces incomplete sentences and loses semantic meaning. Instead, a three-layer approach was implemented:
 
-Suggested limits:
-- `stated_intent`: 200 chars
-- `recommendation`: 300 chars
-- Per-item `hidden_behaviors`: 200 chars
-- Per-item `semantic_domains`: 50 chars (domain names are always short: "spending", "communication", "deletion")
+**Layer 1: Schema enforcement (pre-generation).** `max_length` constraints are set directly on the `AIAnalysisOutput` Pydantic model fields. These emit `maxLength` / `maxItems` in the JSON Schema, which OpenAI's structured output engine enforces **during token generation**. The LLM writes complete, coherent text that naturally fits within the budget — no truncation, no unfinished sentences.
 
-**Important:** Do NOT add these truncations as a pre-AI scanner or as injection detection. They are simply field-length normalizations, like any data validation. The comment in code should say "length normalization" not "injection protection."
+**Layer 2: Pydantic validation (post-generation).** If raw output somehow exceeds the schema limits, Pydantic raises a `ValidationError` before the value ever reaches `_convert_to_report()`.
 
-```python
-# In _convert_to_report():
-_MAX_STATED_INTENT = 200
-_MAX_RECOMMENDATION = 300
-_MAX_BEHAVIOR_ITEM = 200
-_MAX_DOMAIN_ITEM = 50
+**Layer 3: Deterministic backstop.** `_detect_overflow()` cross-checks every field against its bound. If any field exceeds the limit (which should never happen with Layers 1-2), the `AnalysisReport` is flagged with `ae_output_anomaly = True`. No data is truncated — the full output passes through, but Guardian's `_has_risk_flags()` treats the anomaly as elevated risk.
 
-# When constructing AnalysisReport:
-stated_intent=ai_output.stated_intent[:_MAX_STATED_INTENT],
-recommendation=ai_output.recommendation[:_MAX_RECOMMENDATION],
-hidden_behaviors=[b[:_MAX_BEHAVIOR_ITEM] for b in ai_output.hidden_behaviors],
-semantic_domains=[d[:_MAX_DOMAIN_ITEM] for d in ai_output.semantic_domains],
-```
+### Constants (`AEFieldLimit` IntEnum)
+
+All limits are defined in a single `AEFieldLimit` enum at the top of `engine.py`. Every consumer — schema, bounded types, backstop dictionaries, tests — references the enum. Changing a limit is a one-line change.
+
+| Constant | Value | Rationale |
+|---|---|---|
+| `STATED_INTENT` | 400 | Complex multi-step intents need room |
+| `ACTUAL_BEHAVIOR` | 600 | Real-world behavior descriptions for complex actions |
+| `RISK_REASON` | 400 | Multi-factor risk explanations |
+| `SCOPE_ANALYSIS` | 400 | Actions touching multiple resources |
+| `RECOMMENDATION` | 600 | Nuanced analysis summaries |
+| `HIDDEN_BEHAVIOR_ITEM` | 300 | Subtle behaviors need explanation |
+| `HIDDEN_BEHAVIORS_MAX_ITEMS` | 10 | Complex commands have many side effects |
+| `SEMANTIC_DOMAIN_ITEM` | 80 | Compound domain descriptions |
+| `SEMANTIC_DOMAINS_MAX_ITEMS` | 15 | Cross-domain actions |
+
+### Test coverage
+
+| Test class | What it verifies |
+|---|---|
+| `TestSchemaLengthBounds` | Pydantic rejects over-limit strings and lists; boundary values accepted; realistic injection payloads blocked at schema level |
+| `TestOverflowDetectionBackstop` | Uses `model_construct()` to bypass validation, verifying `_detect_overflow` catches every overflow type |
+| `TestGuardianAnomalyRiskFlag` | `ae_output_anomaly` alone triggers `_has_risk_flags`, even when all other signals are benign |
+| `TestJsonSchemaConstraints` | JSON Schema output contains correct `maxLength` / `maxItems` values for OpenAI structured output enforcement |
 
 ---
 

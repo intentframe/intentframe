@@ -82,7 +82,7 @@ class AIOnboardingEngine(OnboardingEngine):
     hardcoding specific rules for each agent.
     """
 
-    def __init__(self, model: str = "gpt-5-mini-2025-08-07", verbose: bool = True):
+    def __init__(self, model: str = "gpt-4o-mini", verbose: bool = True):
         self.model = model
         self.verbose = verbose
 

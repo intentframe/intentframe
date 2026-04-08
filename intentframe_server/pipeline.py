@@ -33,7 +33,7 @@ from typing import Optional
 from action_registry.types import ActionType
 from command_shield import Verdict, analyze as shield_analyze
 from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
-from intentframe_core.enums import Decision
+from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
     ExecutionResult,
@@ -365,10 +365,20 @@ class IntentFrameRuntime:
         )
         
         if self.verbose:
+            print(f"    │  AI analyzing: {intent.action.value}...")
             print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
             print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
             if analysis.hidden_behaviors:
                 print(f"    │  ⚠️  Hidden behaviors: {str(analysis.hidden_behaviors)[:33]:<33} │")
+            if analysis.semantic_domains:
+                domains_str = ", ".join(analysis.semantic_domains)
+                print(f"    │  Domains: {domains_str:<48} │")
+            if analysis.risk_factors:
+                overall = max(analysis.risk_factors.values(), key=lambda r: list(RiskLevel).index(r))
+                factors_str = ", ".join(f"{k}: {v.value}" for k, v in analysis.risk_factors.items())
+                print(f"    │  Risk factors: {factors_str[:44]:<44} │")
+            if analysis.scope_mismatch:
+                print(f"    │  ⚠️  Scope mismatch detected                              │")
             print(f"    └──────────────────────────────────────────────────────────┘")
         
         # ═══════════════════════════════════════════════════════════════

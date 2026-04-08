@@ -7,15 +7,50 @@ so that LLM-generated paths like "/home", "/home/", "~/Documents", and
 
 The virtual home root is /home/ — this is what agents see regardless of
 the real OS path (/Users/username/, /home/username/, C:\\Users\\username\\).
+
+Security canonicalization pipeline (runs before any path logic):
+    1. URL-decode repeatedly      — defeats %2e%2e, %252e%252e, etc.
+    2. Unicode NFKC normalization — folds fullwidth ．／ to ASCII ./
+    3. Strip control characters   — removes null bytes, \r, \x1b, etc.
+    4. Backslash → forward slash  — prevents \\..\\ traversal on Windows
+    5. posixpath.normpath          — resolves .. and . canonically
 """
 
 from __future__ import annotations
 
 import posixpath
+import re
+import unicodedata
+from urllib.parse import unquote
 
 __all__ = ["normalize_virtual_path", "VIRTUAL_HOME"]
 
 VIRTUAL_HOME = "/home"
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def _canonicalize(path: str) -> str:
+    """Security-first canonicalization of an untrusted virtual path string.
+
+    Applied before any path semantics so that encoding tricks, Unicode
+    confusables, and control-character injections are neutralised.
+    """
+    prev = path
+    while True:
+        decoded = unquote(prev)
+        if decoded == prev:
+            break
+        prev = decoded
+    path = prev
+
+    path = unicodedata.normalize("NFKC", path)
+
+    path = _CONTROL_CHARS_RE.sub("", path)
+
+    path = path.replace("\\", "/")
+
+    return path
 
 
 def normalize_virtual_path(raw: str) -> str:
@@ -35,7 +70,7 @@ def normalize_virtual_path(raw: str) -> str:
     Directories (no file extension in last component) get a trailing /.
     Files keep no trailing /.
     """
-    path = raw.strip()
+    path = _canonicalize(raw.strip())
 
     if not path or path == "/":
         return "/"
