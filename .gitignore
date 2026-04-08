@@ -108,3 +108,4 @@ macos-appkit-server/.build/
 demo/demo_data/attack_invoices_sandbox/
 
 .claude/
+.claude_chats/
