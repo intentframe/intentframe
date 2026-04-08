@@ -346,6 +346,12 @@ Be brief and cite the specific concern that caused your decision."""
                 "produce abnormally long or numerous outputs. Treat with elevated suspicion."
             )
 
+        actual_behavior_str = (
+            ", ".join(b["actual_behavior"] for b in analysis.actual_behaviors)
+            if analysis.actual_behaviors
+            else "None"
+        )
+
         trusted_sections["Analysis Report"] = (
             f"Stated Intent: {analysis.stated_intent}\n"
             f"Confidence: {analysis.confidence:.0%}\n"
@@ -355,6 +361,7 @@ Be brief and cite the specific concern that caused your decision."""
             f"Scope Mismatch: {'YES - actual scope exceeds stated!' if analysis.scope_mismatch else 'No'}\n"
             f"AE Output Anomaly: {anomaly_str}\n"
             f"Hidden Behaviors: {hidden_str}\n"
+            f"Actual Behaviors: {actual_behavior_str}\n"
             f"Recommendation: {analysis.recommendation}"
         )
 

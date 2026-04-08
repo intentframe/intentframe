@@ -106,3 +106,5 @@ macos-appkit-server/.build/
 
 # Attack test sandbox (populated at runtime by test harness)
 demo/demo_data/attack_invoices_sandbox/
+
+.claude/
