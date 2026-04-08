@@ -377,7 +377,7 @@ class TestAnalysisEnginePrompt:
     def test_system_prompt_has_immutable_role(self):
         sys = self._get_system_prompt()
         assert "IMMUTABLE" in sys
-        assert "Analysis Engine" in sys
+        assert "security analyst" in sys
 
     def test_system_prompt_has_boundary_protocol(self):
         sys = self._get_system_prompt()
@@ -551,7 +551,7 @@ class TestGuardianPrompt:
     def test_system_prompt_has_immutable_role(self):
         sys = self._get_system_prompt()
         assert "IMMUTABLE" in sys
-        assert "Policy Guardian" in sys
+        assert "policy enforcer" in sys
 
     def test_system_prompt_has_boundary_protocol(self):
         sys = self._get_system_prompt()
