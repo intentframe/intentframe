@@ -33,7 +33,7 @@ from typing import Optional
 from action_registry.types import ActionType
 from command_shield import Verdict, analyze as shield_analyze
 from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
-from intentframe_core.enums import Decision
+from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
     ExecutionResult,
