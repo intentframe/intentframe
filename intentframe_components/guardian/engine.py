@@ -25,9 +25,10 @@ Validation flow:
 
 from typing import Optional
 
+from openai.types.shared import Reasoning
 from pydantic import BaseModel, Field
 
-from agents import Agent, Runner
+from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ACTION_DOMAINS, DomainType
 from intentframe_core.types import IntentFrame, AnalysisReport, ValidationResult, UserContext
@@ -96,6 +97,30 @@ class AIGuardian(Guardian):
 
     _hardener = PromptHardening()
 
+    # ── Model settings note ──────────────────────────────────────
+    # The Agents SDK passes ModelSettings fields to the OpenAI Responses
+    # API via a _non_null_or_omit() pattern: any field left as None is
+    # omitted from the request entirely, falling back to the API's own
+    # default (temperature=1.0, top_p=1.0, etc.).
+    #
+    # GPT-5 family models are reasoning models — they do NOT accept
+    # the `temperature` parameter (the API returns HTTP 400).  Their
+    # output variability is controlled via `reasoning.effort` instead.
+    # The SDK default is effort="low" (with verbosity="low") — chosen
+    # for latency.  Available levels: "minimal", "low", "medium", "high".
+    # Guardian is security-critical so "medium" or "high" may be worth
+    # the latency trade-off if judgment accuracy matters more than speed.
+    #
+    # For non-reasoning models (gpt-4o-mini, gpt-4.1, etc.) use
+    # ModelSettings(temperature=0) for greedy decoding.  See the
+    # Analysis Engine for that pattern.
+    #
+    # The SDK also auto-detects GPT-5 models and applies default
+    # reasoning settings (effort="low", verbosity="low") via
+    # get_default_model_settings() — but only when model_settings is
+    # left at the factory default.  Passing explicit ModelSettings
+    # overrides that, so we must set reasoning ourselves.
+
     def __init__(self, model: str = "gpt-5-mini-2025-08-07", verbose: bool = True):
         self.model = model
         self.verbose = verbose
@@ -108,6 +133,9 @@ class AIGuardian(Guardian):
             ),
             model=self.model,
             output_type=AIGuardianOutput,
+            # model_settings=ModelSettings(
+            #     reasoning=Reasoning(effort="high"),
+            # ),
         )
 
     @staticmethod

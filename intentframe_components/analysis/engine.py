@@ -22,7 +22,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from agents import Agent, Runner
+from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, AnalysisReport
@@ -199,6 +199,23 @@ class AIAnalysisEngine(AnalysisEngine):
 
     _hardener = PromptHardening()
 
+    # ── Model settings note ──────────────────────────────────────
+    # The Agents SDK passes ModelSettings fields to the OpenAI Responses
+    # API via a _non_null_or_omit() pattern: any field left as None is
+    # omitted from the request entirely, falling back to the API's own
+    # default (temperature=1.0, top_p=1.0, etc.).
+    #
+    # For standard completion models (gpt-4o-mini, gpt-4.1, etc.)
+    # temperature=0 gives greedy decoding — always picks the highest-
+    # probability token.  This is the single biggest lever for
+    # reproducibility (~95%+ identical outputs on identical inputs).
+    # OpenAI recommends not setting both temperature and top_p, and
+    # with temperature=0 top_p is irrelevant, so we leave it as None.
+    #
+    # GPT-5 family models are reasoning models and do NOT accept
+    # temperature — use ModelSettings(reasoning=Reasoning(effort=...))
+    # instead.  See the Guardian engine for that pattern.
+
     def __init__(
         self,
         model: str = "gpt-4o-mini",
@@ -215,6 +232,7 @@ class AIAnalysisEngine(AnalysisEngine):
             ),
             model=self.model,
             output_type=AIAnalysisOutput,
+            model_settings=ModelSettings(temperature=0),
         )
     
     @staticmethod

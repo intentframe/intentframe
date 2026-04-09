@@ -95,6 +95,13 @@ def _attack_user_policy() -> UserPolicy:
                 threshold=5000.0,
                 effect="block",
             ),
+            SemanticIntentLimit(
+                limit_id="invoice-face-value",
+                domain="invoicing",
+                description="Record invoices at face value only",
+                raw="The amount written on the invoice is the amount we record and pay. We never change it or adjust it later.",
+                effect="block",
+            ),
         ],
         domain_constraints={
             "finance": FinanceConstraints(
