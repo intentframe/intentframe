@@ -405,6 +405,7 @@ For recommendation:
         intent: IntentFrame,
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
+        active_domains: set[str] | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -418,6 +419,10 @@ For recommendation:
         When present the signals are injected into the AI prompt for
         richer context.  Fast-path decisions are unaffected — they
         apply to their own intent types independently.
+
+        active_domains are domain strings the user has active rules for.
+        Injected as trusted context so the AE knows which semantic
+        domains are relevant to this user's configuration.
         """
         # ── Fast path: safe read-only ────────────────────────────────
         fast = self._try_fast_path(intent, safe_actions or set())
@@ -438,7 +443,9 @@ For recommendation:
             print(f"    │  Terminal command signals ({len(terminal_command_signals)}) — enriching AI prompt")
 
         prompt = self._build_analysis_prompt(
-            intent, terminal_command_signals=terminal_command_signals,
+            intent,
+            terminal_command_signals=terminal_command_signals,
+            active_domains=active_domains,
         )
         
         if self.verbose:
@@ -455,23 +462,27 @@ For recommendation:
         self,
         intent: IntentFrame,
         terminal_command_signals: tuple = (),
+        active_domains: set[str] | None = None,
     ) -> str:
         """Build a hardened prompt for the AI agent.
 
         Trusted section: action (enum-validated), agent metadata,
-        task description, terminal command signals (from command_shield).
+        task description, active domains, terminal command signals
+        (from command_shield).
         Untrusted section: target, reason, data — the fields the agent
         LLM actually controls.
         """
-        # ── Trusted: pipeline-controlled context ──────────────────
-        trusted_lines = [
+        # ── Trusted sections (pipeline-controlled) ────────────────
+        trusted_sections: dict[str, str] = {}
+
+        context_lines = [
             f"Action: {intent.action.value}",
             f"Agent: {intent.agent_type or intent.agent_id}",
             f"Task: {intent.task_description or 'Not specified'}",
         ]
 
         if terminal_command_signals:
-            trusted_lines.append(
+            context_lines.append(
                 "\nTERMINAL COMMAND — STRUCTURAL SIGNALS:\n"
                 "Before this command reached you, deterministic static analysis "
                 "(AST parsing, pattern matching, normalisation) detected the "
@@ -482,7 +493,19 @@ For recommendation:
                 line = f"  - [{sig.check}:{sig.signal_id}] {sig.description}"
                 if sig.evidence:
                     line += f"  (evidence: {sig.evidence[:120]})"
-                trusted_lines.append(line)
+                context_lines.append(line)
+
+        trusted_sections["Context"] = "\n".join(context_lines)
+
+        if active_domains:
+            domains_str = ", ".join(sorted(active_domains))
+            trusted_sections["Active Domains"] = (
+                f"The system has rules for these domains: {domains_str}\n"
+                "Pay special attention to whether this action falls under any of "
+                "these domains. If it does, include the matching domain(s) in your "
+                "semantic_domains output. This is a hint — still classify any other "
+                "domains you observe."
+            )
 
         # ── Untrusted: agent-controlled fields ────────────────────
         untrusted = {"Target": intent.target, "Reason": intent.reason}
@@ -492,7 +515,7 @@ For recommendation:
             untrusted["Data"] = data_section
 
         return self._hardener.build_hardened_prompt(
-            trusted_sections={"Context": "\n".join(trusted_lines)},
+            trusted_sections=trusted_sections,
             untrusted_fields=untrusted,
             closing_instruction="Analyze what this action will REALLY do.",
         )

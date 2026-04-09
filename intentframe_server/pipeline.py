@@ -119,6 +119,27 @@ class IntentFrameRuntime:
             if perm.safe
         }
 
+    @staticmethod
+    def _extract_active_domains(user_context: UserContext) -> set[str]:
+        """Extract domain strings the user has active rules for.
+
+        Sources:
+        - intent_limits[].domain  (e.g. "spending", "deletion")
+        - domain_constraints keys (e.g. "finance", "deletion")
+
+        These are passed to the Analysis Engine as trusted context so it
+        knows which semantic domains the system cares about, without
+        revealing any policy details (thresholds, effects, etc.).
+        """
+        domains: set[str] = set()
+        if user_context.intent_limits:
+            for limit in user_context.intent_limits:
+                if limit.domain:
+                    domains.add(limit.domain)
+        if user_context.domain_constraints:
+            domains.update(user_context.domain_constraints.keys())
+        return domains
+
     def _resolve_workspace(self, workspace_id: str) -> tuple[list[str], dict[str, str]]:
         """Fetch the ClientView from the Resource Registry.
 
@@ -358,10 +379,12 @@ class IntentFrameRuntime:
             print(f"    │  ANALYSIS ENGINE: Understanding intent                   │")
         
         safe_actions = self._extract_safe_actions(user_context)
+        active_domains = self._extract_active_domains(user_context)
         analysis = await self.analysis_engine.analyze(
             intent,
             safe_actions=safe_actions,
             terminal_command_signals=terminal_command_signals,
+            active_domains=active_domains,
         )
         
         if self.verbose:
@@ -389,7 +412,9 @@ class IntentFrameRuntime:
             print(f"    │  GUARDIAN: Security validation                           │")
             print(f"    │  (Checks authority, NOT business logic)                  │")
         
-        validation = await self.guardian.validate(intent, analysis, user_context)
+        validation = await self.guardian.validate(
+            intent, analysis, user_context, active_domains=active_domains,
+        )
         
         # ═══════════════════════════════════════════════════════════════
         # DECISION: ALLOW / BLOCK
