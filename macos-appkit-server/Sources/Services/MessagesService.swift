@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import SQLite3
+import TypedStream
 
 /// Sends messages via Messages.app and reads history from chat.db (SQLite).
 ///
@@ -96,6 +97,7 @@ actor MessagesService {
                     c.display_name,
                     h.id as handle_id,
                     m.text,
+                    m.attributedBody,
                     m.date as message_date,
                     m.is_from_me,
                     m.service
@@ -104,7 +106,7 @@ actor MessagesService {
                 JOIN chat c ON cmj.chat_id = c.ROWID
                 LEFT JOIN handle h ON m.handle_id = h.ROWID
                 WHERE (c.display_name LIKE ? OR h.id LIKE ?)
-                  AND m.text IS NOT NULL
+                  AND (m.text IS NOT NULL OR m.attributedBody IS NOT NULL)
                 ORDER BY m.date DESC
                 LIMIT ?
             """
@@ -114,13 +116,14 @@ actor MessagesService {
                     c.display_name,
                     c.chat_identifier,
                     m.text,
+                    m.attributedBody,
                     m.date as message_date,
                     m.is_from_me,
                     m.service
                 FROM chat c
                 JOIN chat_message_join cmj ON c.ROWID = cmj.chat_id
                 JOIN message m ON cmj.message_id = m.ROWID
-                WHERE m.text IS NOT NULL
+                WHERE m.text IS NOT NULL OR m.attributedBody IS NOT NULL
                 GROUP BY c.ROWID
                 ORDER BY m.date DESC
                 LIMIT ?
@@ -144,23 +147,39 @@ actor MessagesService {
 
         var messages: [[String: AnyCodableValue]] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            let nameOrId: String
-            if hasContact {
-                nameOrId = sqlite3_column_text(stmt, 0).map { String(cString: $0) }
-                    ?? sqlite3_column_text(stmt, 1).map { String(cString: $0) }
-                    ?? "Unknown"
-            } else {
-                nameOrId = sqlite3_column_text(stmt, 0).map { String(cString: $0) }
-                    ?? sqlite3_column_text(stmt, 1).map { String(cString: $0) }
-                    ?? "Unknown"
-            }
-            let text = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
-            let appleTs = sqlite3_column_int64(stmt, 3)
+            // For 1:1 chats macOS often stores `display_name` as the empty
+            // string rather than NULL, so optional-chain-then-`??` would
+            // happily return "" instead of falling through. Treat empty as
+            // missing and prefer the chat identifier / handle id (col 1).
+            let nameOrId: String = {
+                let primary = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
+                if !primary.isEmpty { return primary }
+                let secondary = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+                if !secondary.isEmpty { return secondary }
+                return "Unknown"
+            }()
+            let text: String = {
+                // Legacy / pre-Tahoe path: m.text is populated.
+                if let raw = sqlite3_column_text(stmt, 2).map({ String(cString: $0) }) {
+                    return raw
+                }
+                // macOS Tahoe 26+: m.text is NULL, content lives in attributedBody.
+                if sqlite3_column_type(stmt, 3) == SQLITE_BLOB,
+                   let blob = sqlite3_column_blob(stmt, 3) {
+                    let len = Int(sqlite3_column_bytes(stmt, 3))
+                    if len > 0 {
+                        let data = Data(bytes: blob, count: len)
+                        return Self.decodeAttributedBody(data) ?? ""
+                    }
+                }
+                return ""
+            }()
+            let appleTs = sqlite3_column_int64(stmt, 4)
             let unixTs = (Double(appleTs) / 1_000_000_000) + Self.appleEpochOffset
             let date = Date(timeIntervalSince1970: unixTs)
             let isoDate = ISO8601DateFormatter().string(from: date)
-            let fromMe = sqlite3_column_int(stmt, 4) != 0
-            let service = sqlite3_column_text(stmt, 5).map { String(cString: $0) } ?? ""
+            let fromMe = sqlite3_column_int(stmt, 5) != 0
+            let service = sqlite3_column_text(stmt, 6).map { String(cString: $0) } ?? ""
 
             messages.append([
                 "name": .string(nameOrId),
@@ -245,6 +264,25 @@ actor MessagesService {
     }
 
     // MARK: - Helpers
+
+    /// Decode an iMessage `attributedBody` blob into its plain string.
+    ///
+    /// On macOS Tahoe 26+, `message.text` is NULL for nearly every row and the
+    /// content is stored only in `message.attributedBody` as an `NSArchiver`
+    /// typedstream — Apple's legacy binary format, not a keyed archive. The
+    /// public `NSUnarchiver` API was deprecated in 10.13 and is not surfaced to
+    /// Swift, so we use Madrid's `TypedStream` decoder which parses the format
+    /// from scratch.
+    ///
+    /// `Archivable.stringValue` already filters out class-metadata strings
+    /// (e.g. `"NSAttributedString"`, `"__kIM..."`), leaving only message text.
+    /// Multiple `NSString` chunks (from messages with attribute runs) are
+    /// joined with newlines, matching Madrid's own consumer pattern.
+    private static func decodeAttributedBody(_ data: Data) -> String? {
+        guard let parts = try? TypedStreamDecoder.decode(data) else { return nil }
+        let joined = parts.compactMap { $0.stringValue }.joined(separator: "\n")
+        return joined.isEmpty ? nil : joined
+    }
 
     private static func escapeForAS(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")
