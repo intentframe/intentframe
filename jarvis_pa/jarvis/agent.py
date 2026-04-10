@@ -229,20 +229,26 @@ class JarvisAgent:
         except Exception as exc:
             logger.warning(f"Skill discovery failed (non-fatal): {exc}")
 
-        # 7. Build system prompt (now with skills).
-        system_prompt = build_system_prompt(
-            soul=soul,
-            user=user,
-            memory=memory,
-            heartbeat=heartbeat_md,
-            guardrails=guardrails,
-            virtual_paths=virtual_paths,
-            path_permissions=path_permissions,
-            skills_xml=skills_xml,
-            config=self.config,
-            session_id=self._session_id,
-        )
-        logger.debug(f"System prompt assembled ({len(system_prompt)} chars)")
+        # 7. Build instructions callable.
+        # The closure captures all static inputs (soul, user, skills, etc.)
+        # so they stay one-shot from setup(). Only the cheap Jinja render +
+        # datetime.now() runs per turn, giving the model a fresh timestamp
+        # without compromising the prefix-based prompt cache.
+        def _instructions(_ctx, _agent):
+            return build_system_prompt(
+                soul=soul,
+                user=user,
+                memory=memory,
+                heartbeat=heartbeat_md,
+                guardrails=guardrails,
+                virtual_paths=virtual_paths,
+                path_permissions=path_permissions,
+                skills_xml=skills_xml,
+                config=self.config,
+                session_id=self._session_id,
+            )
+
+        logger.debug(f"System prompt assembled ({len(_instructions(None, None))} chars)")
 
         # 8. Create the OpenAI Agents SDK Agent.
         #    Only set verbosity; let the API decide reasoning effort (medium).
@@ -252,7 +258,7 @@ class JarvisAgent:
         if is_openai_native:
             self.agent = Agent(
                 name="jarvis",
-                instructions=system_prompt,
+                instructions=_instructions,
                 tools=ALL_TOOLS,
                 model=model_name,
                 model_settings=settings,
@@ -262,7 +268,7 @@ class JarvisAgent:
             litellm_model = _build_model(openai_client, model_name)
             self.agent = Agent(
                 name="jarvis",
-                instructions=system_prompt,
+                instructions=_instructions,
                 tools=ALL_TOOLS,
                 model=litellm_model,
                 model_settings=settings,
