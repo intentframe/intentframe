@@ -108,6 +108,24 @@ uv run pytest tests/test_transitive_injection.py -v
 python demo/tests/test_transitive_injection_live.py
 ```
 
+### Non-attack tests (no supervisor needed)
+
+```bash
+# Deterministic only — no API key, runs anywhere (357 tests)
+.venv/bin/python -m pytest tests/ demo/tests/test_domain_hardening.py -v
+
+# With OPENAI_API_KEY — adds AI Analysis Engine + full pipeline tests
+export OPENAI_API_KEY=your-key-here
+.venv/bin/python -m pytest tests/ demo/tests/test_domain_hardening.py \
+    demo/tests/test_ai_analysis.py demo/tests/test_ai_pipeline.py -v
+
+# Adapter contract tests (standalone script, from repo root)
+.venv/bin/python demo/tests/test_adapters.py
+
+# Executor pipeline tests (standalone script, must run from demo/)
+cd demo && ../.venv/bin/python tests/test_executor.py
+```
+
 ---
 
 ## Attack Matrix

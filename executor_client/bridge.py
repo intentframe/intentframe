@@ -314,6 +314,9 @@ class ExecutorBridge:
             async def has(self, service: str, key: str) -> bool:
                 return False
 
+            async def list_keys(self, namespace: str) -> list[str]:
+                return []
+
         # ── Wire gateway ─────────────────────────────────────────────────
         from executor.services.credential_scrubber import CredentialScrubber
         from executor.services.hash_chain import HashChain
