@@ -12,7 +12,7 @@ Runs as an `.app` bundle with `LSUIElement = true` (no Dock icon, no menu bar). 
 | **Reminders** | EventKit | Create, list, complete, update, delete reminders and lists |
 | **Contacts** | Contacts.framework | Search, get, add, update, delete contacts |
 | **Notes** | SQLite + NSAppleScript | List, read, create, delete notes (hides Notes.app after writes) |
-| **Messages** | SQLite + NSAppleScript | Send messages, read conversation history |
+| **Messages** | SQLite + NSAppleScript + Madrid (typedstream) | Send messages, read conversation history (incl. macOS Tahoe `attributedBody`) |
 | **Mail** | NSAppleScript | Send, read, search email via Mail.app (executor uses EDI instead; retained for Mail.app-specific use) |
 | **Mail Corpus** | NSAppleScript | List mailboxes, fetch headers and bodies for external consumers |
 | **Notifications** | UserNotifications | Show rich branded notifications |
@@ -21,9 +21,23 @@ Runs as an `.app` bundle with `LSUIElement = true` (no Dock icon, no menu bar). 
 
 ## Requirements
 
-- macOS 14 (Sonoma) or later
-- Swift 5.9+
+- macOS 14 (Sonoma) through macOS 26 (Tahoe) and later
+- Swift 5.9+ for the manifest, Swift 6.0+ compiler for building dependencies
 - Xcode Command Line Tools (`xcode-select --install`)
+
+## Dependencies
+
+Resolved by Swift Package Manager from `Package.swift`. Pinned in
+`Package.resolved` (checked into git for reproducible builds).
+
+| Package | Version | Why |
+|---|---|---|
+| [Vapor](https://github.com/vapor/vapor) | `from: 4.89.0` | HTTP server over the Unix domain socket |
+| [Madrid](https://github.com/loopwork-ai/Madrid) | `from: 0.4.0` (TypedStream product only) | Pure-Swift parser for Apple's `NSArchiver` typedstream format. Required to read iMessage `attributedBody` blobs on macOS 26 Tahoe, where Apple stopped populating `message.text` in `chat.db`. See [`docs/imessage-attributedbody.md`](docs/imessage-attributedbody.md) for the full story. |
+
+To bump Madrid: `cd macos-appkit-server && swift package update Madrid`,
+re-run the [`READ_MESSAGES` curl tests](docs/imessage-attributedbody.md#verifying-the-fix),
+then commit the updated `Package.resolved`.
 
 ## Project structure
 
@@ -260,6 +274,8 @@ The `adapter` field routes to a service. The `action` field selects the operatio
 On first launch the server requests access to Calendars, Reminders, Contacts, and Notifications. macOS will show permission prompts. If denied, the corresponding service returns `access_denied` errors with a hint to grant access in System Settings.
 
 Notes and Messages use SQLite reads which require **Full Disk Access** (System Settings > Privacy & Security > Full Disk Access) for the app or terminal running the server.
+
+On **macOS 26 Tahoe** specifically, Messages reading also depends on the Madrid TypedStream decoder because Apple changed how `chat.db` stores message text — see [`docs/imessage-attributedbody.md`](docs/imessage-attributedbody.md). Pre-Tahoe macOS works without ever invoking the decoder.
 
 Mail and Mail Corpus use AppleScript to control Mail.app. Mail.app must be running (or will be launched). On first use, macOS may prompt for **Automation** permission (System Settings > Privacy & Security > Automation) to allow the server to control Mail.app. Note: the executor's `MailAdapter` now uses the EDI `EmailClient` (IMAP/SMTP) for all email operations and does not route through this server. The Mail service here is retained for Mail.app-specific integrations (e.g. bulk mail corpus export).
 
