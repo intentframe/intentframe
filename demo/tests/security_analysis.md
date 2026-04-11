@@ -259,7 +259,7 @@ world stays safe.
 | **AGA07** | Inadequate Guardrails & Alignment | **Core mission** | `intent_limits` (semantic guardrails), `domain_constraints` (structural guardrails), `allowed_actions` (action guardrails). Three layers of defense-in-depth. |
 | **AGA08** | Knowledge Poisoning | **Partial** | Attack 3 (analysis poisoning), transitive injection tests (poisoned AE to Guardian). The architectural separation between AE (understanding) and Guardian (decision) limits blast radius. Active domains from policy provide trusted ground truth independent of any LLM output. |
 | **AGA09** | Opaque Decision Chains | **Yes** | Full audit log with `decision`, `decision_path` (fast_path vs ai), `action`, `message`, timestamps. Every intent's journey through the pipeline is recorded. |
-| **AGA10** | Cascading Trust Failures | **Yes** | `test_transitive_injection_live.py` directly tests AE-to-Guardian trust chain poisoning. Guardian doesn't blindly trust AE — it independently inspects intent fields and uses deterministic active domains as ground truth. |
+| **AGA10** | Cascading Trust Failures | **Yes** | `test_transitive_injection_live.py` stress-tests the AE→Guardian trust boundary. The architecture designates the AE as the source of truth for semantic analysis; cascading failure is bounded not by Guardian re-verifying the AE (which would defeat the purpose of having an AE), but by deterministic gates (permission, constraint, active_domains from policy) that run regardless of AE content, plus the AE's own hardened input surface (see tests 4, 5 — real injected intent → real AE → real Guardian, both pass end-to-end). |
 
 ### Scorecard
 
@@ -280,11 +280,19 @@ Agentic Top 10 has zero irrelevant categories for IntentFrame.
 executor thoroughly, but doesn't currently sanitize what the executor returns to
 the user or downstream systems.
 
-**AGA08 (Knowledge Poisoning)** — IntentFrame mitigates this at the AE-to-Guardian
-boundary (the transitive injection tests prove Guardian resists poisoned AE
-output). But if the agent's own RAG knowledge base is poisoned before it
-formulates the intent, IntentFrame only sees the resulting intent — it can catch
-the symptom (malicious action) but not the root cause (poisoned knowledge).
+**AGA08 (Knowledge Poisoning)** — IntentFrame mitigates this primarily at the AE
+input surface. The AE's hardened prompt, structured output, encoding normalization,
+and `AEFieldLimit` bounds are what resist prompt injection in `intent.reason` /
+`target` / `data` — this is exercised end-to-end by tests 4 and 5 in
+`test_transitive_injection_live.py` (real injected intent → real AE → real Guardian,
+both pass). Cascading failure from a hypothetically fully-compromised AE is then
+bounded by the Guardian's deterministic gates (permission, constraint, active_domains
+from policy), not by Guardian re-verifying the AE's semantic analysis — see the
+`Transitive Injection Tests — What They Prove` section in `demo/tests/README.md`
+for the trust-boundary interpretation. But if the agent's own RAG knowledge base
+is poisoned before it formulates the intent, IntentFrame only sees the resulting
+intent — it can catch the symptom (malicious action) but not the root cause
+(poisoned knowledge).
 
 ---
 
