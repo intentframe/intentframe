@@ -57,56 +57,73 @@ If the gateway CLI is already running, it uses `jarvis_pa/executor.yaml` — a d
 
 ## Running the tests
 
-The tests in `tests/` exercise different aspects of the pipeline. Run them from the **repo root** with the supervisor running.
+See [`tests/README.md`](tests/README.md) for the full test guide — threat model, attack matrix, how to run, and current results.
+
+Quick start (from **repo root**, with the attack supervisor running):
 
 ```bash
+# Start the supervisor with the attack executor profile
+EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+
+# Foundation attacks (1-6)
+python demo/tests/test_attacks.py
+
+# Advanced attacks (7-14: encoding, many-shot, crescendo, unicode, etc.)
+python demo/tests/test_advanced_attacks.py
+
+# Red-team attacks (15-24: expert-level, payloads in data/target fields)
+python demo/tests/test_redteam_attacks.py
+
+# Specific attacks
+python demo/tests/test_attacks.py 2
+python demo/tests/test_redteam_attacks.py 15 17
+
 # Full AI pipeline (invoice processing end-to-end)
-python -m tests.test_ai_pipeline
-
-# Security: basic prompt injection attacks (01-06)
-python -m tests.test_attacks
-
-# Security: advanced attacks (07-14, sourced from JailbreakBench/OWASP/academic research)
-python -m tests.test_advanced_attacks
-
-# Specific attack numbers
-python -m tests.test_advanced_attacks 7 9 12
-
-# JSON output for CI
-python -m tests.test_advanced_attacks --json
+python demo/tests/test_ai_pipeline.py
 
 # Executor adapter tests
-python -m tests.test_adapters
-
-# Domain constraint hardening
-python -m tests.test_domain_hardening
+python demo/tests/test_adapters.py
 ```
 
 ## Layout
 
 ```
 demo/
-├── demo_dashboard.py          # Entry point — config-driven dashboard run
+├── demo_dashboard.py              # Entry point — config-driven dashboard run
 ├── config/
-│   ├── dashboard.yaml         # Users, workspaces, tasks
-│   └── executor.yaml          # Executor profile for the demo
+│   ├── dashboard.yaml             # Users, workspaces, tasks
+│   ├── executor.yaml              # Executor profile for the demo
+│   ├── executor_attacks.yaml      # Executor profile for attack tests
+│   └── test_policy.yaml           # Shared test policy (all attack suites)
 ├── demo_data/
-│   ├── acme_corp.md           # Normal invoice (potential duplicate)
-│   ├── office_depot.md        # Normal invoice (within limit)
-│   ├── techconsult.md         # Over-limit invoice ($12,000)
-│   ├── expense_tracker.md     # Written by the agent during the run
-│   ├── expense_tracker_original_locked.md   # Clean starting state (reset on each run)
-│   └── attacks/               # 14 prompt injection attack test cases
-│       └── README.md          # Attack descriptions and expected outcomes
+│   ├── acme_corp.md               # Normal invoice (potential duplicate)
+│   ├── office_depot.md            # Normal invoice (within limit)
+│   ├── techconsult.md             # Over-limit invoice ($12,000)
+│   ├── expense_tracker.md         # Written by the agent during the run
+│   ├── expense_tracker_original_locked.md
+│   ├── attacks/                   # 14 malicious invoice files (attacks 1-14)
+│   │   └── README.md
+│   └── attack_intents/            # 24 pre-built attack intent JSONs
+│       ├── attack_01_*.json ... attack_14_*.json
+│       └── redteam/
+│           └── attack_15_*.json ... attack_24_*.json
 └── tests/
-    ├── test_ai_pipeline.py
-    ├── test_attacks.py
-    ├── test_advanced_attacks.py
-    ├── test_adapters.py
-    ├── test_domain_hardening.py
-    └── test_ai_analysis.py
+    ├── README.md                  # Test guide, attack matrix, results
+    ├── security_analysis.md       # Deep security analysis & OWASP coverage
+    ├── test_attacks.py            # Attacks 1-6 (foundation)
+    ├── test_advanced_attacks.py   # Attacks 7-14 (advanced evasion)
+    ├── test_redteam_attacks.py    # Attacks 15-24 (expert red-team)
+    ├── stub_pipeline_agent.py     # Agent-agnostic test harness
+    ├── invoice_attack_pipeline.py # Test orchestration
+    ├── policy_loader.py           # Shared YAML → UserPolicy loader
+    ├── test_ai_pipeline.py        # Full pipeline integration
+    ├── test_ai_analysis.py        # AE unit tests
+    ├── test_adapters.py           # Executor adapter tests
+    ├── test_domain_hardening.py   # Domain constraint tests
+    ├── test_executor.py           # Executor service tests
+    └── test_transitive_injection_live.py  # AE → Guardian boundary (live LLM)
 ```
 
 ## Attack test cases
 
-`demo_data/attacks/` contains 14 prompt injection scenarios sourced from JailbreakBench, OWASP LLM Top 10, Microsoft Crescendo, and academic research. See [`demo_data/attacks/README.md`](demo_data/attacks/README.md) for the full attack matrix and expected outcomes.
+24 attacks across three suites, mapped to OWASP LLM Top 10 and OWASP Agentic Top 10 categories. Current results: **23/24 defended, 1 known gap** (salami slicing — cumulative spending detection is planned). See [`tests/README.md`](tests/README.md) for the full attack matrix, reproducibility data, and detailed results.

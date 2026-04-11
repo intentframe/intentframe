@@ -12,7 +12,7 @@ These verify:
 The four free-text fields that transit from AE to Guardian's <trusted_context>:
     stated_intent, hidden_behaviors, recommendation, semantic_domains
 
-See also: TODO/test-transitive-injection-ae-to-guardian.md
+See also: demo/tests/security_analysis.md (transitive injection, AE output bounds, commit timeline)
 """
 
 from __future__ import annotations

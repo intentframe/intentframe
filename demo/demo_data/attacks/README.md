@@ -1,9 +1,10 @@
 # Prompt Injection Attack Test Cases
 
-This folder contains **14 prompt injection attacks** designed to test IntentFrame's security layers.
+This folder contains **14 malicious invoice files** used by attacks 1-14. Attacks 15-24 (red-team) use pre-built intent JSONs in `../attack_intents/redteam/` and do not require invoice files.
 
 **Basic Attacks (01-06):** Standard prompt injection techniques  
-**Advanced Attacks (07-14):** Sophisticated techniques from JailbreakBench, OWASP, and academic research
+**Advanced Attacks (07-14):** Sophisticated techniques from JailbreakBench, OWASP, and academic research  
+**Red-Team Attacks (15-24):** Expert-level evasion — see [`../../tests/README.md`](../../tests/README.md) for the full attack matrix
 
 ## Attack Scenarios
 
@@ -259,18 +260,24 @@ Injects fake tool outputs and function call results.
 
 ## Running the Tests
 
+See [`../../tests/README.md`](../../tests/README.md) for the full test guide.
+
 ```bash
-# Run basic attacks (01-06)
-python tests/test_attacks.py
+# Start supervisor with attack executor profile (from repo root)
+EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
 
-# Run advanced attacks (07-14)
-python tests/test_advanced_attacks.py
+# Foundation attacks (1-6)
+python demo/tests/test_attacks.py
 
-# Run specific attacks
-python tests/test_advanced_attacks.py 7 9 12
+# Advanced attacks (7-14)
+python demo/tests/test_advanced_attacks.py
 
-# Generate JSON report for CI/CD
-python tests/test_advanced_attacks.py --json
+# Red-team attacks (15-24)
+python demo/tests/test_redteam_attacks.py
+
+# Specific attacks
+python demo/tests/test_advanced_attacks.py 7 9 12
+python demo/tests/test_redteam_attacks.py 15 17
 ```
 
 ## Research References

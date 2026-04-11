@@ -37,6 +37,7 @@ class AnalysisEngine(ABC):
         intent: IntentFrame,
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
+        active_domains: set[str] | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -62,5 +63,11 @@ class AnalysisEngine(ABC):
                 Only relevant for RUN_COMMAND — injected into the AI
                 prompt as additional context.  Does not affect fast-path
                 decisions for other intent types.
+            active_domains: Domain strings the user has active rules
+                for, extracted deterministically from intent_limits
+                and domain_constraints.  Injected into the AI prompt
+                as trusted context so the AE knows which domains to
+                check for.  Does not reveal policy details — only
+                the domain vocabulary the system cares about.
         """
         pass

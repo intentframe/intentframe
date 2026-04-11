@@ -126,7 +126,7 @@ A full policy-editing surface — via a web app, the CLI, or a macOS app — is 
 ## Requirements
 
 - Python 3.14+
-- macOS 14+ (Sonoma) for the Swift platform server (optional — core framework works on any OS)
+- macOS 14 (Sonoma) through macOS 26 (Tahoe) and later for the Swift platform server (optional — core framework works on any OS). On Tahoe, iMessage reading uses a typedstream decoder to handle Apple's `chat.db` schema-behavior change; see [`macos-appkit-server/docs/imessage-attributedbody.md`](macos-appkit-server/docs/imessage-attributedbody.md) for the technical details.
 
 ---
 

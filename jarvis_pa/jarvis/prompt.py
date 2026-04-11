@@ -63,7 +63,7 @@ def build_system_prompt(
         path_permissions=path_permissions or {},
         skills_xml=skills_xml,
         skills_instructions=SKILLS_INSTRUCTIONS,
-        now=datetime.now().strftime("%Y-%m-%d %H:%M %Z").strip(),
+        now=datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z (UTC%z)"),
         model=config.model,
         session_id=session_id or str(uuid.uuid4())[:8],
     )

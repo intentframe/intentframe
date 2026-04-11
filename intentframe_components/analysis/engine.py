@@ -22,7 +22,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from agents import Agent, Runner
+from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, AnalysisReport
@@ -199,6 +199,23 @@ class AIAnalysisEngine(AnalysisEngine):
 
     _hardener = PromptHardening()
 
+    # ── Model settings note ──────────────────────────────────────
+    # The Agents SDK passes ModelSettings fields to the OpenAI Responses
+    # API via a _non_null_or_omit() pattern: any field left as None is
+    # omitted from the request entirely, falling back to the API's own
+    # default (temperature=1.0, top_p=1.0, etc.).
+    #
+    # For standard completion models (gpt-4o-mini, gpt-4.1, etc.)
+    # temperature=0 gives greedy decoding — always picks the highest-
+    # probability token.  This is the single biggest lever for
+    # reproducibility (~95%+ identical outputs on identical inputs).
+    # OpenAI recommends not setting both temperature and top_p, and
+    # with temperature=0 top_p is irrelevant, so we leave it as None.
+    #
+    # GPT-5 family models are reasoning models and do NOT accept
+    # temperature — use ModelSettings(reasoning=Reasoning(effort=...))
+    # instead.  See the Guardian engine for that pattern.
+
     def __init__(
         self,
         model: str = "gpt-4o-mini",
@@ -215,6 +232,7 @@ class AIAnalysisEngine(AnalysisEngine):
             ),
             model=self.model,
             output_type=AIAnalysisOutput,
+            model_settings=ModelSettings(temperature=0),
         )
     
     @staticmethod
@@ -387,6 +405,7 @@ For recommendation:
         intent: IntentFrame,
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
+        active_domains: set[str] | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -400,6 +419,10 @@ For recommendation:
         When present the signals are injected into the AI prompt for
         richer context.  Fast-path decisions are unaffected — they
         apply to their own intent types independently.
+
+        active_domains are domain strings the user has active rules for.
+        Injected as trusted context so the AE knows which semantic
+        domains are relevant to this user's configuration.
         """
         # ── Fast path: safe read-only ────────────────────────────────
         fast = self._try_fast_path(intent, safe_actions or set())
@@ -420,7 +443,9 @@ For recommendation:
             print(f"    │  Terminal command signals ({len(terminal_command_signals)}) — enriching AI prompt")
 
         prompt = self._build_analysis_prompt(
-            intent, terminal_command_signals=terminal_command_signals,
+            intent,
+            terminal_command_signals=terminal_command_signals,
+            active_domains=active_domains,
         )
         
         if self.verbose:
@@ -437,23 +462,27 @@ For recommendation:
         self,
         intent: IntentFrame,
         terminal_command_signals: tuple = (),
+        active_domains: set[str] | None = None,
     ) -> str:
         """Build a hardened prompt for the AI agent.
 
         Trusted section: action (enum-validated), agent metadata,
-        task description, terminal command signals (from command_shield).
+        task description, active domains, terminal command signals
+        (from command_shield).
         Untrusted section: target, reason, data — the fields the agent
         LLM actually controls.
         """
-        # ── Trusted: pipeline-controlled context ──────────────────
-        trusted_lines = [
+        # ── Trusted sections (pipeline-controlled) ────────────────
+        trusted_sections: dict[str, str] = {}
+
+        context_lines = [
             f"Action: {intent.action.value}",
             f"Agent: {intent.agent_type or intent.agent_id}",
             f"Task: {intent.task_description or 'Not specified'}",
         ]
 
         if terminal_command_signals:
-            trusted_lines.append(
+            context_lines.append(
                 "\nTERMINAL COMMAND — STRUCTURAL SIGNALS:\n"
                 "Before this command reached you, deterministic static analysis "
                 "(AST parsing, pattern matching, normalisation) detected the "
@@ -464,7 +493,19 @@ For recommendation:
                 line = f"  - [{sig.check}:{sig.signal_id}] {sig.description}"
                 if sig.evidence:
                     line += f"  (evidence: {sig.evidence[:120]})"
-                trusted_lines.append(line)
+                context_lines.append(line)
+
+        trusted_sections["Context"] = "\n".join(context_lines)
+
+        if active_domains:
+            domains_str = ", ".join(sorted(active_domains))
+            trusted_sections["Active Domains"] = (
+                f"The system has rules for these domains: {domains_str}\n"
+                "Pay special attention to whether this action falls under any of "
+                "these domains. If it does, include the matching domain(s) in your "
+                "semantic_domains output. This is a hint — still classify any other "
+                "domains you observe."
+            )
 
         # ── Untrusted: agent-controlled fields ────────────────────
         untrusted = {"Target": intent.target, "Reason": intent.reason}
@@ -474,7 +515,7 @@ For recommendation:
             untrusted["Data"] = data_section
 
         return self._hardener.build_hardened_prompt(
-            trusted_sections={"Context": "\n".join(trusted_lines)},
+            trusted_sections=trusted_sections,
             untrusted_fields=untrusted,
             closing_instruction="Analyze what this action will REALLY do.",
         )

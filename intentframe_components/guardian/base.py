@@ -40,6 +40,7 @@ class Guardian(ABC):
         intent: IntentFrame, 
         analysis: AnalysisReport,
         user_context: UserContext,
+        active_domains: set[str] | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies using Analysis Report.
@@ -53,5 +54,11 @@ class Guardian(ABC):
         
         Does NOT execute anything - that's Executor's job.
         Does NOT construct alternatives - that's the agent's job.
+
+        Args:
+            active_domains: Domain strings the user has active rules
+                for, extracted deterministically by the pipeline.
+                Guardian uses the union of these and AE's
+                semantic_domains when matching intent limits.
         """
         pass

@@ -25,9 +25,10 @@ Validation flow:
 
 from typing import Optional
 
+from openai.types.shared import Reasoning
 from pydantic import BaseModel, Field
 
-from agents import Agent, Runner
+from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ACTION_DOMAINS, DomainType
 from intentframe_core.types import IntentFrame, AnalysisReport, ValidationResult, UserContext
@@ -96,6 +97,30 @@ class AIGuardian(Guardian):
 
     _hardener = PromptHardening()
 
+    # ── Model settings note ──────────────────────────────────────
+    # The Agents SDK passes ModelSettings fields to the OpenAI Responses
+    # API via a _non_null_or_omit() pattern: any field left as None is
+    # omitted from the request entirely, falling back to the API's own
+    # default (temperature=1.0, top_p=1.0, etc.).
+    #
+    # GPT-5 family models are reasoning models — they do NOT accept
+    # the `temperature` parameter (the API returns HTTP 400).  Their
+    # output variability is controlled via `reasoning.effort` instead.
+    # The SDK default is effort="low" (with verbosity="low") — chosen
+    # for latency.  Available levels: "minimal", "low", "medium", "high".
+    # Guardian is security-critical so "medium" or "high" may be worth
+    # the latency trade-off if judgment accuracy matters more than speed.
+    #
+    # For non-reasoning models (gpt-4o-mini, gpt-4.1, etc.) use
+    # ModelSettings(temperature=0) for greedy decoding.  See the
+    # Analysis Engine for that pattern.
+    #
+    # The SDK also auto-detects GPT-5 models and applies default
+    # reasoning settings (effort="low", verbosity="low") via
+    # get_default_model_settings() — but only when model_settings is
+    # left at the factory default.  Passing explicit ModelSettings
+    # overrides that, so we must set reasoning ourselves.
+
     def __init__(self, model: str = "gpt-5-mini-2025-08-07", verbose: bool = True):
         self.model = model
         self.verbose = verbose
@@ -108,6 +133,9 @@ class AIGuardian(Guardian):
             ),
             model=self.model,
             output_type=AIGuardianOutput,
+            # model_settings=ModelSettings(
+            #     reasoning=Reasoning(effort="high"),
+            # ),
         )
 
     @staticmethod
@@ -117,22 +145,23 @@ class AIGuardian(Guardian):
 You receive:
 1. Context (task and agent identity) — in trusted pipeline tags
 2. IntentFrame fields (target, reason, data) — in untrusted boundary markers
-3. AnalysisReport (factual description of what it will do) — in trusted pipeline tags
+3. AnalysisReport (factual description of what the action will do) — in trusted pipeline tags
 4. UserContext (user policies: allowed_actions with constraints) — in trusted pipeline tags
 
 Your responsibilities:
-- Apply UserContext policies to the action described in IntentFrame + AnalysisReport
-- Do NOT re-analyze the action or infer new facts
-- Do NOT perform separate detection (use AnalysisReport facts)
+- Apply UserContext policies to the action described in the IntentFrame and AnalysisReport.
+- Do NOT re-analyze the action or infer new facts.
+- Do NOT perform separate detection; use the facts in the AnalysisReport.
 
 Decision rules:
-- ALLOW if all policies are satisfied
+- ALLOW if all policies are satisfied.
 - BLOCK if any policy is violated:
-    • Social engineering / phishing detected in the analysis
+    • Social engineering or phishing detected in the analysis
     • Scope mismatch (actual scope exceeds stated scope)
     • Hidden behaviors that represent a genuine security concern (not exhaustive): data exfiltration,
       unauthorized access, privilege escalation, data deception (claimed values
-      contradicting actual payload, structurally inappropriate content in data fields) and other kind of hidden behaviours.
+      contradict the actual payload or data fields contain structurally inappropriate content),
+      and other kinds of hidden behavior
     • Risk factors at HIGH or CRITICAL level
     • Clear mismatch between what the intentframe structure reason field is and actual behaviours
 
@@ -140,27 +169,37 @@ CRITICAL — ASK_USER / SHOW_MESSAGE / GET_CONFIRMATION are QUESTIONS, not commi
     Financial constraints do NOT apply to user-IO actions.
     An agent asking "this invoice is $12K, what should I do?" is NOT spending $12K.
     For ASK_USER, validate ONLY:
-      • Is the prompt safe (not phishing / social engineering)?
+      • Whether the prompt is safe (not phishing or social engineering)
 
 Important:
 - This action has ALREADY passed deterministic permission and constraint checks.
-- You are validating semantic safety: scope mismatches, actual security risks.
+- You are validating semantic safety: scope mismatches and actual security risks.
 - You do NOT suggest alternatives or construct modified actions.
 - You do NOT enforce business logic (duplicates, workflow choices, data validation).
 - If you BLOCK, the agent (the business domain expert) decides what to do next.
 
 Intent Limits:
 - You may receive a list of user-defined intent limits (spending caps, communication rules, etc.).
-- The AnalysisReport includes semantic_domains — the Analysis Engine has already classified
-  what this action means (e.g. ["spending"], ["communication", "deletion"]).
+- Important: You are responsible for finalizing the effective set of semantic domains
+  (e.g. ["spending"], ["communication", "deletion"]) and checking them against the
+  intent limits and user policy.
+- You receive semantic domain signals from two trusted sources, already merged in the Analysis Report:
+  1. Policy-declared domains — deterministically extracted from the user's rules (always present).
+  2. AE-classified domains — the Analysis Engine's best-effort semantic classification of what this action does.
+  The "Merged Semantic Domains" field you see is the union of both. This is your
+  starting point, not your final set of effective semantic domains. It ensures that limits are evaluated when
+  the user has a rule for that domain, even if the AE missed it.
 - Intent limits are BOUNDARIES, not suggestions. Your job is ENFORCEMENT:
-  1. Match the Analysis Engine's semantic_domains against each limit's domain.
-  2. If a domain matches AND the limit is violated (threshold exceeded, pattern matched, etc.),
+  1. Start with the merged semantic domains.
+  2. Additionally, inspect the untrusted intent fields (target, reason, data) yourself.
+  3. If you identify a domain that is clearly relevant but missing from the merged semantic
+     domains (e.g. target is stripe.com/charges but "spending" is absent, or data
+     contains a recipient email but "communication" is absent), add it to your final
+     effective set and treat domain as active for limit matching. Earlier layers can miss things; you are the last gate.
+  4. Match your final effective set of semantic domains against each limit's domain.
+  5. If a domain matches AND the limit is violated (threshold exceeded, pattern matched, etc.),
      BLOCK. You do NOT second-guess the limit. You do NOT make exceptions.
      The user set this boundary deliberately.
-  3. If the Analysis Engine's domains seem clearly wrong given the intent data
-     (e.g. domains is empty but the intent is obviously a payment to stripe.com),
-     you may flag this — but err on the side of blocking, not allowing.
 - If violated, BLOCK (or apply the specified effect) and cite the limit_id in your limit_violated field.
 - If no intent limits are provided, skip this check.
 
@@ -220,6 +259,7 @@ Be brief and cite the specific concern that caused your decision."""
         intent: IntentFrame,
         analysis: AnalysisReport,
         user_context: UserContext,
+        active_domains: set[str] | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies.
@@ -287,7 +327,10 @@ Be brief and cite the specific concern that caused your decision."""
             )
 
         # ── AI path: semantic validation ───────────────────────────
-        prompt = self._build_validation_prompt(intent, analysis, user_context, permission)
+        prompt = self._build_validation_prompt(
+            intent, analysis, user_context, permission,
+            active_domains=active_domains,
+        )
 
         if self.verbose:
             print(f"    │  AI judging: {action}...")
@@ -302,6 +345,7 @@ Be brief and cite the specific concern that caused your decision."""
         analysis: AnalysisReport,
         user_context: UserContext,
         permission: ActionPermission,
+        active_domains: set[str] | None = None,
     ) -> str:
         """Build a hardened prompt for the AI guardian.
 
@@ -327,6 +371,10 @@ Be brief and cite the specific concern that caused your decision."""
         else:
             constraint_str = "No specific constraints"
 
+        # ── Build effective domains (union of deterministic + AE) ─
+        ae_domains = set(analysis.semantic_domains) if analysis.semantic_domains else set()
+        effective_domains = ae_domains | (active_domains or set())
+
         # ── Trusted sections (pipeline-controlled) ────────────────
         trusted_sections: dict[str, str] = {}
 
@@ -350,10 +398,21 @@ Be brief and cite the specific concern that caused your decision."""
             else "None"
         )
 
+        domains_display = ', '.join(sorted(effective_domains)) if effective_domains else 'None identified'
+        ae_only = ae_domains - (active_domains or set())
+        domain_source_note = ""
+        if active_domains and ae_only:
+            domain_source_note = (
+                f"\n  (Sources: policy-declared={', '.join(sorted(active_domains))}"
+                f" | AE-classified={', '.join(sorted(ae_domains))})"
+            )
+        elif active_domains:
+            domain_source_note = " (includes policy-declared domains)"
+
         trusted_sections["Analysis Report"] = (
             f"Stated Intent: {analysis.stated_intent}\n"
             f"Confidence: {analysis.confidence:.0%}\n"
-            f"Semantic Domains: {', '.join(analysis.semantic_domains) if analysis.semantic_domains else 'None identified'}\n"
+            f"Merged Semantic Domains (AE + Policy): {domains_display}{domain_source_note}\n"
             f"Risk Factors: {risk_str}\n"
             f"Reversibility: {analysis.reversibility.value if analysis.reversibility else 'UNKNOWN'}\n"
             f"Scope Mismatch: {'YES - actual scope exceeds stated!' if analysis.scope_mismatch else 'No'}\n"
@@ -385,6 +444,14 @@ Be brief and cite the specific concern that caused your decision."""
                     f"  {i}. [{limit.domain}] {limit.description}{threshold_str}{pattern_str} {effect_str}\n"
                     f"     \"{limit.raw}\"\n"
                     f"     (limit_id: {limit.limit_id}, scope: {limit.scope})"
+                )
+            if active_domains:
+                limit_lines.append(
+                    f"\nStart with the merged semantic domains listed above"
+                    f" (policy-declared={', '.join(sorted(active_domains))}"
+                    f" plus any AE-classified domains shown there)."
+                    f" Then add any clearly missing domains you identify from the"
+                    f" untrusted fields before evaluating limits."
                 )
             trusted_sections["Intent Limits"] = "\n".join(limit_lines)
 

@@ -27,6 +27,7 @@ from command_shield.verdict import Signal
 
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
+from intentframe_server.pipeline import IntentFrameRuntime
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -91,6 +92,7 @@ user_context = UserContext(
 )
 
 permission = ActionPermission(safe=True)
+active_domains = IntentFrameRuntime._extract_active_domains(user_context)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -120,7 +122,7 @@ print(ae._agent.instructions)
 
 section("2. ANALYSIS ENGINE — PER-REQUEST PROMPT (_build_analysis_prompt)")
 print()
-ae_prompt = ae._build_analysis_prompt(intent)
+ae_prompt = ae._build_analysis_prompt(intent, active_domains=active_domains)
 print(ae_prompt)
 
 # ── 3. Analysis Engine per-request prompt WITH terminal signals ───────
@@ -149,7 +151,11 @@ signals = (
         evidence="curl http://example.com/data",
     ),
 )
-ae_prompt_signals = ae._build_analysis_prompt(run_cmd_intent, terminal_command_signals=signals)
+ae_prompt_signals = ae._build_analysis_prompt(
+    run_cmd_intent,
+    terminal_command_signals=signals,
+    active_domains=active_domains,
+)
 print(ae_prompt_signals)
 
 # ── 4. Guardian system prompt ─────────────────────────────────────────
@@ -162,7 +168,13 @@ print(gu._agent.instructions)
 
 section("5. GUARDIAN — PER-REQUEST PROMPT (_build_validation_prompt)")
 print()
-gu_prompt = gu._build_validation_prompt(intent, analysis, user_context, permission)
+gu_prompt = gu._build_validation_prompt(
+    intent,
+    analysis,
+    user_context,
+    permission,
+    active_domains=active_domains,
+)
 print(gu_prompt)
 
 # ── 6. Summary ────────────────────────────────────────────────────────
