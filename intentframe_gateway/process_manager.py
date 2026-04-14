@@ -10,8 +10,10 @@ Manages process types that are NOT part of the supervisor:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -222,8 +224,20 @@ class ProcessManager:
     # ── Generic lifecycle ──────────────────────────────────────────
 
     async def stop(self, name: str, *, timeout: float = 10.0) -> None:
-        """Stop a managed process by name."""
+        """Stop a managed process by name.
+
+        EDI is special: its `python -m ... start` is a wrapper that exits
+        as soon as the async daemon finishes (same process) — but when
+        the gateway restarts against an already-running daemon, the
+        wrapper exited with code 1 and the real daemon keeps running
+        detached from our Popen. Signal the real daemon via its PID file.
+        """
         proc = self._processes.pop(name, None)
+
+        if name == "edi":
+            await self._stop_edi_daemon(timeout)
+            return
+
         if proc is None:
             return
         if proc.process.poll() is not None:
@@ -241,13 +255,80 @@ class ProcessManager:
         if proc.socket_path:
             proc.socket_path.unlink(missing_ok=True)
 
+    async def _stop_edi_daemon(self, timeout: float) -> None:
+        """SIGTERM the EDI daemon via its PID file, then verify it exits."""
+        alive, pid = self._edi_daemon_status()
+        if not alive or pid is None:
+            return
+        logger.info("Stopping edi daemon (pid=%d)", pid)
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            alive, _ = self._edi_daemon_status()
+            if not alive:
+                return
+            await asyncio.sleep(0.2)
+        logger.warning("EDI daemon did not exit after SIGTERM; sending SIGKILL")
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def _edi_daemon_status(self) -> tuple[bool, int | None]:
+        """Probe EDI's daemon via its PID file. Mirrors EDI's own
+        is_daemon_running() logic so the two agree.
+        """
+        pid_file = Path(
+            os.environ.get(
+                "INTENTFRAME_EMAIL_HOME",
+                os.path.expanduser("~/.intentframe/email"),
+            )
+        ) / "daemon.pid"
+        if not pid_file.exists():
+            return False, None
+        try:
+            pid = int(pid_file.read_text().strip())
+        except (ValueError, OSError):
+            return False, None
+        try:
+            os.kill(pid, 0)
+            return True, pid
+        except ProcessLookupError:
+            return False, None
+        except PermissionError:
+            # Process exists under a different uid — count as alive.
+            return True, pid
+
     async def stop_all(self) -> None:
         """Stop all managed processes in reverse insertion order."""
         for name in reversed(list(self._processes)):
             await self.stop(name)
 
     def status(self, name: str) -> dict[str, Any]:
-        """Return status dict for a managed process."""
+        """Return status dict for a managed process.
+
+        EDI uses a PID-file lifecycle (daemon detaches from our wrapper
+        Popen), so its liveness is determined by its own PID file, not
+        by the wrapper's exit code.
+        """
+        if name == "edi":
+            alive, pid = self._edi_daemon_status()
+            proc = self._processes.get(name)
+            uptime = 0.0
+            if alive and proc is not None:
+                uptime = time.monotonic() - proc.started_at
+            return {
+                "name": "edi",
+                "running": alive,
+                "pid": pid,
+                "healthy": alive,
+                "restarts": proc.restart_count if proc else 0,
+                "uptime": uptime,
+            }
+
         proc = self._processes.get(name)
         if proc is None:
             return {"name": name, "running": False, "pid": None}

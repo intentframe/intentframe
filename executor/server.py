@@ -100,6 +100,10 @@ app = FastAPI(
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "executor"
+    uid: int = 0
+    euid: int = 0
+    running_as_root: bool = False
+    pid: int = 0
 
 
 class RollbackRequest(BaseModel):
@@ -108,8 +112,13 @@ class RollbackRequest(BaseModel):
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse()
-
+    euid = os.geteuid()
+    return HealthResponse(
+        uid=os.getuid(),
+        euid=euid,
+        running_as_root=(euid == 0),
+        pid=os.getpid(),
+    )
 
 @app.post("/execute", response_model=ExecutionResult)
 async def execute(request: ExecutionRequest) -> ExecutionResult:
