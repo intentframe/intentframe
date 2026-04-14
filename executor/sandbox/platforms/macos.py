@@ -177,10 +177,11 @@ _PTY = (
     '(allow file-read* file-write* (literal "/dev/ptmx") (regex #"^/dev/ttys"))',
 )
 
-# System file reads — intentionally does NOT include /private/var/folders
-# or /var.  Those broad allows would undermine deny rules for paths under
-# the macOS per-user temp directory.  Mount-derived rules grant access to
-# specific directories the command actually needs.
+# System file reads — every root-level directory where macOS tools live.
+# Covers Homebrew (Apple Silicon + Intel), MacPorts, Nix, Xcode CLT,
+# system frameworks, and manual /usr/local installs.
+# Does NOT include /private/var/folders or /Users — those stay gated
+# behind VFS mount rules so user data is never readable by default.
 _SYSTEM_FILE_READS = (
     "(allow file-read-metadata)",
     "(allow file-read*",
@@ -188,15 +189,21 @@ _SYSTEM_FILE_READS = (
     '  (subpath "/usr/bin")',
     '  (subpath "/usr/sbin")',
     '  (subpath "/usr/share")',
+    '  (subpath "/usr/local")',
     '  (subpath "/bin")',
     '  (subpath "/sbin")',
+    '  (subpath "/opt")',
     '  (subpath "/System/Library")',
-    '  (subpath "/Library/Apple")',
+    '  (subpath "/Library")',
     '  (subpath "/private/etc")',
     '  (subpath "/private/var/db")',
+    '  (subpath "/private/tmp")',
+    '  (subpath "/nix")',
     '  (subpath "/dev")',
     '  (literal "/")',
     '  (literal "/etc")',
+    '  (literal "/tmp")',
+    '  (literal "/var")',
     '  (literal "/private")',
     '  (literal "/private/var"))',
 )
