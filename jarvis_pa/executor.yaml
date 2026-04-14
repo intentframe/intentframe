@@ -54,6 +54,20 @@ filesystem:
       real_path: ~/
       writable: true
 
+# ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
+# Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
+# The classifier picks the narrowest template that covers a command's needs.
+# Opaque or unclassifiable commands use the fallback template.
+sandbox:
+  enabled: true
+  default_template: file_read_only
+  opaque_fallback: file_read_write
+  allowed_templates:
+    - pure_compute
+    - file_read_only
+    - file_read_write
+    - network_outbound
+
 storage:
   database_path: null
   log_path: null

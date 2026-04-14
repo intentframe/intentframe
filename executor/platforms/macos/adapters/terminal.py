@@ -35,8 +35,16 @@ DEFAULT_COMMAND_TIMEOUT = 30.0
 class TerminalAdapter(CapabilityAdapter):
     """Shell command execution adapter."""
 
-    def __init__(self, **_kwargs) -> None:
-        pass
+    def __init__(
+        self,
+        sandbox_engine=None,
+        sandbox_planner=None,
+        sandbox_config=None,
+        **_kwargs,
+    ) -> None:
+        self._sandbox_engine = sandbox_engine
+        self._sandbox_planner = sandbox_planner
+        self._sandbox_config = sandbox_config
 
     def supported_actions(self) -> list[str]:
         return [ActionType.RUN_COMMAND.value]
@@ -70,9 +78,33 @@ class TerminalAdapter(CapabilityAdapter):
         working_dir = params.get("working_directory")
         timeout = params.get("timeout", DEFAULT_COMMAND_TIMEOUT)
 
+        # ── Sandbox wrapping ──────────────────────────────────────────────
+        actual_command = command
+        if self._sandbox_config and self._sandbox_config.enabled:
+            if not self._sandbox_engine or not self._sandbox_planner:
+                return ExecutionResult(
+                    success=False,
+                    error="Sandbox enabled but engine unavailable on this platform -- RUN_COMMAND blocked",
+                )
+
+            from executor.sandbox.classifier import classify
+
+            cap_report = classify(command)
+            plan = self._sandbox_planner.plan(cap_report, working_directory=working_dir)
+            if plan is None:
+                return ExecutionResult(
+                    success=False,
+                    error="Command requires capabilities beyond executor sandbox policy",
+                )
+            actual_command = self._sandbox_engine.wrap(command, plan)
+            logger.debug(
+                "Sandbox: template=%s opaque=%s command=%s",
+                plan.template.value, cap_report.opaque, command[:120],
+            )
+
         try:
             process = await asyncio.create_subprocess_shell(
-                command,
+                actual_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=working_dir,

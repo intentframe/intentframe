@@ -1228,3 +1228,51 @@ observation bus — the last piece that PyXA could not provide.
 adapters: import, instantiation, `supported_actions()`, `manifest()`, subclass
 check, registry population, factory round-trip, action uniqueness, and pyobjc
 framework availability. All pass.
+
+---
+
+## Part 20: Progress — Kernel-Enforced RUN_COMMAND Sandbox (Apr 2026)
+
+Every `RUN_COMMAND` is now wrapped in a macOS Seatbelt sandbox before subprocess
+execution. The sandbox is entirely internal to the executor — no pipeline, Guardian,
+or agent changes.
+
+See `executor/sandbox.md` for the full implementation reference.
+
+### Design principles
+
+- `(deny default)` — kernel blocks everything not explicitly allowed
+- Filesystem scope derived from the same VFS mounts the executor already uses
+- Template selection via deterministic command classifier (shlex-based, no execution)
+- Non-negotiable deny overrides placed last (Seatbelt last-match-wins)
+- All paths canonicalized via `os.path.realpath()` before entering SBPL rules
+- Controlled `TMPDIR` (`/tmp/intentframe`) instead of blanket-allowing `/var/folders`
+- Per-request rejection if sandbox engine unavailable (fail-closed)
+
+### New module
+
+`executor/sandbox/` — classifier, planner, pathing, templates, engine, macOS platform.
+Dynamic SBPL profile generation following Anthropic's `sandbox-runtime` pattern.
+
+### What changed in existing code
+
+| File | Change |
+|---|---|
+| `executor/config/schema.py` | Added `SandboxConfig` Pydantic model |
+| `executor/main.py` | Engine/planner init after VFS mount resolution |
+| `executor/platforms/macos/adapters/terminal.py` | Classify → plan → wrap before subprocess |
+| `jarvis_pa/executor.yaml` | Added `sandbox:` config section |
+
+### Default Jarvis sandbox behavior
+
+- Template ceiling: `pure_compute`, `file_read_only`, `file_read_write`
+- Network commands rejected (above ceiling)
+- Opaque commands (scripts, eval) use `file_read_write` fallback
+- `~/.intentframe` blocked from read and write
+- System directories blocked from write
+
+### Verification
+
+`tests/test_sandbox.py` — 126 tests including real `sandbox-exec` kernel
+enforcement tests that run actual commands through Seatbelt and verify the
+kernel blocks or allows operations.

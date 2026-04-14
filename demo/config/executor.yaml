@@ -48,6 +48,11 @@ adapters:
     - files
     - user_io
 
+# ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
+# Demo does not enable the terminal adapter, so sandbox config is omitted.
+# If terminal is added to adapters.enabled, add a sandbox: section here.
+# See jarvis_pa/executor.yaml or executor/config/executor.yaml for examples.
+
 storage:
   database_path: null
   log_path: null

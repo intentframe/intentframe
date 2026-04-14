@@ -156,12 +156,33 @@ def build_gateway(
 
     mount_resolver = MountPointResolver(mount_configs, base_path)
 
+    # ── Sandbox Engine (RUN_COMMAND kernel-enforced sandboxing) ───────────
+    from executor.sandbox.engine import create_sandbox_engine
+    from executor.sandbox.planner import SandboxPlanner
+
+    sandbox_engine = None
+    sandbox_planner = None
+    if config.sandbox.enabled:
+        sandbox_engine = create_sandbox_engine(config.platform)
+        if sandbox_engine and sandbox_engine.available():
+            sandbox_planner = SandboxPlanner(config.sandbox, mount_resolver)
+            logger.info("Sandbox engine: %s", type(sandbox_engine).__name__)
+        else:
+            logger.warning(
+                "Sandbox enabled but engine unavailable on this platform "
+                "-- RUN_COMMAND will be rejected at request time"
+            )
+            sandbox_engine = None
+
     # ── Adapters ──────────────────────────────────────────────────────────
     # All possible adapter dependencies -- each adapter takes what it needs
     adapter_deps: dict[str, Any] = {
         "credential_vault": credential_vault,
         "mount_resolver": mount_resolver,
         "base_path": base_path,
+        "sandbox_engine": sandbox_engine,
+        "sandbox_planner": sandbox_planner,
+        "sandbox_config": config.sandbox,
     }
 
     dispatcher = ActionDispatcher()

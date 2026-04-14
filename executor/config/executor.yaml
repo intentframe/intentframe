@@ -84,6 +84,24 @@ adapters:
     # - lambda_invoke
     # - cloud_storage
 
+# ─── RUN_COMMAND Sandboxing ─────────────────────────────────────────────────
+# Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
+# Filesystem scope is derived from VFS mounts above.
+# The classifier picks the narrowest template that covers a command's needs.
+# Opaque or unclassifiable commands use the opaque_fallback template.
+# If the sandbox engine is unavailable, every RUN_COMMAND is rejected (fail-closed).
+sandbox:
+  enabled: true
+  default_template: file_read_only
+  opaque_fallback: file_read_write
+  allowed_templates:
+    - pure_compute
+    - file_read_only
+    - file_read_write
+    # - network_outbound    # uncomment to allow outbound network in sandboxed commands
+    # - network_full        # uncomment to allow port binding
+    # - unrestricted        # NOT recommended — bypasses most sandbox restrictions
+
 # ─── Storage: Database and log paths ────────────────────────────────────────
 # null = platform default (macOS: ~/Library/Application Support/IntentFrame/)
 storage:

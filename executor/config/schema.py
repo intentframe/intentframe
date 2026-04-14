@@ -33,6 +33,7 @@ __all__ = [
     "CredentialConfig",
     "WorkerPoolConfig",
     "AdapterConfig",
+    "SandboxConfig",
     "StorageConfig",
     "LoggingConfig",
 ]
@@ -165,6 +166,39 @@ class FilesystemConfig(BaseModel):
     )
 
 
+class SandboxConfig(BaseModel):
+    """Configuration for RUN_COMMAND kernel-enforced sandboxing.
+
+    When enabled, the executor wraps shell commands with a platform-specific
+    sandbox (macOS Seatbelt via sandbox-exec, Linux bubblewrap in the future).
+    The classifier inspects each command to pick the narrowest template that
+    covers its capability requirements.
+
+    If the sandbox engine is unavailable at runtime (wrong platform, missing
+    binary), individual RUN_COMMAND requests are rejected -- the rest of the
+    executor keeps running normally.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        description="Master switch for RUN_COMMAND sandboxing.",
+    )
+    default_template: str = Field(
+        default="file_read_only",
+        description="Preferred template when the classifier can fit the command.",
+    )
+    opaque_fallback: str = Field(
+        default="file_read_write",
+        description="Template used when the command cannot be confidently classified.",
+    )
+    allowed_templates: list[str] = Field(
+        default_factory=lambda: ["pure_compute", "file_read_only", "file_read_write"],
+        description="Template ceiling for this executor profile.",
+    )
+
+
 class StorageConfig(BaseModel):
     """Configuration for database, log file paths, and backend selection.
 
@@ -232,5 +266,6 @@ class ExecutorConfig(BaseModel):
     worker_pool: WorkerPoolConfig = Field(default_factory=WorkerPoolConfig)
     adapters: AdapterConfig = Field(default_factory=AdapterConfig)
     filesystem: FilesystemConfig = Field(default_factory=FilesystemConfig)
+    sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
