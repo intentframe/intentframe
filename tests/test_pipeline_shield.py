@@ -94,7 +94,7 @@ def _make_runtime(
     if validation_return:
         guardian.validate = AsyncMock(return_value=validation_return)
     else:
-        async def _auto_allow(intent, analysis, user_context):
+        async def _auto_allow(intent, analysis, user_context, **kwargs):
             return _allow_validation(intent)
         guardian.validate = AsyncMock(side_effect=_auto_allow)
 
