@@ -86,7 +86,7 @@ adapters:
 
 # ─── RUN_COMMAND Sandboxing ─────────────────────────────────────────────────
 # Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
-# Filesystem scope is derived from VFS mounts above.
+# Write scope is controlled by allowed_write_paths below (independent of VFS).
 # The classifier picks the narrowest template that covers a command's needs.
 # Opaque or unclassifiable commands use the opaque_fallback template.
 # If the sandbox engine is unavailable, every RUN_COMMAND is rejected (fail-closed).
@@ -94,6 +94,9 @@ sandbox:
   enabled: true
   default_template: file_read_only
   opaque_fallback: file_read_write
+  working_directory: ~/
+  allowed_write_paths:
+    - ~/
   allowed_templates:
     - pure_compute
     - file_read_only

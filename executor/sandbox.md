@@ -11,10 +11,12 @@ Every shell command that reaches `TerminalAdapter.execute()` is wrapped in a mac
 The sandbox:
 
 - starts from `(deny default)` — everything blocked unless explicitly allowed
-- allows only the filesystem paths derived from the executor's VFS mounts
+- globally allows all file reads (`(allow file-read*)`) — reads are not the threat model
+- restricts writes to paths explicitly listed in `SandboxConfig.allowed_write_paths`
 - blocks network access unless the command's template explicitly permits it
 - denies writes to system directories and IntentFrame internals regardless of template
 - sets a controlled `TMPDIR` so sandboxed processes don't inherit the user's temp tree
+- overrides `PATH` with a clean system path (from `/etc/paths` + `/etc/paths.d/*`), preventing the executor's venv from leaking into sandboxed commands
 
 ---
 
@@ -34,21 +36,25 @@ RUN_COMMAND arrives at TerminalAdapter
     ├── planner.plan(report, cwd)        template selection + path derivation
     │       │
     │       ├── reads SandboxConfig from executor.yaml
-    │       ├── reads VFS mounts from MountPointResolver
+    │       ├── derives write paths from config.allowed_write_paths
     │       ├── canonicalizes all paths via pathing.canonical_sandbox_path()
     │       │
     │       ▼
     │   ExecutionPlan
-    │       { template, allowed_read_paths, allowed_write_paths,
-    │         deny_write_paths, deny_access_paths, working_directory }
+    │       { template, allowed_read_paths=(),
+    │         allowed_write_paths, deny_write_paths, deny_access_paths }
     │
-    ├── engine.wrap(command, plan)        build SBPL profile, wrap command
+    ├── engine.wrap(command, plan)        build SBPL profile, return argv
     │       │
     │       ▼
-    │   sandbox-exec -p '<profile>' /bin/sh -c '<command>'
+    │   SandboxedCommand
+    │       { argv: [sandbox-exec, -p, '<profile>', /bin/sh, -c, '<command>'],
+    │         env_overrides: {TMPDIR: ..., PATH: ...} }
     │
-    └── asyncio.create_subprocess_shell(wrapped_command)
+    └── asyncio.create_subprocess_exec(*argv, env=clean_env | overrides)
 ```
+
+The engine returns a `SandboxedCommand` dataclass with an `argv` list and `env_overrides` dict. The adapter passes `argv` directly to `create_subprocess_exec` — no shell re-parsing, no `shlex.quote()` issues.
 
 ---
 
@@ -62,7 +68,7 @@ executor/sandbox/
 ├── templates.py         SandboxTemplate enum, capability lattice, deny lists
 ├── pathing.py           canonical_sandbox_path() — realpath normalization
 ├── planner.py           SandboxPlanner + ExecutionPlan
-├── engine.py            SandboxEngine ABC + platform factory
+├── engine.py            SandboxEngine ABC + SandboxedCommand + platform factory
 └── platforms/
     ├── __init__.py
     └── macos.py         MacOSSandboxEngine + dynamic SBPL profile generator
@@ -79,6 +85,9 @@ sandbox:
   enabled: true
   default_template: file_read_only
   opaque_fallback: file_read_write
+  working_directory: ~/
+  allowed_write_paths:
+    - ~/
   allowed_templates:
     - pure_compute
     - file_read_only
@@ -93,22 +102,61 @@ sandbox:
 | `default_template` | Preferred template when the classifier can fit the command. |
 | `opaque_fallback` | Template used when the command can't be confidently classified. |
 | `allowed_templates` | Template ceiling for this executor profile. Commands needing a higher template are rejected. |
+| `working_directory` | Default cwd for sandboxed commands. Expanded via `os.path.expanduser()` at runtime. Defaults to `~/`. |
+| `allowed_write_paths` | Paths where sandboxed commands can write. Expanded + canonicalized at runtime. Defaults to `["~/"]`. |
 
-### Filesystem scope comes from VFS mounts
+### Filesystem scope is self-contained
 
-The sandbox does not have its own path config. It reads the same `filesystem.mounts` the executor already uses for VFS:
+The sandbox does **not** read VFS mounts. Write paths come directly from `SandboxConfig.allowed_write_paths`. Read paths are not restricted (global `(allow file-read*)`).
 
-```yaml
-filesystem:
-  mounts:
-    - virtual_path: /home/
-      real_path: ~/
-      writable: true
+This decoupling is intentional: `RUN_COMMAND` is a different tool from file I/O adapters. The VFS translates virtual paths for `READ_FILE`/`WRITE_FILE` — that's a completely separate concern from what a shell command can touch. A sandboxed `cp` or `python3` needs real filesystem access, not virtual path translation.
+
+With `allowed_write_paths: ["~/"]`, the generated SBPL profile includes:
+
+```
+(allow file-write* (subpath "/Users/prince"))
 ```
 
-This mount produces:
-- `(allow file-read* (subpath "/Users/prince"))` in the SBPL profile
-- `(allow file-write* (subpath "/Users/prince"))` for `file_read_write` and higher templates
+---
+
+## Read Policy: Allow All, Deny Sensitive
+
+The sandbox uses a **permissive read / restrictive write** model, mirroring Anthropic's `sandbox-runtime` approach:
+
+```
+(allow file-read*)
+```
+
+Reads are globally allowed. Sensitive paths are protected by deny-access overrides placed last (Seatbelt last-match-wins), which block both reads and writes:
+
+```
+(deny file-read* file-write* (subpath "/Users/prince/.intentframe"))
+```
+
+Why not a read whitelist? Because macOS system binaries need to read from unpredictable paths:
+
+- `/usr/bin/python3` is an `xcrun` shim that loads a dylib from `/Applications/Xcode.app/Contents/Developer/...`
+- Homebrew lives in `/opt/homebrew` on Apple Silicon, `/usr/local` on Intel
+- System frameworks load from `/System/Library`, `/usr/lib`, `/Library/Apple/...`
+
+Whitelisting individual system directories is a losing game. Reads are not the threat model — writes and network exfiltration are.
+
+---
+
+## Clean PATH (No Venv Leakage)
+
+The engine sets `PATH` in `env_overrides` to a clean system path built from `/etc/paths` and `/etc/paths.d/*` — the same source macOS uses for login shells:
+
+```python
+env_overrides = {
+    "TMPDIR": "/private/tmp/intentframe",
+    "PATH": _system_path(),  # e.g. /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin
+}
+```
+
+This guarantees that `python3` inside the sandbox resolves to `/usr/bin/python3` (system Python), not the executor's `.venv/bin/python3`. The executor runs inside a venv, but sandboxed commands must not inherit it.
+
+The fallback path (if `/etc/paths` can't be read) is: `/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin`.
 
 ---
 
@@ -157,7 +205,7 @@ Whatever template was selected, it must be in `allowed_templates`. If it's not:
 
 **Build ExecutionPlan:**
 
-If a template passes the ceiling check, the planner assembles the plan with canonicalized paths from VFS mounts and non-negotiable deny lists, then hands it to the engine.
+If a template passes the ceiling check, the planner assembles the plan with canonicalized write paths from `SandboxConfig.allowed_write_paths` plus the working directory, and non-negotiable deny lists. `allowed_read_paths` is always empty (global read is in the SBPL profile, not per-path).
 
 ### Decision flow examples
 
@@ -226,7 +274,7 @@ These paths cannot be read or written by any sandboxed command:
 
 - `~/.intentframe`
 
-This protects IntentFrame's runtime data: config, secrets, databases, logs, audit trail. Even though `~/` is typically a writable VFS mount, the deny override blocks all access to `~/.intentframe`.
+This protects IntentFrame's runtime data: config, secrets, databases, logs, audit trail. Even though `~/` is typically an allowed write path, the deny override blocks all access to `~/.intentframe`.
 
 ---
 
@@ -242,7 +290,7 @@ All paths in the `ExecutionPlan` are canonical — resolved via `os.path.realpat
 The macOS kernel (Seatbelt) enforces rules against canonical paths. If the SBPL profile says `(allow file-write* (subpath "/var/folders/..."))` but the kernel sees `/private/var/folders/...`, the rule doesn't match and the write is denied.
 
 `executor/sandbox/pathing.py` provides `canonical_sandbox_path()` which the planner applies to:
-- every VFS mount real_path
+- every path in `SandboxConfig.allowed_write_paths`
 - working directory
 - all deny list paths
 
@@ -254,10 +302,10 @@ Sandboxed commands use `/tmp/intentframe` (canonicalized to `/private/tmp/intent
 
 The engine:
 1. Creates `/tmp/intentframe` with mode `0o700` if it doesn't exist
-2. Adds read+write SBPL rules for that directory
+2. Adds a write SBPL rule for that directory
 3. Sets `TMPDIR=/private/tmp/intentframe` in the subprocess environment
 
-This avoids blanket-allowing `/private/var/folders` in the system reads, which would undermine deny rules for paths under the user's temp tree.
+This avoids blanket-allowing `/private/var/folders` in the profile, which would undermine deny rules for paths under the user's temp tree.
 
 ---
 
@@ -267,11 +315,11 @@ The generated Seatbelt profile follows this order (last-match-wins):
 
 1. **Header**: `(version 1)` + `(deny default)`
 2. **Essential system allowances**: process-exec, process-fork, mach-lookup, sysctl-read, iokit, pseudo-tty, etc.
-3. **Essential system file reads**: `/usr/lib`, `/bin`, `/System/Library`, `/dev`, etc. (read-only, needed for any binary to load)
-4. **Controlled temp directory**: read+write for `/private/tmp/intentframe`
+3. **Global file reads**: `(allow file-read*)` — reads are unrestricted
+4. **Controlled temp directory**: write for `/private/tmp/intentframe`
 5. **Device writes**: `/dev/null`, `/dev/tty`
-6. **Template-specific rules**: network-outbound, network-bind, network-inbound (only for network templates)
-7. **Mount-derived allow rules**: `file-read*` and `file-write*` subpath rules from VFS mounts
+6. **Template-specific rules**: network-outbound, network-bind, network-inbound (only for network templates); `(allow default)` for `unrestricted`
+7. **Config-derived write allow rules**: `(allow file-write* (subpath ...))` for each path in `allowed_write_paths` (only for `file_read_write` and higher templates)
 8. **Non-negotiable deny overrides**: deny-write for system dirs, deny-access for `~/.intentframe` (always last)
 
 The profile is generated entirely in Python code (`executor/sandbox/platforms/macos.py`), following Anthropic's `sandbox-runtime` pattern. There is no static `.sbpl` file.
@@ -364,12 +412,13 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 - It does not modify `IntentFrame`, `RuntimeContext`, `ExecutionRequest`, or any pipeline types.
 - It does not touch policy registry, resource registry, or Guardian.
 - It does not handle `sudo`. `sudo` is blocked by command_shield before the sandbox is involved.
+- It does not use VFS mounts. Write paths come from `SandboxConfig`, not `MountPointResolver`.
 
 ---
 
 ## Testing
 
-126 tests in `tests/test_sandbox.py` covering:
+146 tests in `tests/test_sandbox.py` covering:
 
 | Test class | What it tests |
 |---|---|
@@ -382,15 +431,17 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 | `TestClassifierPureCompute` | Commands with no capabilities |
 | `TestTemplates` | Lattice properties, minimum-fit selection |
 | `TestPathing` | `/var` → `/private/var`, `/tmp` → `/private/tmp`, tilde, tempfile canonicalization |
-| `TestPlanner` | Template selection, ceiling enforcement, opaque fallback, path inclusion |
-| `TestPlannerVFSShapes` | Relative paths, mixed writability, working dir, deny paths, canonicalization |
+| `TestPlanner` | Template selection, ceiling enforcement, opaque fallback, config write paths |
+| `TestPlannerConfigShapes` | Write path canonicalization, tilde expansion, working dir, deny paths |
 | `TestEngineFactory` | Platform detection, unsupported platform |
-| `TestProfileGeneration` | SBPL structure, deny ordering, no blanket /var/folders, TMPDIR, path escaping |
+| `TestProfileGeneration` | SBPL structure: global file-read, deny ordering, TMPDIR write, path escaping |
 | `TestSeatbeltEnforcement` | **Real `sandbox-exec` calls**: echo, read, write, deny-write, deny-access, pure-compute block |
+| `TestNetworkEnforcement` | **Real `sandbox-exec` calls**: outbound connect, bind, template-specific network blocking |
+| `TestUnrestrictedEnforcement` | **Real `sandbox-exec` calls**: unrestricted template with deny overrides still holding |
 | `TestTerminalAdapterSandbox` | Adapter wiring: disabled, unavailable, rejected, wrapped, bare compat |
 | `TestEndToEnd` | Full pipeline: classify → plan → wrap → subprocess for echo, cat, cp, curl rejection |
 
-The enforcement tests (`TestSeatbeltEnforcement`, `TestEndToEnd`) run actual commands through `sandbox-exec` and verify the kernel blocks or allows operations. They must run outside Cursor's sandbox (`required_permissions: ["all"]`).
+The enforcement tests run actual commands through `sandbox-exec` and verify the kernel blocks or allows operations.
 
 ---
 
@@ -400,5 +451,4 @@ The enforcement tests (`TestSeatbeltEnforcement`, `TestEndToEnd`) run actual com
 |---|---|
 | `executor/plan.md` | Overall executor architecture. Sandbox is a new capability of the Terminal adapter (Layer 3). |
 | `TODO/executor-only-run-command-sandbox.md` | Original design doc. All acceptance criteria met. Implementation matches the proposed execution model. |
-| `TODO/root-demo-policy-driven-sandbox.md` | Future work. A broad root-demo profile would use `allowed_templates: [all six]` + `opaque_fallback: unrestricted` + workspace mount `/ → /`. |
-| `docs/executor-root-mode.md` | Root mode is a demo concern. The sandbox works the same whether the executor runs as root or user — it constrains what the sandboxed subprocess can do regardless of executor privilege. |
+| `TODO/root-demo-policy-driven-sandbox.md` | Future work. A broad root-demo profile would use `allowed_templates: [all six]` + `opaque_fallback: unrestricted` + `allowed_write_paths: [/]`. |

@@ -165,7 +165,7 @@ def build_gateway(
     if config.sandbox.enabled:
         sandbox_engine = create_sandbox_engine(config.platform)
         if sandbox_engine and sandbox_engine.available():
-            sandbox_planner = SandboxPlanner(config.sandbox, mount_resolver)
+            sandbox_planner = SandboxPlanner(config.sandbox)
             logger.info("Sandbox engine: %s", type(sandbox_engine).__name__)
         else:
             logger.warning(

@@ -197,6 +197,14 @@ class SandboxConfig(BaseModel):
         default_factory=lambda: ["pure_compute", "file_read_only", "file_read_write"],
         description="Template ceiling for this executor profile.",
     )
+    working_directory: str = Field(
+        default="~/",
+        description="Default cwd for sandboxed shell commands. Expanded at runtime.",
+    )
+    allowed_write_paths: list[str] = Field(
+        default_factory=lambda: ["~/"],
+        description="Paths where sandboxed commands can write. Expanded at runtime.",
+    )
 
 
 class StorageConfig(BaseModel):

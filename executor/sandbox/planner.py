@@ -6,7 +6,7 @@ Given a ``CapabilityReport`` from the classifier, the planner:
 2.  Falls back to the opaque template if the report says ``opaque=True``.
 3.  Rejects the command (returns ``None``) if the selected template is not
     in the executor's ``allowed_templates`` ceiling.
-4.  Derives allowed/denied paths from the ``MountPointResolver``.
+4.  Derives allowed/denied paths from ``SandboxConfig`` (no VFS dependency).
 
 All paths stored in the ``ExecutionPlan`` are **canonical** (symlinks
 resolved via ``os.path.realpath``).  This is critical on macOS where
@@ -15,6 +15,7 @@ resolved via ``os.path.realpath``).  This is critical on macOS where
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 from executor.config.schema import SandboxConfig
@@ -27,7 +28,6 @@ from executor.sandbox.templates import (
     TEMPLATE_ORDER,
     minimum_template,
 )
-from executor.services.virtual_filesystem import MountPointResolver
 
 
 @dataclass(frozen=True)
@@ -48,11 +48,7 @@ class ExecutionPlan:
 class SandboxPlanner:
     """Stateless planner -- one instance per executor lifetime."""
 
-    def __init__(
-        self,
-        config: SandboxConfig,
-        mount_resolver: MountPointResolver,
-    ) -> None:
+    def __init__(self, config: SandboxConfig) -> None:
         self._config = config
 
         allowed_set: set[SandboxTemplate] = set()
@@ -66,9 +62,7 @@ class SandboxPlanner:
         self._default_template = self._safe_template(config.default_template)
         self._opaque_fallback = self._safe_template(config.opaque_fallback)
 
-        self._read_paths, self._write_paths = self._resolve_mount_paths(
-            mount_resolver
-        )
+        self._write_paths = self._resolve_write_paths(config)
 
         self._deny_write = tuple(
             canonical_sandbox_path(p) for p in NON_NEGOTIABLE_DENY_WRITE
@@ -101,18 +95,15 @@ class SandboxPlanner:
             if tmpl is None:
                 return None
 
-        read_paths = list(self._read_paths)
         write_paths = list(self._write_paths)
         if working_directory:
             canon_wd = canonical_sandbox_path(working_directory)
-            if canon_wd not in read_paths:
-                read_paths.append(canon_wd)
             if canon_wd not in write_paths:
                 write_paths.append(canon_wd)
 
         return ExecutionPlan(
             template=tmpl,
-            allowed_read_paths=tuple(read_paths),
+            allowed_read_paths=(),
             allowed_write_paths=tuple(write_paths),
             deny_write_paths=self._deny_write,
             deny_access_paths=self._deny_access,
@@ -137,18 +128,14 @@ class SandboxPlanner:
         return None
 
     @staticmethod
-    def _resolve_mount_paths(
-        resolver: MountPointResolver,
-    ) -> tuple[list[str], list[str]]:
-        """Extract canonical real paths from mount configs."""
-        read_paths: list[str] = []
-        write_paths: list[str] = []
-        for mount in resolver.mounts:
-            real = canonical_sandbox_path(mount.real_path)
-            read_paths.append(real)
-            if mount.writable:
-                write_paths.append(real)
-        return read_paths, write_paths
+    def _resolve_write_paths(config: SandboxConfig) -> list[str]:
+        """Canonicalize write paths from sandbox config."""
+        paths: list[str] = []
+        for p in config.allowed_write_paths:
+            canon = canonical_sandbox_path(os.path.expanduser(p))
+            if canon not in paths:
+                paths.append(canon)
+        return paths
 
     @staticmethod
     def _safe_template(name: str) -> SandboxTemplate:

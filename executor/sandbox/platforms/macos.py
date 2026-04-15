@@ -7,10 +7,10 @@ is built as an array of rule strings and passed inline to ``sandbox-exec -p``.
 Profile structure (order matters — Seatbelt uses last-match-wins):
   1. Header + deny default
   2. Essential system allowances (process, mach, sysctl, iokit, etc.)
-  3. Essential system file reads (dyld, libs, shells, /dev)
-  4. Controlled temp writes (SANDBOX_TMPDIR only — not the entire /var/folders)
+  3. Global file reads: (allow file-read*) — reads are unrestricted
+  4. Controlled temp writes (SANDBOX_TMPDIR only)
   5. Template-specific rules (network scope)
-  6. Mount-derived allow rules (from VFS mounts)
+  6. Config-derived write allow rules
   7. Non-negotiable deny overrides (always last so they win)
 """
 
@@ -19,10 +19,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shlex
 import shutil
+from pathlib import Path
 
-from executor.sandbox.engine import SandboxEngine
+from executor.sandbox.engine import SandboxedCommand, SandboxEngine
 from executor.sandbox.planner import ExecutionPlan
 from executor.sandbox.templates import SandboxTemplate
 
@@ -177,43 +177,20 @@ _PTY = (
     '(allow file-read* file-write* (literal "/dev/ptmx") (regex #"^/dev/ttys"))',
 )
 
-# System file reads — every root-level directory where macOS tools live.
-# Covers Homebrew (Apple Silicon + Intel), MacPorts, Nix, Xcode CLT,
-# system frameworks, and manual /usr/local installs.
-# Does NOT include /private/var/folders or /Users — those stay gated
-# behind VFS mount rules so user data is never readable by default.
-_SYSTEM_FILE_READS = (
-    "(allow file-read-metadata)",
-    "(allow file-read*",
-    '  (subpath "/usr/lib")',
-    '  (subpath "/usr/bin")',
-    '  (subpath "/usr/sbin")',
-    '  (subpath "/usr/share")',
-    '  (subpath "/usr/local")',
-    '  (subpath "/bin")',
-    '  (subpath "/sbin")',
-    '  (subpath "/opt")',
-    '  (subpath "/System/Library")',
-    '  (subpath "/Library")',
-    '  (subpath "/private/etc")',
-    '  (subpath "/private/var/db")',
-    '  (subpath "/private/tmp")',
-    '  (subpath "/nix")',
-    '  (subpath "/dev")',
-    '  (literal "/")',
-    '  (literal "/etc")',
-    '  (literal "/tmp")',
-    '  (literal "/var")',
-    '  (literal "/private")',
-    '  (literal "/private/var"))',
+# Global file reads — allow all reads, deny only sensitive paths later.
+# This mirrors Anthropic's sandbox-runtime approach: reads are not the
+# threat model; writes and network exfiltration are.  Whitelisting
+# individual system directories is a losing game (xcrun needs Xcode.app,
+# python3 shim needs CLT, Homebrew lives in different places per arch).
+_GLOBAL_FILE_READS = (
+    "(allow file-read*)",
 )
 
 
 def _sandbox_tmpdir_rules() -> tuple[str, ...]:
-    """Read+write rules for the controlled sandbox temp directory."""
+    """Write rules for the controlled sandbox temp directory."""
     canon = os.path.realpath(SANDBOX_TMPDIR)
     return (
-        f"(allow file-read* (subpath {_q(canon)}))",
         f"(allow file-write* (subpath {_q(canon)}))",
     )
 
@@ -222,6 +199,32 @@ _SYSTEM_DEVICE_WRITES = (
     '(allow file-write* (literal "/dev/null") (literal "/dev/tty")'
     ' (literal "/dev/dtracehelper"))',
 )
+
+
+_FALLBACK_PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+
+
+def _system_path() -> str:
+    """Build PATH from /etc/paths and /etc/paths.d/* (macOS canonical source).
+
+    This is exactly how macOS itself constructs the default PATH for login
+    shells.  Reading these files guarantees the result works on both Intel
+    (/usr/local/bin for Homebrew) and Apple Silicon (/opt/homebrew/bin via
+    /etc/paths.d/homebrew), and never includes any Python venv.
+    """
+    dirs: list[str] = []
+    try:
+        with open("/etc/paths") as f:
+            dirs.extend(line.strip() for line in f if line.strip())
+        paths_d = Path("/etc/paths.d")
+        if paths_d.is_dir():
+            for entry in sorted(paths_d.iterdir()):
+                if entry.is_file():
+                    with open(entry) as f:
+                        dirs.extend(line.strip() for line in f if line.strip())
+    except OSError:
+        dirs = _FALLBACK_PATH.split(":")
+    return ":".join(dirs)
 
 
 class MacOSSandboxEngine(SandboxEngine):
@@ -233,17 +236,23 @@ class MacOSSandboxEngine(SandboxEngine):
     def available(self) -> bool:
         return self._sandbox_exec is not None
 
-    def wrap(self, command: str, plan: ExecutionPlan) -> str:
+    def wrap(self, command: str, plan: ExecutionPlan) -> SandboxedCommand:
         if not self.available():
             raise RuntimeError("MacOSSandboxEngine.wrap() called but engine unavailable")
 
         _ensure_sandbox_tmpdir()
         profile = generate_sandbox_profile(plan)
-        quoted_cmd = shlex.quote(command)
-        env_prefix = f"TMPDIR={os.path.realpath(SANDBOX_TMPDIR)}"
-        return (
-            f"env {env_prefix} {self._sandbox_exec}"
-            f" -p {shlex.quote(profile)} /bin/sh -c {quoted_cmd}"
+
+        return SandboxedCommand(
+            argv=[
+                self._sandbox_exec,
+                "-p", profile,
+                "/bin/sh", "-c", command,
+            ],
+            env_overrides={
+                "TMPDIR": os.path.realpath(SANDBOX_TMPDIR),
+                "PATH": _system_path(),
+            },
         )
 
 
@@ -280,8 +289,8 @@ def generate_sandbox_profile(plan: ExecutionPlan) -> str:
     rules.extend(_DEVICE_IO)
     rules.extend(_PTY)
 
-    # 3. Essential system file reads
-    rules.extend(_SYSTEM_FILE_READS)
+    # 3. Global file reads (allow everything, deny sensitive paths later)
+    rules.extend(_GLOBAL_FILE_READS)
 
     # 4. Controlled temp directory + device writes
     rules.extend(_sandbox_tmpdir_rules())
@@ -290,9 +299,8 @@ def generate_sandbox_profile(plan: ExecutionPlan) -> str:
     # 5. Template-specific rules (network)
     rules.extend(_network_rules(plan.template))
 
-    # 6. Mount-derived allow rules
-    rules.extend(_mount_read_rules(plan))
-    rules.extend(_mount_write_rules(plan))
+    # 6. Config-derived write allow rules
+    rules.extend(_write_rules(plan))
 
     # 7. Non-negotiable deny overrides (last so they win)
     rules.extend(_deny_override_rules(plan))
@@ -327,17 +335,7 @@ def _network_rules(tmpl: SandboxTemplate) -> list[str]:
     return rules
 
 
-def _mount_read_rules(plan: ExecutionPlan) -> list[str]:
-    if plan.template == SandboxTemplate.PURE_COMPUTE:
-        return []
-
-    rules: list[str] = []
-    for p in plan.allowed_read_paths:
-        rules.append(f"(allow file-read* (subpath {_q(p)}))")
-    return rules
-
-
-def _mount_write_rules(plan: ExecutionPlan) -> list[str]:
+def _write_rules(plan: ExecutionPlan) -> list[str]:
     tmpl = plan.template
     if tmpl in (SandboxTemplate.PURE_COMPUTE, SandboxTemplate.FILE_READ_ONLY):
         return []

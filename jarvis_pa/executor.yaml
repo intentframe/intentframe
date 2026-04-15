@@ -62,6 +62,9 @@ sandbox:
   enabled: true
   default_template: file_read_only
   opaque_fallback: file_read_write
+  working_directory: ~/
+  allowed_write_paths:
+    - ~/
   allowed_templates:
     - pure_compute
     - file_read_only

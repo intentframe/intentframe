@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from action_registry import ActionType
 from command_shield import quick_check
@@ -76,10 +77,12 @@ class TerminalAdapter(CapabilityAdapter):
             )
 
         working_dir = params.get("working_directory")
+        if working_dir is None and self._sandbox_config and self._sandbox_config.enabled:
+            working_dir = os.path.expanduser(self._sandbox_config.working_directory)
         timeout = params.get("timeout", DEFAULT_COMMAND_TIMEOUT)
 
         # ── Sandbox wrapping ──────────────────────────────────────────────
-        actual_command = command
+        sandboxed = None
         if self._sandbox_config and self._sandbox_config.enabled:
             if not self._sandbox_engine or not self._sandbox_planner:
                 return ExecutionResult(
@@ -96,20 +99,31 @@ class TerminalAdapter(CapabilityAdapter):
                     success=False,
                     error="Command requires capabilities beyond executor sandbox policy",
                 )
-            actual_command = self._sandbox_engine.wrap(command, plan)
+            sandboxed = self._sandbox_engine.wrap(command, plan)
             logger.debug(
                 "Sandbox: template=%s opaque=%s command=%s",
                 plan.template.value, cap_report.opaque, command[:120],
             )
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                actual_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=working_dir,
-                env=clean_env(),
-            )
+            if sandboxed is not None:
+                run_env = clean_env()
+                run_env.update(sandboxed.env_overrides)
+                process = await asyncio.create_subprocess_exec(
+                    *sandboxed.argv,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=working_dir,
+                    env=run_env,
+                )
+            else:
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=working_dir,
+                    env=clean_env(),
+                )
 
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(), timeout=timeout

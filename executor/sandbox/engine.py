@@ -9,8 +9,21 @@ from __future__ import annotations
 
 import sys
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 from executor.sandbox.planner import ExecutionPlan
+
+
+@dataclass(frozen=True)
+class SandboxedCommand:
+    """Result of wrapping a command for sandboxed execution.
+
+    Callers pass *argv* to ``create_subprocess_exec`` (no shell re-parsing)
+    and merge *env_overrides* into the process environment.
+    """
+
+    argv: list[str]
+    env_overrides: dict[str, str] = field(default_factory=dict)
 
 
 class SandboxEngine(ABC):
@@ -22,11 +35,11 @@ class SandboxEngine(ABC):
         ...
 
     @abstractmethod
-    def wrap(self, command: str, plan: ExecutionPlan) -> str:
+    def wrap(self, command: str, plan: ExecutionPlan) -> SandboxedCommand:
         """Wrap *command* so it runs inside the sandbox described by *plan*.
 
-        Returns a shell-ready string (the caller passes it to
-        ``create_subprocess_shell``).
+        Returns a ``SandboxedCommand`` whose *argv* is passed directly to
+        ``create_subprocess_exec`` — no shell quoting required.
         """
         ...
 

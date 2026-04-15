@@ -1242,11 +1242,13 @@ See `executor/sandbox.md` for the full implementation reference.
 ### Design principles
 
 - `(deny default)` — kernel blocks everything not explicitly allowed
-- Filesystem scope derived from the same VFS mounts the executor already uses
+- `(allow file-read*)` — reads are globally allowed; sensitive paths denied last
+- Write scope controlled by `SandboxConfig.allowed_write_paths` (independent of VFS)
 - Template selection via deterministic command classifier (shlex-based, no execution)
 - Non-negotiable deny overrides placed last (Seatbelt last-match-wins)
 - All paths canonicalized via `os.path.realpath()` before entering SBPL rules
 - Controlled `TMPDIR` (`/tmp/intentframe`) instead of blanket-allowing `/var/folders`
+- Clean system `PATH` (from `/etc/paths`) prevents executor venv leaking into sandbox
 - Per-request rejection if sandbox engine unavailable (fail-closed)
 
 ### New module
@@ -1254,25 +1256,33 @@ See `executor/sandbox.md` for the full implementation reference.
 `executor/sandbox/` — classifier, planner, pathing, templates, engine, macOS platform.
 Dynamic SBPL profile generation following Anthropic's `sandbox-runtime` pattern.
 
+The engine returns a `SandboxedCommand(argv, env_overrides)` dataclass. The adapter
+passes `argv` directly to `asyncio.create_subprocess_exec` — no shell re-parsing,
+no `shlex.quote()` issues.
+
 ### What changed in existing code
 
 | File | Change |
 |---|---|
-| `executor/config/schema.py` | Added `SandboxConfig` Pydantic model |
-| `executor/main.py` | Engine/planner init after VFS mount resolution |
-| `executor/platforms/macos/adapters/terminal.py` | Classify → plan → wrap before subprocess |
-| `jarvis_pa/executor.yaml` | Added `sandbox:` config section |
+| `executor/config/schema.py` | Added `SandboxConfig` with `working_directory`, `allowed_write_paths` |
+| `executor/main.py` | Engine/planner init from `SandboxConfig` (no VFS dependency) |
+| `executor/platforms/macos/adapters/terminal.py` | Classify → plan → wrap → `create_subprocess_exec` with `env_overrides` |
+| `executor/sandbox/engine.py` | `SandboxedCommand` dataclass (argv + env_overrides) |
+| `executor/sandbox/planner.py` | Write paths from `SandboxConfig`, not VFS mounts |
+| `executor/sandbox/platforms/macos.py` | Global `(allow file-read*)`, clean `PATH` override, config-driven writes |
+| `jarvis_pa/executor.yaml` | `sandbox:` section with `working_directory` and `allowed_write_paths` |
 
 ### Default Jarvis sandbox behavior
 
-- Template ceiling: `pure_compute`, `file_read_only`, `file_read_write`
-- Network commands rejected (above ceiling)
+- Template ceiling: `pure_compute`, `file_read_only`, `file_read_write`, `network_outbound`
+- Default cwd: `~/` (from `SandboxConfig.working_directory`)
+- Write scope: `~/` (from `SandboxConfig.allowed_write_paths`)
 - Opaque commands (scripts, eval) use `file_read_write` fallback
 - `~/.intentframe` blocked from read and write
 - System directories blocked from write
 
 ### Verification
 
-`tests/test_sandbox.py` — 126 tests including real `sandbox-exec` kernel
+`tests/test_sandbox.py` — 146 tests including real `sandbox-exec` kernel
 enforcement tests that run actual commands through Seatbelt and verify the
 kernel blocks or allows operations.

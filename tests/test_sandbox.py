@@ -3,7 +3,7 @@
 Covers:
     - Classifier: capability detection, opaque detection, edge cases
     - Templates: lattice properties, minimum-fit selection
-    - Planner: template selection, VFS mount path resolution, deny paths
+    - Planner: template selection, config-driven write paths, deny paths
     - Pathing: canonical path normalization (symlink regression)
     - Engine (macOS): profile composition, real sandbox-exec enforcement
     - Adapter: TerminalAdapter.execute() with sandbox enabled/disabled/unavailable
@@ -24,6 +24,7 @@ import pytest
 from executor.config.schema import SandboxConfig
 from executor.sandbox.capabilities import Capability, CapabilityReport
 from executor.sandbox.classifier import classify
+from executor.sandbox.engine import SandboxedCommand
 from executor.sandbox.pathing import canonical_sandbox_path
 from executor.sandbox.planner import ExecutionPlan, SandboxPlanner
 from executor.sandbox.templates import (
@@ -33,7 +34,6 @@ from executor.sandbox.templates import (
     TEMPLATE_CAPABILITIES,
     minimum_template,
 )
-from executor.services.virtual_filesystem import MountPointConfig, MountPointResolver
 
 
 def _run(coro):
@@ -43,6 +43,17 @@ def _run(coro):
 def _canon(p: str) -> str:
     """Shorthand for canonical_sandbox_path used in test assertions."""
     return canonical_sandbox_path(p)
+
+
+def _exec_sandboxed(
+    sc: SandboxedCommand, timeout: float = 10.0,
+) -> subprocess.CompletedProcess:
+    """Run a SandboxedCommand via subprocess with no shell re-parsing."""
+    env = os.environ.copy()
+    env.update(sc.env_overrides)
+    return subprocess.run(
+        sc.argv, capture_output=True, text=True, timeout=timeout, env=env,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -321,19 +332,16 @@ def _make_planner(
     allowed: list[str] | None = None,
     default: str = "file_read_only",
     opaque_fallback: str = "file_read_write",
-    mounts: list[MountPointConfig] | None = None,
+    write_paths: list[str] | None = None,
 ) -> SandboxPlanner:
     cfg = SandboxConfig(
         enabled=True,
         default_template=default,
         opaque_fallback=opaque_fallback,
         allowed_templates=allowed or ["pure_compute", "file_read_only", "file_read_write"],
+        allowed_write_paths=write_paths or ["~/"],
     )
-    mount_list = mounts or [
-        MountPointConfig(virtual_path="/home/", real_path="/Users/testuser", writable=True),
-    ]
-    resolver = MountPointResolver(mount_list)
-    return SandboxPlanner(cfg, resolver)
+    return SandboxPlanner(cfg)
 
 
 class TestPlanner:
@@ -373,25 +381,19 @@ class TestPlanner:
         plan = planner.plan(report)
         assert plan is None
 
-    def test_working_dir_added_to_paths(self) -> None:
+    def test_working_dir_added_to_write_paths(self) -> None:
         planner = _make_planner()
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
         plan = planner.plan(report, working_directory="/tmp/workdir")
         assert plan is not None
         canon_wd = _canon("/tmp/workdir")
-        assert canon_wd in plan.allowed_read_paths
+        assert canon_wd in plan.allowed_write_paths
 
-    def test_mount_paths_included(self) -> None:
-        planner = _make_planner(
-            mounts=[
-                MountPointConfig(virtual_path="/docs/", real_path="/Users/testuser/Documents", writable=False),
-                MountPointConfig(virtual_path="/work/", real_path="/Users/testuser/Work", writable=True),
-            ]
-        )
+    def test_config_write_paths_included(self) -> None:
+        planner = _make_planner(write_paths=["/Users/testuser/Work"])
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
         plan = planner.plan(report)
         assert plan is not None
-        assert any("Documents" in p for p in plan.allowed_read_paths)
         assert any("Work" in p for p in plan.allowed_write_paths)
 
     def test_deny_paths_always_present(self) -> None:
@@ -403,56 +405,43 @@ class TestPlanner:
         assert len(plan.deny_access_paths) > 0
 
 
-class TestPlannerVFSShapes:
-    """Planner behaviour with realistic VFS mount configurations."""
+class TestPlannerConfigShapes:
+    """Planner behaviour with config-driven write paths (no VFS)."""
 
-    def test_relative_mount_paths_resolved_to_canonical(self) -> None:
-        """Relative real_path values are resolved to canonical absolute paths."""
-        planner = _make_planner(
-            mounts=[
-                MountPointConfig(virtual_path="/project/", real_path="project_files", writable=True),
-            ]
-        )
+    def test_write_paths_resolved_to_canonical(self) -> None:
+        """Write path values are resolved to canonical absolute paths."""
+        planner = _make_planner(write_paths=["~/project_files"])
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
         plan = planner.plan(report)
         assert plan is not None
-        for p in plan.allowed_read_paths:
-            assert os.path.isabs(p), f"mount path {p!r} should be absolute"
-            assert p == os.path.realpath(p), f"mount path {p!r} should be canonical"
+        for p in plan.allowed_write_paths:
+            assert os.path.isabs(p), f"write path {p!r} should be absolute"
+            assert p == os.path.realpath(p), f"write path {p!r} should be canonical"
 
-    def test_multiple_mounts_mixed_writability(self) -> None:
-        """Read-only mounts appear in read paths only; writable in both."""
-        planner = _make_planner(
-            mounts=[
-                MountPointConfig(virtual_path="/code/", real_path="/Users/dev/code", writable=False),
-                MountPointConfig(virtual_path="/output/", real_path="/Users/dev/output", writable=True),
-                MountPointConfig(virtual_path="/config/", real_path="/Users/dev/config", writable=False),
-            ]
-        )
+    def test_multiple_write_paths(self) -> None:
+        """Multiple write paths from config all appear in plan."""
+        planner = _make_planner(write_paths=["/Users/dev/output", "/Users/dev/scratch"])
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
         plan = planner.plan(report)
         assert plan is not None
-
-        assert any("code" in p for p in plan.allowed_read_paths)
-        assert any("output" in p for p in plan.allowed_read_paths)
-        assert any("config" in p for p in plan.allowed_read_paths)
-
         assert any("output" in p for p in plan.allowed_write_paths)
-        assert not any("code" in p for p in plan.allowed_write_paths)
-        assert not any("config" in p for p in plan.allowed_write_paths)
+        assert any("scratch" in p for p in plan.allowed_write_paths)
 
-    def test_working_dir_outside_mounts_still_added(self) -> None:
-        """Working directory is added even if it's not under any mount."""
-        planner = _make_planner(
-            mounts=[
-                MountPointConfig(virtual_path="/data/", real_path="/Users/dev/data", writable=True),
-            ]
-        )
+    def test_read_paths_always_empty(self) -> None:
+        """allowed_read_paths is always empty (global file-read* is in profile)."""
+        planner = _make_planner(write_paths=["/Users/dev/data"])
+        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
+        plan = planner.plan(report)
+        assert plan is not None
+        assert plan.allowed_read_paths == ()
+
+    def test_working_dir_outside_write_paths_still_added(self) -> None:
+        """Working directory is added to write_paths even if not in config."""
+        planner = _make_planner(write_paths=["/Users/dev/data"])
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
         plan = planner.plan(report, working_directory="/var/tmp/agent_scratch")
         assert plan is not None
         canon_wd = _canon("/var/tmp/agent_scratch")
-        assert canon_wd in plan.allowed_read_paths
         assert canon_wd in plan.allowed_write_paths
 
     def test_deny_write_paths_contain_system_dirs(self) -> None:
@@ -475,57 +464,41 @@ class TestPlannerVFSShapes:
         canon = _canon("~/.intentframe")
         assert canon in plan.deny_access_paths
 
-    def test_tilde_mount_path_expanded(self) -> None:
-        """Mount paths with ~ are resolved to the real home directory."""
-        planner = _make_planner(
-            mounts=[
-                MountPointConfig(virtual_path="/home/", real_path="~/Documents", writable=True),
-            ]
-        )
+    def test_tilde_write_path_expanded(self) -> None:
+        """Write paths with ~ are resolved to the real home directory."""
+        planner = _make_planner(write_paths=["~/Documents"])
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
         plan = planner.plan(report)
         assert plan is not None
-        for p in plan.allowed_read_paths:
+        for p in plan.allowed_write_paths:
             assert "~" not in p, f"tilde not expanded in {p!r}"
 
     def test_no_duplicate_working_dir(self) -> None:
-        """If working_directory resolves to the same canonical path as a mount, no duplicate."""
-        planner = _make_planner(
-            mounts=[
-                MountPointConfig(virtual_path="/work/", real_path="/tmp/workdir", writable=True),
-            ]
-        )
+        """If working_directory resolves to the same canonical path as a write_path, no duplicate."""
+        planner = _make_planner(write_paths=["/tmp/workdir"])
         report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
         plan = planner.plan(report, working_directory="/tmp/workdir")
         assert plan is not None
         canon_wd = _canon("/tmp/workdir")
-        count = plan.allowed_read_paths.count(canon_wd)
+        count = plan.allowed_write_paths.count(canon_wd)
         assert count == 1, f"working_dir duplicated {count} times"
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS symlink")
-    def test_planner_canonicalizes_var_folders_mount(self) -> None:
-        """A mount under /var/folders is stored as /private/var/folders in the plan."""
+    def test_planner_canonicalizes_var_folders_path(self) -> None:
+        """A write path under /var/folders is stored as /private/var/folders in the plan."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            planner = _make_planner(
-                mounts=[
-                    MountPointConfig(virtual_path="/work/", real_path=tmpdir, writable=True),
-                ]
-            )
+            planner = _make_planner(write_paths=[tmpdir])
             report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
             plan = planner.plan(report)
             assert plan is not None
-            for p in plan.allowed_read_paths:
+            for p in plan.allowed_write_paths:
                 assert not p.startswith("/var/"), f"non-canonical path {p!r} in plan"
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS symlink")
     def test_all_plan_paths_are_canonical(self) -> None:
         """Every path in a plan equals its own realpath."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            planner = _make_planner(
-                mounts=[
-                    MountPointConfig(virtual_path="/work/", real_path=tmpdir, writable=True),
-                ]
-            )
+            planner = _make_planner(write_paths=[tmpdir])
             report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
             plan = planner.plan(report, working_directory=tmpdir)
             assert plan is not None
@@ -590,7 +563,7 @@ class TestProfileGeneration:
         assert "(allow process-fork)" in profile
         assert "(allow signal (target same-sandbox))" in profile
 
-    def test_profile_contains_system_reads(self) -> None:
+    def test_profile_contains_global_file_read(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
@@ -598,24 +571,21 @@ class TestProfileGeneration:
             deny_write_paths=(), deny_access_paths=(),
         )
         profile = generate_sandbox_profile(plan)
-        assert '(subpath "/usr/lib")' in profile
-        assert '(subpath "/bin")' in profile
-        assert '(subpath "/System/Library")' in profile
-        assert "(allow file-read-metadata)" in profile
+        assert "(allow file-read*)" in profile
 
-    def test_profile_does_not_blanket_allow_var_folders(self) -> None:
-        """System reads must NOT include /private/var/folders (too broad)."""
+    def test_deny_access_overrides_global_read(self) -> None:
+        """Deny-access paths override the global (allow file-read*)."""
         from executor.sandbox.platforms.macos import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
-            deny_write_paths=(), deny_access_paths=(),
+            deny_write_paths=(), deny_access_paths=("/secret",),
         )
         profile = generate_sandbox_profile(plan)
-        assert '(subpath "/private/var/folders")' not in profile
-        assert '(subpath "/var")' not in profile
+        assert "(allow file-read*)" in profile
+        assert '(deny file-read* file-write* (subpath "/secret"))' in profile
 
-    def test_profile_includes_sandbox_tmpdir(self) -> None:
+    def test_profile_includes_sandbox_tmpdir_write(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile, SANDBOX_TMPDIR
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
@@ -624,7 +594,7 @@ class TestProfileGeneration:
         )
         profile = generate_sandbox_profile(plan)
         canon_tmp = os.path.realpath(SANDBOX_TMPDIR)
-        assert f'(subpath "{canon_tmp}")' in profile
+        assert f'(allow file-write* (subpath "{canon_tmp}"))' in profile
 
     def test_pure_compute_has_no_mount_rules(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
@@ -637,28 +607,28 @@ class TestProfileGeneration:
         profile = generate_sandbox_profile(plan)
         assert '"/Users/test/project"' not in profile
 
-    def test_file_read_only_has_read_rules_no_write_rules(self) -> None:
+    def test_file_read_only_has_global_read_no_write_rules(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_ONLY,
-            allowed_read_paths=("/Users/test/project",),
+            allowed_read_paths=(),
             allowed_write_paths=("/Users/test/project",),
             deny_write_paths=(), deny_access_paths=(),
         )
         profile = generate_sandbox_profile(plan)
-        assert '(allow file-read* (subpath "/Users/test/project"))' in profile
+        assert "(allow file-read*)" in profile
         assert '(allow file-write* (subpath "/Users/test/project"))' not in profile
 
-    def test_file_read_write_has_both_rules(self) -> None:
+    def test_file_read_write_has_global_read_and_write_rules(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_WRITE,
-            allowed_read_paths=("/Users/test/project",),
+            allowed_read_paths=(),
             allowed_write_paths=("/Users/test/project",),
             deny_write_paths=(), deny_access_paths=(),
         )
         profile = generate_sandbox_profile(plan)
-        assert '(allow file-read* (subpath "/Users/test/project"))' in profile
+        assert "(allow file-read*)" in profile
         assert '(allow file-write* (subpath "/Users/test/project"))' in profile
 
     def test_network_outbound_has_network_rules(self) -> None:
@@ -688,7 +658,7 @@ class TestProfileGeneration:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_WRITE,
-            allowed_read_paths=("/Users/test",),
+            allowed_read_paths=(),
             allowed_write_paths=("/Users/test",),
             deny_write_paths=("/System",),
             deny_access_paths=("/secret",),
@@ -701,13 +671,13 @@ class TestProfileGeneration:
     def test_path_with_spaces_is_escaped(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
         plan = ExecutionPlan(
-            template=SandboxTemplate.FILE_READ_ONLY,
-            allowed_read_paths=("/Users/test/My Documents",),
-            allowed_write_paths=(),
+            template=SandboxTemplate.FILE_READ_WRITE,
+            allowed_read_paths=(),
+            allowed_write_paths=("/Users/test/My Documents",),
             deny_write_paths=(), deny_access_paths=(),
         )
         profile = generate_sandbox_profile(plan)
-        assert '(allow file-read* (subpath "/Users/test/My Documents"))' in profile
+        assert '(allow file-write* (subpath "/Users/test/My Documents"))' in profile
 
     def test_unrestricted_has_allow_default_with_deny_overrides(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
@@ -772,12 +742,6 @@ class TestSeatbeltEnforcement:
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
 
-    @staticmethod
-    def _exec(wrapped: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            wrapped, shell=True, capture_output=True, text=True, timeout=timeout,
-        )
-
     def test_echo_succeeds_pure_compute(self) -> None:
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
@@ -786,7 +750,7 @@ class TestSeatbeltEnforcement:
             deny_write_paths=(),
             deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap("echo sandbox_ok", plan))
+        result = _exec_sandboxed(self.engine.wrap("echo sandbox_ok", plan))
         assert result.returncode == 0
         assert "sandbox_ok" in result.stdout
 
@@ -803,7 +767,7 @@ class TestSeatbeltEnforcement:
                 deny_write_paths=(),
                 deny_access_paths=(),
             )
-            result = self._exec(self.engine.wrap(f"cat {test_file}", plan))
+            result = _exec_sandboxed(self.engine.wrap(f"cat {test_file}", plan))
             assert result.returncode == 0
             assert "mount_content" in result.stdout
 
@@ -818,7 +782,7 @@ class TestSeatbeltEnforcement:
                 deny_write_paths=(),
                 deny_access_paths=(),
             )
-            result = self._exec(
+            result = _exec_sandboxed(
                 self.engine.wrap(f"echo written > {target}", plan)
             )
             assert result.returncode == 0
@@ -837,7 +801,7 @@ class TestSeatbeltEnforcement:
                     deny_write_paths=(canon_forbidden,),
                     deny_access_paths=(),
                 )
-                result = self._exec(
+                result = _exec_sandboxed(
                     self.engine.wrap(f"touch {target}", plan)
                 )
                 assert result.returncode != 0
@@ -856,7 +820,7 @@ class TestSeatbeltEnforcement:
                 deny_write_paths=(),
                 deny_access_paths=(canon,),
             )
-            result = self._exec(self.engine.wrap(f"cat {secret}", plan))
+            result = _exec_sandboxed(self.engine.wrap(f"cat {secret}", plan))
             assert result.returncode != 0
             assert "classified" not in result.stdout
 
@@ -871,7 +835,7 @@ class TestSeatbeltEnforcement:
                 deny_write_paths=(canon,),
                 deny_access_paths=(),
             )
-            result = self._exec(
+            result = _exec_sandboxed(
                 self.engine.wrap(f"touch {target}", plan)
             )
             assert result.returncode != 0
@@ -885,7 +849,7 @@ class TestSeatbeltEnforcement:
             deny_write_paths=(),
             deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap("date +%Y", plan))
+        result = _exec_sandboxed(self.engine.wrap("date +%Y", plan))
         assert result.returncode == 0
         assert result.stdout.strip().isdigit()
 
@@ -907,40 +871,34 @@ class TestNetworkEnforcement:
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
 
-    _NET_PROBE = (
-        "python3 -c \""
-        "import socket;"
-        "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
-        "s.settimeout(1);"
-        "try:\n"
-        "  s.connect(('127.0.0.1', 1))\\n"
-        "  print('connected')\\n"
-        "except ConnectionRefusedError:\\n"
-        "  print('conn_refused')\\n"
-        "except OSError as e:\\n"
-        "  print(f'sandbox_blocked: {e}')\\n"
-        "finally:\\n"
-        "  s.close()\""
-    )
+    _NET_PROBE = """python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(1)
+try:
+    s.connect(("127.0.0.1", 1))
+    print("connected")
+except ConnectionRefusedError:
+    print("conn_refused")
+except OSError as e:
+    print(f"sandbox_blocked: {e}")
+finally:
+    s.close()
+'"""
 
-    _BIND_PROBE = (
-        "python3 -c \""
-        "import socket;"
-        "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
-        "try:\\n"
-        "  s.bind(('127.0.0.1', 0))\\n"
-        "  print('bind_ok')\\n"
-        "except OSError as e:\\n"
-        "  print(f'bind_blocked: {e}')\\n"
-        "finally:\\n"
-        "  s.close()\""
-    )
+    _BIND_PROBE = """python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(("127.0.0.1", 0))
+    print("bind_ok")
+except OSError as e:
+    print(f"bind_blocked: {e}")
+finally:
+    s.close()
+'"""
 
-    @staticmethod
-    def _exec(wrapped: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            wrapped, shell=True, capture_output=True, text=True, timeout=timeout,
-        )
+
 
     def test_network_outbound_allows_connect(self) -> None:
         """Under NETWORK_OUTBOUND, outbound connect() is allowed by the kernel."""
@@ -949,7 +907,7 @@ class TestNetworkEnforcement:
             allowed_read_paths=(), allowed_write_paths=(),
             deny_write_paths=(), deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap(self._NET_PROBE, plan))
+        result = _exec_sandboxed(self.engine.wrap(self._NET_PROBE, plan))
         assert "conn_refused" in result.stdout, (
             f"Expected conn_refused (network allowed), got: {result.stdout!r} {result.stderr!r}"
         )
@@ -961,7 +919,7 @@ class TestNetworkEnforcement:
             allowed_read_paths=(), allowed_write_paths=(),
             deny_write_paths=(), deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap(self._NET_PROBE, plan))
+        result = _exec_sandboxed(self.engine.wrap(self._NET_PROBE, plan))
         assert "conn_refused" not in result.stdout, (
             "Network should be blocked under FILE_READ_WRITE"
         )
@@ -974,7 +932,7 @@ class TestNetworkEnforcement:
             allowed_read_paths=(), allowed_write_paths=(),
             deny_write_paths=(), deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap(self._NET_PROBE, plan))
+        result = _exec_sandboxed(self.engine.wrap(self._NET_PROBE, plan))
         assert "conn_refused" not in result.stdout
 
     def test_network_full_allows_bind(self) -> None:
@@ -984,7 +942,7 @@ class TestNetworkEnforcement:
             allowed_read_paths=(), allowed_write_paths=(),
             deny_write_paths=(), deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap(self._BIND_PROBE, plan))
+        result = _exec_sandboxed(self.engine.wrap(self._BIND_PROBE, plan))
         assert "bind_ok" in result.stdout, (
             f"Expected bind_ok under NETWORK_FULL, got: {result.stdout!r} {result.stderr!r}"
         )
@@ -996,7 +954,7 @@ class TestNetworkEnforcement:
             allowed_read_paths=(), allowed_write_paths=(),
             deny_write_paths=(), deny_access_paths=(),
         )
-        result = self._exec(self.engine.wrap(self._BIND_PROBE, plan))
+        result = _exec_sandboxed(self.engine.wrap(self._BIND_PROBE, plan))
         assert "bind_ok" not in result.stdout, (
             "Port binding should be blocked under NETWORK_OUTBOUND"
         )
@@ -1020,12 +978,6 @@ class TestUnrestrictedEnforcement:
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
 
-    @staticmethod
-    def _exec(wrapped: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            wrapped, shell=True, capture_output=True, text=True, timeout=timeout,
-        )
-
     def _root_plan(self) -> ExecutionPlan:
         """ExecutionPlan that mimics a root-demo profile: workspace /, all templates."""
         return ExecutionPlan(
@@ -1042,19 +994,19 @@ class TestUnrestrictedEnforcement:
 
     def test_echo_succeeds(self) -> None:
         plan = self._root_plan()
-        result = self._exec(self.engine.wrap("echo unrestricted_ok", plan))
+        result = _exec_sandboxed(self.engine.wrap("echo unrestricted_ok", plan))
         assert result.returncode == 0
         assert "unrestricted_ok" in result.stdout
 
     def test_read_etc_hosts(self) -> None:
         plan = self._root_plan()
-        result = self._exec(self.engine.wrap("cat /etc/hosts", plan))
+        result = _exec_sandboxed(self.engine.wrap("cat /etc/hosts", plan))
         assert result.returncode == 0
         assert "localhost" in result.stdout
 
     def test_list_root_directory(self) -> None:
         plan = self._root_plan()
-        result = self._exec(self.engine.wrap("ls /", plan))
+        result = _exec_sandboxed(self.engine.wrap("ls /", plan))
         assert result.returncode == 0
         assert "usr" in result.stdout
 
@@ -1063,7 +1015,7 @@ class TestUnrestrictedEnforcement:
             canon = os.path.realpath(tmpdir)
             target = Path(canon) / "unrestricted_write.txt"
             plan = self._root_plan()
-            result = self._exec(
+            result = _exec_sandboxed(
                 self.engine.wrap(f"echo written > {target}", plan)
             )
             assert result.returncode == 0
@@ -1072,22 +1024,21 @@ class TestUnrestrictedEnforcement:
     def test_network_outbound_succeeds(self) -> None:
         """UNRESTRICTED includes network-outbound."""
         plan = self._root_plan()
-        cmd = (
-            "python3 -c \""
-            "import socket;"
-            "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
-            "s.settimeout(1);"
-            "try:\\n"
-            "  s.connect(('127.0.0.1', 1))\\n"
-            "  print('connected')\\n"
-            "except ConnectionRefusedError:\\n"
-            "  print('conn_refused')\\n"
-            "except OSError as e:\\n"
-            "  print(f'sandbox_blocked: {e}')\\n"
-            "finally:\\n"
-            "  s.close()\""
-        )
-        result = self._exec(self.engine.wrap(cmd, plan))
+        cmd = """python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(1)
+try:
+    s.connect(("127.0.0.1", 1))
+    print("connected")
+except ConnectionRefusedError:
+    print("conn_refused")
+except OSError as e:
+    print(f"sandbox_blocked: {e}")
+finally:
+    s.close()
+'"""
+        result = _exec_sandboxed(self.engine.wrap(cmd, plan))
         assert "conn_refused" in result.stdout, (
             f"UNRESTRICTED should allow outbound network, got: {result.stdout!r}"
         )
@@ -1095,19 +1046,18 @@ class TestUnrestrictedEnforcement:
     def test_port_binding_succeeds(self) -> None:
         """UNRESTRICTED includes network-bind."""
         plan = self._root_plan()
-        cmd = (
-            "python3 -c \""
-            "import socket;"
-            "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
-            "try:\\n"
-            "  s.bind(('127.0.0.1', 0))\\n"
-            "  print('bind_ok')\\n"
-            "except OSError as e:\\n"
-            "  print(f'bind_blocked: {e}')\\n"
-            "finally:\\n"
-            "  s.close()\""
-        )
-        result = self._exec(self.engine.wrap(cmd, plan))
+        cmd = """python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(("127.0.0.1", 0))
+    print("bind_ok")
+except OSError as e:
+    print(f"bind_blocked: {e}")
+finally:
+    s.close()
+'"""
+        result = _exec_sandboxed(self.engine.wrap(cmd, plan))
         assert "bind_ok" in result.stdout, (
             f"UNRESTRICTED should allow bind, got: {result.stdout!r}"
         )
@@ -1115,7 +1065,7 @@ class TestUnrestrictedEnforcement:
     def test_deny_write_system_holds(self) -> None:
         """Even under UNRESTRICTED, /System is write-protected by deny override."""
         plan = self._root_plan()
-        result = self._exec(
+        result = _exec_sandboxed(
             self.engine.wrap("touch /System/sandbox_test_file", plan)
         )
         assert result.returncode != 0
@@ -1124,7 +1074,7 @@ class TestUnrestrictedEnforcement:
     def test_deny_write_usr_holds(self) -> None:
         """Even under UNRESTRICTED, /usr is write-protected by deny override."""
         plan = self._root_plan()
-        result = self._exec(
+        result = _exec_sandboxed(
             self.engine.wrap("touch /usr/sandbox_test_file", plan)
         )
         assert result.returncode != 0
@@ -1133,7 +1083,7 @@ class TestUnrestrictedEnforcement:
     def test_deny_write_bin_holds(self) -> None:
         """Even under UNRESTRICTED, /bin is write-protected by deny override."""
         plan = self._root_plan()
-        result = self._exec(
+        result = _exec_sandboxed(
             self.engine.wrap("touch /bin/sandbox_test_file", plan)
         )
         assert result.returncode != 0
@@ -1143,7 +1093,7 @@ class TestUnrestrictedEnforcement:
         """Even under UNRESTRICTED, LaunchAgents dir is write-protected."""
         la_path = canonical_sandbox_path("~/Library/LaunchAgents")
         plan = self._root_plan()
-        result = self._exec(
+        result = _exec_sandboxed(
             self.engine.wrap(f"touch {la_path}/sandbox_test.plist", plan)
         )
         assert result.returncode != 0
@@ -1156,7 +1106,7 @@ class TestUnrestrictedEnforcement:
         sentinel.write_text("secret")
         try:
             plan = self._root_plan()
-            result = self._exec(
+            result = _exec_sandboxed(
                 self.engine.wrap(f"cat {sentinel}", plan)
             )
             assert "secret" not in result.stdout, (
@@ -1176,7 +1126,7 @@ class TestUnrestrictedEnforcement:
         a clean exit.
         """
         plan = self._root_plan()
-        result = self._exec(self.engine.wrap("sudo echo escaped", plan))
+        result = _exec_sandboxed(self.engine.wrap("sudo echo escaped", plan))
         escaped = result.returncode == 0 and "escaped" in result.stdout
         assert not escaped, (
             "sudo must not cleanly succeed within the sandbox"
@@ -1221,10 +1171,7 @@ class TestTerminalAdapterSandbox:
             allowed_templates=["pure_compute"],
             opaque_fallback="pure_compute",
         )
-        resolver = MountPointResolver([
-            MountPointConfig(virtual_path="/home/", real_path="/Users/testuser", writable=True),
-        ])
-        planner = SandboxPlanner(cfg, resolver)
+        planner = SandboxPlanner(cfg)
 
         mock_engine = MagicMock()
         mock_engine.available.return_value = True
@@ -1247,10 +1194,7 @@ class TestTerminalAdapterSandbox:
             enabled=True,
             allowed_templates=["pure_compute", "file_read_only", "file_read_write"],
         )
-        resolver = MountPointResolver([
-            MountPointConfig(virtual_path="/home/", real_path="/Users/testuser", writable=True),
-        ])
-        planner = SandboxPlanner(cfg, resolver)
+        planner = SandboxPlanner(cfg)
         engine = create_sandbox_engine("macos")
         if engine is None or not engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1270,10 +1214,7 @@ class TestTerminalAdapterSandbox:
         from executor.sandbox.engine import create_sandbox_engine
 
         cfg = SandboxConfig(enabled=True)
-        resolver = MountPointResolver([
-            MountPointConfig(virtual_path="/home/", real_path="/Users/testuser", writable=True),
-        ])
-        planner = SandboxPlanner(cfg, resolver)
+        planner = SandboxPlanner(cfg)
         engine = create_sandbox_engine("macos")
         if engine is None or not engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1320,10 +1261,7 @@ class TestEndToEnd:
         assert plan is not None
         assert plan.template == SandboxTemplate.PURE_COMPUTE
 
-        result = subprocess.run(
-            self.engine.wrap("echo hello world", plan),
-            shell=True, capture_output=True, text=True, timeout=10,
-        )
+        result = _exec_sandboxed(self.engine.wrap("echo hello world", plan))
         assert result.returncode == 0
         assert "hello world" in result.stdout
 
@@ -1334,10 +1272,7 @@ class TestEndToEnd:
         assert plan is not None
         assert plan.template == SandboxTemplate.FILE_READ_ONLY
 
-        result = subprocess.run(
-            self.engine.wrap("cat /etc/hosts", plan),
-            shell=True, capture_output=True, text=True, timeout=10,
-        )
+        result = _exec_sandboxed(self.engine.wrap("cat /etc/hosts", plan))
         assert result.returncode == 0
         assert "localhost" in result.stdout
 
@@ -1355,27 +1290,20 @@ class TestEndToEnd:
         assert plan is not None
         assert plan.template == SandboxTemplate.FILE_READ_WRITE
 
-    def test_write_command_in_allowed_mount(self) -> None:
-        """cp inside an allowed writable mount succeeds through the full pipeline."""
+    def test_write_command_in_allowed_path(self) -> None:
+        """cp inside an allowed write path succeeds through the full pipeline."""
         with tempfile.TemporaryDirectory() as tmpdir:
             canon = os.path.realpath(tmpdir)
             src = Path(canon) / "src.txt"
             dst = Path(canon) / "dst.txt"
             src.write_text("e2e_content")
 
-            planner = _make_planner(
-                mounts=[
-                    MountPointConfig(virtual_path="/work/", real_path=canon, writable=True),
-                ]
-            )
+            planner = _make_planner(write_paths=[canon])
             report = classify(f"cp {src} {dst}")
             plan = planner.plan(report, working_directory=canon)
             assert plan is not None
             assert plan.template == SandboxTemplate.FILE_READ_WRITE
 
-            result = subprocess.run(
-                self.engine.wrap(f"cp {src} {dst}", plan),
-                shell=True, capture_output=True, text=True, timeout=10,
-            )
+            result = _exec_sandboxed(self.engine.wrap(f"cp {src} {dst}", plan))
             assert result.returncode == 0
             assert dst.read_text() == "e2e_content"
