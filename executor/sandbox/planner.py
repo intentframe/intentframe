@@ -11,10 +11,13 @@ via ``os.path.realpath``).  Critical on macOS where ``/var`` →
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 
 from executor.config.schema import SandboxConfig
+
+logger = logging.getLogger(__name__)
 from executor.sandbox.pathing import canonical_sandbox_path
 from executor.sandbox.templates import (
     NON_NEGOTIABLE_DENY_ACCESS,
@@ -52,10 +55,21 @@ class SandboxPlanner:
             try:
                 allowed_set.add(SandboxTemplate(name))
             except ValueError:
-                pass
+                logger.warning(
+                    "Ignoring unrecognised sandbox template %r in allowed_templates "
+                    "(valid: %s)",
+                    name,
+                    ", ".join(t.value for t in TEMPLATE_ORDER),
+                )
         self._allowed_templates = allowed_set
 
         self._template = self._resolve_template(allowed_set)
+        if not allowed_set:
+            logger.error(
+                "No valid templates in allowed_templates — falling back to %s. "
+                "Check executor.yaml sandbox.allowed_templates.",
+                self._template.value,
+            )
 
         self._write_paths = self._resolve_write_paths(config)
 
