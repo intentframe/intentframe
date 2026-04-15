@@ -709,6 +709,38 @@ class TestProfileGeneration:
         profile = generate_sandbox_profile(plan)
         assert '(allow file-read* (subpath "/Users/test/My Documents"))' in profile
 
+    def test_unrestricted_has_allow_default_with_deny_overrides(self) -> None:
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.UNRESTRICTED,
+            allowed_read_paths=("/",),
+            allowed_write_paths=("/",),
+            deny_write_paths=("/System",),
+            deny_access_paths=("/secret",),
+        )
+        profile = generate_sandbox_profile(plan)
+        assert "(allow default)" in profile
+        assert '(deny file-write* (subpath "/System"))' in profile
+        assert '(deny file-read* file-write* (subpath "/secret"))' in profile
+        allow_pos = profile.index("(allow default)")
+        deny_write_pos = profile.index('(deny file-write* (subpath "/System"))')
+        deny_access_pos = profile.index('(deny file-read* file-write* (subpath "/secret"))')
+        assert deny_write_pos > allow_pos, "deny-write must come after allow default"
+        assert deny_access_pos > allow_pos, "deny-access must come after allow default"
+
+    def test_unrestricted_includes_network_outbound_bind_inbound(self) -> None:
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.UNRESTRICTED,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        profile = generate_sandbox_profile(plan)
+        assert "(allow network-outbound)" in profile
+        assert "(allow network-bind)" in profile
+        assert "(allow network-inbound)" in profile
+        assert "(allow default)" in profile
+
     def test_engine_available_without_file(self) -> None:
         """Engine availability only depends on sandbox-exec binary, not any file."""
         from executor.sandbox.platforms.macos import MacOSSandboxEngine
@@ -856,6 +888,299 @@ class TestSeatbeltEnforcement:
         result = self._exec(self.engine.wrap("date +%Y", plan))
         assert result.returncode == 0
         assert result.stdout.strip().isdigit()
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestNetworkEnforcement:
+    """Verify network sandbox rules with real socket operations.
+
+    Uses a Python one-liner that attempts socket.connect() — the connect()
+    syscall is what Seatbelt's network-outbound rule gates.  On success the
+    process prints 'conn_refused' (connection refused, but socket was allowed).
+    On sandbox denial it prints 'sandbox_blocked'.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    _NET_PROBE = (
+        "python3 -c \""
+        "import socket;"
+        "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
+        "s.settimeout(1);"
+        "try:\n"
+        "  s.connect(('127.0.0.1', 1))\\n"
+        "  print('connected')\\n"
+        "except ConnectionRefusedError:\\n"
+        "  print('conn_refused')\\n"
+        "except OSError as e:\\n"
+        "  print(f'sandbox_blocked: {e}')\\n"
+        "finally:\\n"
+        "  s.close()\""
+    )
+
+    _BIND_PROBE = (
+        "python3 -c \""
+        "import socket;"
+        "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
+        "try:\\n"
+        "  s.bind(('127.0.0.1', 0))\\n"
+        "  print('bind_ok')\\n"
+        "except OSError as e:\\n"
+        "  print(f'bind_blocked: {e}')\\n"
+        "finally:\\n"
+        "  s.close()\""
+    )
+
+    @staticmethod
+    def _exec(wrapped: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            wrapped, shell=True, capture_output=True, text=True, timeout=timeout,
+        )
+
+    def test_network_outbound_allows_connect(self) -> None:
+        """Under NETWORK_OUTBOUND, outbound connect() is allowed by the kernel."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = self._exec(self.engine.wrap(self._NET_PROBE, plan))
+        assert "conn_refused" in result.stdout, (
+            f"Expected conn_refused (network allowed), got: {result.stdout!r} {result.stderr!r}"
+        )
+
+    def test_file_read_write_blocks_connect(self) -> None:
+        """Under FILE_READ_WRITE (no network), outbound connect() is denied."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.FILE_READ_WRITE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = self._exec(self.engine.wrap(self._NET_PROBE, plan))
+        assert "conn_refused" not in result.stdout, (
+            "Network should be blocked under FILE_READ_WRITE"
+        )
+        assert "sandbox_blocked" in result.stdout or result.returncode != 0
+
+    def test_pure_compute_blocks_connect(self) -> None:
+        """Under PURE_COMPUTE, outbound connect() is denied."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = self._exec(self.engine.wrap(self._NET_PROBE, plan))
+        assert "conn_refused" not in result.stdout
+
+    def test_network_full_allows_bind(self) -> None:
+        """Under NETWORK_FULL, bind() to a local port is allowed."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_FULL,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = self._exec(self.engine.wrap(self._BIND_PROBE, plan))
+        assert "bind_ok" in result.stdout, (
+            f"Expected bind_ok under NETWORK_FULL, got: {result.stdout!r} {result.stderr!r}"
+        )
+
+    def test_network_outbound_blocks_bind(self) -> None:
+        """Under NETWORK_OUTBOUND, bind() is denied (no port binding)."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = self._exec(self.engine.wrap(self._BIND_PROBE, plan))
+        assert "bind_ok" not in result.stdout, (
+            "Port binding should be blocked under NETWORK_OUTBOUND"
+        )
+        assert "bind_blocked" in result.stdout or result.returncode != 0
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestUnrestrictedEnforcement:
+    """Verify that UNRESTRICTED template allows broad operations but non-negotiable
+    deny overrides still hold.  These tests are agnostic of IntentFrame — they
+    exercise the raw sandbox-exec kernel mechanism.
+
+    This is the "root demo" scenario: the executor runs as root, workspace is /,
+    but the deny base still protects system integrity.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    @staticmethod
+    def _exec(wrapped: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            wrapped, shell=True, capture_output=True, text=True, timeout=timeout,
+        )
+
+    def _root_plan(self) -> ExecutionPlan:
+        """ExecutionPlan that mimics a root-demo profile: workspace /, all templates."""
+        return ExecutionPlan(
+            template=SandboxTemplate.UNRESTRICTED,
+            allowed_read_paths=("/",),
+            allowed_write_paths=("/",),
+            deny_write_paths=tuple(
+                canonical_sandbox_path(p) for p in NON_NEGOTIABLE_DENY_WRITE
+            ),
+            deny_access_paths=tuple(
+                canonical_sandbox_path(p) for p in NON_NEGOTIABLE_DENY_ACCESS
+            ),
+        )
+
+    def test_echo_succeeds(self) -> None:
+        plan = self._root_plan()
+        result = self._exec(self.engine.wrap("echo unrestricted_ok", plan))
+        assert result.returncode == 0
+        assert "unrestricted_ok" in result.stdout
+
+    def test_read_etc_hosts(self) -> None:
+        plan = self._root_plan()
+        result = self._exec(self.engine.wrap("cat /etc/hosts", plan))
+        assert result.returncode == 0
+        assert "localhost" in result.stdout
+
+    def test_list_root_directory(self) -> None:
+        plan = self._root_plan()
+        result = self._exec(self.engine.wrap("ls /", plan))
+        assert result.returncode == 0
+        assert "usr" in result.stdout
+
+    def test_write_to_tmpdir_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            canon = os.path.realpath(tmpdir)
+            target = Path(canon) / "unrestricted_write.txt"
+            plan = self._root_plan()
+            result = self._exec(
+                self.engine.wrap(f"echo written > {target}", plan)
+            )
+            assert result.returncode == 0
+            assert target.read_text().strip() == "written"
+
+    def test_network_outbound_succeeds(self) -> None:
+        """UNRESTRICTED includes network-outbound."""
+        plan = self._root_plan()
+        cmd = (
+            "python3 -c \""
+            "import socket;"
+            "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
+            "s.settimeout(1);"
+            "try:\\n"
+            "  s.connect(('127.0.0.1', 1))\\n"
+            "  print('connected')\\n"
+            "except ConnectionRefusedError:\\n"
+            "  print('conn_refused')\\n"
+            "except OSError as e:\\n"
+            "  print(f'sandbox_blocked: {e}')\\n"
+            "finally:\\n"
+            "  s.close()\""
+        )
+        result = self._exec(self.engine.wrap(cmd, plan))
+        assert "conn_refused" in result.stdout, (
+            f"UNRESTRICTED should allow outbound network, got: {result.stdout!r}"
+        )
+
+    def test_port_binding_succeeds(self) -> None:
+        """UNRESTRICTED includes network-bind."""
+        plan = self._root_plan()
+        cmd = (
+            "python3 -c \""
+            "import socket;"
+            "s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);"
+            "try:\\n"
+            "  s.bind(('127.0.0.1', 0))\\n"
+            "  print('bind_ok')\\n"
+            "except OSError as e:\\n"
+            "  print(f'bind_blocked: {e}')\\n"
+            "finally:\\n"
+            "  s.close()\""
+        )
+        result = self._exec(self.engine.wrap(cmd, plan))
+        assert "bind_ok" in result.stdout, (
+            f"UNRESTRICTED should allow bind, got: {result.stdout!r}"
+        )
+
+    def test_deny_write_system_holds(self) -> None:
+        """Even under UNRESTRICTED, /System is write-protected by deny override."""
+        plan = self._root_plan()
+        result = self._exec(
+            self.engine.wrap("touch /System/sandbox_test_file", plan)
+        )
+        assert result.returncode != 0
+        assert not Path("/System/sandbox_test_file").exists()
+
+    def test_deny_write_usr_holds(self) -> None:
+        """Even under UNRESTRICTED, /usr is write-protected by deny override."""
+        plan = self._root_plan()
+        result = self._exec(
+            self.engine.wrap("touch /usr/sandbox_test_file", plan)
+        )
+        assert result.returncode != 0
+        assert not Path("/usr/sandbox_test_file").exists()
+
+    def test_deny_write_bin_holds(self) -> None:
+        """Even under UNRESTRICTED, /bin is write-protected by deny override."""
+        plan = self._root_plan()
+        result = self._exec(
+            self.engine.wrap("touch /bin/sandbox_test_file", plan)
+        )
+        assert result.returncode != 0
+        assert not Path("/bin/sandbox_test_file").exists()
+
+    def test_deny_write_launch_agents_holds(self) -> None:
+        """Even under UNRESTRICTED, LaunchAgents dir is write-protected."""
+        la_path = canonical_sandbox_path("~/Library/LaunchAgents")
+        plan = self._root_plan()
+        result = self._exec(
+            self.engine.wrap(f"touch {la_path}/sandbox_test.plist", plan)
+        )
+        assert result.returncode != 0
+
+    def test_deny_access_intentframe_holds(self) -> None:
+        """Even under UNRESTRICTED, ~/.intentframe is deny-access (no read or write)."""
+        if_path = canonical_sandbox_path("~/.intentframe")
+        os.makedirs(if_path, exist_ok=True)
+        sentinel = Path(if_path) / "sandbox_sentinel.txt"
+        sentinel.write_text("secret")
+        try:
+            plan = self._root_plan()
+            result = self._exec(
+                self.engine.wrap(f"cat {sentinel}", plan)
+            )
+            assert "secret" not in result.stdout, (
+                "Sandbox must deny reading ~/.intentframe even under UNRESTRICTED"
+            )
+            assert result.returncode != 0
+        finally:
+            sentinel.unlink(missing_ok=True)
+
+    def test_sudo_fails_within_sandbox(self) -> None:
+        """sudo cannot escalate or bypass the sandbox.
+
+        Even though (allow process-exec) permits running /usr/bin/sudo, the
+        sandbox restricts the PAM/authentication services sudo needs.  And even
+        if sudo somehow succeeded, the child process inherits the sandbox —
+        deny overrides still apply.  This test verifies sudo doesn't produce
+        a clean exit.
+        """
+        plan = self._root_plan()
+        result = self._exec(self.engine.wrap("sudo echo escaped", plan))
+        escaped = result.returncode == 0 and "escaped" in result.stdout
+        assert not escaped, (
+            "sudo must not cleanly succeed within the sandbox"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
