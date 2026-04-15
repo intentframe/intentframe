@@ -109,3 +109,5 @@ demo/demo_data/attack_invoices_sandbox/
 
 .claude/
 .claude_chats/
+
+.cursorignore
