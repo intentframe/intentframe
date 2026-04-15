@@ -386,6 +386,22 @@ class TestPlanner:
         )
         assert planner.template == SandboxTemplate.NETWORK_OUTBOUND
 
+    def test_invalid_template_name_warns(self, caplog) -> None:
+        """Unrecognised template names emit a warning, valid ones still work."""
+        import logging
+        with caplog.at_level(logging.WARNING, logger="executor.sandbox.planner"):
+            planner = _make_planner(allowed=["pure_compute", "bogus_template"])
+        assert planner.template == SandboxTemplate.PURE_COMPUTE
+        assert "bogus_template" in caplog.text
+
+    def test_all_invalid_templates_logs_error(self, caplog) -> None:
+        """If every template name is invalid, an error is logged and fallback is used."""
+        import logging
+        with caplog.at_level(logging.WARNING, logger="executor.sandbox.planner"):
+            planner = _make_planner(allowed=["typo_one", "typo_two"])
+        assert planner.template == SandboxTemplate.FILE_READ_ONLY
+        assert "No valid templates" in caplog.text
+
 
 class TestPlannerConfigShapes:
     """Planner behaviour with config-driven write paths (no VFS)."""
