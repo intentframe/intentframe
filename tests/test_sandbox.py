@@ -1049,6 +1049,35 @@ finally:
         )
         assert result.returncode != 0
 
+    def test_deny_write_sbin_holds(self) -> None:
+        """Even under UNRESTRICTED, /sbin is write-protected by deny override."""
+        plan = self._root_plan()
+        result = _exec_sandboxed(
+            self.engine.wrap("touch /sbin/sandbox_test_file", plan)
+        )
+        assert result.returncode != 0
+        assert not Path("/sbin/sandbox_test_file").exists()
+
+    def test_deny_write_global_launch_daemons_holds(self) -> None:
+        """Even under UNRESTRICTED, /Library/LaunchDaemons is write-protected."""
+        ld_path = canonical_sandbox_path("/Library/LaunchDaemons")
+        plan = self._root_plan()
+        result = _exec_sandboxed(
+            self.engine.wrap(f"touch {ld_path}/sandbox_test.plist", plan)
+        )
+        assert result.returncode != 0
+        assert not Path(f"{ld_path}/sandbox_test.plist").exists()
+
+    def test_deny_write_global_launch_agents_holds(self) -> None:
+        """Even under UNRESTRICTED, /Library/LaunchAgents is write-protected."""
+        la_path = canonical_sandbox_path("/Library/LaunchAgents")
+        plan = self._root_plan()
+        result = _exec_sandboxed(
+            self.engine.wrap(f"touch {la_path}/sandbox_test.plist", plan)
+        )
+        assert result.returncode != 0
+        assert not Path(f"{la_path}/sandbox_test.plist").exists()
+
     def test_deny_access_intentframe_holds(self) -> None:
         """Even under UNRESTRICTED, ~/.intentframe is deny-access (no read or write)."""
         if_path = canonical_sandbox_path("~/.intentframe")
@@ -1066,6 +1095,69 @@ finally:
             assert result.returncode != 0
         finally:
             sentinel.unlink(missing_ok=True)
+
+    # ── Symlink TOCTOU: verify Seatbelt resolves symlink targets ──────
+
+    def test_symlink_to_system_cannot_bypass_deny(self) -> None:
+        """A symlink pointing to /System must not bypass the write-deny.
+
+        Seatbelt resolves symlink targets at the kernel level (MAC operates
+        on vnodes, not path strings).  This test proves a subprocess cannot
+        create a symlink to a denied path and write through it.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            canon = os.path.realpath(tmpdir)
+            link = Path(canon) / "sys_link"
+            plan = self._root_plan()
+            result = _exec_sandboxed(
+                self.engine.wrap(
+                    f"ln -s /System {link} && touch {link}/sandbox_test_file",
+                    plan,
+                )
+            )
+            assert not Path("/System/sandbox_test_file").exists(), (
+                "Symlink bypass: write reached /System through symlink"
+            )
+
+    def test_symlink_to_intentframe_cannot_bypass_deny(self) -> None:
+        """A symlink pointing to ~/.intentframe must not bypass the access-deny."""
+        if_path = canonical_sandbox_path("~/.intentframe")
+        os.makedirs(if_path, exist_ok=True)
+        sentinel = Path(if_path) / "toctou_sentinel.txt"
+        sentinel.write_text("secret_toctou")
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                canon = os.path.realpath(tmpdir)
+                link = Path(canon) / "if_link"
+                plan = self._root_plan()
+                result = _exec_sandboxed(
+                    self.engine.wrap(
+                        f"ln -s {if_path} {link} && cat {link}/toctou_sentinel.txt",
+                        plan,
+                    )
+                )
+                assert "secret_toctou" not in result.stdout, (
+                    "Symlink bypass: read reached ~/.intentframe through symlink"
+                )
+        finally:
+            sentinel.unlink(missing_ok=True)
+
+    def test_symlink_to_launch_agents_cannot_bypass_deny(self) -> None:
+        """A symlink pointing to ~/Library/LaunchAgents must not bypass write-deny."""
+        la_path = canonical_sandbox_path("~/Library/LaunchAgents")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            canon = os.path.realpath(tmpdir)
+            link = Path(canon) / "la_link"
+            plan = self._root_plan()
+            result = _exec_sandboxed(
+                self.engine.wrap(
+                    f"ln -s {la_path} {link} && touch {link}/sandbox_toctou.plist",
+                    plan,
+                )
+            )
+            assert not Path(f"{la_path}/sandbox_toctou.plist").exists(), (
+                "Symlink bypass: write reached LaunchAgents through symlink"
+            )
 
     def test_sudo_fails_within_sandbox(self) -> None:
         """sudo cannot escalate or bypass the sandbox.
