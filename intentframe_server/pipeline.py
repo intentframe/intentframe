@@ -27,7 +27,11 @@ what to do next — ask the user, retry differently, or skip.
 """
 
 import asyncio
+import json
 import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from action_registry.types import ActionType
@@ -49,6 +53,36 @@ from policy_registry.client import PolicyRegistryClient
 from resource_registry.client import ResourceRegistryClient
 
 logger = logging.getLogger(__name__)
+
+_failure_logger: logging.Logger | None = None
+
+
+def _get_failure_logger() -> logging.Logger:
+    """Lazily initialise a file-only logger for failed executor actions."""
+    global _failure_logger
+    if _failure_logger is not None:
+        return _failure_logger
+
+    log_dir = Path(
+        os.environ.get(
+            "INTENTFRAME_LOG_DIR",
+            Path.home() / "Library" / "Logs" / "IntentFrame",
+        )
+    )
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "executor_failed_actions.log"
+
+    fl = logging.getLogger("intentframe.executor_failures")
+    fl.setLevel(logging.WARNING)
+    fl.propagate = False
+
+    if not fl.handlers:
+        handler = logging.FileHandler(str(log_path), encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        fl.addHandler(handler)
+
+    _failure_logger = fl
+    return _failure_logger
 
 
 class IntentFrameRuntime:
@@ -87,7 +121,24 @@ class IntentFrameRuntime:
         self.audit_log: list = []
         self._request_counter = 0
         self._lock = asyncio.Lock()
-    
+
+    @staticmethod
+    def _log_failed_action(intent: IntentFrame, result: ExecutionResult) -> None:
+        """Write full failure details to a dedicated log file."""
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "action": intent.action.value,
+            "target": intent.target or "",
+            "command": (intent.data or {}).get("command", "")[:500],
+            "error": result.error,
+            "stderr": (result.data or {}).get("stderr", "")[:1000] if result.data else None,
+            "return_code": (result.data or {}).get("return_code") if result.data else None,
+        }
+        try:
+            _get_failure_logger().warning(json.dumps(entry, default=str))
+        except Exception:
+            logger.debug("Could not write to executor failure log", exc_info=True)
+
     def _resolve_user_context(self, user_context: UserContext) -> UserContext:
         """Look up the user's real policies from the policy registry.
 
@@ -472,7 +523,14 @@ class IntentFrameRuntime:
                     if msg:
                         msg_short = msg[:52] + "…" if len(msg) > 52 else msg
                         print(f"    │  Shown:  {msg_short:<49} │")
+                if not result.success and result.error:
+                    hint = result.error.replace("\n", " ")
+                    hint = hint[:49] + "…" if len(hint) > 49 else hint
+                    print(f"    │  Reason: {hint:<49} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
+
+            if not result.success:
+                self._log_failed_action(intent, result)
             
             # Log the outcome
             audit_entry["executed"] = result.success

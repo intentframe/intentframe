@@ -286,7 +286,10 @@ async def delete_file(ctx: RunContextWrapper[AgentContext], path: str, reason: s
 
 @function_tool
 async def run_command(ctx: RunContextWrapper[AgentContext], command: str, reason: str) -> str:
-    """Execute a shell command and return its output."""
+    """Execute a shell command and return its output.
+
+    Commands run in a real OS shell. Do not assume the paths used for file
+    tools will work inside the shell — discover and use real host paths instead."""
     return await _submit(ctx, _CommandAction(command=command, reason=reason))
 
 

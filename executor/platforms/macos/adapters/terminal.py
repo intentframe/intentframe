@@ -90,19 +90,11 @@ class TerminalAdapter(CapabilityAdapter):
                     error="Sandbox enabled but engine unavailable on this platform -- RUN_COMMAND blocked",
                 )
 
-            from executor.sandbox.classifier import classify
-
-            cap_report = classify(command)
-            plan = self._sandbox_planner.plan(cap_report, working_directory=working_dir)
-            if plan is None:
-                return ExecutionResult(
-                    success=False,
-                    error="Command requires capabilities beyond executor sandbox policy",
-                )
+            plan = self._sandbox_planner.plan(working_directory=working_dir)
             sandboxed = self._sandbox_engine.wrap(command, plan)
             logger.debug(
-                "Sandbox: template=%s opaque=%s command=%s",
-                plan.template.value, cap_report.opaque, command[:120],
+                "Sandbox: template=%s command=%s",
+                plan.template.value, command[:120],
             )
 
         try:

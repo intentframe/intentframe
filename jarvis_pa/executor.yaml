@@ -56,12 +56,9 @@ filesystem:
 
 # ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
 # Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
-# The classifier picks the narrowest template that covers a command's needs.
-# Opaque or unclassifiable commands use the fallback template.
+# All commands run under the highest-privilege template in allowed_templates.
 sandbox:
   enabled: true
-  default_template: file_read_only
-  opaque_fallback: file_read_write
   working_directory: ~/
   allowed_write_paths:
     - ~/

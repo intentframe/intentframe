@@ -375,11 +375,12 @@ The credential vault provides credentials directly to adapters in-process;
 they are never serialized, never passed over the socket, never written to disk
 outside of macOS Keychain.
 
-### Invariant 4: Virtual Paths Only
+### Invariant 4: Virtual Paths Only (File I/O Tools)
 
-Agents operate in a sandboxed virtual filesystem. They see `/invoices/` not
-`/Users/john/Documents/finance/invoices/`. The Executor's files adapter resolves
-virtual paths to real paths via MountPoints. This prevents:
+Agents operate in a sandboxed virtual filesystem for file I/O tools
+(`READ_FILE`, `WRITE_FILE`, `LIST_DIRECTORY`, `DELETE_FILE`). They see
+`/invoices/` not `/Users/john/Documents/finance/invoices/`. The Executor's
+files adapter resolves virtual paths to real paths via MountPoints. This prevents:
 
 - Path traversal attacks (`../../../etc/passwd`)
 - Information leakage (agent learning OS, username, directory structure)
@@ -387,6 +388,13 @@ virtual paths to real paths via MountPoints. This prevents:
 
 The existing MountPoint system from `demo/data_structures.py` and
 `demo/resources/file_system.py` is carried forward into the production executor.
+
+**Note:** `RUN_COMMAND` intentionally bypasses VFS — shell commands operate on
+the real filesystem because they need access to system binaries, interpreters,
+and OS paths that virtual path translation cannot cover. Instead of VFS,
+`RUN_COMMAND` is constrained by a kernel-enforced Seatbelt sandbox that
+restricts writes according to runtime configuration and blocks network access
+unless the command's template permits it. See Part 20 and `executor/sandbox.md`.
 
 ---
 
@@ -1244,7 +1252,7 @@ See `executor/sandbox.md` for the full implementation reference.
 - `(deny default)` — kernel blocks everything not explicitly allowed
 - `(allow file-read*)` — reads are globally allowed; sensitive paths denied last
 - Write scope controlled by `SandboxConfig.allowed_write_paths` (independent of VFS)
-- Template selection via deterministic command classifier (shlex-based, no execution)
+- All commands run under `max(allowed_templates)` — the admin-configured privilege ceiling
 - Non-negotiable deny overrides placed last (Seatbelt last-match-wins)
 - All paths canonicalized via `os.path.realpath()` before entering SBPL rules
 - Controlled `TMPDIR` (`/tmp/intentframe`) instead of blanket-allowing `/var/folders`
@@ -1253,7 +1261,7 @@ See `executor/sandbox.md` for the full implementation reference.
 
 ### New module
 
-`executor/sandbox/` — classifier, planner, pathing, templates, engine, macOS platform.
+`executor/sandbox/` — planner, pathing, templates, engine, macOS platform.
 Dynamic SBPL profile generation following Anthropic's `sandbox-runtime` pattern.
 
 The engine returns a `SandboxedCommand(argv, env_overrides)` dataclass. The adapter

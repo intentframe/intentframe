@@ -1,16 +1,12 @@
-"""Sandbox planner -- selects template and computes filesystem scope.
+"""Sandbox planner -- computes template and filesystem scope.
 
-Given a ``CapabilityReport`` from the classifier, the planner:
+Every command gets the same sandbox template: ``max(allowed_templates)``
+from config.  The admin decides the privilege ceiling once; the planner
+applies it uniformly.  No per-command classification.
 
-1.  Picks the narrowest ``SandboxTemplate`` that covers all capabilities.
-2.  Falls back to the opaque template if the report says ``opaque=True``.
-3.  Rejects the command (returns ``None``) if the selected template is not
-    in the executor's ``allowed_templates`` ceiling.
-4.  Derives allowed/denied paths from ``SandboxConfig`` (no VFS dependency).
-
-All paths stored in the ``ExecutionPlan`` are **canonical** (symlinks
-resolved via ``os.path.realpath``).  This is critical on macOS where
-``/var`` → ``/private/var`` and ``/tmp`` → ``/private/tmp``.
+All paths in the ``ExecutionPlan`` are **canonical** (symlinks resolved
+via ``os.path.realpath``).  Critical on macOS where ``/var`` →
+``/private/var`` and ``/tmp`` → ``/private/tmp``.
 """
 
 from __future__ import annotations
@@ -19,15 +15,15 @@ import os
 from dataclasses import dataclass
 
 from executor.config.schema import SandboxConfig
-from executor.sandbox.capabilities import CapabilityReport
 from executor.sandbox.pathing import canonical_sandbox_path
 from executor.sandbox.templates import (
     NON_NEGOTIABLE_DENY_ACCESS,
     NON_NEGOTIABLE_DENY_WRITE,
     SandboxTemplate,
     TEMPLATE_ORDER,
-    minimum_template,
 )
+
+_TEMPLATE_RANK = {t: i for i, t in enumerate(TEMPLATE_ORDER)}
 
 
 @dataclass(frozen=True)
@@ -59,8 +55,7 @@ class SandboxPlanner:
                 pass
         self._allowed_templates = allowed_set
 
-        self._default_template = self._safe_template(config.default_template)
-        self._opaque_fallback = self._safe_template(config.opaque_fallback)
+        self._template = self._resolve_template(allowed_set)
 
         self._write_paths = self._resolve_write_paths(config)
 
@@ -71,30 +66,13 @@ class SandboxPlanner:
             canonical_sandbox_path(p) for p in NON_NEGOTIABLE_DENY_ACCESS
         )
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+    @property
+    def template(self) -> SandboxTemplate:
+        """The single template applied to all commands."""
+        return self._template
 
-    def plan(
-        self,
-        report: CapabilityReport,
-        working_directory: str | None = None,
-    ) -> ExecutionPlan | None:
-        """Produce an ``ExecutionPlan`` or ``None`` (= reject command)."""
-        if report.opaque:
-            tmpl = self._opaque_fallback
-        else:
-            tmpl = minimum_template(report.capabilities)
-            if tmpl is None:
-                tmpl = self._opaque_fallback
-
-        if tmpl not in self._allowed_templates:
-            if report.opaque:
-                return None
-            tmpl = self._find_allowed_covering(report)
-            if tmpl is None:
-                return None
-
+    def plan(self, working_directory: str | None = None) -> ExecutionPlan:
+        """Produce an ``ExecutionPlan`` using the config-driven template."""
         write_paths = list(self._write_paths)
         if working_directory:
             canon_wd = canonical_sandbox_path(working_directory)
@@ -102,7 +80,7 @@ class SandboxPlanner:
                 write_paths.append(canon_wd)
 
         return ExecutionPlan(
-            template=tmpl,
+            template=self._template,
             allowed_read_paths=(),
             allowed_write_paths=tuple(write_paths),
             deny_write_paths=self._deny_write,
@@ -114,18 +92,13 @@ class SandboxPlanner:
     # Internals
     # ------------------------------------------------------------------
 
-    def _find_allowed_covering(
-        self, report: CapabilityReport
-    ) -> SandboxTemplate | None:
-        """Walk the lattice upward for the narrowest *allowed* template."""
-        from executor.sandbox.templates import TEMPLATE_CAPABILITIES
-
-        for tmpl in TEMPLATE_ORDER:
-            if tmpl not in self._allowed_templates:
-                continue
-            if report.capabilities <= TEMPLATE_CAPABILITIES[tmpl]:
-                return tmpl
-        return None
+    @staticmethod
+    def _resolve_template(
+        allowed: set[SandboxTemplate],
+    ) -> SandboxTemplate:
+        if not allowed:
+            return SandboxTemplate.FILE_READ_ONLY
+        return max(allowed, key=lambda t: _TEMPLATE_RANK.get(t, 0))
 
     @staticmethod
     def _resolve_write_paths(config: SandboxConfig) -> list[str]:
@@ -136,10 +109,3 @@ class SandboxPlanner:
             if canon not in paths:
                 paths.append(canon)
         return paths
-
-    @staticmethod
-    def _safe_template(name: str) -> SandboxTemplate:
-        try:
-            return SandboxTemplate(name)
-        except ValueError:
-            return SandboxTemplate.FILE_READ_ONLY

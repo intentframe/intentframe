@@ -330,14 +330,10 @@ class TestPathing:
 
 def _make_planner(
     allowed: list[str] | None = None,
-    default: str = "file_read_only",
-    opaque_fallback: str = "file_read_write",
     write_paths: list[str] | None = None,
 ) -> SandboxPlanner:
     cfg = SandboxConfig(
         enabled=True,
-        default_template=default,
-        opaque_fallback=opaque_fallback,
         allowed_templates=allowed or ["pure_compute", "file_read_only", "file_read_write"],
         allowed_write_paths=write_paths or ["~/"],
     )
@@ -345,163 +341,118 @@ def _make_planner(
 
 
 class TestPlanner:
-    def test_pure_compute_produces_plan(self) -> None:
+    def test_uses_max_allowed_template(self) -> None:
         planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset())
-        plan = planner.plan(report)
-        assert plan is not None
-        assert plan.template == SandboxTemplate.PURE_COMPUTE
-
-    def test_file_read_produces_plan(self) -> None:
-        planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report)
-        assert plan is not None
-        assert plan.template == SandboxTemplate.FILE_READ_ONLY
-
-    def test_opaque_uses_fallback(self) -> None:
-        planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset(), opaque=True)
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         assert plan.template == SandboxTemplate.FILE_READ_WRITE
 
-    def test_exceeds_ceiling_returns_none(self) -> None:
-        planner = _make_planner(allowed=["pure_compute"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report)
-        assert plan is None
-
-    def test_opaque_exceeds_ceiling_returns_none(self) -> None:
+    def test_network_outbound_ceiling(self) -> None:
         planner = _make_planner(
-            allowed=["pure_compute", "file_read_only"],
-            opaque_fallback="file_read_write",
+            allowed=["pure_compute", "file_read_only", "file_read_write", "network_outbound"],
         )
-        report = CapabilityReport(capabilities=frozenset(), opaque=True)
-        plan = planner.plan(report)
-        assert plan is None
+        plan = planner.plan()
+        assert plan.template == SandboxTemplate.NETWORK_OUTBOUND
+
+    def test_narrow_ceiling(self) -> None:
+        planner = _make_planner(allowed=["pure_compute", "file_read_only"])
+        plan = planner.plan()
+        assert plan.template == SandboxTemplate.FILE_READ_ONLY
+
+    def test_single_template(self) -> None:
+        planner = _make_planner(allowed=["pure_compute"])
+        plan = planner.plan()
+        assert plan.template == SandboxTemplate.PURE_COMPUTE
 
     def test_working_dir_added_to_write_paths(self) -> None:
         planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report, working_directory="/tmp/workdir")
-        assert plan is not None
+        plan = planner.plan(working_directory="/tmp/workdir")
         canon_wd = _canon("/tmp/workdir")
         assert canon_wd in plan.allowed_write_paths
 
     def test_config_write_paths_included(self) -> None:
         planner = _make_planner(write_paths=["/Users/testuser/Work"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         assert any("Work" in p for p in plan.allowed_write_paths)
 
     def test_deny_paths_always_present(self) -> None:
         planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset())
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         assert len(plan.deny_write_paths) > 0
         assert len(plan.deny_access_paths) > 0
+
+    def test_template_property(self) -> None:
+        planner = _make_planner(
+            allowed=["pure_compute", "file_read_only", "network_outbound"],
+        )
+        assert planner.template == SandboxTemplate.NETWORK_OUTBOUND
 
 
 class TestPlannerConfigShapes:
     """Planner behaviour with config-driven write paths (no VFS)."""
 
     def test_write_paths_resolved_to_canonical(self) -> None:
-        """Write path values are resolved to canonical absolute paths."""
         planner = _make_planner(write_paths=["~/project_files"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         for p in plan.allowed_write_paths:
             assert os.path.isabs(p), f"write path {p!r} should be absolute"
             assert p == os.path.realpath(p), f"write path {p!r} should be canonical"
 
     def test_multiple_write_paths(self) -> None:
-        """Multiple write paths from config all appear in plan."""
         planner = _make_planner(write_paths=["/Users/dev/output", "/Users/dev/scratch"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         assert any("output" in p for p in plan.allowed_write_paths)
         assert any("scratch" in p for p in plan.allowed_write_paths)
 
     def test_read_paths_always_empty(self) -> None:
-        """allowed_read_paths is always empty (global file-read* is in profile)."""
         planner = _make_planner(write_paths=["/Users/dev/data"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         assert plan.allowed_read_paths == ()
 
     def test_working_dir_outside_write_paths_still_added(self) -> None:
-        """Working directory is added to write_paths even if not in config."""
         planner = _make_planner(write_paths=["/Users/dev/data"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report, working_directory="/var/tmp/agent_scratch")
-        assert plan is not None
+        plan = planner.plan(working_directory="/var/tmp/agent_scratch")
         canon_wd = _canon("/var/tmp/agent_scratch")
         assert canon_wd in plan.allowed_write_paths
 
     def test_deny_write_paths_contain_system_dirs(self) -> None:
-        """Non-negotiable deny-write covers /System, /usr, /bin, /sbin (canonical)."""
         planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
-        plan = planner.plan(report)
-        assert plan is not None
-
+        plan = planner.plan()
         for system_dir in ("/System", "/usr", "/bin", "/sbin"):
             canon = _canon(system_dir)
             assert canon in plan.deny_write_paths, f"{canon} missing from deny_write_paths"
 
     def test_deny_access_covers_intentframe_dir(self) -> None:
-        """Non-negotiable deny-access covers ~/.intentframe (canonical)."""
         planner = _make_planner()
-        report = CapabilityReport(capabilities=frozenset())
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         canon = _canon("~/.intentframe")
         assert canon in plan.deny_access_paths
 
     def test_tilde_write_path_expanded(self) -> None:
-        """Write paths with ~ are resolved to the real home directory."""
         planner = _make_planner(write_paths=["~/Documents"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report)
-        assert plan is not None
+        plan = planner.plan()
         for p in plan.allowed_write_paths:
             assert "~" not in p, f"tilde not expanded in {p!r}"
 
     def test_no_duplicate_working_dir(self) -> None:
-        """If working_directory resolves to the same canonical path as a write_path, no duplicate."""
         planner = _make_planner(write_paths=["/tmp/workdir"])
-        report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-        plan = planner.plan(report, working_directory="/tmp/workdir")
-        assert plan is not None
+        plan = planner.plan(working_directory="/tmp/workdir")
         canon_wd = _canon("/tmp/workdir")
         count = plan.allowed_write_paths.count(canon_wd)
         assert count == 1, f"working_dir duplicated {count} times"
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS symlink")
     def test_planner_canonicalizes_var_folders_path(self) -> None:
-        """A write path under /var/folders is stored as /private/var/folders in the plan."""
         with tempfile.TemporaryDirectory() as tmpdir:
             planner = _make_planner(write_paths=[tmpdir])
-            report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ}))
-            plan = planner.plan(report)
-            assert plan is not None
+            plan = planner.plan()
             for p in plan.allowed_write_paths:
                 assert not p.startswith("/var/"), f"non-canonical path {p!r} in plan"
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS symlink")
     def test_all_plan_paths_are_canonical(self) -> None:
-        """Every path in a plan equals its own realpath."""
         with tempfile.TemporaryDirectory() as tmpdir:
             planner = _make_planner(write_paths=[tmpdir])
-            report = CapabilityReport(capabilities=frozenset({Capability.FILE_READ, Capability.FILE_WRITE}))
-            plan = planner.plan(report, working_directory=tmpdir)
-            assert plan is not None
+            plan = planner.plan(working_directory=tmpdir)
             all_paths = (
                 *plan.allowed_read_paths,
                 *plan.allowed_write_paths,
@@ -1163,28 +1114,6 @@ class TestTerminalAdapterSandbox:
         assert not result.success
         assert "unavailable" in result.error.lower()
 
-    def test_sandbox_planner_rejects_beyond_ceiling(self) -> None:
-        from executor.platforms.macos.adapters.terminal import TerminalAdapter
-
-        cfg = SandboxConfig(
-            enabled=True,
-            allowed_templates=["pure_compute"],
-            opaque_fallback="pure_compute",
-        )
-        planner = SandboxPlanner(cfg)
-
-        mock_engine = MagicMock()
-        mock_engine.available.return_value = True
-
-        adapter = TerminalAdapter(
-            sandbox_engine=mock_engine,
-            sandbox_planner=planner,
-            sandbox_config=cfg,
-        )
-        result = _run(adapter.execute("RUN_COMMAND", {"command": "curl https://evil.com"}))
-        assert not result.success
-        assert "beyond" in result.error.lower()
-
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_sandbox_enabled_wraps_and_succeeds(self) -> None:
         from executor.platforms.macos.adapters.terminal import TerminalAdapter
@@ -1254,41 +1183,26 @@ class TestEndToEnd:
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
 
-    def test_echo_classified_planned_executed(self) -> None:
+    def test_echo_planned_executed(self) -> None:
         planner = _make_planner()
-        report = classify("echo hello world")
-        plan = planner.plan(report)
-        assert plan is not None
-        assert plan.template == SandboxTemplate.PURE_COMPUTE
-
+        plan = planner.plan()
         result = _exec_sandboxed(self.engine.wrap("echo hello world", plan))
         assert result.returncode == 0
         assert "hello world" in result.stdout
 
-    def test_cat_classified_planned_executed(self) -> None:
+    def test_cat_planned_executed(self) -> None:
         planner = _make_planner()
-        report = classify("cat /etc/hosts")
-        plan = planner.plan(report)
-        assert plan is not None
-        assert plan.template == SandboxTemplate.FILE_READ_ONLY
-
+        plan = planner.plan()
         result = _exec_sandboxed(self.engine.wrap("cat /etc/hosts", plan))
         assert result.returncode == 0
         assert "localhost" in result.stdout
 
-    def test_curl_rejected_by_default_ceiling(self) -> None:
-        planner = _make_planner()
-        report = classify("curl https://evil.com")
-        plan = planner.plan(report)
-        assert plan is None
-
-    def test_opaque_python_uses_fallback_template(self) -> None:
-        planner = _make_planner()
-        report = classify("python3 myscript.py")
-        assert report.opaque
-        plan = planner.plan(report)
-        assert plan is not None
-        assert plan.template == SandboxTemplate.FILE_READ_WRITE
+    def test_network_command_with_network_ceiling(self) -> None:
+        planner = _make_planner(
+            allowed=["pure_compute", "file_read_only", "file_read_write", "network_outbound"],
+        )
+        plan = planner.plan()
+        assert plan.template == SandboxTemplate.NETWORK_OUTBOUND
 
     def test_write_command_in_allowed_path(self) -> None:
         """cp inside an allowed write path succeeds through the full pipeline."""
@@ -1299,11 +1213,7 @@ class TestEndToEnd:
             src.write_text("e2e_content")
 
             planner = _make_planner(write_paths=[canon])
-            report = classify(f"cp {src} {dst}")
-            plan = planner.plan(report, working_directory=canon)
-            assert plan is not None
-            assert plan.template == SandboxTemplate.FILE_READ_WRITE
-
+            plan = planner.plan(working_directory=canon)
             result = _exec_sandboxed(self.engine.wrap(f"cp {src} {dst}", plan))
             assert result.returncode == 0
             assert dst.read_text() == "e2e_content"

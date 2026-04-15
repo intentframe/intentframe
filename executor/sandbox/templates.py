@@ -2,8 +2,10 @@
 
 Templates form an ordered lattice from narrowest (PURE_COMPUTE) to broadest
 (UNRESTRICTED).  Each template declares which capabilities it grants.  The
-planner picks the narrowest template that covers all capabilities a command
-requires.
+planner uses ``max(allowed_templates)`` from config for all commands.
+
+``minimum_template()`` is retained as a library function for auditing and
+testing but is not called in the execution path.
 """
 
 from __future__ import annotations
@@ -87,7 +89,11 @@ NON_NEGOTIABLE_DENY_ACCESS: tuple[str, ...] = (
 
 
 def minimum_template(capabilities: frozenset[Capability]) -> SandboxTemplate | None:
-    """Return the narrowest template that covers *capabilities*, or ``None``."""
+    """Return the narrowest template that covers *capabilities*, or ``None``.
+
+    Not used in the execution path (planner uses max(allowed_templates)).
+    Retained for auditing, testing, and potential future use.
+    """
     for tmpl in TEMPLATE_ORDER:
         if capabilities <= TEMPLATE_CAPABILITIES[tmpl]:
             return tmpl

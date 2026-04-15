@@ -168,12 +168,19 @@ class RuntimeContext(BaseModel):
             lines.append(f"- Fast-path (safe) Actions: {', '.join(sorted(safe_list))}")
 
         if self.virtual_paths:
-            lines.append("\n## Your Filesystem")
-            lines.append("Use these paths for all file operations.")
+            lines.append("\n## Default Filesystem for File Operations")
+            lines.append("Use these paths for all file operations (read_file, write_file, etc.).")
             for vp in self.virtual_paths:
                 perm = self.path_permissions.get(vp, "read")
                 lines.append(f"- {vp} ({perm})")
             lines.append("\nExample: /home/Documents/report.md, /home/Desktop/notes.txt")
+            lines.append("Use them exactly as provided without adding extra username directories.")
+
+            if "RUN_COMMAND" in self.allowed_actions:
+                lines.append("\n### Terminal (run_command)")
+                lines.append("Shell commands operate on the real host OS filesystem, NOT the file-operation paths above.")
+                lines.append("- Do not assume the file-operation paths will work inside shell commands.")
+                lines.append("- Discover and use real host paths for shell commands.")
 
         if self.guardrails:
             lines.append("\n## GUARDRAILS (You MUST follow these)")

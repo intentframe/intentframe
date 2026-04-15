@@ -125,6 +125,7 @@ For each action type the agent can use, generate appropriate guardrails:
 
 ### Terminal (RUN_COMMAND)
 - HIGH RISK - always flag as warning
+- Note that terminal commands run on the real OS filesystem, which has a different path structure than file tools
 - Specify allowed command patterns from constraints
 - Require confirmation for destructive operations
 

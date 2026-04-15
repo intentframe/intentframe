@@ -23,7 +23,13 @@ without adding a username directory.
 - `{{ vp }}` ({{ path_permissions.get(vp, "read") }})
 {% endfor %}
 Example: `/home/Documents/report.md`, `/home/Desktop/notes.txt`, `/home/Downloads/file.pdf`
-Do NOT use `/home/<username>/...` — `/home/` already points to your home directory.
+Do NOT add extra username directories (e.g. do not use `/home/<username>/...`).
+
+### Terminal (run_command)
+Shell commands operate on the real host OS filesystem, NOT the file-operation paths above.
+- Do not assume the file-operation paths will work inside shell commands.
+- Use real host paths (e.g. `~/Documents/report.md`, `/etc/hosts`) when invoking shell commands.
+- Exact working directory and write access depend on runtime security configurations.
 
 {% endif -%}
 {% include "tool_usage.j2" %}

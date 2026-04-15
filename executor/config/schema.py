@@ -171,8 +171,8 @@ class SandboxConfig(BaseModel):
 
     When enabled, the executor wraps shell commands with a platform-specific
     sandbox (macOS Seatbelt via sandbox-exec, Linux bubblewrap in the future).
-    The classifier inspects each command to pick the narrowest template that
-    covers its capability requirements.
+    All commands run under the highest-privilege template in
+    ``allowed_templates`` — the admin-approved ceiling.
 
     If the sandbox engine is unavailable at runtime (wrong platform, missing
     binary), individual RUN_COMMAND requests are rejected -- the rest of the
@@ -185,17 +185,12 @@ class SandboxConfig(BaseModel):
         default=True,
         description="Master switch for RUN_COMMAND sandboxing.",
     )
-    default_template: str = Field(
-        default="file_read_only",
-        description="Preferred template when the classifier can fit the command.",
-    )
-    opaque_fallback: str = Field(
-        default="file_read_write",
-        description="Template used when the command cannot be confidently classified.",
-    )
     allowed_templates: list[str] = Field(
         default_factory=lambda: ["pure_compute", "file_read_only", "file_read_write"],
-        description="Template ceiling for this executor profile.",
+        description=(
+            "Sandbox template ceiling. All commands run under the "
+            "highest-privilege template in this list."
+        ),
     )
     working_directory: str = Field(
         default="~/",
