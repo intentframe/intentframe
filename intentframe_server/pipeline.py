@@ -67,7 +67,7 @@ def _get_executor_logger() -> logging.Logger:
     log_dir = Path(
         os.environ.get(
             "INTENTFRAME_LOG_DIR",
-            Path.home() / "Library" / "Logs" / "IntentFrame",
+            os.path.expanduser("~/.intentframe/logs"),
         )
     )
     log_dir.mkdir(parents=True, exist_ok=True)
