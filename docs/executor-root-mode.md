@@ -126,7 +126,7 @@ This means:
 
 - The pipeline self-discovers executor privilege level. No environment variable or config flag needed.
 - If the executor is unreachable at startup, intentframe-core fails to start (fail-closed).
-- `ExecutionContext` is threaded to `AnalysisEngine.analyze()`, `Guardian.validate()`, and `OnboardingEngine.onboard()` so all layers can account for root privilege in future work.
+- `ExecutionContext` is threaded to `AnalysisEngine.analyze()`, `Guardian.validate()`, and `OnboardingEngine.onboard()`. All three layers inject an "Execution Privilege" trusted section into their AI prompts when `executor_running_as_root` is true, so the AI accounts for elevated blast radius, applies heightened scrutiny, and generates root-aware guardrails.
 - The agent never sees `ExecutionContext` directly. It learns the consequences via `RuntimeContext` guardrails (e.g. "commands run as root, do not use sudo").
 
 For tests, `ExecutionContext` is constructed explicitly rather than probed:

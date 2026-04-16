@@ -185,7 +185,10 @@ For each action type the agent can use, generate appropriate guardrails:
         execution_context: ExecutionContext | None = None,
     ) -> RuntimeContext:
         """Perform AI-powered handshake to generate agent context."""
-        prompt = self._build_onboarding_prompt(capabilities, user_context)
+        prompt = self._build_onboarding_prompt(
+            capabilities, user_context,
+            execution_context=execution_context,
+        )
 
         if self.verbose:
             print(f"\n    [ONBOARDING] AI analyzing agent '{capabilities.agent_type}'...")
@@ -204,7 +207,8 @@ For each action type the agent can use, generate appropriate guardrails:
     def _build_onboarding_prompt(
         self,
         capabilities: AgentCapabilities,
-        user_context: UserContext
+        user_context: UserContext,
+        execution_context: ExecutionContext | None = None,
     ) -> str:
         """Build the prompt for the AI agent."""
 
@@ -246,6 +250,19 @@ Constraints:
             prompt += "\nMetadata:\n"
             for key, value in user_context.metadata.items():
                 prompt += f"  - {key}: {value}\n"
+
+        if execution_context and execution_context.executor_running_as_root:
+            prompt += """
+## EXECUTION ENVIRONMENT
+
+The executor is running as root (uid=0).
+All commands this agent issues via RUN_COMMAND will execute with full root privileges.
+The agent must NOT use sudo — commands already run as root.
+Generate guardrails that reflect this elevated privilege level:
+- Explicitly tell the agent its commands run with root privileges.
+- Explicitly tell the agent to never use sudo.
+- Warn that filesystem operations affect the entire system.
+"""
 
         prompt += """
 

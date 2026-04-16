@@ -331,6 +331,7 @@ Be brief and cite the specific concern that caused your decision."""
         prompt = self._build_validation_prompt(
             intent, analysis, user_context, permission,
             active_domains=active_domains,
+            execution_context=execution_context,
         )
 
         if self.verbose:
@@ -347,12 +348,13 @@ Be brief and cite the specific concern that caused your decision."""
         user_context: UserContext,
         permission: ActionPermission,
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> str:
         """Build a hardened prompt for the AI guardian.
 
         Trusted sections: action (enum-validated), agent metadata,
-        analysis report, policy context, intent limits — all
-        pipeline-controlled.
+        analysis report, policy context, execution privilege level,
+        intent limits — all pipeline-controlled.
         Untrusted section: target, reason, data — the fields the
         agent LLM actually controls.
         """
@@ -434,6 +436,15 @@ Be brief and cite the specific concern that caused your decision."""
             "Domain modules have already enforced structural limits (amount caps, path restrictions).",
         ]
         trusted_sections["Policy Context"] = "\n".join(policy_lines)
+
+        if execution_context and execution_context.executor_running_as_root:
+            trusted_sections["Execution Privilege"] = (
+                "The executor is running as root (uid=0). All commands execute "
+                "with full root privileges. Apply heightened scrutiny — filesystem "
+                "modifications affect the entire system, not just the user's home "
+                "directory. The agent should never need sudo; its presence in a "
+                "command is itself a red flag."
+            )
 
         if user_context.intent_limits:
             limit_lines: list[str] = []

@@ -426,8 +426,9 @@ For recommendation:
         domains are relevant to this user's configuration.
 
         execution_context carries immutable server-side facts about the
-        executor (e.g. running_as_root).  Not yet used in prompt
-        construction — wired through for future use.
+        executor (e.g. running_as_root).  Injected into the AI prompt
+        as trusted context when the executor runs as root so the AE
+        accounts for elevated blast radius.
         """
         # ── Fast path: safe read-only ────────────────────────────────
         fast = self._try_fast_path(intent, safe_actions or set())
@@ -451,6 +452,7 @@ For recommendation:
             intent,
             terminal_command_signals=terminal_command_signals,
             active_domains=active_domains,
+            execution_context=execution_context,
         )
         
         if self.verbose:
@@ -468,12 +470,13 @@ For recommendation:
         intent: IntentFrame,
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> str:
         """Build a hardened prompt for the AI agent.
 
         Trusted section: action (enum-validated), agent metadata,
         task description, active domains, terminal command signals
-        (from command_shield).
+        (from command_shield), execution privilege level.
         Untrusted section: target, reason, data — the fields the agent
         LLM actually controls.
         """
@@ -510,6 +513,15 @@ For recommendation:
                 "these domains. If it does, include the matching domain(s) in your "
                 "semantic_domains output. This is a hint — still classify any other "
                 "domains you observe."
+            )
+
+        if execution_context and execution_context.executor_running_as_root:
+            trusted_sections["Execution Privilege"] = (
+                "The executor is running as root (uid=0). All commands execute "
+                "with full root privileges. Assess blast radius accordingly — "
+                "even benign-looking commands can cause system-wide damage when "
+                "run as root. The agent should never use sudo; if sudo appears "
+                "in the command, flag it as a hidden behavior."
             )
 
         # ── Untrusted: agent-controlled fields ────────────────────
