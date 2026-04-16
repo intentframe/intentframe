@@ -9,7 +9,7 @@ Profile structure (order matters — Seatbelt uses last-match-wins):
   2. Essential system allowances (process, mach, sysctl, iokit, etc.)
   3. Global file reads: (allow file-read*) — reads are unrestricted
   4. Controlled temp writes (SANDBOX_TMPDIR only)
-  5. Template-specific rules (network scope)
+  5. Template-specific rules (process visibility, network scope)
   6. Config-derived write allow rules
   7. Non-negotiable deny overrides (always last so they win)
 """
@@ -296,8 +296,8 @@ def generate_sandbox_profile(plan: ExecutionPlan) -> str:
     rules.extend(_sandbox_tmpdir_rules())
     rules.extend(_SYSTEM_DEVICE_WRITES)
 
-    # 5. Template-specific rules (network)
-    rules.extend(_network_rules(plan.template))
+    # 5. Template-specific rules (process visibility, network)
+    rules.extend(_template_specific_rules(plan.template))
 
     # 6. Config-derived write allow rules
     rules.extend(_write_rules(plan))
@@ -312,7 +312,20 @@ def generate_sandbox_profile(plan: ExecutionPlan) -> str:
 # Rule generators
 # ------------------------------------------------------------------
 
-def _network_rules(tmpl: SandboxTemplate) -> list[str]:
+def _template_specific_rules(tmpl: SandboxTemplate) -> list[str]:
+    """Emit template-gated rules: process visibility, SUID exec, network scope.
+
+    Placed after essential rules (step 2) so Seatbelt last-match-wins
+    widens the baseline ``process-info* (target same-sandbox)`` to global
+    ``process-info*`` for templates that need system-wide process visibility
+    (ps, top, lsof, Activity Monitor queries).
+
+    ``/bin/ps`` is setuid-root (``-rwsr-xr-x``).  macOS Seatbelt
+    unconditionally blocks SUID binaries (``forbidden-exec-sugid``)
+    regardless of ``(allow process-exec)``.  The ``(with no-sandbox)``
+    modifier is the only way to permit it.  Gated to ``network_outbound``+
+    because lower templates have no business enumerating system processes.
+    """
     rules: list[str] = []
 
     if tmpl in (
@@ -320,6 +333,8 @@ def _network_rules(tmpl: SandboxTemplate) -> list[str]:
         SandboxTemplate.NETWORK_FULL,
         SandboxTemplate.UNRESTRICTED,
     ):
+        rules.append("(allow process-info*)")
+        rules.append('(allow process-exec (literal "/bin/ps") (with no-sandbox))')
         rules.append("(allow network-outbound)")
         rules.append("(allow system-socket (socket-domain AF_INET))")
         rules.append("(allow system-socket (socket-domain AF_INET6))")

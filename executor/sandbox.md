@@ -163,14 +163,18 @@ The fallback path (if `/etc/paths` can't be read) is: `/usr/local/bin:/usr/bin:/
 
 Templates form a lattice from narrowest to broadest:
 
-| Template | File Read | File Write | Network Out | Network Bind | Background | Signals | Opaque |
-|---|---|---|---|---|---|---|---|
-| `pure_compute` | | | | | | | |
-| `file_read_only` | x | | | | | | |
-| `file_read_write` | x | x | | | | | |
-| `network_outbound` | x | x | x | | | | |
-| `network_full` | x | x | x | x | x | | |
-| `unrestricted` | x | x | x | x | x | x | x |
+| Template | File Read | File Write | Process Info | Network Out | Network Bind | Background | Signals | Opaque |
+|---|---|---|---|---|---|---|---|---|
+| `pure_compute` | | | same-sandbox | | | | | |
+| `file_read_only` | x | | same-sandbox | | | | | |
+| `file_read_write` | x | x | same-sandbox | | | | | |
+| `network_outbound` | x | x | **global** | x | | | | |
+| `network_full` | x | x | **global** | x | x | x | | |
+| `unrestricted` | x | x | **global** | x | x | x | x | x |
+
+**Process Info** — Templates below `network_outbound` restrict `process-info*` to `(target same-sandbox)`, meaning sandboxed code can only see processes inside the sandbox. Templates at `network_outbound` and above get unrestricted `process-info*`, enabling system-wide process enumeration (`ps`, `top`, `lsof`, Activity Monitor queries). This is gated at the network tier because if the sandbox already trusts commands enough for outbound network (where data could be exfiltrated to external servers), process visibility is a strictly lesser disclosure.
+
+**SUID `/bin/ps`** — `/bin/ps` is a setuid-root binary (`-rwsr-xr-x`). macOS Seatbelt unconditionally blocks execution of SUID binaries (`forbidden-exec-sugid`) regardless of any `(allow process-exec)` rule. For `network_outbound`+ templates, the profile includes `(allow process-exec (literal "/bin/ps") (with no-sandbox))` which permits executing this specific binary without sandbox inheritance. Lower templates cannot run `ps` at all.
 
 The admin controls which templates are available via `allowed_templates`. The planner uses the highest one in the list for all commands.
 
@@ -240,11 +244,11 @@ This avoids blanket-allowing `/private/var/folders` in the profile, which would 
 The generated Seatbelt profile follows this order (last-match-wins):
 
 1. **Header**: `(version 1)` + `(deny default)`
-2. **Essential system allowances**: process-exec, process-fork, mach-lookup, sysctl-read, iokit, pseudo-tty, etc.
+2. **Essential system allowances**: process-exec, process-fork, process-info* (same-sandbox), mach-lookup, sysctl-read, iokit, pseudo-tty, etc.
 3. **Global file reads**: `(allow file-read*)` — reads are unrestricted
 4. **Controlled temp directory**: write for `/private/tmp/intentframe`
 5. **Device writes**: `/dev/null`, `/dev/tty`
-6. **Template-specific rules**: network-outbound, network-bind, network-inbound (only for network templates); `(allow default)` for `unrestricted`
+6. **Template-specific rules**: global `(allow process-info*)` and SUID `/bin/ps` exec (`with no-sandbox`) for `network_outbound`+; network-outbound, network-bind, network-inbound (only for network templates); `(allow default)` for `unrestricted`. Placed after essential rules so Seatbelt last-match-wins widens the baseline same-sandbox process-info to global.
 7. **Config-derived write allow rules**: `(allow file-write* (subpath ...))` for each path in `allowed_write_paths` (only for `file_read_write` and higher templates)
 8. **Non-negotiable deny overrides**: deny-write for system dirs, deny-access for `~/.intentframe` (always last)
 
@@ -302,9 +306,10 @@ Tests in `tests/test_sandbox.py` covering:
 | `TestPlanner` | Template = max(allowed_templates), config write paths, deny paths |
 | `TestPlannerConfigShapes` | Write path canonicalization, tilde expansion, working dir, deny paths |
 | `TestEngineFactory` | Platform detection, unsupported platform |
-| `TestProfileGeneration` | SBPL structure: global file-read, deny ordering, TMPDIR write, path escaping |
+| `TestProfileGeneration` | SBPL structure: global file-read, deny ordering, TMPDIR write, path escaping, template-gated process-info |
 | `TestSeatbeltEnforcement` | **Real `sandbox-exec` calls**: echo, read, write, deny-write, deny-access, pure-compute block |
 | `TestNetworkEnforcement` | **Real `sandbox-exec` calls**: outbound connect, bind, template-specific network blocking |
+| `TestProcessInfoEnforcement` | **Real `sandbox-exec` calls**: ps, pidinfo, rusage, listpids — global for network_outbound+, same-sandbox for lower |
 | `TestUnrestrictedEnforcement` | **Real `sandbox-exec` calls**: unrestricted template with deny overrides still holding |
 | `TestTerminalAdapterSandbox` | Adapter wiring: disabled, unavailable, wrapped, bare compat |
 | `TestEndToEnd` | Full pipeline: plan → wrap → subprocess for echo, cat, cp, network ceiling |

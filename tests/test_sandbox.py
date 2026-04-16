@@ -529,6 +529,84 @@ class TestProfileGeneration:
         assert "(allow process-exec)" in profile
         assert "(allow process-fork)" in profile
         assert "(allow signal (target same-sandbox))" in profile
+        assert "(allow process-info* (target same-sandbox))" in profile
+
+    def test_pure_compute_has_no_global_process_info(self) -> None:
+        """PURE_COMPUTE only gets same-sandbox process-info, not global."""
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        profile = generate_sandbox_profile(plan)
+        lines = profile.splitlines()
+        process_info_lines = [l for l in lines if "process-info" in l]
+        assert all("same-sandbox" in l for l in process_info_lines), (
+            "PURE_COMPUTE must not have global process-info*"
+        )
+
+    def test_file_read_write_has_no_global_process_info(self) -> None:
+        """FILE_READ_WRITE only gets same-sandbox process-info, not global."""
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.FILE_READ_WRITE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        profile = generate_sandbox_profile(plan)
+        lines = profile.splitlines()
+        process_info_lines = [l for l in lines if "process-info" in l]
+        assert all("same-sandbox" in l for l in process_info_lines), (
+            "FILE_READ_WRITE must not have global process-info*"
+        )
+
+    def test_network_outbound_has_global_process_info(self) -> None:
+        """NETWORK_OUTBOUND gets global process-info* (for ps, top, etc.)."""
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        profile = generate_sandbox_profile(plan)
+        lines = profile.splitlines()
+        has_global = any(
+            l.strip() == "(allow process-info*)" for l in lines
+        )
+        assert has_global, (
+            "NETWORK_OUTBOUND must have global (allow process-info*)"
+        )
+
+    def test_network_full_has_global_process_info(self) -> None:
+        """NETWORK_FULL gets global process-info*."""
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_FULL,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        profile = generate_sandbox_profile(plan)
+        lines = profile.splitlines()
+        has_global = any(
+            l.strip() == "(allow process-info*)" for l in lines
+        )
+        assert has_global
+
+    def test_global_process_info_comes_after_same_sandbox(self) -> None:
+        """Global process-info* must come after same-sandbox (last-match-wins)."""
+        from executor.sandbox.platforms.macos import generate_sandbox_profile
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        profile = generate_sandbox_profile(plan)
+        same_pos = profile.index("(allow process-info* (target same-sandbox))")
+        global_pos = profile.index("(allow process-info*)\n")
+        assert global_pos > same_pos, (
+            "global process-info* must come after same-sandbox baseline"
+        )
 
     def test_profile_contains_global_file_read(self) -> None:
         from executor.sandbox.platforms.macos import generate_sandbox_profile
@@ -926,6 +1004,223 @@ finally:
             "Port binding should be blocked under NETWORK_OUTBOUND"
         )
         assert "bind_blocked" in result.stdout or result.returncode != 0
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestProcessInfoEnforcement:
+    """Verify process-info* kernel enforcement across templates.
+
+    Templates below NETWORK_OUTBOUND get ``process-info* (target same-sandbox)``
+    — they can only see their own sandbox's processes.  NETWORK_OUTBOUND and
+    above get global ``process-info*`` so commands like ps, top, lsof can
+    enumerate all system processes.
+
+    These tests run real commands through sandbox-exec.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    # -- Probes ---------------------------------------------------------------
+
+    _PS_LIST_PIDS = "ps -axo pid="
+
+    _PS_RSS = "ps -axo pid,rss,command= | head -5"
+
+    _PROC_INFO_PROBE = """python3 -c '
+import os, json
+my_pid = os.getpid()
+my_ppid = os.getppid()
+print(json.dumps({"pid": my_pid, "ppid": my_ppid}))
+'"""
+
+    _PROC_LISTPIDS = """python3 -c '
+import subprocess, sys
+r = subprocess.run(["ps", "-axo", "pid="], capture_output=True, text=True)
+pids = [int(l.strip()) for l in r.stdout.strip().splitlines() if l.strip()]
+print(f"pid_count={len(pids)}")
+for p in pids[:5]:
+    print(f"pid={p}")
+'"""
+
+    _PROC_RUSAGE = """python3 -c '
+import resource, json
+usage = resource.getrusage(resource.RUSAGE_SELF)
+print(json.dumps({"maxrss": usage.ru_maxrss, "utime": usage.ru_utime}))
+'"""
+
+    _PROC_PIDINFO = """python3 -c '
+import subprocess, sys
+r = subprocess.run(
+    ["ps", "-axo", "pid,pmem,rss,command="],
+    capture_output=True, text=True,
+)
+lines = [l for l in r.stdout.strip().splitlines() if l.strip()]
+print(f"line_count={len(lines)}")
+for l in lines[:3]:
+    print(l.strip())
+'"""
+
+    # -- NETWORK_OUTBOUND: global process-info* -------------------------------
+
+    def test_ps_lists_all_pids_network_outbound(self) -> None:
+        """ps -axo pid= under NETWORK_OUTBOUND returns many system PIDs."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PS_LIST_PIDS, plan))
+        assert result.returncode == 0
+        pids = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+        assert len(pids) > 5, (
+            f"Expected many PIDs from ps under NETWORK_OUTBOUND, got {len(pids)}: {pids!r}"
+        )
+        for pid in pids:
+            assert pid.isdigit(), f"Non-numeric PID line: {pid!r}"
+
+    def test_ps_rss_shows_process_details_network_outbound(self) -> None:
+        """ps -axo pid,rss,command under NETWORK_OUTBOUND returns real process details."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PS_RSS, plan))
+        assert result.returncode == 0
+        lines = [l for l in result.stdout.strip().splitlines() if l.strip()]
+        assert len(lines) >= 1, (
+            f"Expected process detail lines, got: {result.stdout!r}"
+        )
+
+    def test_python_process_listpids_network_outbound(self) -> None:
+        """Python subprocess calling ps sees many PIDs under NETWORK_OUTBOUND."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PROC_LISTPIDS, plan))
+        assert result.returncode == 0
+        assert "pid_count=" in result.stdout
+        count_line = [l for l in result.stdout.splitlines() if "pid_count=" in l][0]
+        count = int(count_line.split("=")[1])
+        assert count > 5, f"Expected many PIDs, got pid_count={count}"
+
+    def test_python_pidinfo_network_outbound(self) -> None:
+        """ps -axo pid,pmem,rss,command under NETWORK_OUTBOUND shows real data."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PROC_PIDINFO, plan))
+        assert result.returncode == 0
+        assert "line_count=" in result.stdout
+        count_line = [l for l in result.stdout.splitlines() if "line_count=" in l][0]
+        count = int(count_line.split("=")[1])
+        assert count > 5, f"Expected many process info lines, got line_count={count}"
+
+    def test_python_own_process_info_network_outbound(self) -> None:
+        """Python can read its own pid/ppid under NETWORK_OUTBOUND."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PROC_INFO_PROBE, plan))
+        assert result.returncode == 0
+        import json
+        data = json.loads(result.stdout.strip())
+        assert data["pid"] > 0
+        assert data["ppid"] > 0
+
+    def test_python_rusage_network_outbound(self) -> None:
+        """Python resource.getrusage works under NETWORK_OUTBOUND."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_OUTBOUND,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PROC_RUSAGE, plan))
+        assert result.returncode == 0
+        import json
+        data = json.loads(result.stdout.strip())
+        assert data["maxrss"] > 0
+
+    # -- NETWORK_FULL: also gets global process-info* -------------------------
+
+    def test_ps_lists_all_pids_network_full(self) -> None:
+        """ps under NETWORK_FULL also sees all system PIDs."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.NETWORK_FULL,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PS_LIST_PIDS, plan))
+        assert result.returncode == 0
+        pids = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+        assert len(pids) > 5
+
+    # -- Lower templates: same-sandbox only -----------------------------------
+
+    def test_ps_restricted_pure_compute(self) -> None:
+        """Under PURE_COMPUTE, ps returns very few PIDs (only same-sandbox)."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PS_LIST_PIDS, plan))
+        pids = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+        assert len(pids) <= 10, (
+            f"PURE_COMPUTE should see very few PIDs (same-sandbox only), got {len(pids)}"
+        )
+
+    def test_ps_restricted_file_read_write(self) -> None:
+        """Under FILE_READ_WRITE, ps returns very few PIDs (same-sandbox only)."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.FILE_READ_WRITE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PS_LIST_PIDS, plan))
+        pids = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+        assert len(pids) <= 10, (
+            f"FILE_READ_WRITE should see very few PIDs (same-sandbox only), got {len(pids)}"
+        )
+
+    # -- Own-process info always works ----------------------------------------
+
+    def test_own_process_info_pure_compute(self) -> None:
+        """Even PURE_COMPUTE can read its own pid/ppid (same-sandbox)."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PROC_INFO_PROBE, plan))
+        assert result.returncode == 0
+        import json
+        data = json.loads(result.stdout.strip())
+        assert data["pid"] > 0
+
+    def test_own_rusage_pure_compute(self) -> None:
+        """Even PURE_COMPUTE can read its own resource usage (same-sandbox)."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+        )
+        result = _exec_sandboxed(self.engine.wrap(self._PROC_RUSAGE, plan))
+        assert result.returncode == 0
+        import json
+        data = json.loads(result.stdout.strip())
+        assert data["maxrss"] > 0
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
