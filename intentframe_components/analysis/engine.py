@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ActionType
-from intentframe_core.types import IntentFrame, AnalysisReport
+from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport
 from intentframe_core.enums import Reversibility, RiskLevel
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
@@ -406,6 +406,7 @@ For recommendation:
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -423,6 +424,10 @@ For recommendation:
         active_domains are domain strings the user has active rules for.
         Injected as trusted context so the AE knows which semantic
         domains are relevant to this user's configuration.
+
+        execution_context carries immutable server-side facts about the
+        executor (e.g. running_as_root).  Not yet used in prompt
+        construction — wired through for future use.
         """
         # ── Fast path: safe read-only ────────────────────────────────
         fast = self._try_fast_path(intent, safe_actions or set())

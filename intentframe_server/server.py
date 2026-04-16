@@ -30,6 +30,7 @@ from pydantic import BaseModel
 from intentframe_components.analysis import AIAnalysisEngine
 from intentframe_core.types import (
     AgentCapabilities,
+    ExecutionContext,
     ExecutionResult,
     IntentFrame,
     RuntimeContext,
@@ -56,6 +57,19 @@ def _create_runtime() -> IntentFrameRuntime:
 
     executor = ExecutorHTTPClient(socket_path=executor_socket)
 
+    executor_health = executor.health()
+    execution_context = ExecutionContext(
+        executor_running_as_root=executor_health.get("running_as_root", False),
+        executor_uid=executor_health.get("uid", -1),
+        executor_euid=executor_health.get("euid", -1),
+    )
+    logger.info(
+        "Executor probe: uid=%d euid=%d running_as_root=%s",
+        execution_context.executor_uid,
+        execution_context.executor_euid,
+        execution_context.executor_running_as_root,
+    )
+
     skip_onboarding = os.environ.get("INTENTFRAME_SKIP_ONBOARDING", "0") == "1"
     onboarding = None if skip_onboarding else AIOnboardingEngine(verbose=verbose)
 
@@ -63,6 +77,7 @@ def _create_runtime() -> IntentFrameRuntime:
         analysis_engine=AIAnalysisEngine(verbose=verbose),
         guardian=AIGuardian(verbose=verbose),
         executor=executor,
+        execution_context=execution_context,
         onboarding_engine=onboarding,
         verbose=verbose,
     )

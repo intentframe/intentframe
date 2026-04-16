@@ -20,6 +20,7 @@ from command_shield.verdict import Signal
 from intentframe_core.enums import Decision, RiskLevel, Reversibility
 from intentframe_core.types import (
     AnalysisReport,
+    ExecutionContext,
     ExecutionResult,
     IntentFrame,
     UserContext,
@@ -273,6 +274,78 @@ class TestPipelineEdgeCases:
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent("sudo halt"), _user_context()))
         assert runtime._request_counter == 1
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# ExecutionContext plumbing
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestExecutionContextPlumbing:
+    """ExecutionContext is threaded through to analyze and validate."""
+
+    def _make_root_runtime(self) -> IntentFrameRuntime:
+        root_ctx = ExecutionContext(
+            executor_running_as_root=True,
+            executor_uid=0,
+            executor_euid=0,
+        )
+        analysis_engine = AsyncMock()
+        analysis_engine.analyze = AsyncMock(return_value=_safe_analysis())
+
+        guardian = AsyncMock()
+        executor = MagicMock()
+        executor.execute = MagicMock(
+            return_value=ExecutionResult(success=True, data={"stdout": "ok"})
+        )
+
+        runtime = IntentFrameRuntime(
+            analysis_engine=analysis_engine,
+            guardian=guardian,
+            executor=executor,
+            execution_context=root_ctx,
+            verbose=False,
+        )
+        runtime._resolve_user_context = MagicMock(side_effect=lambda uc: uc)
+
+        async def _auto_allow(intent, analysis, user_context, **kwargs):
+            return _allow_validation(intent)
+        guardian.validate = AsyncMock(side_effect=_auto_allow)
+
+        return runtime
+
+    def test_analyze_receives_execution_context(self):
+        runtime = self._make_root_runtime()
+        _run(runtime.process_intent(_intent("echo hi"), _user_context()))
+
+        call_kwargs = runtime.analysis_engine.analyze.call_args
+        ctx = call_kwargs.kwargs.get("execution_context")
+        assert ctx is not None
+        assert ctx.executor_running_as_root is True
+        assert ctx.executor_euid == 0
+
+    def test_validate_receives_execution_context(self):
+        runtime = self._make_root_runtime()
+        _run(runtime.process_intent(_intent("echo hi"), _user_context()))
+
+        call_kwargs = runtime.guardian.validate.call_args
+        ctx = call_kwargs.kwargs.get("execution_context")
+        assert ctx is not None
+        assert ctx.executor_running_as_root is True
+
+    def test_default_execution_context_is_non_root(self):
+        runtime = _make_runtime()
+        _run(runtime.process_intent(_intent("echo hi"), _user_context()))
+
+        call_kwargs = runtime.analysis_engine.analyze.call_args
+        ctx = call_kwargs.kwargs.get("execution_context")
+        assert ctx is not None
+        assert ctx.executor_running_as_root is False
+        assert ctx.executor_euid == -1
+
+    def test_execution_context_is_frozen(self):
+        ctx = ExecutionContext(executor_running_as_root=True, executor_uid=0, executor_euid=0)
+        with pytest.raises(Exception):
+            ctx.executor_running_as_root = False
 
 
 if __name__ == "__main__":

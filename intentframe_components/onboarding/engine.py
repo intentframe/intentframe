@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, Runner
 
-from intentframe_core.types import AgentCapabilities, RuntimeContext, UserContext
+from intentframe_core.types import AgentCapabilities, ExecutionContext, RuntimeContext, UserContext
 from intentframe_components.onboarding.base import OnboardingEngine
 from policy_registry.constraints.email import EmailConstraints
 from policy_registry.constraints.message import MessageConstraints
@@ -181,7 +181,8 @@ For each action type the agent can use, generate appropriate guardrails:
     async def onboard(
         self,
         capabilities: AgentCapabilities,
-        user_context: UserContext
+        user_context: UserContext,
+        execution_context: ExecutionContext | None = None,
     ) -> RuntimeContext:
         """Perform AI-powered handshake to generate agent context."""
         prompt = self._build_onboarding_prompt(capabilities, user_context)

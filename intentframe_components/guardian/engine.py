@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ACTION_DOMAINS, DomainType
-from intentframe_core.types import IntentFrame, AnalysisReport, ValidationResult, UserContext
+from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport, ValidationResult, UserContext
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.guardian.domains import DOMAIN_MODULES
@@ -260,6 +260,7 @@ Be brief and cite the specific concern that caused your decision."""
         analysis: AnalysisReport,
         user_context: UserContext,
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies.

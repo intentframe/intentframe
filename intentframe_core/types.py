@@ -7,7 +7,7 @@ Pydantic BaseModel for automatic JSON serialization over HTTP.
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
@@ -110,6 +110,21 @@ class UserContext(BaseModel):
     intent_limits: List[SemanticIntentLimit] = Field(default_factory=list)
     domain_constraints: Dict[str, DomainConstraintTypes] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ExecutionContext(BaseModel):
+    """Server-side infrastructure facts about the executor.
+
+    Probed once at startup from the executor's /health endpoint.
+    Immutable for the lifetime of the server process.
+    Never exposed to agents -- they learn consequences via RuntimeContext.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    executor_running_as_root: bool = False
+    executor_uid: int = -1
+    executor_euid: int = -1
 
 
 class AgentCapabilities(BaseModel):

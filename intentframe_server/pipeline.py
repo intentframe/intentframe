@@ -40,6 +40,7 @@ from intentframe_server.enrichers.email import enrich_intent as enrich_email_int
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
+    ExecutionContext,
     ExecutionResult,
     IntentFrame,
     AgentCapabilities,
@@ -54,14 +55,14 @@ from resource_registry.client import ResourceRegistryClient
 
 logger = logging.getLogger(__name__)
 
-_failure_logger: logging.Logger | None = None
+_executor_logger: logging.Logger | None = None
 
 
-def _get_failure_logger() -> logging.Logger:
-    """Lazily initialise a file-only logger for failed executor actions."""
-    global _failure_logger
-    if _failure_logger is not None:
-        return _failure_logger
+def _get_executor_logger() -> logging.Logger:
+    """Lazily initialise a file-only logger for executor action results."""
+    global _executor_logger
+    if _executor_logger is not None:
+        return _executor_logger
 
     log_dir = Path(
         os.environ.get(
@@ -70,10 +71,10 @@ def _get_failure_logger() -> logging.Logger:
         )
     )
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "executor_failed_actions.log"
+    log_path = log_dir / "executor_actions.log"
 
-    fl = logging.getLogger("intentframe.executor_failures")
-    fl.setLevel(logging.WARNING)
+    fl = logging.getLogger("intentframe.executor_results")
+    fl.setLevel(logging.DEBUG)
     fl.propagate = False
 
     if not fl.handlers:
@@ -81,8 +82,8 @@ def _get_failure_logger() -> logging.Logger:
         handler.setFormatter(logging.Formatter("%(message)s"))
         fl.addHandler(handler)
 
-    _failure_logger = fl
-    return _failure_logger
+    _executor_logger = fl
+    return _executor_logger
 
 
 class IntentFrameRuntime:
@@ -106,6 +107,7 @@ class IntentFrameRuntime:
         analysis_engine: AnalysisEngine,
         guardian: Guardian,
         executor: Executor,
+        execution_context: Optional[ExecutionContext] = None,
         onboarding_engine: Optional[OnboardingEngine] = None,
         policy_client: Optional[PolicyRegistryClient] = None,
         resource_client: Optional[ResourceRegistryClient] = None,
@@ -114,6 +116,7 @@ class IntentFrameRuntime:
         self.analysis_engine = analysis_engine
         self.guardian = guardian
         self.executor = executor
+        self._execution_context = execution_context or ExecutionContext()
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
         self._resource_client = resource_client or ResourceRegistryClient()
@@ -123,21 +126,32 @@ class IntentFrameRuntime:
         self._lock = asyncio.Lock()
 
     @staticmethod
-    def _log_failed_action(intent: IntentFrame, result: ExecutionResult) -> None:
-        """Write full failure details to a dedicated log file."""
+    def _log_executor_result(intent: IntentFrame, result: ExecutionResult) -> None:
+        """Write every executor result (success or failure) to a dedicated log file."""
+        data_summary: str | None = None
+        if result.data:
+            try:
+                raw = json.dumps(result.data, default=str)
+                data_summary = raw[:500] + "…" if len(raw) > 500 else raw
+            except Exception:
+                data_summary = str(result.data)[:500]
+
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "action": intent.action.value,
+            "success": result.success,
             "target": intent.target or "",
             "command": (intent.data or {}).get("command", "")[:500],
             "error": result.error,
+            "data": data_summary,
             "stderr": (result.data or {}).get("stderr", "")[:1000] if result.data else None,
             "return_code": (result.data or {}).get("return_code") if result.data else None,
         }
+        level = logging.INFO if result.success else logging.WARNING
         try:
-            _get_failure_logger().warning(json.dumps(entry, default=str))
+            _get_executor_logger().log(level, json.dumps(entry, default=str))
         except Exception:
-            logger.debug("Could not write to executor failure log", exc_info=True)
+            logger.debug("Could not write to executor action log", exc_info=True)
 
     def _resolve_user_context(self, user_context: UserContext) -> UserContext:
         """Look up the user's real policies from the policy registry.
@@ -258,7 +272,10 @@ class IntentFrameRuntime:
                 print(f"    ║  Allowed Actions: {num_actions:<40} ║")
                 print(f"    ╚══════════════════════════════════════════════════════════╝")
             
-            context = await self.onboarding_engine.onboard(capabilities, user_context)
+            context = await self.onboarding_engine.onboard(
+                capabilities, user_context,
+                execution_context=self._execution_context,
+            )
             context.virtual_paths = virtual_paths
             context.path_permissions = path_permissions
 
@@ -436,6 +453,7 @@ class IntentFrameRuntime:
             safe_actions=safe_actions,
             terminal_command_signals=terminal_command_signals,
             active_domains=active_domains,
+            execution_context=self._execution_context,
         )
         
         if self.verbose:
@@ -464,7 +482,9 @@ class IntentFrameRuntime:
             print(f"    │  (Checks authority, NOT business logic)                  │")
         
         validation = await self.guardian.validate(
-            intent, analysis, user_context, active_domains=active_domains,
+            intent, analysis, user_context,
+            active_domains=active_domains,
+            execution_context=self._execution_context,
         )
         
         # ═══════════════════════════════════════════════════════════════
@@ -527,10 +547,17 @@ class IntentFrameRuntime:
                     hint = result.error.replace("\n", " ")
                     hint = hint[:49] + "…" if len(hint) > 49 else hint
                     print(f"    │  Reason: {hint:<49} │")
+                elif result.success and result.data:
+                    try:
+                        raw = json.dumps(result.data, default=str)
+                    except Exception:
+                        raw = str(result.data)
+                    info = raw.replace("\n", " ")
+                    info = info[:49] + "…" if len(info) > 49 else info
+                    print(f"    │  Result Info:   {info:<49} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
 
-            if not result.success:
-                self._log_failed_action(intent, result)
+            self._log_executor_result(intent, result)
             
             # Log the outcome
             audit_entry["executed"] = result.success

@@ -109,6 +109,35 @@ Those ideas add complexity to startup, shutdown, configuration, and docs without
 
 ---
 
+## Pipeline startup probe
+
+The IntentFrame Core server (`intentframe_server/server.py`) probes the executor's `/health` endpoint once at startup and stores the result as a frozen `ExecutionContext`:
+
+```
+Supervisor starts executor → executor healthy
+Supervisor starts intentframe-core
+  → _create_runtime()
+    → ExecutorHTTPClient.health() → { running_as_root, uid, euid }
+    → ExecutionContext(frozen, immutable)
+    → IntentFrameRuntime stores it as _execution_context
+```
+
+This means:
+
+- The pipeline self-discovers executor privilege level. No environment variable or config flag needed.
+- If the executor is unreachable at startup, intentframe-core fails to start (fail-closed).
+- `ExecutionContext` is threaded to `AnalysisEngine.analyze()`, `Guardian.validate()`, and `OnboardingEngine.onboard()` so all layers can account for root privilege in future work.
+- The agent never sees `ExecutionContext` directly. It learns the consequences via `RuntimeContext` guardrails (e.g. "commands run as root, do not use sudo").
+
+For tests, `ExecutionContext` is constructed explicitly rather than probed:
+
+```python
+execution_context = ExecutionContext(executor_running_as_root=True, executor_uid=0, executor_euid=0)
+runtime = IntentFrameRuntime(..., execution_context=execution_context)
+```
+
+---
+
 ## Technical notes we want to preserve
 
 Even though we are not shipping a full root-mode feature, two findings from the investigation are worth keeping:

@@ -79,6 +79,12 @@ class ExecutorHTTPClient(Executor):
     def close(self) -> None:
         self._client.close()
 
+    def health(self) -> dict[str, Any]:
+        """Probe the executor's /health endpoint. Raises on failure."""
+        resp = self._client.get("/health")
+        resp.raise_for_status()
+        return resp.json()
+
     def execute(self, validated_intent: IntentFrame) -> IFExecutionResult:
         action = validated_intent.action.value
 

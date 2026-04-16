@@ -6,7 +6,7 @@ Policy Enforcer - HYBRID (Local + Cloud)
 
 from abc import ABC, abstractmethod
 
-from intentframe_core.types import IntentFrame, AnalysisReport, ValidationResult, UserContext
+from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport, ValidationResult, UserContext
 
 
 class Guardian(ABC):
@@ -41,6 +41,7 @@ class Guardian(ABC):
         analysis: AnalysisReport,
         user_context: UserContext,
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies using Analysis Report.
@@ -60,5 +61,8 @@ class Guardian(ABC):
                 for, extracted deterministically by the pipeline.
                 Guardian uses the union of these and AE's
                 semantic_domains when matching intent limits.
+            execution_context: Immutable server-side facts about the
+                executor (privilege level, uid/euid).  Allows policy
+                enforcement to account for actual executor privilege.
         """
         pass

@@ -6,7 +6,7 @@ Semantic AI - SECRET, Cloud Only
 
 from abc import ABC, abstractmethod
 
-from intentframe_core.types import IntentFrame, AnalysisReport
+from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport
 
 
 class AnalysisEngine(ABC):
@@ -38,6 +38,7 @@ class AnalysisEngine(ABC):
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -69,5 +70,9 @@ class AnalysisEngine(ABC):
                 as trusted context so the AE knows which domains to
                 check for.  Does not reveal policy details — only
                 the domain vocabulary the system cares about.
+            execution_context: Immutable server-side facts about the
+                executor (privilege level, uid/euid).  Probed once at
+                startup.  Allows risk assessment to account for
+                whether commands will actually execute as root.
         """
         pass
