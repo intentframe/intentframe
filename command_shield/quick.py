@@ -1,16 +1,21 @@
 """Fast subset analysis for the executor adapter.
 
-Runs normalize + pattern match + indirection extraction only.
-No AST parsing, no external tools.  Returns CATASTROPHIC or PASS.
+Runs length check + normalize + pattern match + indirection extraction
+only.  No AST parsing, no external tools.  Returns CATASTROPHIC or SAFE.
+
+Mirrors the first three steps of the main pipeline so the executor
+floor obeys the same ordering (size gate cheapest, patterns next,
+indirection last).
 """
 
 from __future__ import annotations
 
 import shlex
 
+from command_shield.config import DEFAULT_CONFIG, ShieldConfig
 from command_shield.patterns import match_patterns
 from command_shield.structural import normalize
-from command_shield.verdict import CommandReport, Verdict
+from command_shield.verdict import CommandReport, Signal, Verdict
 
 _INTERPRETERS = frozenset({
     "python", "python3", "python2",
@@ -22,11 +27,15 @@ _INTERPRETERS = frozenset({
 _INLINE_FLAGS = frozenset({"-c", "-e", "--eval"})
 
 
-def quick_check(command: str) -> CommandReport:
-    """Fast deterministic check — CATASTROPHIC patterns + indirection only.
+def quick_check(
+    command: str, *, config: ShieldConfig | None = None
+) -> CommandReport:
+    """Fast deterministic check — size + CATASTROPHIC patterns + indirection.
 
     Used by the executor adapter as a last-resort floor.
     """
+    cfg = config or DEFAULT_CONFIG
+
     if not command or not command.strip():
         return CommandReport(
             verdict=Verdict.SAFE,
@@ -34,7 +43,25 @@ def quick_check(command: str) -> CommandReport:
             normalized_command="",
         )
 
-    # 1. Normalize
+    # 1. Length check — oversized input is not trustworthy to tokenize.
+    if len(command) > cfg.max_command_length:
+        return CommandReport(
+            verdict=Verdict.SAFE,
+            command=command,
+            normalized_command="",
+            signals=(Signal(
+                check="size",
+                signal_id="COMMAND_TOO_LARGE",
+                description=(
+                    f"Command length {len(command)} exceeds "
+                    f"max_command_length {cfg.max_command_length}."
+                ),
+                evidence=command[:120],
+                severity="high",
+            ),),
+        )
+
+    # 2. Normalize
     normalized = normalize(command)
 
     # 2. Pattern match
