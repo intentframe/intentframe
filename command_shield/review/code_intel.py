@@ -1,7 +1,28 @@
 """Code content analysis — Python AST and shell regex.
 
-Examines code strings and reports findings about what
-the code does.
+Step 10 of the inspection pipeline.  Examines code content for
+statically-detectable risk patterns.  Findings are returned on
+``CodeIntel.findings`` with structured severity/confidence; no
+allow/block decision is made here.
+
+Emitted finding IDs (stable contract, Python):
+    DANGEROUS_IMPORT_<top>        — subprocess, socket, pickle, ctypes,
+                                    importlib, flask, fastapi, … (critical)
+    DANGEROUS_CALL_<name>         — eval / exec / compile / __import__ (critical)
+    DANGEROUS_CALL_os_<method>    — os.system / popen / exec* / spawn* /
+                                    kill / killpg (critical)
+    DANGEROUS_CALL_signal_<name>  — any signal.* call (high)
+    NETWORK_SERVER_BIND           — any .bind() attribute call (high, conf 0.7)
+    FILE_SYSTEM_ESCAPE_OPEN       — open() on a literal /etc|/usr|… path (high)
+    SUSPICIOUS_CALL_<name>        — os.chmod / shutil.rmtree / os.remove / … (high)
+    REFERENCES_INTENTFRAME        — .intentframe / gateway.sock / executor.sock
+                                    string anywhere in source (critical)
+    PYTHON_SYNTAX_ERROR           — source failed to parse (high)
+
+Shell detectors emit SHELL_EVAL, SHELL_SOURCE_REMOTE,
+SHELL_NESTED_BACKTICKS, SHELL_CHMOD_NUMERIC, SHELL_CHOWN,
+SHELL_SYSTEM_REDIRECT, SHELL_LONG_PIPE_CHAIN, plus the same
+REFERENCES_INTENTFRAME when the raw text mentions runtime paths.
 """
 
 from __future__ import annotations
@@ -29,6 +50,19 @@ _DANGEROUS_PYTHON_IMPORTS: frozenset[str] = frozenset({
     "antigravity",
     "http.server",
     "xmlrpc.server",
+    # Network-server frameworks — listening / serving network traffic.
+    "flask",
+    "fastapi",
+    "aiohttp",
+    "tornado",
+    "bottle",
+    "uvicorn",
+    "starlette",
+    "sanic",
+    "twisted",
+    "quart",
+    "hypercorn",
+    "gunicorn",
 })
 
 # ── Dangerous Python calls ───────────────────────────────────────────
@@ -43,7 +77,35 @@ _DANGEROUS_OS_CALLS: frozenset[str] = frozenset({
     "execv", "execve", "execvp", "execvpe",
     "spawnl", "spawnle", "spawnlp", "spawnlpe",
     "spawnv", "spawnve", "spawnvp", "spawnvpe",
+    "kill", "killpg",
 })
+
+# Filesystem prefixes that should never be opened as literal paths from
+# Python code.  Detector only fires on `open("<literal>", ...)` where the
+# first argument is a compile-time constant string — dynamic paths
+# (`open(os.environ["X"], ...)`) are out of scope for the deterministic
+# layer and belong to the AE.
+_DANGEROUS_FS_PREFIXES: tuple[str, ...] = (
+    "/etc/",
+    "/System/",
+    "/usr/",
+    "/var/",
+    "/sys/",
+    "/proc/",
+    "/root/",
+    "/boot/",
+    "/dev/",
+)
+
+# IntentFrame-infrastructure references in code — any direct mention of
+# these is highly suspicious regardless of surrounding context.
+_INTENTFRAME_REF_PATTERN = re.compile(
+    r"\.intentframe\b"
+    r"|~/\.intentframe\b"
+    r"|/intentframe/"
+    r"|\bgateway\.sock\b"
+    r"|\bexecutor\.sock\b"
+)
 
 _SUSPICIOUS_CALLS: dict[str, str] = {
     "os.chmod": "Filesystem permission change",
@@ -102,6 +164,8 @@ def analyze_python_code(source: str, *, file_path: str | None = None) -> CodeInt
     imports: list[str] = []
     dangerous_calls: list[str] = []
 
+    _scan_intentframe_refs(source, findings)
+
     try:
         tree = ast.parse(source)
     except SyntaxError as exc:
@@ -155,6 +219,8 @@ def analyze_shell_code(source: str, *, file_path: str | None = None) -> CodeInte
     findings: list[ReviewFinding] = []
     dangerous_calls: list[str] = []
 
+    _scan_intentframe_refs(source, findings)
+
     for pattern, finding_id, title, detail in _SHELL_DANGEROUS_PATTERNS:
         match = pattern.search(source)
         if match:
@@ -190,6 +256,30 @@ def analyze_shell_code(source: str, *, file_path: str | None = None) -> CodeInte
 
 
 # ── Internal helpers ─────────────────────────────────────────────────
+
+def _scan_intentframe_refs(source: str, findings: list[ReviewFinding]) -> None:
+    """Flag any mention of IntentFrame infrastructure paths or sockets.
+
+    Scans raw source text (not AST) because these references can appear
+    in comments, docstrings, string literals, or f-strings — all of
+    which are equally concerning regardless of where they sit.
+    """
+    match = _INTENTFRAME_REF_PATTERN.search(source)
+    if match is None:
+        return
+    findings.append(ReviewFinding(
+        source="code_intel",
+        finding_id="REFERENCES_INTENTFRAME",
+        severity="critical",
+        title="Code references IntentFrame infrastructure",
+        detail=(
+            "Source contains a path or socket name used by IntentFrame "
+            "runtime components (.intentframe, gateway.sock, executor.sock)"
+        ),
+        evidence=match.group()[:120],
+        confidence=0.95,
+    ))
+
 
 def _check_import(module: str, findings: list[ReviewFinding]) -> None:
     top_level = module.split(".")[0]
@@ -260,6 +350,58 @@ def _check_call(
                 confidence=1.0,
             ))
             return
+
+    # signal.* — any direct use of the signal module is suspicious.
+    if call_name.startswith("signal."):
+        method = call_name.split(".", 1)[1]
+        dangerous_calls.append(call_name)
+        findings.append(ReviewFinding(
+            source="code_intel",
+            finding_id=f"DANGEROUS_CALL_signal_{method}",
+            severity="high",
+            title=f"Signal call: {call_name}()",
+            detail=f"signal.{method}() can interrupt, time out, or override handlers",
+            evidence=f"{call_name}() at line {node.lineno}",
+            confidence=0.95,
+        ))
+        return
+
+    # .bind() — likely a socket/server listener binding.  Ambiguous (any
+    # object can expose .bind), so confidence is conservative.
+    if call_name.endswith(".bind") and call_name != "bind":
+        dangerous_calls.append(call_name)
+        findings.append(ReviewFinding(
+            source="code_intel",
+            finding_id="NETWORK_SERVER_BIND",
+            severity="high",
+            title=f"Possible listener bind: {call_name}()",
+            detail="A .bind() call commonly indicates opening a network listener",
+            evidence=f"{call_name}() at line {node.lineno}",
+            confidence=0.7,
+        ))
+        return
+
+    # open("<dangerous literal>") — filesystem escape from code.
+    if call_name == "open" and node.args:
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            literal = first.value
+            for prefix in _DANGEROUS_FS_PREFIXES:
+                if literal.startswith(prefix):
+                    dangerous_calls.append(f"open:{prefix}")
+                    findings.append(ReviewFinding(
+                        source="code_intel",
+                        finding_id="FILE_SYSTEM_ESCAPE_OPEN",
+                        severity="high",
+                        title=f"open() targets system path: {literal[:60]}",
+                        detail=(
+                            f"Literal open() on {prefix!r}-rooted path accesses "
+                            f"system state outside the adapter VFS boundary"
+                        ),
+                        evidence=f"open({literal[:80]!r}) at line {node.lineno}",
+                        confidence=1.0,
+                    ))
+                    return
 
     # Suspicious but not necessarily critical
     if call_name in _SUSPICIOUS_CALLS:
