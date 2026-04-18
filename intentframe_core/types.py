@@ -5,13 +5,89 @@ All models used to pass information between layers.
 Pydantic BaseModel for automatic JSON serialization over HTTP.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
 from policy_registry.models import ActionPermission, DomainConstraintTypes, SemanticIntentLimit
+
+
+# ── Shield-side input bounds (transitive-injection defense) ───────
+# Caps on data flowing from command_shield into the pipeline.  These
+# live next to the payload types they bound so every consumer picks
+# them up without importing from the AE engine.  AE-output bounds
+# remain in intentframe_components.analysis.engine.AEFieldLimit.
+COMMAND_INTEL_CAPABILITIES_MAX_ITEMS = 64
+COMMAND_INTEL_CAPABILITY_ITEM_MAX_LEN = 128
+COMMAND_INTEL_FINDING_IDS_MAX_ITEMS = 32
+COMMAND_INTEL_FINDING_ID_MAX_LEN = 96
+TERMINAL_COMMAND_SIGNALS_MAX_ITEMS = 32
+TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN = 300
+
+
+class CommandIntel(BaseModel):
+    """Bounded summary of deterministic facts from command_shield.
+
+    Side-channel carrier from the pipeline to the Analysis Engine, the
+    Guardian, and (eventually) the DeterministicGuardian pre-pass.
+
+    Populated only for RUN_COMMAND intents.  Absent (``None``) for every
+    other action type.
+
+    The full ``CommandReport`` (with ``Signal``, ``Edge``, ``CodeReport``
+    dataclasses) stays on the pipeline-local variable.  What we transport
+    downstream is a narrow, pydantic-friendly summary with explicit
+    length caps — consumers that need the verbose signal list keep
+    reading :pyattr:`AnalysisReport.terminal_command_signals` (already
+    bounded).  The capabilities and code-intel surfaces are the new
+    structured vocabulary.
+
+    Bounds are enforced at construction via ``field_validator`` — any
+    overflow from command_shield is silently truncated so a malformed
+    upstream cannot swell the pipeline payload.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    verdict: Literal["SAFE", "NEEDS_REVIEW", "CATASTROPHIC"] = "SAFE"
+    capabilities: tuple[str, ...] = Field(default_factory=tuple)
+    has_code_intel_findings: bool = False
+    code_intel_finding_ids: tuple[str, ...] = Field(default_factory=tuple)
+    has_edge_signals: bool = False
+
+    @classmethod
+    def _clip_tuple(
+        cls,
+        values: tuple[str, ...] | list[str] | None,
+        max_items: int,
+        max_item_len: int,
+    ) -> tuple[str, ...]:
+        if not values:
+            return ()
+        clipped: list[str] = []
+        for v in values[:max_items]:
+            s = str(v)
+            if len(s) > max_item_len:
+                s = s[:max_item_len]
+            clipped.append(s)
+        return tuple(clipped)
+
+    def __init__(self, **data: Any) -> None:
+        if "capabilities" in data:
+            data["capabilities"] = self._clip_tuple(
+                data["capabilities"],
+                COMMAND_INTEL_CAPABILITIES_MAX_ITEMS,
+                COMMAND_INTEL_CAPABILITY_ITEM_MAX_LEN,
+            )
+        if "code_intel_finding_ids" in data:
+            data["code_intel_finding_ids"] = self._clip_tuple(
+                data["code_intel_finding_ids"],
+                COMMAND_INTEL_FINDING_IDS_MAX_ITEMS,
+                COMMAND_INTEL_FINDING_ID_MAX_LEN,
+            )
+        super().__init__(**data)
 
 
 class IntentFrame(BaseModel):
@@ -68,6 +144,39 @@ class AnalysisReport(BaseModel):
 
     ae_output_anomaly: bool = False
 
+    @staticmethod
+    def clip_terminal_command_signals(
+        signals: List[Dict[str, str]],
+    ) -> tuple[List[Dict[str, str]], bool]:
+        """Enforce the shield-side input bound on serialized signals.
+
+        Returns the clipped list plus an ``overflow`` flag.  The flag
+        is lifted into :pyattr:`ae_output_anomaly` by the caller when
+        truncation occurred, so Guardian treats the report with
+        elevated suspicion.  No caller should ever produce an
+        overflowing list today — this is defense-in-depth against a
+        future shield change or a malformed round-trip.
+        """
+        if not signals:
+            return [], False
+        overflow = False
+        if len(signals) > TERMINAL_COMMAND_SIGNALS_MAX_ITEMS:
+            signals = signals[:TERMINAL_COMMAND_SIGNALS_MAX_ITEMS]
+            overflow = True
+        clipped: List[Dict[str, str]] = []
+        for item in signals:
+            if not isinstance(item, dict):
+                continue
+            capped: Dict[str, str] = {}
+            for k, v in item.items():
+                sv = str(v) if v is not None else ""
+                if len(sv) > TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN:
+                    sv = sv[:TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN]
+                    overflow = True
+                capped[str(k)] = sv
+            clipped.append(capped)
+        return clipped, overflow
+
 
 class ValidationResult(BaseModel):
     """
@@ -76,11 +185,19 @@ class ValidationResult(BaseModel):
     Decisions:
         ALLOW  - Action is authorized, execute as-is (or with modified_intent).
         BLOCK  - Hard policy violation, action rejected.
+
+    decision_path identifies which internal path produced this result.
+    Used for audit logging and metrics; never affects behavior.
+    Reserved values:
+        "fast_path"     - Guardian deterministic fast-path ALLOW (safe + no risk flags).
+        "ai_path"       - AI Guardian rendered judgment (default).
+        "deterministic" - Reserved for the future DeterministicGuardian pre-pass.
     """
     decision: Decision
     intent: IntentFrame
     analysis: Optional[AnalysisReport] = None
     message: str = ""
+    decision_path: Literal["fast_path", "ai_path", "deterministic"] = "ai_path"
 
     modified_intent: Optional[IntentFrame] = None
 

@@ -13,7 +13,7 @@ mirroring the DOMAIN_MODULES pattern from guardian/domains/.
 
 from __future__ import annotations
 
-from intentframe_components.guardian.checkers.base import ConstraintChecker
+from intentframe_components.guardian.checkers.base import CheckContext, ConstraintChecker
 from intentframe_components.guardian.checkers.file import FileChecker
 from intentframe_components.guardian.checkers.terminal import TerminalChecker
 from intentframe_components.guardian.checkers.email import EmailChecker
@@ -41,6 +41,7 @@ CONSTRAINT_CHECKERS: dict[type, ConstraintChecker] = {
 
 __all__ = [
     "CONSTRAINT_CHECKERS",
+    "CheckContext",
     "ConstraintChecker",
     "ApiChecker",
     "BrowserChecker",

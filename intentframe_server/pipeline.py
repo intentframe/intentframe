@@ -40,14 +40,21 @@ from intentframe_server.enrichers.email import enrich_intent as enrich_email_int
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
+    AnalysisReport,
+    CommandIntel,
     ExecutionContext,
     ExecutionResult,
     IntentFrame,
     AgentCapabilities,
     RuntimeContext,
+    ValidationResult,
 )
 from intentframe_components.analysis import AnalysisEngine
-from intentframe_components.guardian import Guardian
+from intentframe_components.guardian import (
+    DeterministicDecision,
+    DeterministicGuardian,
+    Guardian,
+)
 from intentframe_components.executor import Executor
 from intentframe_components.onboarding import OnboardingEngine
 from policy_registry.client import PolicyRegistryClient
@@ -111,6 +118,7 @@ class IntentFrameRuntime:
         onboarding_engine: Optional[OnboardingEngine] = None,
         policy_client: Optional[PolicyRegistryClient] = None,
         resource_client: Optional[ResourceRegistryClient] = None,
+        deterministic_guardian: Optional[DeterministicGuardian] = None,
         verbose: bool = True,
     ):
         self.analysis_engine = analysis_engine
@@ -120,6 +128,9 @@ class IntentFrameRuntime:
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
         self._resource_client = resource_client or ResourceRegistryClient()
+        self.deterministic_guardian = deterministic_guardian or DeterministicGuardian(
+            verbose=verbose,
+        )
         self.verbose = verbose
         self.audit_log: list = []
         self._request_counter = 0
@@ -183,6 +194,43 @@ class IntentFrameRuntime:
             for action, perm in user_context.allowed_actions.items()
             if perm.safe
         }
+
+    @staticmethod
+    def _build_deterministic_report(
+        intent: IntentFrame,
+        det_result,
+    ) -> AnalysisReport:
+        """Build the minimal AnalysisReport we attach when DG ALLOWs.
+
+        The pipeline's downstream audit + verbose printing assume
+        ``analysis`` is a populated :class:`AnalysisReport`.  This
+        builds one with just enough shape: LOW risk, FULLY_REVERSIBLE,
+        and a recommendation that names the matched gate so audit
+        consumers can tell a passive-read ALLOW from a read-only
+        RUN_COMMAND ALLOW.
+        """
+        from intentframe_core.enums import Reversibility, RiskLevel
+
+        return AnalysisReport(
+            stated_intent=f"{intent.action.value} on {intent.target}",
+            actual_behaviors=[{
+                "action": intent.action.value,
+                "actual_behavior": det_result.reason,
+                "matches_intent": True,
+            }],
+            requested_scope=[intent.target],
+            actual_scope=[intent.target],
+            scope_mismatch=False,
+            predicted_outcomes={"risk_reason": "Deterministic pre-AE ALLOW"},
+            hidden_behaviors=[],
+            risk_factors={"overall": RiskLevel.LOW},
+            reversibility=Reversibility.FULLY_REVERSIBLE,
+            confidence=1.0,
+            recommendation=(
+                f"Deterministic Guardian ALLOW "
+                f"(gate={det_result.matched_gate})"
+            ),
+        )
 
     @staticmethod
     def _extract_active_domains(user_context: UserContext) -> set[str]:
@@ -382,6 +430,7 @@ class IntentFrameRuntime:
         # LAYER 2: COMMAND SHIELD - Deterministic structural pre-check
         # ═══════════════════════════════════════════════════════════════
         terminal_command_signals: tuple = ()
+        command_intel: CommandIntel | None = None
         if intent.action.value == ActionType.RUN_COMMAND.value:
             command = intent.target or (intent.data or {}).get("command", "")
             if command:
@@ -393,6 +442,9 @@ class IntentFrameRuntime:
                     print(f"    │  Verdict: {report.verdict.value:<47} │")
                     if report.signals:
                         print(f"    │  Signals: {len(report.signals):<48} │")
+                    if report.capabilities:
+                        caps_preview = ", ".join(report.capabilities[:3])
+                        print(f"    │  Capabilities: {caps_preview[:43]:<43} │")
                     print(f"    └──────────────────────────────────────────────────────────┘")
 
                 if report.verdict == Verdict.CATASTROPHIC:
@@ -431,67 +483,180 @@ class IntentFrameRuntime:
                         },
                     )
 
-                if report.verdict == Verdict.NEEDS_REVIEW:
-                    terminal_command_signals = report.signals
+                # Forward signals for SAFE and NEEDS_REVIEW verdicts
+                # (Gap 1).  Previously gated by NEEDS_REVIEW only —
+                # SAFE commands with meaningful capability tags were
+                # silently discarded.
+                terminal_command_signals = report.signals
+
+                # Build a bounded CommandIntel side-channel carrying
+                # the capability tags and code-intel summary for
+                # downstream consumers (Phase 1 plumbing — no consumer
+                # yet; TerminalChecker reads it in Phase 3).
+                code_intel = report.code_intel
+                finding_ids: tuple[str, ...] = ()
+                if code_intel is not None and code_intel.findings:
+                    finding_ids = tuple(
+                        getattr(f, "finding_id", "") for f in code_intel.findings
+                    )
+                has_edge_signals = any(
+                    s.check == "edge" or s.signal_id.startswith("edge:")
+                    for s in report.signals
+                )
+                command_intel = CommandIntel(
+                    verdict=report.verdict.value,
+                    capabilities=tuple(report.capabilities),
+                    has_code_intel_findings=bool(finding_ids),
+                    code_intel_finding_ids=finding_ids,
+                    has_edge_signals=has_edge_signals,
+                )
 
         # ═══════════════════════════════════════════════════════════════
         # CONTEXT ENRICHMENT — deterministic metadata from system sources
         # ═══════════════════════════════════════════════════════════════
         intent = await enrich_email_intent(intent)
 
-        # ═══════════════════════════════════════════════════════════════
-        # LAYER 3: ANALYSIS ENGINE - Understand the intent
-        # ═══════════════════════════════════════════════════════════════
-        if self.verbose:
-            print(f"    ┌──────────────────────────────────────────────────────────┐")
-            print(f"    │  ANALYSIS ENGINE: Understanding intent                   │")
-        
         safe_actions = self._extract_safe_actions(user_context)
         active_domains = self._extract_active_domains(user_context)
-        analysis = await self.analysis_engine.analyze(
+
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 4a: DETERMINISTIC GUARDIAN (pre-AE pass)
+        # ═══════════════════════════════════════════════════════════════
+        # Splits Guardian's deterministic stage out so BLOCK / ALLOW can
+        # render BEFORE paying the AE LLM cost.  UNDECIDED falls through
+        # to the AI path (AE + AIGuardian) exactly as before.
+        det_result = self.deterministic_guardian.decide(
             intent,
-            safe_actions=safe_actions,
-            terminal_command_signals=terminal_command_signals,
+            user_context,
             active_domains=active_domains,
             execution_context=self._execution_context,
+            command_intel=command_intel,
         )
-        
-        if self.verbose:
-            print(f"    │  AI analyzing: {intent.action.value}...")
-            print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
-            print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
-            if analysis.hidden_behaviors:
-                print(f"    │  ⚠️  Hidden behaviors: {str(analysis.hidden_behaviors)[:33]:<33} │")
-            if analysis.semantic_domains:
-                domains_str = ", ".join(analysis.semantic_domains)
-                print(f"    │  Domains: {domains_str:<48} │")
-            if analysis.risk_factors:
-                overall = max(analysis.risk_factors.values(), key=lambda r: list(RiskLevel).index(r))
-                factors_str = ", ".join(f"{k}: {v.value}" for k, v in analysis.risk_factors.items())
-                print(f"    │  Risk factors: {factors_str[:44]:<44} │")
-            if analysis.scope_mismatch:
-                print(f"    │  ⚠️  Scope mismatch detected                              │")
-            print(f"    └──────────────────────────────────────────────────────────┘")
-        
-        # ═══════════════════════════════════════════════════════════════
-        # LAYER 4: GUARDIAN - Validate SECURITY (not business logic!)
-        # ═══════════════════════════════════════════════════════════════
         if self.verbose:
             print(f"    ┌──────────────────────────────────────────────────────────┐")
-            print(f"    │  GUARDIAN: Security validation                           │")
-            print(f"    │  (Checks authority, NOT business logic)                  │")
-        
-        validation = await self.guardian.validate(
-            intent, analysis, user_context,
-            active_domains=active_domains,
-            execution_context=self._execution_context,
-        )
+            print(f"    │  DETERMINISTIC GUARDIAN: pre-AE pass                     │")
+            print(f"    │  Decision: {det_result.decision.value:<46} │")
+            if det_result.matched_gate:
+                print(f"    │  Gate:     {det_result.matched_gate:<46} │")
+            print(f"    └──────────────────────────────────────────────────────────┘")
+
+        if det_result.decision is DeterministicDecision.BLOCK:
+            # ───── Deterministic BLOCK — skip AE + AIGuardian ─────
+            audit_entry = {
+                "action": intent.action.value,
+                "target": intent.target,
+                "data": intent.data,
+                "reason": intent.reason,
+                "decision": "BLOCK",
+                "message": det_result.reason,
+                "decision_path": "deterministic",
+                "matched_gate": det_result.matched_gate,
+                "executed": False,
+            }
+            self.audit_log.append(audit_entry)
+            if self.verbose:
+                print(f"")
+                print(f"    ╔══════════════════════════════════════════════════════════╗")
+                print(f"    ║  ⛔ ACTION BLOCKED (Deterministic)                        ║")
+                print(f"    ╠══════════════════════════════════════════════════════════╣")
+                print(f"    ║  {det_result.reason[:56]:<56} ║")
+                print(f"    ╚══════════════════════════════════════════════════════════╝")
+                print(f"")
+            return ExecutionResult(
+                success=False,
+                error=f"Blocked: {det_result.reason}",
+                data={
+                    "decision": "BLOCK",
+                    "reason": det_result.reason,
+                    "layer": "deterministic_guardian",
+                    "matched_gate": det_result.matched_gate,
+                },
+            )
+
+        # Captured here so the shared audit entry below can reference
+        # it without keeping a reference to det_result at call sites.
+        dg_matched_gate: str | None = None
+
+        if det_result.decision is DeterministicDecision.ALLOW:
+            # ───── Deterministic ALLOW — skip AE + AIGuardian ─────
+            # Build a minimal AnalysisReport mirroring the shape AE's
+            # own fast-path produces.  Audit + log formatting below
+            # assume `analysis` is a real report, so we give them one.
+            analysis = self._build_deterministic_report(intent, det_result)
+            validation = ValidationResult(
+                decision=Decision.ALLOW,
+                intent=intent,
+                analysis=analysis,
+                message=det_result.reason,
+                decision_path="deterministic",
+            )
+            dg_matched_gate = det_result.matched_gate
+            if self.verbose:
+                print(f"    │  ⚡ Deterministic ALLOW — AE + AIGuardian skipped        │")
+        else:
+            # ═══════════════════════════════════════════════════════════════
+            # LAYER 4b: ANALYSIS ENGINE (UNDECIDED path only)
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"    ┌──────────────────────────────────────────────────────────┐")
+                print(f"    │  ANALYSIS ENGINE: Understanding intent                   │")
+
+            analysis = await self.analysis_engine.analyze(
+                intent,
+                safe_actions=safe_actions,
+                terminal_command_signals=terminal_command_signals,
+                active_domains=active_domains,
+                execution_context=self._execution_context,
+                command_intel=command_intel,
+            )
+
+            if self.verbose:
+                print(f"    │  AI analyzing: {intent.action.value}...")
+                print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
+                print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
+                if analysis.hidden_behaviors:
+                    print(f"    │  ⚠️  Hidden behaviors: {str(analysis.hidden_behaviors)[:33]:<33} │")
+                if analysis.semantic_domains:
+                    domains_str = ", ".join(analysis.semantic_domains)
+                    print(f"    │  Domains: {domains_str:<48} │")
+                if analysis.risk_factors:
+                    overall = max(analysis.risk_factors.values(), key=lambda r: list(RiskLevel).index(r))
+                    factors_str = ", ".join(f"{k}: {v.value}" for k, v in analysis.risk_factors.items())
+                    print(f"    │  Risk factors: {factors_str[:44]:<44} │")
+                if analysis.scope_mismatch:
+                    print(f"    │  ⚠️  Scope mismatch detected                              │")
+                print(f"    └──────────────────────────────────────────────────────────┘")
+
+            # ═══════════════════════════════════════════════════════════════
+            # LAYER 4c: AI GUARDIAN - Validate SECURITY (not business logic!)
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"    ┌──────────────────────────────────────────────────────────┐")
+                print(f"    │  GUARDIAN: Security validation                           │")
+                print(f"    │  (Checks authority, NOT business logic)                  │")
+
+            validation = await self.guardian.validate(
+                intent, analysis, user_context,
+                active_domains=active_domains,
+                execution_context=self._execution_context,
+                command_intel=command_intel,
+            )
         
         # ═══════════════════════════════════════════════════════════════
         # DECISION: ALLOW / BLOCK
         # ═══════════════════════════════════════════════════════════════
         
-        is_fast_path = "fast-path" in (validation.message or "").lower()
+        # decision_path is authoritative; fall back to message substring
+        # only if a Guardian implementation predates the field (defensive
+        # — all first-party Guardians set it explicitly).
+        decision_path = getattr(validation, "decision_path", None)
+        if not decision_path:
+            decision_path = (
+                "fast_path"
+                if "fast-path" in (validation.message or "").lower()
+                else "ai_path"
+            )
+        is_fast_path = decision_path == "fast_path"
 
         # Build audit entry
         audit_entry = {
@@ -501,10 +666,12 @@ class IntentFrameRuntime:
             "reason": intent.reason,
             "decision": validation.decision.value,
             "message": validation.message,
-            "decision_path": "fast_path" if is_fast_path else "ai_path",
+            "decision_path": decision_path,
             "risk_level": str(analysis.risk_factors) if analysis.risk_factors else None,
             "confidence": analysis.confidence,
         }
+        if dg_matched_gate:
+            audit_entry["matched_gate"] = dg_matched_gate
         
         if validation.decision == Decision.ALLOW:
             # ───────────────────────────────────────────────────────────

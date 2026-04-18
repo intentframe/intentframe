@@ -6,7 +6,7 @@ import fnmatch
 
 from intentframe_core.types import IntentFrame
 from intentframe_core.paths import normalize_virtual_path
-from intentframe_components.guardian.checkers.base import ConstraintChecker
+from intentframe_components.guardian.checkers.base import CheckContext, ConstraintChecker
 from policy_registry.constraints.file import FileConstraints
 
 
@@ -36,7 +36,13 @@ class FileChecker(ConstraintChecker):
                 return True
         return False
 
-    def check(self, intent: IntentFrame, constraints: FileConstraints) -> tuple[bool, str]:
+    def check(
+        self,
+        intent: IntentFrame,
+        constraints: FileConstraints,
+        context: CheckContext | None = None,
+    ) -> tuple[bool, str]:
+        del context  # file checks are pure path/target today
         if not self._path_matches(intent.target, constraints.allowed_paths):
             return False, f"Path '{intent.target}' not in allowed paths"
         return True, ""

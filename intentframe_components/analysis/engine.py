@@ -25,7 +25,12 @@ from pydantic import BaseModel, Field, StringConstraints
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ActionType
-from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport
+from intentframe_core.types import (
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
+    IntentFrame,
+)
 from intentframe_core.enums import Reversibility, RiskLevel
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
@@ -407,6 +412,7 @@ For recommendation:
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
+        command_intel: CommandIntel | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -593,6 +599,9 @@ For recommendation:
             }
             for s in terminal_command_signals
         ]
+        clipped_signals, signals_overflow = AnalysisReport.clip_terminal_command_signals(
+            serialized_signals
+        )
 
         return AnalysisReport(
             stated_intent=ai_output.stated_intent,
@@ -613,8 +622,8 @@ For recommendation:
             semantic_domains=ai_output.semantic_domains,
             confidence=ai_output.confidence,
             recommendation=ai_output.recommendation,
-            terminal_command_signals=serialized_signals,
-            ae_output_anomaly=anomaly,
+            terminal_command_signals=clipped_signals,
+            ae_output_anomaly=anomaly or signals_overflow,
         )
 
     def _detect_overflow(self, ai_output: AIAnalysisOutput) -> bool:

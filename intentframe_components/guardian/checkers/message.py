@@ -5,14 +5,20 @@ from __future__ import annotations
 import fnmatch
 
 from intentframe_core.types import IntentFrame
-from intentframe_components.guardian.checkers.base import ConstraintChecker
+from intentframe_components.guardian.checkers.base import CheckContext, ConstraintChecker
 from policy_registry.constraints.message import MessageConstraints
 
 
 class MessageChecker(ConstraintChecker):
     """Contact-based constraint enforcement for messaging operations."""
 
-    def check(self, intent: IntentFrame, constraints: MessageConstraints) -> tuple[bool, str]:
+    def check(
+        self,
+        intent: IntentFrame,
+        constraints: MessageConstraints,
+        context: CheckContext | None = None,
+    ) -> tuple[bool, str]:
+        del context
         contact = (intent.data or {}).get("to", intent.target)
         for pattern in constraints.allowed_contacts:
             if fnmatch.fnmatch(str(contact), pattern):

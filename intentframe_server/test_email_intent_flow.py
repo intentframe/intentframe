@@ -56,6 +56,7 @@ class LoggingAnalysisEngine:
         *,
         safe_actions: set[str],
         terminal_command_signals: tuple = (),
+        **kwargs: Any,
     ) -> AnalysisReport:
         _dump("STAGE 4: Analysis Engine received intent", intent)
         _dump(
@@ -63,6 +64,7 @@ class LoggingAnalysisEngine:
             {
                 "safe_actions": sorted(safe_actions),
                 "terminal_command_signals": list(terminal_command_signals),
+                "command_intel": kwargs.get("command_intel"),
             },
         )
         return AnalysisReport(
@@ -82,6 +84,7 @@ class LoggingGuardian:
         intent: IntentFrame,
         analysis: AnalysisReport,
         user_context: UserContext,
+        **kwargs: Any,
     ) -> ValidationResult:
         _dump("STAGE 5: Guardian received intent", intent)
         _dump(

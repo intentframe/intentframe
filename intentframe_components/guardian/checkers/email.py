@@ -16,7 +16,7 @@ import re
 
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
-from intentframe_components.guardian.checkers.base import ConstraintChecker
+from intentframe_components.guardian.checkers.base import CheckContext, ConstraintChecker
 from policy_registry.constraints.email import EmailConstraints
 
 _EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
@@ -33,7 +33,13 @@ class EmailChecker(ConstraintChecker):
         display names, comma-separated lists, etc."""
         return _EMAIL_RE.findall(value)
 
-    def check(self, intent: IntentFrame, constraints: EmailConstraints) -> tuple[bool, str]:
+    def check(
+        self,
+        intent: IntentFrame,
+        constraints: EmailConstraints,
+        context: CheckContext | None = None,
+    ) -> tuple[bool, str]:
+        del context
         data = intent.data or {}
         action = intent.action.value
 

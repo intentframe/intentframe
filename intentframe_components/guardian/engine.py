@@ -31,7 +31,14 @@ from pydantic import BaseModel, Field
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ACTION_DOMAINS, DomainType
-from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport, ValidationResult, UserContext
+from intentframe_core.types import (
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
+    IntentFrame,
+    UserContext,
+    ValidationResult,
+)
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.guardian.domains import DOMAIN_MODULES
@@ -222,18 +229,26 @@ Be brief and cite the specific concern that caused your decision."""
         self,
         intent: IntentFrame,
         permission: ActionPermission,
+        command_intel: CommandIntel | None = None,
     ) -> tuple[bool, str]:
         """Evaluate per-category constraints against the intent.
 
         Dispatches to the registered ConstraintChecker for the constraint type.
         Returns (passed, reason).
+
+        ``command_intel`` is forwarded as ``CheckContext.command_intel``
+        to checkers that can consume it (TerminalChecker).  Checkers
+        that don't care simply ignore the context.
         """
+        from intentframe_components.guardian.checkers.base import CheckContext
+
         constraints = permission.constraints
         if constraints is None:
             return True, ""
         checker = CONSTRAINT_CHECKERS.get(type(constraints))
         if checker:
-            return checker.check(intent, constraints)
+            context = CheckContext(command_intel=command_intel)
+            return checker.check(intent, constraints, context)
         return True, ""
 
     # ── Risk Flag Check ────────────────────────────────────────────
@@ -261,6 +276,7 @@ Be brief and cite the specific concern that caused your decision."""
         user_context: UserContext,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
+        command_intel: CommandIntel | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies.
@@ -269,6 +285,10 @@ Be brief and cite the specific concern that caused your decision."""
         1. Permission check  → BLOCK if action not in allowed_actions
         2. Constraint check  → BLOCK if per-category constraints violated
         3. Safety routing    → fast ALLOW or AI validation
+
+        ``command_intel`` carries deterministic command_shield facts
+        (verdict, capability tags).  It is consumed by per-category
+        checkers (see TerminalChecker) and otherwise ignored here.
         """
         action = intent.action.value
 
@@ -281,12 +301,15 @@ Be brief and cite the specific concern that caused your decision."""
                 intent=intent,
                 analysis=analysis,
                 message=f"Action '{action}' is not permitted by user policy",
+                decision_path="ai_path",
             )
 
         permission = user_context.allowed_actions[action]
 
         # ── Step 2: Constraint check (deterministic) ───────────────
-        passed, reason = self._check_constraints(intent, permission)
+        passed, reason = self._check_constraints(
+            intent, permission, command_intel=command_intel,
+        )
         if not passed:
             if self.verbose:
                 print(f"    │  ✘ BLOCK: {action} — {reason}")
@@ -295,6 +318,7 @@ Be brief and cite the specific concern that caused your decision."""
                 intent=intent,
                 analysis=analysis,
                 message=f"Constraint violation: {reason}",
+                decision_path="ai_path",
             )
 
         # ── Step 2.5: Domain module enforcement (structural hard gate) ──
@@ -312,6 +336,7 @@ Be brief and cite the specific concern that caused your decision."""
                         intent=intent,
                         analysis=analysis,
                         message=f"Domain violation ({domain.value}): {reason}",
+                        decision_path="ai_path",
                     )
                 if self.verbose:
                     print(f"    │  ✓ Domain check passed ({domain.value}) — proceeding to AI")
@@ -325,6 +350,7 @@ Be brief and cite the specific concern that caused your decision."""
                 intent=intent,
                 analysis=analysis,
                 message=f"Permitted (fast-path): {action}",
+                decision_path="fast_path",
             )
 
         # ── AI path: semantic validation ───────────────────────────
@@ -515,4 +541,5 @@ Be brief and cite the specific concern that caused your decision."""
             intent=intent,
             analysis=analysis,
             message=message,
+            decision_path="ai_path",
         )

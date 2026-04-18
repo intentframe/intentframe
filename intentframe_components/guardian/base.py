@@ -6,7 +6,14 @@ Policy Enforcer - HYBRID (Local + Cloud)
 
 from abc import ABC, abstractmethod
 
-from intentframe_core.types import ExecutionContext, IntentFrame, AnalysisReport, ValidationResult, UserContext
+from intentframe_core.types import (
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
+    IntentFrame,
+    UserContext,
+    ValidationResult,
+)
 
 
 class Guardian(ABC):
@@ -42,6 +49,7 @@ class Guardian(ABC):
         user_context: UserContext,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
+        command_intel: CommandIntel | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies using Analysis Report.
@@ -64,5 +72,11 @@ class Guardian(ABC):
             execution_context: Immutable server-side facts about the
                 executor (privilege level, uid/euid).  Allows policy
                 enforcement to account for actual executor privilege.
+            command_intel: Bounded summary of command_shield facts
+                (verdict, capability tags, code-intel findings).
+                Populated only for RUN_COMMAND intents; ``None`` for
+                every other action.  Consumed by per-category
+                constraint checkers that need capability vocabulary
+                (see TerminalChecker).
         """
         pass
