@@ -1,69 +1,85 @@
-"""command_shield — deterministic shell command classification.
+"""command_shield — deterministic shell command & code inspection.
 
-Classifies commands as CATASTROPHIC, NEEDS_REVIEW, or SAFE before
-they enter the IntentFrame pipeline.  Standalone module with no
-imports from intentframe_components, policy_registry, or executor.
+Standalone module.  No imports from intentframe_components,
+policy_registry, or executor.  Used by the IntentFrame runtime as a
+pre-execution gate and by ad-hoc tooling that needs structured
+findings on a shell command or a raw code body.
 
-Architecture
-------------
-All inspection flows through a single 12-step pipeline
-(:mod:`command_shield.pipeline`):
+Model
+-----
+A shell command is the root of a graph of code units linked by
+*containment edges*::
 
-    1  length check                  7  capability classify
-    2  normalize + tokenize           8  code extraction
-    3  pattern match (verdict)        9  code length check
-    4  structural decompose           10 deterministic code analysis
-    5  language detect                11 LLM reviewer (async only)
-    6  scope check                    12 assemble CommandReport
+    inline       python -c "import os; os.system(...)"
+    referenced   python foo.py                      (resolvable path)
+    piped_stdin  cat foo.py | python -
+    dynamic      python $SCRIPT  /  python <(curl ...)
+    interactive  bash                               (no body)
 
-The 3-way verdict is driven only by fixed-system checks (steps 3 & 4).
-Config-driven signals (size, scope, capabilities) ride with severity
-but never change the verdict.  Guardian/AE decide what to do with them.
+The pipeline walks this graph: cheap → expensive checks, emits
+structured signals for each finding, and — when the caller opts in —
+auto-resolves local referenced scripts, sniffs their language from
+content, and delegates each body to :func:`inspect_code`.
+
+Verdict (CATASTROPHIC / NEEDS_REVIEW / SAFE) is set ONLY by
+fixed-system checks (pattern and structural).  Every other signal is
+advisory context for the caller.
 
 Public API
 ----------
-inspect_command(cmd, *, config=...)        Sync pipeline (steps 1-10, 12).
-inspect_command_deep(cmd, *, config=...)   Async pipeline (steps 1-12).
-quick_check(cmd, *, config=...)            Executor last-resort floor.
-analyze(cmd, *, ...)                       Back-compat alias for inspect_command.
-review_command(cmd, ...)                   Back-compat adapter returning CommandReview.
-clean_env()                                Filtered os.environ for subprocess.
+inspect_command(cmd, *, session=None, config=None) -> CommandReport
+    Sync command inspection.  No LLM, no network.  Runtime gate.
+
+inspect_command_deep(cmd, *, ...) -> CommandReport  (async)
+    Same, plus conditional LLM review of the first in-scope body.
+
+inspect_code(code, *, language=None, source_path=None, config=None)
+    Sync code-only inspector.  Use when you already have the body.
+
+inspect_code_deep(code, *, ...) -> CodeReport  (async)
+    Code-only inspector with conditional LLM review.
+
+quick_check(cmd, *, config=None) -> CommandReport
+    Executor last-resort floor (patterns only; no structural walk).
+
+clean_env() -> dict[str, str]
+    Filtered ``os.environ`` safe to pass into child processes.
 
 Types
 -----
-Verdict, Signal, CommandReport                        core
-ShieldConfig                                          operational config
-LanguageInfo, CodeIntel, ReviewFinding, CommandReview review extensions
+Verdict, Signal, CommandReport, CodeReport, ResolvedNode, Edge,
+ShieldConfig, ResolveSession.
 """
 
-from command_shield.analyzer import analyze
+from command_shield.code_inspector import inspect_code, inspect_code_deep
 from command_shield.config import DEFAULT_CONFIG, ShieldConfig
 from command_shield.env import clean_env
 from command_shield.pipeline import inspect_command, inspect_command_deep
 from command_shield.quick import quick_check
-from command_shield.review import review_command
-from command_shield.review.types import (
-    CodeIntel,
-    CommandReview,
-    LanguageInfo,
-    ReviewFinding,
+from command_shield.resolve import ResolveSession
+from command_shield.verdict import (
+    CodeReport,
+    CommandReport,
+    Edge,
+    ResolvedNode,
+    Signal,
+    Verdict,
 )
-from command_shield.verdict import CommandReport, Signal, Verdict
 
 __all__ = [
     "DEFAULT_CONFIG",
-    "CodeIntel",
+    "CodeReport",
     "CommandReport",
-    "CommandReview",
-    "LanguageInfo",
-    "ReviewFinding",
+    "Edge",
+    "ResolveSession",
+    "ResolvedNode",
     "ShieldConfig",
     "Signal",
     "Verdict",
-    "analyze",
     "clean_env",
+    "inspect_code",
+    "inspect_code_deep",
     "inspect_command",
     "inspect_command_deep",
     "quick_check",
-    "review_command",
 ]

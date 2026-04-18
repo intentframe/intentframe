@@ -36,6 +36,7 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
     capability:binary_download   — fetches a remote payload to disk (no shell pipe)
     capability:process_signal    — sends signals to processes (kill/pkill/killall)
     capability:spawns_process    — shells out / spawns a child process
+    capability:stdin_exec        — pipes data into an interpreter (`… | python -`)
 
 Each hit produces a Signal with check="capability" and signal_id set to
 the capability tag.  Multiple capabilities per command are expected;
@@ -60,6 +61,7 @@ CAPABILITY_DOWNLOAD_AND_EXEC = "capability:download_and_exec"
 CAPABILITY_BINARY_DOWNLOAD = "capability:binary_download"
 CAPABILITY_PROCESS_SIGNAL = "capability:process_signal"
 CAPABILITY_SPAWNS_PROCESS = "capability:spawns_process"
+CAPABILITY_STDIN_EXEC = "capability:stdin_exec"
 
 
 # ── Detection rules ─────────────────────────────────────────────────
@@ -191,6 +193,20 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         ),
         CAPABILITY_BINARY_DOWNLOAD,
         "Command downloads a remote payload to disk",
+    ),
+    # Stdin-piped interpreter execution — `… | python -`, `… | bash`.
+    # Distinct from download_and_exec (no network fetch component) and
+    # from script_execution (no literal file path).  Treated as a
+    # capability rather than a verdict-bearing pattern because benign
+    # uses exist (`echo 'print(1)' | python`), but the edge body is
+    # unresolvable so policy layers may want to deny it outright.
+    (
+        re.compile(
+            r"\|\s*(?:python3?|python2|node|nodejs|ruby|perl|"
+            r"bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)"
+        ),
+        CAPABILITY_STDIN_EXEC,
+        "Command pipes input into an interpreter (stdin exec)",
     ),
     # Process signaling — kill/pkill/killall family.
     (

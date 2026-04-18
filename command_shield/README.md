@@ -1,14 +1,15 @@
 # `command_shield`
 
-Deterministic command inspection for `RUN_COMMAND`-style actions.
+Deterministic inspection for shell commands **and** raw code bodies.
 
-`command_shield` examines a command string and returns a structured, immutable report describing:
+`command_shield` takes a command string (or a standalone code body) and returns a structured, immutable report describing:
 
-- whether the command is immediately catastrophic,
+- whether the input is immediately catastrophic,
 - whether fixed-system patterns suggest it needs review,
 - what deterministic capabilities it exposes,
 - what language / interpreter shape it appears to use,
-- and, when code is available, what static-analysis findings were observed.
+- which file paths or inline bodies it would actually execute, and
+- what static-analysis findings exist in any reachable code.
 
 It is intentionally a **fact producer**, not a policy engine:
 
@@ -26,16 +27,30 @@ Arbitrary shell commands are the one action class that can hide a lot of behavio
 - chained / nested subcommands,
 - package installs, compilation, listeners, background jobs,
 - inline Python or shell code,
-- code that touches system paths or spawns processes.
+- code that touches system paths or spawns processes,
+- references to scripts that live on disk.
 
 If every caller had to rediscover those mechanics itself, every downstream policy or AI layer would spend time re-parsing command strings instead of reasoning about user intent and authorization.
 
-`command_shield` exists to centralize that mechanical inspection into one standalone module with a small, stable contract:
+`command_shield` centralizes that mechanical inspection into one standalone module with a small, stable contract:
 
 - **cheap checks run first,**
 - **deterministic facts are produced once,**
 - **verdict semantics stay stable,**
 - **higher layers consume a trusted report instead of raw shell trivia.**
+
+## Mental Model: Commands as a Graph of Code Units
+
+A shell command is the *root* of a graph.  The command itself is one code unit (a shell body), and it links — via **containment edges** — to inner code units that the shell may cause to execute:
+
+    inline       python -c "import os; os.system('rm -rf /')"
+    referenced   python foo.py                        # literal path
+    piped_stdin  cat foo.py | python -
+    dynamic      python $SCRIPT  /  python <(curl ...)
+    interactive  bash                                 # REPL, no body
+    compiled     ./a.out                              # no source available
+
+`command_shield` walks that graph: cheap → expensive checks on the root, extracts the edges, and — when the caller opts in — resolves local referenced scripts and runs the code inspector on each reachable body.  Every edge and every resolver result turns into a structured signal.
 
 ## What It Does
 
@@ -54,38 +69,41 @@ The verdict is intentionally narrow:
 - `NEEDS_REVIEW` means fixed-system non-catastrophic review-worthy signals were found.
 - `SAFE` means no fixed-system review-worthy patterns were found.
 
-Config-driven findings like `COMMAND_TOO_LARGE`, `OUT_OF_SCOPE`, `CODE_TOO_LARGE`, and `capability:*` **do not change the verdict**. They are advisory facts for consumers.
+Config-driven findings like `COMMAND_TOO_LARGE`, `OUT_OF_SCOPE`, `CODE_TOO_LARGE`, `capability:*`, `edge:*`, and `resolved:*` **do not change the verdict**.  They are advisory facts for consumers.
 
 ### Extended report fields
 
 As later steps run, `CommandReport` may also include:
 
-- `language`: `LanguageInfo`
+- `language`: `LanguageInfo` — detected interpreter / inline-vs-file shape
 - `capabilities`: tuple of capability tags
-- `code_intel`: `CodeIntel`
+- `code_intel`: `CodeIntel` — mirrors the most informative resolved node
 - `reviewer_findings`, `reviewer_summary`, `reviewer_ran` (deep async path only)
+- `edges`: tuple of `Edge` — containment edges discovered in the command
+- `resolved_nodes`: tuple of `ResolvedNode` — per-edge inspection result
+- `script_path_candidate`: first literal referenced path, if any
+- `script_resolved`: True when that path was actually read and inspected
 - `elapsed_ms`
 
 These fields default cleanly, so callers that only read `verdict` and `signals` keep working unchanged.
 
 ## How It Works
 
-All full inspection flows through a single ordered pipeline in `command_shield.pipeline`:
+All full command inspection flows through a single ordered pipeline in `command_shield.pipeline`:
 
-1. `max_command_length` check
-2. normalize + tokenize
-3. fixed-system pattern match
-4. structural decomposition / indirection re-check
-5. language / role detection
-6. scope check against `allowed_languages`
-7. capability classification
-8. code extraction
-9. `max_code_length` check
-10. deterministic code analysis
-11. optional LLM reviewer (async path only)
-12. assemble `CommandReport`
+1.  `max_command_length` check
+2.  normalize + tokenize
+3.  fixed-system pattern match (verdict-bearing)
+4.  structural decomposition + indirection re-check (verdict-bearing)
+5.  language / role detection
+6.  scope check against `allowed_languages`
+7.  capability classification
+8.  containment-edge extraction
+9.  edge walk → per-node `inspect_code`
+10. optional LLM reviewer (async path only)
+11. assemble `CommandReport`
 
-The ordering is deliberate: cheapest and most certain checks run first, and expensive checks only run when earlier gates allow them to.
+The ordering is deliberate: cheapest and most certain checks run first; expensive checks only run when earlier gates allow them to; I/O (reading a referenced script) happens only when the caller opts in.
 
 ### 1. Pattern and structural analysis
 
@@ -102,18 +120,10 @@ This is where the verdict comes from.
 
 `command_shield` classifies the command shape using `LanguageInfo`:
 
-- detected language (`python`, `shell`, `javascript`, `ruby`, etc.),
+- detected language (`python`, `shell`, `javascript`, `ruby`, ...),
 - interpreter (`python3`, `bash`, `node`, ...),
 - whether code is inline (`-c`, `-e`, `--eval`),
 - whether the command appears to execute a file.
-
-This lets consumers distinguish, for example:
-
-- plain shell utility invocation,
-- inline Python,
-- Python script execution,
-- shell script execution,
-- non-Python / non-shell interpreters.
 
 ### 3. Capability classification
 
@@ -148,25 +158,32 @@ Current capability families:
 - `capability:binary_download`
 - `capability:process_signal`
 - `capability:spawns_process`
+- `capability:stdin_exec`
 
-These tags are intended for policy consumers. A caller can match exact tags or do prefix matching such as:
+Callers can match exact tags or prefixes like `capability:package_install:*`.
 
-- `capability:package_install:*`
-- `capability:script_execution:*`
+### 4. Containment-edge extraction and walk
 
-### 4. Deterministic code analysis
+Step 8 builds the graph.  Each `Edge` carries:
 
-When code content is available, `command_shield` performs static analysis:
+- `kind` — `inline` / `referenced` / `piped_stdin` / `dynamic` / `interactive` / `compiled`
+- `language` — best-effort language for the inner body
+- `body` — inline payload (when available)
+- `path_arg` — literal file path (for `referenced`)
+- `resolvable` — whether the body can be obtained without executing the shell
+- `unresolvable_reason` — e.g. `"command-substitution"`, `"variable-expansion"`, `"glob-pattern"`
+- `depth` — 0 for the outermost command, 1 for one nested-interpreter layer, …
+
+When `config.detect_file_path` is on (default) one `edge:<kind>` signal is emitted per edge — cheap, no I/O.
+
+When `config.auto_resolve_local` is on **and** the caller passed a `ResolveSession`, the pipeline resolves each literal referenced path (respecting symlink rules, allow-roots, size caps), sniffs the on-disk language from extension → shebang → content, and runs the code inspector on the result.  Outcomes surface as `resolved:*` signals (`auto-read`, `truncated`, `binary`, `language-mismatch`, `outside-allow-roots`, `too-large`, `not-found`, …).
+
+### 5. Deterministic code analysis
+
+For every resolved node (and every inline body), the pipeline calls `inspect_code` and folds its `CodeReport` back into the parent `CommandReport`.  The analysers are:
 
 - Python via AST walk
-- shell via regex heuristics
-
-Code is available when:
-
-- the caller passes `file_content=...`, or
-- the command contains inline code such as `python -c "..."` or `bash -c "..."`.
-
-Important: `command_shield` itself is not session-aware. If a consumer wants analysis of a file written earlier in the session, it must resolve that file content and pass it in as `file_content`.
+- Shell via regex heuristics
 
 #### Python findings
 
@@ -198,107 +215,186 @@ Examples of shell findings:
 - `SHELL_LONG_PIPE_CHAIN`
 - `REFERENCES_INTENTFRAME`
 
-These findings are structured, severity-bearing facts. They still do not make policy decisions.
+These findings are structured, severity-bearing facts.  They still do not make policy decisions.
 
 ## Public API
 
-`command_shield` intentionally exposes a small surface:
+`command_shield` intentionally exposes a small surface.
 
-### `inspect_command(...) -> CommandReport`
+### Command inspection
 
-Synchronous, deterministic full inspection.
+#### `inspect_command(command, *, session=None, config=None) -> CommandReport`
 
-Uses steps 1-10 and 12. No LLM, no network, no policy decisions.
+Synchronous, deterministic full command inspection.  No LLM, no network, no policy decisions.  This is the primary entry point for runtime / policy / pre-execution callers.
 
-This is the primary entry point for runtime / policy / pre-execution callers.
+- `session` — pass a `ResolveSession(cwd=..., allow_roots=..., follow_symlinks=...)` when you want `auto_resolve_local` to read referenced files.  Omit it for pure in-memory inspection.
+- `config` — a `ShieldConfig`; defaults to `DEFAULT_CONFIG`.
 
-### `inspect_command_deep(...) -> CommandReport`
+#### `inspect_command_deep(command, *, session=None, config=None) -> CommandReport`  *(async)*
 
-Asynchronous deep inspection.
-
-Runs the same sync pipeline first, then conditionally runs the LLM reviewer when:
+Runs the sync pipeline, then conditionally fires the LLM reviewer over the first in-scope code body when:
 
 - LLM review is enabled,
-- the language is in scope,
-- code is available,
-- code size is within bounds,
+- language is in scope,
+- code body is present and within `max_code_length`,
 - and deterministic findings or non-trivial capabilities justify the extra step.
 
 If the LLM is unavailable or declined by the gate, the caller still gets the full deterministic report.
 
-### `quick_check(...) -> CommandReport`
+### Code inspection
 
-Fast executor-floor check.
+#### `inspect_code(code, *, language=None, source_path=None, config=None) -> CodeReport`
 
-This is a deliberately small subset of the full pipeline:
+Synchronous inspection of a raw code body.  Use this when you already have the content (a notebook cell, a file you read yourself, an LLM-generated script) and want structured findings without any shell parsing.
+
+Pipeline inside `inspect_code`:
+
+1. size gate (`CODE_TOO_LARGE`)
+2. binary guard (magic bytes / NUL density → `resolved:binary`)
+3. language selection: explicit > extension > shebang > content sniff
+4. scope check (`resolved:unsupported-language` when out of scope)
+5. deterministic analyser dispatch (Python AST / shell regex)
+
+Returns a `CodeReport` with `language`, `source_path`, `code_intel`, `signals`, `reviewer_*` fields, and `elapsed_ms`.
+
+#### `inspect_code_deep(code, *, ...) -> CodeReport`  *(async)*
+
+Same deterministic pipeline, then conditional LLM review gated by findings.
+
+### Executor floor
+
+#### `quick_check(command, *, config=None) -> CommandReport`
+
+Fast, last-resort check for an executor adapter right before subprocess launch.  A deliberately small subset of the full pipeline:
 
 - size check,
 - normalize,
 - pattern match,
 - inline interpreter indirection re-check.
 
-It returns only the catastrophic / safe floor needed by an executor adapter right before subprocess launch.
+Use this as a final floor, **not** as a replacement for full inspection.
 
-### Backward-compatible aliases
+### Utility
 
-- `analyze(...)` is a compatibility alias for `inspect_command(...)`
-- `review_command(...)` is a compatibility adapter that returns `CommandReview`
+#### `clean_env() -> dict[str, str]`
+
+Filtered `os.environ` safe to pass to subprocesses.
 
 ## Configuration
 
 `ShieldConfig` controls operational analysis bounds, not user policy:
 
 ```python
-from command_shield import ShieldConfig
+from command_shield import ShieldConfig, ResolveSession, inspect_command
 
 config = ShieldConfig(
     max_command_length=10_000,
     max_code_length=50_000,
     allowed_languages=frozenset({"python", "shell"}),
     enable_llm_review=True,
+    detect_file_path=True,
+    auto_resolve_local=False,
+    max_resolved_bytes=1_000_000,
+    resolve_max_depth=2,
+    sniff_language_from_content=True,
 )
+
+report = inspect_command("python /srv/jobs/clean.py", config=config)
 ```
 
 Meaning of each field:
 
-- `max_command_length`: oversized commands emit `COMMAND_TOO_LARGE` and skip deeper analysis.
-- `max_code_length`: oversized code emits `CODE_TOO_LARGE` and skips code analysis.
-- `allowed_languages`: only these languages get deep code analysis.
-- `enable_llm_review`: disables the deep reviewer even on the async path.
+- `max_command_length` — oversized commands emit `COMMAND_TOO_LARGE` and skip deeper analysis.
+- `max_code_length` — oversized code emits `CODE_TOO_LARGE` and skips code analysis.
+- `allowed_languages` — only these languages get deep code analysis.
+- `enable_llm_review` — disables the deep reviewer even on the async path.
+- `detect_file_path` — emit an `edge:*` signal per discovered containment edge.  Cheap, on by default; no I/O.
+- `auto_resolve_local` — read literal referenced scripts and run the code inspector on them.  Off by default: caller must also supply a `ResolveSession`.
+- `max_resolved_bytes` — hard cap per auto-resolved file.  Files larger than this emit `resolved:too-large` and are not read.
+- `resolve_max_depth` — maximum edge-walk depth (e.g. 1 = outermost command only; 2 allows `bash -c "python foo.py"` to also resolve `foo.py`).
+- `sniff_language_from_content` — fall back to content heuristics when extension/shebang are inconclusive.
 
 Again: this is **inspection scope**, not authorization policy.
 
+### `ResolveSession`
+
+When you want `auto_resolve_local` to actually read files, pass a session that declares the environment and the safety envelope:
+
+```python
+from command_shield import ResolveSession
+
+session = ResolveSession(
+    cwd="/srv/work",
+    allow_roots=("/srv/work",),      # only resolve inside these roots
+    follow_symlinks=False,
+)
+```
+
+The resolver enforces these constraints *before* reading anything.  Violations surface as `resolved:outside-allow-roots`, `resolved:symlink`, `resolved:not-found`, etc.
+
 ## Consumer Usage
 
-### 1. Runtime / policy caller
-
-If you are a policy layer, analysis engine, or runtime gateway, call the sync API and consume the returned facts:
+### 1. Runtime / policy caller (pure in-memory)
 
 ```python
 from command_shield import inspect_command
 
-report = inspect_command(command, file_content=file_content, file_path=file_path)
+report = inspect_command(command)
 
 if report.is_catastrophic:
-    # hard stop
-    ...
+    reject(report)
 
-# otherwise read facts
-capabilities = report.capabilities
-signals = report.signals
-code_findings = report.code_intel.findings if report.code_intel else ()
+capabilities   = report.capabilities
+signals        = report.signals
+findings       = report.code_intel.findings if report.code_intel else ()
+script_target  = report.script_path_candidate   # literal path, if any
 ```
 
-Typical consumer behavior:
+Typical consumer behaviour:
 
 - block immediately on `CATASTROPHIC`,
 - use `capabilities` for deterministic policy,
 - use `code_intel.findings` for deterministic policy or AI context,
 - use `signals` as the stable cross-cutting summary.
 
-### 2. Executor caller
+### 2. Runtime / policy caller (with auto-resolve)
 
-If you are about to spawn a subprocess and want a last-resort floor:
+When you trust a local filesystem root and want the shield to read referenced scripts for you:
+
+```python
+from command_shield import inspect_command, ShieldConfig, ResolveSession
+
+config = ShieldConfig(auto_resolve_local=True)
+session = ResolveSession(cwd="/srv/work", allow_roots=("/srv/work",))
+
+report = inspect_command("python jobs/clean.py", session=session, config=config)
+
+for node in report.resolved_nodes:
+    if node.code_report:
+        print(node.path, node.code_report.code_intel)
+```
+
+### 3. Direct code-string inspection
+
+No shell parsing, no I/O — just analyse a body you already have:
+
+```python
+from command_shield import inspect_code
+
+report = inspect_code(open("my_script.py").read(), language="python", source_path="my_script.py")
+
+if report.code_intel:
+    for finding in report.code_intel.findings:
+        print(finding.finding_id, finding.severity, finding.evidence)
+```
+
+This is the right entry point when:
+
+- you want to inspect an LLM-generated snippet,
+- you already read a file yourself and just want the findings,
+- you are processing notebook cells or templated scripts.
+
+### 4. Executor caller
 
 ```python
 from command_shield import quick_check
@@ -308,47 +404,31 @@ if report.is_catastrophic:
     raise RuntimeError("blocked catastrophic command")
 ```
 
-This should be used as a final floor, not as a replacement for full inspection.
+Final floor only — not a replacement for full inspection.
 
-### 3. Deep inspection caller
-
-If you explicitly want the optional reviewer path:
+### 5. Deep inspection caller
 
 ```python
 from command_shield import inspect_command_deep
 
-report = await inspect_command_deep(
-    command,
-    file_content=file_content,
-    file_path=file_path,
-)
-
+report = await inspect_command_deep(command)
 if report.reviewer_ran:
-    ...
+    use_reviewer_findings(report.reviewer_findings)
 ```
 
-This is useful for offline triage or explicit deep-review flows. Many consumers only need the sync path.
+Useful for offline triage or explicit deep-review flows.
 
-### 4. Policy examples
+### 6. Policy examples
 
-`command_shield` does not implement policy, but it is designed to make policy easy.
+`command_shield` does not implement policy, but is designed to make policy easy.
 
-Examples of deterministic policy questions consumers can ask:
-
-- Does this command install packages?
-  - match `capability:package_install:*`
-- Allow `pip` but deny `apt`?
-  - allow `capability:package_install:pip`
-  - deny `capability:package_install:apt`
-- Allow Python scripts but deny Node scripts?
-  - allow `capability:script_execution:python`
-  - deny `capability:script_execution:node`
-- Deny all listeners?
-  - deny `capability:network_bind`
-- Deny any code touching system paths?
-  - deny `FILE_SYSTEM_ESCAPE_OPEN`
-- Flag any code that references runtime internals?
-  - deny `REFERENCES_INTENTFRAME`
+- Does this command install packages? → match `capability:package_install:*`
+- Allow `pip` but deny `apt`? → allow `capability:package_install:pip`, deny `capability:package_install:apt`
+- Allow Python scripts but deny Node? → allow `capability:script_execution:python`, deny `capability:script_execution:node`
+- Deny all listeners? → deny `capability:network_bind`
+- Deny any code touching system paths? → deny `FILE_SYSTEM_ESCAPE_OPEN`
+- Flag any code that references runtime internals? → deny `REFERENCES_INTENTFRAME`
+- Deny commands that stream code into an interpreter? → deny `capability:stdin_exec` or `edge:piped_stdin`
 
 ## Design Principles
 
@@ -363,6 +443,7 @@ Known dangerous command structures should be classified without spending LLM tok
 - what is this command structurally,
 - what did it match,
 - what capabilities does it expose,
+- what code units does it reach,
 - what static-analysis findings exist.
 
 It does not answer:
@@ -386,13 +467,11 @@ Everything else is additive.
 
 ### Standalone module
 
-`command_shield` deliberately does not import:
+`command_shield` deliberately does not import `intentframe_components`, `policy_registry`, or `executor`.  It stays reusable as a pure inspection library.
 
-- `intentframe_components`
-- `policy_registry`
-- `executor`
+### Explicit opt-in for I/O
 
-That keeps it reusable as a pure inspection library.
+The shield does not touch the filesystem by default.  Reading a referenced script requires `auto_resolve_local=True` **and** a `ResolveSession` whose `allow_roots` the caller explicitly chose.  This keeps the module safe to call in any environment.
 
 ## What `command_shield` Does Not Do
 
@@ -402,17 +481,20 @@ That keeps it reusable as a pure inspection library.
 - It does not prove code is safe.
 - It does not replace downstream semantic analysis.
 - It does not mutate commands.
+- It does not resolve filesystem paths unless the caller explicitly opts in.
 
-It is a deterministic inspection module whose job is to turn a raw command string into structured facts.
+It is a deterministic inspection module whose job is to turn a raw command string (or a raw code body) into structured facts.
 
 ## Recommended Consumer Pattern
 
-For most consumers, the intended pattern is:
+For most consumers:
 
-1. call `inspect_command(...)`
-2. hard-block `CATASTROPHIC`
-3. consume `capabilities`, `signals`, and `code_intel`
-4. apply policy
-5. only call deeper AI reasoning when deterministic gates do not already decide the outcome
+1. call `inspect_command(...)` (add `session=` + `auto_resolve_local=True` only if you trust the local fs root),
+2. hard-block `CATASTROPHIC`,
+3. consume `capabilities`, `signals`, `resolved_nodes`, and `code_intel`,
+4. apply policy,
+5. only call deeper AI reasoning when deterministic gates do not already decide the outcome.
+
+When you already have the content and don't need shell parsing, call `inspect_code(...)` directly.
 
 That keeps mechanical inspection centralized in one place and reserves expensive semantic reasoning for the cases where it is actually needed.

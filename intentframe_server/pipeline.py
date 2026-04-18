@@ -6,7 +6,7 @@ and runs them through the security pipeline:
 
     command_shield → context enrichment → AnalysisEngine → Guardian → Executor → Result
 
-For RUN_COMMAND intents, command_shield.analyze() runs first:
+For RUN_COMMAND intents, command_shield.inspect_command() runs first:
 - CATASTROPHIC: reject immediately, never enters the pipeline.
 - NEEDS_REVIEW: structural signals are passed to the Analysis Engine
   so the AI has richer context.  Never fast-paths.
@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Optional
 
 from action_registry.types import ActionType
-from command_shield import Verdict, analyze as shield_analyze
+from command_shield import Verdict, inspect_command as shield_inspect
 from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
@@ -385,7 +385,7 @@ class IntentFrameRuntime:
         if intent.action.value == ActionType.RUN_COMMAND.value:
             command = intent.target or (intent.data or {}).get("command", "")
             if command:
-                report = shield_analyze(command)
+                report = shield_inspect(command)
 
                 if self.verbose:
                     print(f"    ┌──────────────────────────────────────────────────────────┐")
