@@ -11,12 +11,21 @@ Deterministic inspection for shell commands **and** raw code bodies.
 - which file paths or inline bodies it would actually execute, and
 - what static-analysis findings exist in any reachable code.
 
+It is designed for **focused inspection**, not whole-repository understanding:
+
+- inspect a raw terminal command before execution,
+- inspect inline interpreter payloads like `python -c ...`,
+- inspect a literal referenced local script when the caller explicitly opts into safe file resolution,
+- inspect a raw code blob you already have in memory via `inspect_code(...)`.
+
 It is intentionally a **fact producer**, not a policy engine:
 
 - `command_shield` decides only the 3-way verdict (`CATASTROPHIC`, `NEEDS_REVIEW`, `SAFE`) from fixed-system checks.
 - It does **not** allow or deny commands based on user policy.
 - It does **not** know about Guardian, AE, runtime context, session state, or root.
 - Consumers decide what to do with the emitted facts.
+
+That means `command_shield` is useful for investigating **a command, a resolved script, or an already-loaded code body**.  It is not a repo crawler, dependency graph engine, or semantic codebase explorer.
 
 ## Why It Exists
 
@@ -430,6 +439,24 @@ Useful for offline triage or explicit deep-review flows.
 - Flag any code that references runtime internals? → deny `REFERENCES_INTENTFRAME`
 - Deny commands that stream code into an interpreter? → deny `capability:stdin_exec` or `edge:piped_stdin`
 
+### 7. Investigation examples
+
+`command_shield` is often enough when the question is narrow and mechanical:
+
+- "What would this terminal command execute?"
+- "Does this command reference a local script or inline code?"
+- "If I allow local resolution, what findings exist in that Python or shell script?"
+- "I already read this notebook cell / generated script; what deterministic findings does it contain?"
+
+It is **not** the right tool when the question is broader:
+
+- "How does this repository work overall?"
+- "Where is this symbol used across the codebase?"
+- "What data flow reaches this function across multiple files?"
+- "Is this application behavior safe in context of business logic and user intent?"
+
+For those questions, use repo search, semantic navigation, or a higher-level analysis layer on top of the facts `command_shield` emits.
+
 ## Design Principles
 
 ### Deterministic first
@@ -480,6 +507,8 @@ The shield does not touch the filesystem by default.  Reading a referenced scrip
 - It does not track session write history on its own.
 - It does not prove code is safe.
 - It does not replace downstream semantic analysis.
+- It does not crawl or index an entire repository.
+- It does not build cross-file call graphs or usage graphs.
 - It does not mutate commands.
 - It does not resolve filesystem paths unless the caller explicitly opts in.
 

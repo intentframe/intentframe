@@ -15,6 +15,19 @@ Module-local tests for the `command_shield` package — no pipeline, no mocks, n
 Covers patterns, normalization, AST decomposition, language sniffing, edge extraction,
 file resolution, code inspection, and full `inspect_command` pipeline integration.
 
+These tests are not limited to toy strings.  They include realistic command families such as:
+
+- destructive shell commands (`sudo rm -rf /`, `mkfs`, `dd`, `wipefs`),
+- macOS admin / persistence commands (`diskutil`, `security`, `launchctl`, `tmutil`, `csrutil`),
+- exfiltration and download-and-exec patterns (`curl ... | bash`, reverse shells, credential reads),
+- git footguns (`git reset --hard`, `git clean -fd`, force-push),
+- benign day-to-day commands (`git status`, `git diff`, `npm install`, `pip install`).
+
+Path-bearing behavior is also covered: relative paths, absolute paths, home-directory paths,
+literal referenced scripts, `source .env`, allow-roots enforcement, symlink handling, and
+dynamic path forms like `$SCRIPT`, `$(gen)`, and globs.  What the tests do **not** try to prove
+is broad codebase understanding; they validate command inspection and focused code/script analysis.
+
 | File | What It Covers |
 |---|---|
 | `test_patterns.py` | Catastrophic, macOS, persistence, exfiltration, credential, git, shell wrapper patterns; safe commands; pattern data integrity; direct `match_patterns` calls |
