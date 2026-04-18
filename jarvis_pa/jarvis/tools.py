@@ -218,6 +218,95 @@ class _SystemAction(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Result rendering
+# ---------------------------------------------------------------------------
+#
+# The LLM must see the same structured shape on both success and failure;
+# otherwise it loses useful context (e.g. a `find` with rc=1 still has
+# thousands of lines of real answers in stdout). We forward the full data
+# dict in both cases but cap the known-big string fields so a multi-MB
+# blob from a noisy command can't torch the context window.
+#
+# Caps are per-field (not a single JSON cap) so the payload stays valid
+# JSON and small keys like return_code / command always make it through.
+# Truncation keeps head + tail: listings keep their first entries and
+# compile logs keep the real error line at the bottom.
+
+MAX_STDOUT_CHARS = 8192    # ~2k tokens — fine for listings, diffs, logs
+MAX_STDERR_CHARS = 2048    # errors are almost always short
+MAX_CONTENT_CHARS = 8192   # read_file already paginates; this is a backstop
+MAX_ERROR_CHARS = 2048     # for result.error when distinct from stderr
+
+_TRUNCATE_LIMITS: dict[str, int] = {
+    "stdout": MAX_STDOUT_CHARS,
+    "stderr": MAX_STDERR_CHARS,
+    "content": MAX_CONTENT_CHARS,
+}
+
+
+def _truncate(text: str, limit: int) -> tuple[str, bool]:
+    """Return ``(maybe_shortened, was_truncated)`` using a head+tail window.
+
+    Preserves the first and last portions of the text so both the start
+    of a listing and the trailing error/summary line survive. The marker
+    in the middle tells the LLM the gap is a truncation, not real data.
+    """
+    if len(text) <= limit:
+        return text, False
+    head = limit // 2
+    tail = limit - head
+    dropped = len(text) - limit
+    return f"{text[:head]}\n…[{dropped} chars truncated]…\n{text[-tail:]}", True
+
+
+def _render_result(result: Any) -> str:
+    """Serialise an ExecutionResult for the LLM.
+
+    Success and failure produce the same shape — a JSON object with
+    ``success`` plus the adapter's ``data`` fields (truncated where
+    relevant). On failure, ``error`` is added only when it carries
+    information beyond what ``stderr`` already contains, avoiding the
+    duplicate text that ``f"Error: {stderr}"`` used to emit.
+
+    Falls back to plain strings when ``data`` is not a dict (rare:
+    some adapters return a scalar or None).
+    """
+    if not isinstance(result.data, dict):
+        if result.success:
+            return str(result.data) if result.data is not None else "OK"
+        return f"Error: {result.error or 'unknown error'}"
+
+    rendered: dict[str, Any] = {"success": result.success}
+    for key, value in result.data.items():
+        limit = _TRUNCATE_LIMITS.get(key)
+        if limit is not None and isinstance(value, str):
+            shortened, was_truncated = _truncate(value, limit)
+            rendered[key] = shortened
+            if was_truncated:
+                rendered[f"{key}_truncated"] = True
+                rendered[f"{key}_total_chars"] = len(value)
+        else:
+            rendered[key] = value
+
+    if not result.success and result.error:
+        # For terminal failures result.error is literally stderr — don't
+        # double-send it. For other adapters (email, calendar, etc.) it's
+        # distinct information and must be surfaced.
+        #
+        # Compare against the ORIGINAL stderr, not the truncated form;
+        # otherwise a large stderr (cap-triggered) would never match
+        # result.error and we'd emit both fields with the same text.
+        original_stderr = result.data.get("stderr")
+        if original_stderr != result.error:
+            err_short, err_truncated = _truncate(result.error, MAX_ERROR_CHARS)
+            rendered["error"] = err_short
+            if err_truncated:
+                rendered["error_truncated"] = True
+
+    return json.dumps(rendered, default=str)
+
+
+# ---------------------------------------------------------------------------
 # Shared submit helper
 # ---------------------------------------------------------------------------
 
@@ -236,11 +325,7 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
     logger.debug(f"actor.submit: {action_type} — {str(subject)[:60]}")
     try:
         result = await ctx.context.actor.submit(payload)
-        if result.success:
-            if isinstance(result.data, dict):
-                return json.dumps(result.data, default=str)
-            return str(result.data)
-        return f"Error: {result.error}"
+        return _render_result(result)
     except Exception as exc:
         logger.warning(f"actor.submit failed for {action_type}: {exc}")
         return f"Error: {exc}"
