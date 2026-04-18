@@ -14,7 +14,8 @@
 - `report.code_intel` — deterministic AST / shell-regex findings (dangerous imports, eval calls, etc.)
 
 **Update (read-only fast-path tags — v2):** the classifier now emits a
-`capability:read_only:*` family covering ten sub-tags:
+`capability:read_only:*` family covering ten single-head sub-tags
+plus one aggregate `composition` sub-tag:
 
 - `filesystem_list` — `ls` / `tree` / `stat` / `file` / `du` / `df` /
   `lsattr` / `getfacl` / `namei` / `pathchk` / `findmnt` /
@@ -55,17 +56,42 @@
   `kubectl` (`get` / `describe` / `logs` / `top` / `version` /
   `api-resources` / `explain` / `config view` / `cluster-info` /
   `auth can-i`)
+- `composition` — aggregate tag emitted when the command is a
+  multi-segment composition joined only by `|` / `||` / `&&` / `;` /
+  `|&`, every segment is independently either a safe literal `cd` or
+  a read-only head from the sub-tags above, no segment emits an
+  incompatible capability (write, stdin-exec, spawns-process,
+  download-and-exec, network-bind, background-exec, package-install,
+  script-execution), and no dynamic content / interpreter indirection
+  is present.  Covers real-world LLM patterns like `ls -la | head`,
+  `cd /tmp && ls`, `ps aux | grep nginx`, `git log --oneline | head`,
+  `cat file | wc -l`.  Specific-family sub-tags are NOT emitted for
+  compositions — the aggregate tag is load-bearing.
 
 It also emits `capability:filesystem_write` for shell-redirect / `tee`
-writes.  Read-only tags only fire when the command is a structurally
-bare single-head invocation — see `command_shield/README.md` for the
-full gate.  These are the signals Gap 4's ALLOW short-circuit should
-key off for `RUN_COMMAND` traffic.
+writes.  Single-head read-only tags fire only for a structurally bare
+single-head invocation; the `composition` sub-tag fires only under the
+strict per-segment gate above — see `command_shield/README.md` for the
+full rules.  Both shapes additionally apply **trusted-path head
+normalisation** before the regex match: an absolute path whose parent
+is in `{/bin, /usr/bin, /sbin, /usr/sbin, /usr/local/bin,
+/usr/local/sbin, /opt/homebrew/{bin,sbin}, /opt/local/{bin,sbin}}` is
+rewritten to its basename (`/bin/ls -la` is matched as `ls -la`,
+`/opt/homebrew/bin/rg foo src/` as `rg foo src/`, etc.).  Paths
+outside the allow-list (`/tmp/ls`, `./ls`, `~/bin/ls`) stay strict to
+avoid spoofing.  These are the signals Gap 4's ALLOW short-circuit
+should key off for `RUN_COMMAND` traffic.
 
 **Consumer matching rule:** any tag starting with
 `capability:read_only:` qualifies for the fast-path — the consumer
 does NOT need to enumerate individual sub-tags, so adding new
 sub-tags in `command_shield` later is transparent to the consumer.
+In particular the new `capability:read_only:composition` tag and the
+trusted-path head normalisation are picked up automatically by any
+consumer that uses the prefix-match rule: the deterministic Guardian
+on `intentframe_components/guardian/deterministic.py` already does,
+so pipelines like `ls -la | head` and `cd /tmp && ls` now land on the
+RUN_COMMAND fast-path with no consumer-side code changes.
 
 **Update (network-probe family):** the classifier also emits a
 sibling positive-fact family `capability:network_probe:*` with nine
@@ -289,6 +315,8 @@ def _is_read_only_fast_path(report, deny_caps):
 | Traffic class | Today | After |
 |---|---|---|
 | Passive reads (ls, pwd, cat, git status, …) | AE called (fast-path internal) | No AE, no Guardian AI (keyed on `capability:read_only:*`) |
+| Passive reads via absolute path (`/bin/ls -la`, `/usr/bin/cat file`, `/opt/homebrew/bin/rg …`) | AE called | No AE, no Guardian AI — trusted-path head normalisation lands them on the same fast-path |
+| Passive read compositions (`ls -la \| head`, `cd /tmp && ls`, `ps aux \| grep nginx`, `git log \| head -50`) | AE called | No AE, no Guardian AI — `capability:read_only:composition` lands on the same fast-path via prefix match |
 | Package installs (pip install, npm install) if policy allows | AE called | No AE, no Guardian AI |
 | Network bind / background exec if policy denies | AE called, then Guardian blocks | Blocked in deterministic pass, no AE |
 | Any write redirect (`cmd > file`, `cmd \| tee`) | AE called | AE called (read-only fast-path refuses to fire because `capability:filesystem_write` is present) |
@@ -307,6 +335,7 @@ Rough aggregate: **70–85% of total intent traffic** avoids an AE LLM call. For
 |---|---|---|
 | 0 | **(Done)** Add `capability:read_only:*` + `capability:filesystem_write` tags to `command_shield.classifier` | — |
 | 0.5 | **(Done)** Add `capability:network_probe:*` family to `command_shield.classifier` (9 sub-tags, same structural gate as read_only) | — |
+| 0.6 | **(Done)** Add `capability:read_only:composition` + trusted-path head normalisation to `command_shield.classifier` (covers pipe / `cd &&` / chain / mixed-joiner compositions and absolute paths from trusted `bin` directories — transparent to consumers via prefix match) | — |
 | 1 | Always forward `report.signals` to AE (Gap 1) | Low — AE already handles extra signals gracefully |
 | 2 | Add `allow_capabilities`/`deny_capabilities` to `TerminalConstraints` (Gap 2) | Low — additive fields, existing policy unaffected |
 | 3 | Extend `TerminalChecker` to evaluate capabilities (Gap 3) | Low — pure addition to checker logic |

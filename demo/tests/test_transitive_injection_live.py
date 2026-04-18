@@ -360,7 +360,7 @@ def test_ae_output_anomaly_forces_ai_path_without_hard_block():
     )
     check(
         "Negative control: result is fast-path ALLOW",
-        control_result.decision == Decision.ALLOW and "fast-path" in control_result.message.lower(),
+        control_result.decision == Decision.ALLOW and control_result.decision_path == "fast_path",
         f"got {control_result.decision.value}: {control_result.message[:60]}",
     )
 

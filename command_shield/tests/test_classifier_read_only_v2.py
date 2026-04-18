@@ -601,26 +601,50 @@ class TestContainerInspect:
 
 
 class TestGateHoldsOnNewFamilies:
-    """Every new family must still fail the gate under composition."""
+    """Gate robustness across the v2 families.
+
+    Pure-read-only compositions now emit the aggregate
+    ``capability:read_only:composition`` tag, but the family-specific
+    sub-tags (``text_transform``, ``archive_inspect``, …) stay a
+    single-head-only contract.  Compositions containing a write
+    redirect or other incompatible segment must still emit no
+    ``read_only:*`` tag at all.
+    """
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "tar -tf archive.tar > listing.txt",
+            "kubectl get pods > pods.yaml",
+        ],
+    )
+    def test_redirect_in_composition_blocks_read_only(self, cmd: str) -> None:
+        r = inspect_command(cmd)
+        assert not any(
+            c.startswith("capability:read_only:") for c in r.capabilities
+        ), f"{cmd!r} should not emit read_only; got {r.capabilities}"
 
     @pytest.mark.parametrize(
         "cmd",
         [
             "sort file.txt | uniq -c",
             "docker ps | grep alpine",
-            "tar -tf archive.tar > listing.txt",
             "zcat file.gz | head",
             "netstat -tulpn; echo done",
-            "kubectl get pods > pods.yaml",
             "jq .foo a.json && jq .bar b.json",
             "diff a b | less",
         ],
     )
-    def test_composition_blocks_read_only(self, cmd: str) -> None:
+    def test_pure_read_only_composition_emits_only_composition_tag(
+        self, cmd: str
+    ) -> None:
         r = inspect_command(cmd)
-        assert not any(
-            c.startswith("capability:read_only:") for c in r.capabilities
-        ), f"{cmd!r} should not emit read_only; got {r.capabilities}"
+        read_only_caps = [
+            c for c in r.capabilities if c.startswith("capability:read_only:")
+        ]
+        assert read_only_caps == ["capability:read_only:composition"], (
+            f"{cmd!r} expected only composition tag; got {read_only_caps}"
+        )
 
     def test_verdict_stays_safe_for_all_new_families(self) -> None:
         for cmd in [

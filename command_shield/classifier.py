@@ -92,15 +92,39 @@ the capability tag.  Multiple capabilities per command are expected;
 they are not mutually exclusive.  Policy can match exact tags or use
 prefix matching on the `:` boundary (e.g. `capability:package_install:*`).
 
-`capability:read_only:*` is a positive fact family: it fires only when
-the command is structurally a bare single-head invocation (bashlex
-reports exactly one sub-command, no interpreter indirection, and no
-shell composition / redirect tokens).  Consumers — notably the
-intentframe-side deterministic Guardian — use the combination
-``verdict == SAFE`` + at least one ``capability:read_only:*`` + no
-deny-listed capabilities + no edge/code-intel signals as a fast-path
-ALLOW rule that skips the AE LLM call.  The tag still does not change
-the verdict — that stability guarantee is preserved.
+`capability:read_only:*` is a positive fact family. It fires on two
+shapes:
+
+1. **Single-head** — the command is structurally a bare single-head
+   invocation (bashlex reports exactly one sub-command, no interpreter
+   indirection, no shell composition / redirect tokens).  The specific
+   sub-tag corresponding to the head's family is emitted
+   (``filesystem_list``, ``filesystem_read``, ``search``, …).  The
+   head may be either a bare name (``ls``) or an absolute path under a
+   trusted system bin directory (``/bin/ls``, ``/usr/bin/cat``,
+   ``/opt/homebrew/bin/rg``) — see ``_TRUSTED_BIN_DIRS``.  Path-prefixed
+   heads under user-writable directories (``/tmp/ls``, ``./ls``,
+   ``~/bin/ls``) stay rejected; spoofing is credible there.
+
+2. **Composition** — the command is a multi-segment composition joined
+   by ``|``, ``||``, ``&&``, ``;``, or ``|&`` where every segment is
+   independently either a read-only head (same rule set as single-head)
+   or a safe ``cd <literal>``, no redirect tokens are present, no
+   incompatible capability was emitted anywhere in the command, and no
+   dynamic-content structural signal fired.  A single aggregate tag
+   ``capability:read_only:composition`` is emitted — specific family
+   sub-tags are *not* emitted for pipelines, since the composition's
+   effect is the pipe-joined whole, not any one segment.
+
+Consumers — notably the intentframe-side deterministic Guardian — use
+the combination ``verdict == SAFE`` + at least one
+``capability:read_only:*`` + no deny-listed capabilities + no
+edge/code-intel signals as a fast-path ALLOW rule that skips the AE
+LLM call.  Because all sub-tags share the ``capability:read_only:``
+prefix, a consumer that prefix-matches the family picks up
+``composition`` automatically; a consumer that wants stricter control
+can list the accepted sub-tags explicitly.  The tag still does not
+change the verdict — that stability guarantee is preserved.
 
 `capability:network_probe:*` is ALSO a positive fact family that fires
 only under the same structural-bareness predicate, but unlike
@@ -953,6 +977,20 @@ _SHELL_COMPOSITION_TOKENS: frozenset[str] = frozenset({
 })
 
 
+# Composition tokens that a read-only multi-segment invocation may
+# use as joiners.  Everything in `_SHELL_COMPOSITION_TOKENS` outside
+# this set is a redirect or a state-changing token (background `&`,
+# case fallthrough `;;`) that disqualifies a composition from being
+# tagged read-only.
+_READ_ONLY_COMPOSITION_JOINERS: frozenset[str] = frozenset({
+    "|", "||", "&&", ";", "|&",
+})
+
+_READ_ONLY_DISQUALIFYING_TOKENS: frozenset[str] = (
+    _SHELL_COMPOSITION_TOKENS - _READ_ONLY_COMPOSITION_JOINERS
+)
+
+
 # Structural signal IDs that indicate dynamic content — any of these
 # disqualifies the command from a read-only fast-path because the
 # actual execution shape cannot be decided statically.
@@ -965,6 +1003,157 @@ _DYNAMIC_STRUCTURAL_IDS: frozenset[str] = frozenset({
     "parse-failure",
     "shlex-failure",
 })
+
+
+# Capabilities that are incompatible with any read-only tagging.
+# Shared between the single-head gate (`_safe_for_read_only`) and the
+# composition gate (`_composition_is_all_read_only`) so both families
+# reject the same set of side-effect signals.
+_READ_ONLY_INCOMPATIBLE_CAPS: frozenset[str] = frozenset({
+    CAPABILITY_STDIN_EXEC,
+    CAPABILITY_FILESYSTEM_WRITE,
+    CAPABILITY_SPAWNS_PROCESS,
+    CAPABILITY_NETWORK_BIND,
+    CAPABILITY_BACKGROUND_EXEC,
+    CAPABILITY_DOWNLOAD_AND_EXEC,
+    CAPABILITY_BINARY_DOWNLOAD,
+    CAPABILITY_PROCESS_SIGNAL,
+    CAPABILITY_COMPILATION,
+})
+
+
+# Trusted absolute-path bin directories.  Heads matching
+# ``<trusted>/<name>`` are rewritten to just ``<name>`` for rule
+# matching, on the premise that these directories are system-owned
+# and not user-writable without root on a correctly-configured host,
+# so path-prefix spoofing is not a credible threat.  Any other
+# absolute or relative path prefix keeps the current strict behaviour.
+_TRUSTED_BIN_DIRS: frozenset[str] = frozenset({
+    "/bin", "/usr/bin", "/sbin", "/usr/sbin",
+    "/usr/local/bin", "/usr/local/sbin",
+    "/opt/homebrew/bin", "/opt/homebrew/sbin",
+    "/opt/local/bin", "/opt/local/sbin",
+})
+
+
+# Characters that, if present in a ``cd`` argument, indicate shell
+# expansion or composition the classifier cannot statically reason
+# about.  A ``cd`` arg containing any of these is NOT treated as a
+# safe read-only prefix.  ``~`` is intentionally NOT included —
+# tilde expansion is deterministic and resolves to the user's home
+# directory with no side effects.
+_CD_UNSAFE_METACHARS: frozenset[str] = frozenset("$`*?[](){}<>|&;\n\r\"'\\")
+
+
+# Heads that safely consume from stdin in a pipeline and are therefore
+# accepted as read-only pipe-consumer segments even without a
+# positional file argument.  The main ``_READ_ONLY_RULES`` regexes for
+# ``filesystem_read`` / ``search`` / streaming ``archive_inspect``
+# require ``\s+<positional>`` because bare single-head invocations of
+# these tools would wait on an interactive TTY — an unusual shape the
+# classifier intentionally doesn't bless outside a pipeline.  Inside a
+# composition, though, ``… | head``, ``… | wc``, ``cat`` reading from
+# a heredoc, etc. are the overwhelmingly common pattern.
+#
+# Verb-discriminated heads (``git``, ``hg``, ``svn``, ``docker``,
+# ``kubectl``, ``tar``, ``unzip``, ``arp``, ``route``, ``ip``,
+# ``ifconfig``, ``sort`` with ``-o``, ``xmllint`` with ``--output``,
+# ``sysctl`` with ``-w``, etc.) are deliberately NOT in this set —
+# their safety depends on arguments the main regex checks.
+_PIPE_CONSUMER_HEADS: frozenset[str] = frozenset({
+    "cat", "head", "tail", "less", "more", "wc",
+    "hexdump", "xxd", "od", "nl", "tac", "rev",
+    "md5sum", "sha1sum", "sha224sum", "sha256sum", "sha384sum",
+    "sha512sum", "b2sum", "shasum", "cksum", "sum",
+    "grep", "egrep", "fgrep", "rg", "ack",
+    "zcat", "bzcat", "xzcat", "zstdcat", "lz4cat",
+})
+
+_FLAG_TOKEN_RE: re.Pattern[str] = re.compile(
+    r"\A(?:-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?|-\d+)\Z"
+)
+
+
+def _normalize_trusted_head(command: str) -> str:
+    """Return *command* with its head token replaced by basename iff
+    the head is an absolute path under ``_TRUSTED_BIN_DIRS``.
+
+    The input is assumed to be the already-shlex-normalised command
+    string produced by :func:`command_shield.structural.normalize`
+    (quotes already stripped, whitespace collapsed).  That means the
+    first whitespace-delimited field is the head token verbatim.
+
+    Returns the original command unchanged when:
+      * the command is empty,
+      * the head is not an absolute path,
+      * the head's parent directory is not trusted,
+      * the head's basename is empty.
+    """
+    parts = command.split(None, 1)
+    if not parts:
+        return command
+    head = parts[0]
+    if not head.startswith("/"):
+        return command
+    parent, slash, base = head.rpartition("/")
+    if not slash or not base or parent not in _TRUSTED_BIN_DIRS:
+        return command
+    if len(parts) == 1:
+        return base
+    return f"{base} {parts[1]}"
+
+
+def _is_safe_cd(sub_command: str) -> bool:
+    """True iff *sub_command* is a read-only-equivalent ``cd`` form:
+    ``cd``, ``cd -``, or ``cd <arg>`` where ``<arg>`` is a single
+    literal with no shell metacharacters.
+
+    A safe ``cd`` changes the working directory deterministically
+    without touching disk, spawning processes, or emitting network
+    traffic.  It is accepted as a segment inside a read-only
+    composition even though ``cd`` itself is not in the
+    ``_READ_ONLY_RULES`` (which target observable read operations).
+    """
+    try:
+        toks = shlex.split(sub_command)
+    except ValueError:
+        return False
+    if not toks or toks[0] != "cd":
+        return False
+    if len(toks) == 1:
+        return True
+    if len(toks) != 2:
+        return False
+    return not any(c in _CD_UNSAFE_METACHARS for c in toks[1])
+
+
+def _sub_command_matches_read_only(sub_command: str) -> bool:
+    """True iff *sub_command*, after trusted-path head normalisation,
+    is a read-only invocation.
+
+    Primary check: match any regex in ``_READ_ONLY_RULES``.
+
+    Fallback: pipe-consumer head from ``_PIPE_CONSUMER_HEADS`` with
+    no positional argument (only flag-shaped tokens).  The main
+    ``filesystem_read`` / ``search`` regexes require ≥1 positional
+    so bare ``head``, ``wc``, ``grep`` etc. never match as
+    single-head invocations — but in a pipeline those same heads are
+    the canonical stdin consumers.  The fallback accepts that narrow
+    shape and nothing else.
+
+    Used by the composition gate to check per-segment read-only-ness
+    without duplicating the rule list.  The sub-command is assumed
+    to be the whitespace-joined word form produced by the structural
+    visitor (no quoting to strip).
+    """
+    normalized = _normalize_trusted_head(sub_command)
+    for rx, _suffix in _READ_ONLY_RULES:
+        if rx.match(normalized) is not None:
+            return True
+    parts = normalized.split()
+    if not parts or parts[0] not in _PIPE_CONSUMER_HEADS:
+        return False
+    return all(_FLAG_TOKEN_RE.match(t) is not None for t in parts[1:])
 
 
 def classify_capabilities(
@@ -1018,8 +1207,9 @@ def classify_capabilities(
         structural_signals=structural_signals,
         emitted=seen,
     ):
+        head_normalized = _normalize_trusted_head(command)
         for rx, suffix in _READ_ONLY_RULES:
-            m = rx.match(command)
+            m = rx.match(head_normalized)
             if m is None:
                 continue
             cap_id = f"{CAPABILITY_READ_ONLY}:{suffix}"
@@ -1032,8 +1222,27 @@ def classify_capabilities(
                     f"Command is a bare read-only {suffix.replace('_', ' ')} "
                     f"invocation (no composition / redirect / indirection)"
                 ),
-                evidence=m.group()[:120],
+                evidence=command[:120],
             )
+    elif _composition_is_all_read_only(
+        command,
+        sub_commands=sub_commands,
+        indirections=indirections,
+        structural_signals=structural_signals,
+        emitted=seen,
+    ):
+        cap_id = f"{CAPABILITY_READ_ONLY}:composition"
+        seen[cap_id] = Signal(
+            check="capability",
+            signal_id=cap_id,
+            description=(
+                "Command is a read-only composition: every sub-command is "
+                "an individually bare read-only invocation (or a safe "
+                "literal `cd`), joined by pipe / && / || / ; only, with "
+                "no redirects, indirection, or dynamic content"
+            ),
+            evidence=command[:120],
+        )
 
     if _safe_for_network_probe(
         command,
@@ -1041,6 +1250,7 @@ def classify_capabilities(
         indirections=indirections,
         structural_signals=structural_signals,
     ):
+        head_normalized = _normalize_trusted_head(command)
         # Walk rules in declaration order and emit only the FIRST
         # matching sub-tag for each of the three HTTP-family slots.
         # Outside the HTTP family every rule can fire independently
@@ -1051,7 +1261,7 @@ def classify_capabilities(
             is_http = suffix in {"http_get", "http_mutate", "http_download"}
             if is_http and http_family_tagged:
                 continue
-            m = rx.match(command)
+            m = rx.match(head_normalized)
             if m is None:
                 continue
             cap_id = f"{CAPABILITY_NETWORK_PROBE}:{suffix}"
@@ -1066,7 +1276,7 @@ def classify_capabilities(
                     f"Command emits outbound network traffic "
                     f"({suffix.replace('_', ' ')})"
                 ),
-                evidence=m.group()[:120],
+                evidence=command[:120],
             )
             if is_http:
                 http_family_tagged = True
@@ -1147,25 +1357,85 @@ def _safe_for_read_only(
         return False
 
     for cap_id in emitted:
-        # Any refined script_execution / package_install / read-only-
-        # incompatible tag means this command is doing more than
-        # passive inspection.
-        if cap_id in {
-            CAPABILITY_STDIN_EXEC,
-            CAPABILITY_FILESYSTEM_WRITE,
-            CAPABILITY_SPAWNS_PROCESS,
-            CAPABILITY_NETWORK_BIND,
-            CAPABILITY_BACKGROUND_EXEC,
-            CAPABILITY_DOWNLOAD_AND_EXEC,
-            CAPABILITY_BINARY_DOWNLOAD,
-            CAPABILITY_PROCESS_SIGNAL,
-            CAPABILITY_COMPILATION,
-        }:
+        if cap_id in _READ_ONLY_INCOMPATIBLE_CAPS:
             return False
         if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
             return False
+
+    return True
+
+
+def _composition_is_all_read_only(
+    command: str,
+    *,
+    sub_commands: tuple[str, ...],
+    indirections: tuple[str, ...],
+    structural_signals: tuple[Signal, ...],
+    emitted: dict[str, Signal],
+) -> bool:
+    """Return True iff *command* is a multi-segment composition
+    whose every sub-command is independently a read-only invocation.
+
+    Invariants — a composition qualifies only if all hold:
+
+    1. No interpreter indirection payloads.
+    2. At least two structural sub-commands (single-head case is
+       already handled by ``_safe_for_read_only``).
+    3. No dynamic-content structural signal (command-substitution,
+       process-substitution, variable-expansion, parse/shlex failure,
+       interpreter indirection).
+    4. No already-emitted capability in the read-only-incompatible
+       set or the refined package_install / script_execution
+       families.  This is the single broadest safety gate: any
+       sub-segment that emits ``filesystem_write`` (redirects,
+       ``tee``), ``spawns_process`` (``xargs``, ``sudo``, ``ssh``,
+       ``docker run``, …), ``stdin_exec`` (``| sh``, ``| python -``),
+       ``download_and_exec`` (``curl … | sh``), ``background_exec``
+       (trailing ``&``), ``network_bind``, etc. disqualifies the
+       whole composition automatically.
+    5. Every bare shell token in the re-tokenised command that lies
+       in ``_SHELL_COMPOSITION_TOKENS`` must also lie in
+       ``_READ_ONLY_COMPOSITION_JOINERS`` — i.e. only ``|``, ``||``,
+       ``&&``, ``;``, ``|&`` are allowed as joiners; redirects and
+       ``;;`` / standalone ``&`` are rejected at this layer even
+       though they would also be caught by the capability check.
+    6. Every structural sub-command is either a safe ``cd <literal>``
+       or a head that matches ``_READ_ONLY_RULES`` (with trusted-path
+       head-basename normalisation applied).
+    """
+    if indirections:
+        return False
+    if len(sub_commands) < 2:
+        return False
+
+    for sig in structural_signals:
+        if sig.signal_id in _DYNAMIC_STRUCTURAL_IDS:
+            return False
+
+    for cap_id in emitted:
+        if cap_id in _READ_ONLY_INCOMPATIBLE_CAPS:
+            return False
+        if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
+            return False
+
+    try:
+        toks = shlex.split(command)
+    except ValueError:
+        return False
+    for tok in toks:
+        if tok in _READ_ONLY_DISQUALIFYING_TOKENS:
+            return False
+
+    for sub in sub_commands:
+        if _is_safe_cd(sub):
+            continue
+        if _sub_command_matches_read_only(sub):
+            continue
+        return False
 
     return True
 

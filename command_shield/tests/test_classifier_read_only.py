@@ -203,15 +203,18 @@ class TestReadOnlyGit:
 
 
 class TestReadOnlyGate:
-    """The structural gate must reject anything that isn't a bare head."""
+    """The structural gate must reject anything whose composition
+    is not wholly read-only, and must NOT emit the specific-family
+    sub-tags (filesystem_list / filesystem_read / search / …) for
+    any composition — those tags are reserved for bare single-head
+    invocations.  Pure-read-only compositions emit the dedicated
+    ``capability:read_only:composition`` aggregate tag instead; that
+    contract is covered in ``test_classifier_read_only_composition``.
+    """
 
     @pytest.mark.parametrize(
         "cmd",
         [
-            "ls | wc -l",
-            "ls; echo done",
-            "ls && echo done",
-            "ls || echo missing",
             "ls & disown",
             "cat foo.py | python -",
             "cat foo.py > /tmp/dest",
@@ -219,7 +222,6 @@ class TestReadOnlyGate:
             "cat foo.py 2> /tmp/err",
             "ls > /tmp/out",
             "grep foo file | tee out",
-            "ps aux | grep python",
             "echo $(whoami)",
             "echo `whoami`",
             "cat $FILE",
@@ -228,11 +230,36 @@ class TestReadOnlyGate:
             "python -c 'print(1)'",
         ],
     )
-    def test_composition_blocks_read_only(self, cmd: str) -> None:
+    def test_dangerous_composition_blocks_read_only(self, cmd: str) -> None:
         r = inspect_command(cmd)
         assert not any(
             c.startswith("capability:read_only:") for c in r.capabilities
         ), f"{cmd!r} should not emit read_only; got {r.capabilities}"
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "ls | wc -l",
+            "ls; echo done",
+            "ls && echo done",
+            "ls || echo missing",
+            "ps aux | grep python",
+        ],
+    )
+    def test_pure_read_only_composition_emits_only_composition_tag(
+        self, cmd: str
+    ) -> None:
+        # These compositions ARE read-only as a whole, so they get the
+        # aggregate ``capability:read_only:composition`` tag — but they
+        # must NOT receive any specific-family sub-tag, because the
+        # family sub-tags are a single-head-only contract.
+        r = inspect_command(cmd)
+        read_only_caps = [
+            c for c in r.capabilities if c.startswith("capability:read_only:")
+        ]
+        assert read_only_caps == ["capability:read_only:composition"], (
+            f"{cmd!r} expected only composition tag; got {read_only_caps}"
+        )
 
     def test_quoted_pipe_in_grep_does_not_block(self) -> None:
         # `grep "foo|bar" file.txt` has the `|` inside quotes — bashlex

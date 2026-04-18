@@ -160,8 +160,10 @@ Current capability families:
   - `capability:script_execution:perl`
   - `capability:script_execution:shell`
   - `capability:script_execution:local_binary`
-- read-only (positive family — emitted only when the command is a
-  structurally bare single-head invocation; see below):
+- read-only (positive family — emitted in two shapes: a bare
+  single-head invocation gets a precise sub-tag; a composition of
+  read-only sub-commands joined by `|` / `||` / `&&` / `;` / `|&`
+  gets the aggregate `composition` sub-tag; see below):
   - `capability:read_only:filesystem_list`   (`ls`, `tree`, `stat`, `file`, `du`, `df`, `lsattr`, `getfacl`, `namei`, `pathchk`, `findmnt`, `mountpoint`, `lsblk`, `blkid`, `find` with safe flags)
   - `capability:read_only:filesystem_read`   (`cat`, `head`, `tail`, `less`, `more`, `wc`, `hexdump`, `xxd`, `od`, `nl`, `tac`, `rev`, `md5sum` / `sha*sum` / `b2sum` / `shasum` / `cksum` / `sum`)
   - `capability:read_only:search`            (`grep`, `egrep`, `fgrep`, `rg`, `ack`, `jq`, `yq`, `xmllint` excluding `--output`)
@@ -172,7 +174,15 @@ Current capability families:
   - `capability:read_only:network_inspect`   (`netstat`, `ss`, `arp` excluding `-s` / `-d`, `ip <obj> show|list|get`, `route` excluding `add` / `del` / `flush`, `ifconfig` in inspect-only form)
   - `capability:read_only:archive_inspect`   (`tar -tf` / `--list` (mode letters excluding `c`/`x`/`r`/`A`/`u`), `unzip -l|-v|-Z|-t|-p|-c`, `zipinfo`, `gzip|bzip2|xz|zstd` with `-l` / `-t`, streaming decompressors: `zcat`, `bzcat`, `xzcat`, `zstdcat`, `zless`, `zmore`, `zgrep` family)
   - `capability:read_only:container_inspect` (`docker` / `podman` `ps` / `images` / `logs` / `inspect` / `info` / `version` / `history` / `port` / `diff` / `top` / `stats` / `events` / `network ls` / `volume ls`, `kubectl` `get` / `describe` / `logs` / `top` / `version` / `api-resources` / `explain` / `config view` / `cluster-info` / `auth can-i`)
-- network probe (positive family — emitted only when the command is a
+  - `capability:read_only:composition`       (aggregate tag for a
+    multi-segment composition — `ls -la | head`, `cd /tmp && ls`,
+    `ps aux | grep nginx`, `git log --oneline | head -50` — where
+    every segment is independently either a safe `cd <literal>` or
+    a read-only head from the sub-tags above.  The specific-family
+    sub-tags are *not* emitted for compositions; a consumer that
+    prefix-matches `capability:read_only:` picks `composition` up
+    automatically.)
+- network probe (positive family — emitted when the command is a
   structurally bare single-head invocation; **not** a fast-path license,
   see below):
   - `capability:network_probe:icmp`          (`ping`, `ping6`)
@@ -202,7 +212,15 @@ or `capability:read_only:*`.
 `capability:read_only:*` is a *positive* capability — it describes
 what the command is, not just what it can do.  Unlike the other
 capability rules (which run per-haystack `regex.search`), a read-only
-tag is only emitted when **all** of the following hold:
+tag is only emitted after a strict structural gate passes.  There are
+two emission shapes — **single-head** (precise family sub-tag) and
+**composition** (aggregate sub-tag).  Both share the same
+incompatibility and dynamic-content rejections; they differ only in
+how many segments the command has.
+
+**Single-head shape.**  A precise family sub-tag
+(`filesystem_list`, `filesystem_read`, `search`, …) is emitted only
+when **all** of the following hold:
 
 1. bashlex reports exactly one sub-command (no `|` / `;` / `&&` / `||`).
 2. No interpreter indirection payload (`bash -c "..."`, `python -c ...`).
@@ -214,14 +232,62 @@ tag is only emitted when **all** of the following hold:
    `stdin_exec`, `filesystem_write`, `spawns_process`, `network_bind`,
    `background_exec`, `download_and_exec`, `binary_download`,
    `process_signal`, `compilation`, `package_install:*`, `script_execution:*`.
-6. The normalized command fully matches one of the per-family head
+6. The normalized command (with trusted-path head normalisation
+   applied — see below) fully matches one of the per-family head
    regexes (which themselves exclude destructive flag modes like
    `find -delete` / `find -exec` / `sed -i`).
 
-Because (1)–(5) are structural invariants derived from earlier
-pipeline steps, a single-haystack regex hit is never enough to emit
-read-only on its own — the gate has to pass first.  This keeps the
-tag trustworthy as a fast-path signal.
+**Composition shape.**  When the command is a multi-segment
+composition, the aggregate `capability:read_only:composition`
+sub-tag is emitted iff **all** of the following hold:
+
+1. bashlex reports at least two sub-commands joined only by
+   `|` / `||` / `&&` / `;` / `|&`.  The re-tokenised command contains
+   no redirect token, no trailing background `&`, and no case-fallthrough `;;`.
+2. No interpreter indirection, no dynamic structural signal — same
+   rejections as (2) and (3) for single-head.
+3. No incompatible capability is emitted anywhere in the command.
+   This is the broadest gate: a single segment that emits
+   `filesystem_write` (redirect, `tee`), `spawns_process` (`xargs`,
+   `sudo`, `ssh`, `docker run`), `stdin_exec` (`| sh`, `| python -`),
+   `download_and_exec` (`curl … | sh`), `background_exec` (trailing
+   `&`), `package_install:*`, or `script_execution:*` disqualifies
+   the whole composition automatically.
+4. Every sub-command is independently either (a) a safe literal `cd`
+   — `cd`, `cd -`, or `cd <arg>` with no shell metacharacters in the
+   arg — or (b) a head that matches one of the single-head read-only
+   rules (with the same trusted-path normalisation applied per
+   segment).  A narrow fallback accepts bare pipe-consumer heads
+   (`head`, `cat`, `wc`, `grep`, hashers, …) with flag-only tokens —
+   in a pipeline these tools read from stdin so the single-head
+   regex's "≥1 positional" requirement is deliberately relaxed.
+
+The composition tag does NOT emit any of the specific-family
+sub-tags — those stay a single-head-only contract.  Consumers that
+prefix-match `capability:read_only:` get composition for free;
+consumers that enumerate specific sub-tags stay unaffected.
+
+**Trusted-path head normalisation.**  Both shapes apply the same
+head rewrite before the regex match: when the head is an absolute
+path whose parent directory lives in
+
+    /bin, /usr/bin, /sbin, /usr/sbin,
+    /usr/local/bin, /usr/local/sbin,
+    /opt/homebrew/bin, /opt/homebrew/sbin,
+    /opt/local/bin, /opt/local/sbin
+
+the head is rewritten to its basename.  `/bin/ls -la` is matched as
+`ls -la`, `/opt/homebrew/bin/rg foo src/` as `rg foo src/`, etc.  Any
+other absolute or relative path (e.g. `/tmp/ls`, `./ls`, `~/bin/ls`,
+`/usr/bin/subdir/ls`) is left strict — spoofing is credible in
+user-writable locations, so the classifier deliberately refuses to
+bless them.  The `Signal.evidence` field always records the
+original, un-normalised command string so audit logs stay faithful.
+
+Because every gate above is a structural invariant derived from
+earlier pipeline steps, a single-haystack regex hit is never enough
+to emit read-only on its own.  This keeps the family trustworthy as a
+fast-path signal.
 
 The tag still does **not** change the verdict.  It exists so that
 consumers (notably the intentframe-side deterministic Guardian) can
@@ -236,22 +302,29 @@ use the combination
     and (report.code_intel is None or not report.code_intel.findings)
 
 as an ALLOW short-circuit that skips the AE LLM call for obviously
-passive reads like `ls`, `cat README.md`, `ps aux`, `grep foo src/`,
-`git status`.  The explicit `not …network_probe` exclusion is
-defensive — the structural gate already prevents a single command from
-carrying both a `read_only:*` and a `network_probe:*` tag, but the
-belt-and-braces check keeps the fast-path honest if either family
-expands.
+passive reads — `ls`, `cat README.md`, `ps aux`, `grep foo src/`,
+`git status`, **and now also** `ls -la | head`, `cd /tmp && ls`,
+`ps aux | grep nginx`, `git log --oneline | head -50`, etc.  The
+explicit `not …network_probe` exclusion is defensive — the structural
+gate already prevents a single command from carrying both a
+`read_only:*` and a `network_probe:*` tag, but the belt-and-braces
+check keeps the fast-path honest if either family expands.
 
 #### The network-probe family
 
 `capability:network_probe:*` is a **positive fact family**, emitted
-under the *same* structural-bareness predicate as `read_only:*`: one
-sub-command, no indirection, no dynamic content, no shell composition.
-Unlike `read_only:*`, however, the check does **not** include the
-incompatible-prior-capability clause — `network_probe:http_download`
-is deliberately allowed to co-exist with other capabilities so the
-consumer can observe "network + disk" simultaneously.
+under the *same* structural-bareness predicate as the single-head
+shape of `read_only:*`: one sub-command, no indirection, no dynamic
+content, no shell composition.  Trusted-path head normalisation
+applies here too — `/bin/ping 8.8.8.8` is recognised as `ping`,
+`/usr/bin/curl https://…` as `curl`, and so on, under the same
+`_TRUSTED_BIN_DIRS` allow-list.  There is no `network_probe:composition`
+analogue: a pipeline that emits outbound traffic always needs a
+specialised policy lane, not a fast-path.  Unlike `read_only:*`, the
+check does **not** include the incompatible-prior-capability clause
+— `network_probe:http_download` is deliberately allowed to co-exist
+with other capabilities so the consumer can observe "network + disk"
+simultaneously.
 
 The critical difference from `read_only:*`:
 

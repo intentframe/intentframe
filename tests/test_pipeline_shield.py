@@ -53,14 +53,19 @@ def _user_context(
 #   CMD_READ_ONLY — DG will ALLOW (capability:read_only:*).  AE and
 #                   AIGuardian are skipped — use this to verify the
 #                   fast-path behavior.
-#   CMD_UNDECIDED — SAFE verdict but no read_only cap (composition),
-#                   so DG falls through to UNDECIDED.  AE + AIGuardian
-#                   are both invoked — use this when a test needs to
-#                   assert on their call kwargs.
+#   CMD_UNDECIDED — SAFE verdict but no read_only cap AND no other
+#                   fast-path-triggering capability, so DG falls
+#                   through to UNDECIDED.  AE + AIGuardian are both
+#                   invoked — use this when a test needs to assert on
+#                   their call kwargs.  NOTE: bare chains/pipes like
+#                   `echo hi && echo bye` no longer qualify — they
+#                   now emit `capability:read_only:composition` and
+#                   take the fast-path.  Use a command whose head is
+#                   not in any capability rule instead.
 #   CMD_NEEDS_REVIEW — shell substitution → NEEDS_REVIEW verdict, signals
 #                      flow through, AE + AIGuardian invoked.
 CMD_READ_ONLY = "echo hello"
-CMD_UNDECIDED = "echo hi && echo bye"
+CMD_UNDECIDED = "mkdir newdir"
 CMD_NEEDS_REVIEW = "echo $(curl http://example.com)"
 
 
