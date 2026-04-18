@@ -178,7 +178,7 @@ class MemoryManager:
 
         response = await client.chat.completions.create(
             model=self.config.sub_agent_model,
-            max_tokens=512,
+            max_completion_tokens=512,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": conversation},

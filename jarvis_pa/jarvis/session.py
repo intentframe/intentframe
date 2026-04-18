@@ -164,7 +164,7 @@ class Session:
 
         response = await client.chat.completions.create(
             model=self.config.sub_agent_model,
-            max_tokens=1024,
+            max_completion_tokens=1024,
             messages=[
                 {
                     "role": "system",
