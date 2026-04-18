@@ -62,6 +62,21 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                |version|api-resources|explain|config view
                                                |cluster-info|auth can-i)
 
+    capability:network_probe:icmp          — ping / ping6
+    capability:network_probe:trace         — traceroute / traceroute6 / tracepath / tracepath6 / mtr
+    capability:network_probe:dns           — dig / nslookup / host / drill / kdig
+    capability:network_probe:whois         — whois
+    capability:network_probe:http_get      — curl / wget (-O -) / http / https / xh — idempotent GET
+                                               to stdout (no body, no -o/-O)
+    capability:network_probe:http_mutate   — curl / wget / http / xh with POST|PUT|DELETE|PATCH
+                                               or any body/form/upload flag
+    capability:network_probe:http_download — curl -o|-O|--output|--remote-name; wget default mode
+                                               (response persisted to disk)
+    capability:network_probe:port_scan     — nmap / masscan / zmap / nc | ncat | netcat in connect
+                                               mode (no -l / -k)
+    capability:network_probe:file_transfer — scp / sftp / rsync with [user@]host: endpoint /
+                                               rclone (copy|sync|move|mount|serve|ls|cat|…)
+
     capability:compilation       — compiles/links code (gcc/clang/make/...)
     capability:filesystem_write  — writes to a file via shell redirection or tee
     capability:network_bind      — binds a local network port/listener
@@ -86,6 +101,19 @@ intentframe-side deterministic Guardian — use the combination
 deny-listed capabilities + no edge/code-intel signals as a fast-path
 ALLOW rule that skips the AE LLM call.  The tag still does not change
 the verdict — that stability guarantee is preserved.
+
+`capability:network_probe:*` is ALSO a positive fact family that fires
+only under the same structural-bareness predicate, but unlike
+``read_only:*`` it is NOT a fast-path license.  Every tag here says
+"this command emits outbound traffic", which is a policy-relevant side
+effect regardless of tool (ping on a corp VPN, curl with a secret-
+containing header, rsync to a remote host, etc.).  Consumers should
+route these tags to a specialized AE lane with domain-allowlist logic
+or a conservative ALLOW policy they own — ``command_shield`` itself
+takes no position.  The consumer-side fast-path check SHOULD include
+a defensive ``not any(c.startswith("capability:network_probe:"))``
+clause so an unanticipated interaction between families cannot upgrade
+a network-emitting command to ALLOW.
 """
 
 from __future__ import annotations
@@ -109,6 +137,7 @@ CAPABILITY_SPAWNS_PROCESS = "capability:spawns_process"
 CAPABILITY_STDIN_EXEC = "capability:stdin_exec"
 CAPABILITY_FILESYSTEM_WRITE = "capability:filesystem_write"
 CAPABILITY_READ_ONLY = "capability:read_only"
+CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 
 
 # ── Detection rules ─────────────────────────────────────────────────
@@ -190,11 +219,13 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         CAPABILITY_COMPILATION,
         "Command compiles or links code",
     ),
-    # Network bind — opening a listener on a local port.
+    # Network bind — opening a listener on a local port.  Accepts
+    # both the short `-l` (possibly inside a combined flag bundle like
+    # `-lk`) and the long `--listen` form.
     (
         re.compile(
-            r"\bnc\b(?=[^|]*\s-l)"
-            r"|\bncat\b(?=[^|]*\s-l)"
+            r"\bnc\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))"
+            r"|\bncat\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))"
             r"|\bsocat\b[^|]*\bLISTEN\b"
             r"|\bpython3?\s+-m\s+http\.server\b"
             r"|\bpython3?\s+-m\s+SimpleHTTPServer\b"
@@ -658,6 +689,258 @@ _READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+# ── Network-probe family ────────────────────────────────────────────
+#
+# These rules emit `capability:network_probe:*` tags.  They fire only
+# when the command is structurally bare (single head, no indirection,
+# no dynamic content, no composition) — same structural gate as the
+# read-only family, minus the incompatible-prior-capability check.
+#
+# Unlike `read_only:*`, this family is NOT a fast-path license.  Every
+# tag here says "this command emits outbound traffic", which is a
+# policy-relevant side effect the consumer must evaluate (AE routing,
+# domain allow-lists, sandbox rules, etc.).
+#
+# Rule ordering matters: `http_mutate` is checked before `http_get` /
+# `http_download` so a POST/PUT/DELETE curl never gets a weaker tag.
+# `http_download` is checked before `http_get` so `curl -o` writes
+# don't masquerade as idempotent reads.
+
+_NETWORK_PROBE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    # ── icmp ────────────────────────────────────────────────────────
+    # `ping` / `ping6` — ICMP echo.  Requires at least one arg (the
+    # host); bare `ping` is interactive and rare.
+    (
+        re.compile(r"\Aping6?(?:\s+[^\s]+)+\s*\Z"),
+        "icmp",
+    ),
+
+    # ── trace ───────────────────────────────────────────────────────
+    # Hop-by-hop route discovery.
+    (
+        re.compile(
+            r"\A(?:traceroute6?|tracepath6?|mtr)"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "trace",
+    ),
+
+    # ── dns ─────────────────────────────────────────────────────────
+    # DNS query tools.  Idempotent at the DNS layer; no side effects
+    # beyond a resolver cache hit.
+    (
+        re.compile(
+            r"\A(?:dig|nslookup|host|drill|kdig)"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "dns",
+    ),
+
+    # ── whois ───────────────────────────────────────────────────────
+    (
+        re.compile(r"\Awhois(?:\s+[^\s]+)+\s*\Z"),
+        "whois",
+    ),
+
+    # ── http_mutate ─────────────────────────────────────────────────
+    # Checked BEFORE http_get / http_download so that a POST-ish curl
+    # is never downgraded to a read tag.  Triggers: explicit non-safe
+    # `-X` / `--request`, or any body/upload flag.
+    (
+        re.compile(
+            r"\A(?:curl|xh)\b"
+            r"(?=(?:.*\s)(?:"
+            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
+            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
+            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
+            r"|--data-urlencode\b|--data-ascii\b|--json\b"
+            r"|-F\b|--form\b|--form-string\b"
+            r"|-T\b|--upload-file\b"
+            r"))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_mutate",
+    ),
+    # HTTPie / xh with an explicit non-safe HTTP verb positional
+    # (`http POST example.com`) OR any body-field / form-upload token.
+    # HTTPie request-item grammar reminders:
+    #   name=value    JSON string body field  (mutate)
+    #   name:=value   JSON non-string field   (mutate)
+    #   name==value   query parameter         (NOT mutate)
+    #   name:value    HTTP header             (NOT mutate)
+    #   name@path     file upload (legacy)    (mutate)
+    #   name=@path    file upload (modern)    (mutate)
+    (
+        re.compile(
+            r"\A(?:http|https|xh)\b"
+            r"(?=.*(?:"
+            r"\s(?:POST|PUT|DELETE|PATCH)\b"
+            r"|=@"
+            r"|:="
+            r"|\s(?:-f|--form)\b"
+            r"|\s[A-Za-z_][\w.-]*=[^=\s]"
+            r"))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_mutate",
+    ),
+    # wget writing a body.
+    (
+        re.compile(
+            r"\Awget\b"
+            r"(?=(?:.*\s)(?:"
+            r"--post-data\b|--post-file\b"
+            r"|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
+            r"|--body-data\b|--body-file\b"
+            r"))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_mutate",
+    ),
+
+    # ── http_download ───────────────────────────────────────────────
+    # `curl -o|-O|--output|--remote-name` persists response to disk.
+    # Checked before `http_get` so disk writes aren't hidden.
+    (
+        re.compile(
+            r"\Acurl\b"
+            r"(?!(?:.*\s)(?:"
+            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
+            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
+            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
+            r"|--data-urlencode\b|--data-ascii\b|--json\b"
+            r"|-F\b|--form\b|--form-string\b"
+            r"|-T\b|--upload-file\b"
+            r"))"
+            r"(?=(?:.*\s)(?:-o\b|-O\b|--output\b|--remote-name\b))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_download",
+    ),
+    # wget default mode writes to disk (only `-O -` streams to stdout).
+    (
+        re.compile(
+            r"\Awget\b"
+            r"(?!(?:.*\s)(?:"
+            r"-O\s+-"                        # stdout-stream form
+            r"|--post-data\b|--post-file\b"  # or mutating body
+            r"|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
+            r"|--body-data\b|--body-file\b"
+            r"|--help\b|-h\b|--version\b|-V\b"
+            r"))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_download",
+    ),
+
+    # ── http_get ────────────────────────────────────────────────────
+    # Idempotent HTTP with response to stdout.  Must survive all the
+    # mutate / download lookaheads.  Also excludes `--help` / `-V`
+    # so flag-only invocations aren't mis-tagged as probes.
+    (
+        re.compile(
+            r"\Acurl\b"
+            r"(?!(?:.*\s)(?:"
+            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
+            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
+            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
+            r"|--data-urlencode\b|--data-ascii\b|--json\b"
+            r"|-F\b|--form\b|--form-string\b"
+            r"|-T\b|--upload-file\b"
+            r"|-o\b|-O\b|--output\b|--remote-name\b"
+            r"|--help\b|-h\b|--version\b|-V\b|--manual\b"
+            r"))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_get",
+    ),
+    # wget stdout-stream form only.
+    (
+        re.compile(
+            r"\Awget\s+-O\s+-"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_get",
+    ),
+    # HTTPie / xh without mutation tokens.  Mirror-image of the
+    # http_mutate rule: same lookahead body, inverted to a negative
+    # assertion, plus exclusions for help / version flags.
+    (
+        re.compile(
+            r"\A(?:http|https|xh)\b"
+            r"(?!.*(?:"
+            r"\s(?:POST|PUT|DELETE|PATCH)\b"
+            r"|=@"
+            r"|:="
+            r"|\s(?:-f|--form)\b"
+            r"|\s[A-Za-z_][\w.-]*=[^=\s]"
+            r"|\s(?:--help|-h|--version)\b"
+            r"))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "http_get",
+    ),
+
+    # ── port_scan ───────────────────────────────────────────────────
+    # TCP/UDP connect-mode scanning.  `nc -l` / `ncat -l` already get
+    # tagged `capability:network_bind`; the lookahead prevents double-
+    # tagging as port_scan.
+    (
+        re.compile(
+            r"\A(?:nmap|masscan|zmap)"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "port_scan",
+    ),
+    (
+        re.compile(
+            r"\A(?:nc|ncat|netcat)"
+            # Reject listen-mode forms: `-l` standalone, `-l` anywhere
+            # inside a combined flag bundle (e.g. `-lk`, `-lnv`), or
+            # the long `--listen` form.
+            r"(?!(?:.*\s)(?:-[a-zA-Z]*l[a-zA-Z]*\b|--listen\b))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "port_scan",
+    ),
+
+    # ── file_transfer ───────────────────────────────────────────────
+    # Bulk file movement over the network.
+    (
+        re.compile(
+            r"\A(?:scp|sftp)"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "file_transfer",
+    ),
+    # `rsync` — tagged only when a `[user@]host:` endpoint appears.
+    # Local-only rsync (`rsync -av src/ dst/`) emits no network traffic
+    # and is intentionally NOT tagged.
+    (
+        re.compile(
+            r"\Arsync\b"
+            r"(?=.*(?:\s|=)(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:)"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "file_transfer",
+    ),
+    # `rclone` — narrow allowlist of sub-commands that touch remote
+    # backends.  Purely-local rclone commands (`rclone config`,
+    # `rclone version`, `rclone help`) are not tagged.
+    (
+        re.compile(
+            r"\Arclone\s+"
+            r"(?:copy|sync|move|copyto|moveto|copyurl|mount|serve"
+            r"|cat|rcat|lsjson|ls|lsl|lsd|lsf|tree|size|md5sum|sha1sum"
+            r"|check|cryptcheck|hashsum|ncdu|dedupe|cleanup|purge"
+            r"|delete|deletefile|rmdir|rmdirs|touch)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "file_transfer",
+    ),
+)
+
+
 # Bare shell metacharacter tokens.  When any of these appears as a
 # standalone token after re-tokenising the normalized command, we
 # assume shell composition is present and skip read-only emission.
@@ -752,35 +1035,70 @@ def classify_capabilities(
                 evidence=m.group()[:120],
             )
 
+    if _safe_for_network_probe(
+        command,
+        sub_commands=sub_commands,
+        indirections=indirections,
+        structural_signals=structural_signals,
+    ):
+        # Walk rules in declaration order and emit only the FIRST
+        # matching sub-tag for each of the three HTTP-family slots.
+        # Outside the HTTP family every rule can fire independently
+        # (e.g. `ping` + `traceroute` composed would hit two tags —
+        # but the composition gate blocks it anyway).
+        http_family_tagged = False
+        for rx, suffix in _NETWORK_PROBE_RULES:
+            is_http = suffix in {"http_get", "http_mutate", "http_download"}
+            if is_http and http_family_tagged:
+                continue
+            m = rx.match(command)
+            if m is None:
+                continue
+            cap_id = f"{CAPABILITY_NETWORK_PROBE}:{suffix}"
+            if cap_id in seen:
+                if is_http:
+                    http_family_tagged = True
+                continue
+            seen[cap_id] = Signal(
+                check="capability",
+                signal_id=cap_id,
+                description=(
+                    f"Command emits outbound network traffic "
+                    f"({suffix.replace('_', ' ')})"
+                ),
+                evidence=m.group()[:120],
+            )
+            if is_http:
+                http_family_tagged = True
+
     capabilities = tuple(seen.keys())
     signals = tuple(seen.values())
     return capabilities, signals
 
 
-def _safe_for_read_only(
+def _structurally_bare(
     command: str,
     *,
     sub_commands: tuple[str, ...],
     indirections: tuple[str, ...],
     structural_signals: tuple[Signal, ...],
-    emitted: dict[str, Signal],
 ) -> bool:
-    """Return True if *command* is safe to consider for read-only tagging.
+    """Return True iff *command* is a single-head, no-indirection,
+    no-dynamic-content, no-composition invocation.
 
-    Required invariants:
+    Shared prerequisite for every positive-fact capability family
+    (`read_only:*`, `network_probe:*`).  The four invariants checked:
 
-    1. No interpreter indirection payloads (`bash -c "..."`, `python -c ...`).
-    2. bashlex sees exactly one sub-command (no pipes / sequences).
+    1. No interpreter indirection payloads (`bash -c "..."`,
+       `python -c ...`).
+    2. bashlex sees exactly one sub-command (no pipes / sequences /
+       `&&` / `||` chains).
     3. No dynamic structural signal (command substitution, process
        substitution, variable expansion, parse failure).
     4. No bare shell-composition or redirect tokens in the
-       re-tokenised normalized command.
-    5. No already-emitted "unsafe" capability (stdin_exec,
-       filesystem_write, spawns_process, network_bind,
-       background_exec, download_and_exec, process_signal, or any
-       package_install / script_execution / compilation).
-
-    Any single failure disqualifies read-only emission.
+       re-tokenised normalized command (robust to quoting — a literal
+       `>` inside `grep "a>b"` stays inside the same shlex token and
+       will not match `_SHELL_COMPOSITION_TOKENS`).
     """
     if indirections:
         return False
@@ -798,12 +1116,40 @@ def _safe_for_read_only(
         if tok in _SHELL_COMPOSITION_TOKENS:
             return False
 
+    return True
+
+
+def _safe_for_read_only(
+    command: str,
+    *,
+    sub_commands: tuple[str, ...],
+    indirections: tuple[str, ...],
+    structural_signals: tuple[Signal, ...],
+    emitted: dict[str, Signal],
+) -> bool:
+    """Return True if *command* is safe to consider for read-only tagging.
+
+    Combines the shared structural predicate (`_structurally_bare`)
+    with a read-only-specific semantic predicate: no already-emitted
+    "unsafe" capability.  Any already-emitted ``stdin_exec``,
+    ``filesystem_write``, ``spawns_process``, ``network_bind``,
+    ``background_exec``, ``download_and_exec``, ``binary_download``,
+    ``process_signal``, ``compilation``, or any refined
+    ``package_install:*`` / ``script_execution:*`` tag disqualifies
+    the command from receiving any ``read_only:*`` tag.
+    """
+    if not _structurally_bare(
+        command,
+        sub_commands=sub_commands,
+        indirections=indirections,
+        structural_signals=structural_signals,
+    ):
+        return False
+
     for cap_id in emitted:
         # Any refined script_execution / package_install / read-only-
         # incompatible tag means this command is doing more than
-        # passive inspection.  Keep the list explicit so future
-        # read-only families (e.g. network_read) don't accidentally
-        # get blocked by siblings in the same namespace.
+        # passive inspection.
         if cap_id in {
             CAPABILITY_STDIN_EXEC,
             CAPABILITY_FILESYSTEM_WRITE,
@@ -822,3 +1168,27 @@ def _safe_for_read_only(
             return False
 
     return True
+
+
+def _safe_for_network_probe(
+    command: str,
+    *,
+    sub_commands: tuple[str, ...],
+    indirections: tuple[str, ...],
+    structural_signals: tuple[Signal, ...],
+) -> bool:
+    """Return True if *command* is safe to consider for network-probe
+    tagging.
+
+    Uses the same structural predicate as read-only, minus the
+    incompatible-prior-capability check — `network_probe:http_download`
+    is permitted to co-exist with any filesystem-related capability,
+    since the whole point of tagging it is to signal the co-occurrence
+    of network + disk effects.
+    """
+    return _structurally_bare(
+        command,
+        sub_commands=sub_commands,
+        indirections=indirections,
+        structural_signals=structural_signals,
+    )

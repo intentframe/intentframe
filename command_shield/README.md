@@ -172,6 +172,18 @@ Current capability families:
   - `capability:read_only:network_inspect`   (`netstat`, `ss`, `arp` excluding `-s` / `-d`, `ip <obj> show|list|get`, `route` excluding `add` / `del` / `flush`, `ifconfig` in inspect-only form)
   - `capability:read_only:archive_inspect`   (`tar -tf` / `--list` (mode letters excluding `c`/`x`/`r`/`A`/`u`), `unzip -l|-v|-Z|-t|-p|-c`, `zipinfo`, `gzip|bzip2|xz|zstd` with `-l` / `-t`, streaming decompressors: `zcat`, `bzcat`, `xzcat`, `zstdcat`, `zless`, `zmore`, `zgrep` family)
   - `capability:read_only:container_inspect` (`docker` / `podman` `ps` / `images` / `logs` / `inspect` / `info` / `version` / `history` / `port` / `diff` / `top` / `stats` / `events` / `network ls` / `volume ls`, `kubectl` `get` / `describe` / `logs` / `top` / `version` / `api-resources` / `explain` / `config view` / `cluster-info` / `auth can-i`)
+- network probe (positive family — emitted only when the command is a
+  structurally bare single-head invocation; **not** a fast-path license,
+  see below):
+  - `capability:network_probe:icmp`          (`ping`, `ping6`)
+  - `capability:network_probe:trace`         (`traceroute`, `traceroute6`, `tracepath`, `tracepath6`, `mtr`)
+  - `capability:network_probe:dns`           (`dig`, `nslookup`, `host`, `drill`, `kdig`)
+  - `capability:network_probe:whois`         (`whois`)
+  - `capability:network_probe:http_get`      (`curl` / `xh` without mutate / download flags, `wget -O -`, HTTPie `http` / `https` without body or POST/PUT/DELETE/PATCH verb)
+  - `capability:network_probe:http_mutate`   (`curl` / `xh` / HTTPie / `wget` with `-X POST` / `--request PUT` / `-d` / `--data` / `-F` / `--form` / `-T` / `--upload-file` / `--post-data` / `--method=POST` / HTTPie body tokens `=@` / `:=`)
+  - `capability:network_probe:http_download` (`curl -o` / `-O` / `--output` / `--remote-name`, `wget` in default (non-`-O -`) mode — response persisted to disk; does NOT imply `capability:filesystem_write` which is reserved for shell redirects / `tee`)
+  - `capability:network_probe:port_scan`     (`nmap`, `masscan`, `zmap`, `nc` / `ncat` / `netcat` in connect mode — `-l` / `-k` listen forms stay under `network_bind`)
+  - `capability:network_probe:file_transfer` (`scp`, `sftp`, `rsync` with a `[user@]host:` endpoint, `rclone` `copy` / `sync` / `move` / `mount` / `serve` / `ls` / `cat` / `md5sum` / `check` / etc.)
 - `capability:compilation`
 - `capability:filesystem_write`
 - `capability:network_bind`
@@ -219,12 +231,50 @@ use the combination
     and any(c.startswith("capability:read_only:") for c in report.capabilities)
     and "capability:filesystem_write" not in report.capabilities
     and "capability:stdin_exec"        not in report.capabilities
+    and not any(c.startswith("capability:network_probe:") for c in report.capabilities)
     and not any(s.signal_id.startswith("edge:") for s in report.signals)
     and (report.code_intel is None or not report.code_intel.findings)
 
 as an ALLOW short-circuit that skips the AE LLM call for obviously
 passive reads like `ls`, `cat README.md`, `ps aux`, `grep foo src/`,
-`git status`.
+`git status`.  The explicit `not …network_probe` exclusion is
+defensive — the structural gate already prevents a single command from
+carrying both a `read_only:*` and a `network_probe:*` tag, but the
+belt-and-braces check keeps the fast-path honest if either family
+expands.
+
+#### The network-probe family
+
+`capability:network_probe:*` is a **positive fact family**, emitted
+under the *same* structural-bareness predicate as `read_only:*`: one
+sub-command, no indirection, no dynamic content, no shell composition.
+Unlike `read_only:*`, however, the check does **not** include the
+incompatible-prior-capability clause — `network_probe:http_download`
+is deliberately allowed to co-exist with other capabilities so the
+consumer can observe "network + disk" simultaneously.
+
+The critical difference from `read_only:*`:
+
+> `network_probe:*` is NEVER a fast-path license.
+
+Every tag here means the command emits outbound traffic, which is a
+policy-relevant side effect regardless of tool (a `ping` on a corp
+VPN, a `curl` carrying a bearer token, an `rsync` copying source to
+an external host).  Consumers MUST treat these tags as a signal to
+apply network policy, not as evidence of safety.  Recommended consumer
+routing:
+
+- `network_probe:icmp` / `trace` / `whois` / `dns` / `http_get` →
+  cheap deterministic check (e.g. domain allow-list) → ALLOW or
+  NEEDS_REVIEW
+- `network_probe:http_mutate` / `http_download` / `port_scan` /
+  `file_transfer` → always a specialised AE route with a prompt that
+  knows the command is network-side-effecting
+
+Within a single command only one HTTP sub-tag is emitted: the rule
+table is ordered `http_mutate` → `http_download` → `http_get` so the
+strictest applicable tag wins.  A POST `curl` is never downgraded to
+`http_get` and a `curl -o file` is never masqueraded as idempotent.
 
 ### 4. Containment-edge extraction and walk
 
