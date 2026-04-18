@@ -160,7 +160,20 @@ Current capability families:
   - `capability:script_execution:perl`
   - `capability:script_execution:shell`
   - `capability:script_execution:local_binary`
+- read-only (positive family — emitted only when the command is a
+  structurally bare single-head invocation; see below):
+  - `capability:read_only:filesystem_list`   (`ls`, `tree`, `stat`, `file`, `du`, `df`, `lsattr`, `getfacl`, `namei`, `pathchk`, `findmnt`, `mountpoint`, `lsblk`, `blkid`, `find` with safe flags)
+  - `capability:read_only:filesystem_read`   (`cat`, `head`, `tail`, `less`, `more`, `wc`, `hexdump`, `xxd`, `od`, `nl`, `tac`, `rev`, `md5sum` / `sha*sum` / `b2sum` / `shasum` / `cksum` / `sum`)
+  - `capability:read_only:search`            (`grep`, `egrep`, `fgrep`, `rg`, `ack`, `jq`, `yq`, `xmllint` excluding `--output`)
+  - `capability:read_only:process_inspect`   (`ps`, `top`, `htop`, `lsof`, `pgrep`, `pidof`, `uptime`, `w`, `jobs`, `free`, `vmstat`, `iostat`, `mpstat`, `ipcs`, `nproc`, `arch`, `last`, `who`, `users`, `finger`, `getent`, `cal`, `ncal`)
+  - `capability:read_only:system_info`       (`uname`, `whoami`, `id`, `hostname`, `date`, `pwd`, `env`, `which`, `man`, `info`, `apropos`, `whatis`, `tldr`, `tput`, `alias`, `clear`, `reset`, `seq`, `factor`, `printf`, `sysctl` without `-w` / `-p`, `ulimit` without a value, `stty` / `stty -a` / `stty -g`, …)
+  - `capability:read_only:vcs_inspect`       (`git`, `hg`, `svn`, `fossil`, `bzr` — read-only sub-commands only; e.g. `git status` / `log` / `diff` / `show`, `hg status` / `log`, `svn info` / `log`, …)
+  - `capability:read_only:text_transform`    (`sort` excluding `-o` / `--output`, `sdiff` excluding `-o`, `uniq` with at most one positional, `cut`, `paste`, `join`, `tr`, `column`, `fold`, `fmt`, `pr`, `expand`, `unexpand`, `comm`, `diff`, `diff3`, `cmp`, `colordiff`, `delta`)
+  - `capability:read_only:network_inspect`   (`netstat`, `ss`, `arp` excluding `-s` / `-d`, `ip <obj> show|list|get`, `route` excluding `add` / `del` / `flush`, `ifconfig` in inspect-only form)
+  - `capability:read_only:archive_inspect`   (`tar -tf` / `--list` (mode letters excluding `c`/`x`/`r`/`A`/`u`), `unzip -l|-v|-Z|-t|-p|-c`, `zipinfo`, `gzip|bzip2|xz|zstd` with `-l` / `-t`, streaming decompressors: `zcat`, `bzcat`, `xzcat`, `zstdcat`, `zless`, `zmore`, `zgrep` family)
+  - `capability:read_only:container_inspect` (`docker` / `podman` `ps` / `images` / `logs` / `inspect` / `info` / `version` / `history` / `port` / `diff` / `top` / `stats` / `events` / `network ls` / `volume ls`, `kubectl` `get` / `describe` / `logs` / `top` / `version` / `api-resources` / `explain` / `config view` / `cluster-info` / `auth can-i`)
 - `capability:compilation`
+- `capability:filesystem_write`
 - `capability:network_bind`
 - `capability:background_exec`
 - `capability:download_and_exec`
@@ -169,7 +182,49 @@ Current capability families:
 - `capability:spawns_process`
 - `capability:stdin_exec`
 
-Callers can match exact tags or prefixes like `capability:package_install:*`.
+Callers can match exact tags or prefixes like `capability:package_install:*`
+or `capability:read_only:*`.
+
+#### The read-only fast-path family
+
+`capability:read_only:*` is a *positive* capability — it describes
+what the command is, not just what it can do.  Unlike the other
+capability rules (which run per-haystack `regex.search`), a read-only
+tag is only emitted when **all** of the following hold:
+
+1. bashlex reports exactly one sub-command (no `|` / `;` / `&&` / `||`).
+2. No interpreter indirection payload (`bash -c "..."`, `python -c ...`).
+3. No dynamic structural signal (command substitution, process
+   substitution, variable expansion, parse failure).
+4. No bare shell-composition or redirect token when the normalized
+   command is re-tokenised (`|`, `;`, `>`, `>>`, `&`, `<`, `<<`, …).
+5. No incompatible capability already emitted on the same command —
+   `stdin_exec`, `filesystem_write`, `spawns_process`, `network_bind`,
+   `background_exec`, `download_and_exec`, `binary_download`,
+   `process_signal`, `compilation`, `package_install:*`, `script_execution:*`.
+6. The normalized command fully matches one of the per-family head
+   regexes (which themselves exclude destructive flag modes like
+   `find -delete` / `find -exec` / `sed -i`).
+
+Because (1)–(5) are structural invariants derived from earlier
+pipeline steps, a single-haystack regex hit is never enough to emit
+read-only on its own — the gate has to pass first.  This keeps the
+tag trustworthy as a fast-path signal.
+
+The tag still does **not** change the verdict.  It exists so that
+consumers (notably the intentframe-side deterministic Guardian) can
+use the combination
+
+    report.verdict == Verdict.SAFE
+    and any(c.startswith("capability:read_only:") for c in report.capabilities)
+    and "capability:filesystem_write" not in report.capabilities
+    and "capability:stdin_exec"        not in report.capabilities
+    and not any(s.signal_id.startswith("edge:") for s in report.signals)
+    and (report.code_intel is None or not report.code_intel.findings)
+
+as an ALLOW short-circuit that skips the AE LLM call for obviously
+passive reads like `ls`, `cat README.md`, `ps aux`, `grep foo src/`,
+`git status`.
 
 ### 4. Containment-edge extraction and walk
 
@@ -434,7 +489,9 @@ Useful for offline triage or explicit deep-review flows.
 - Does this command install packages? → match `capability:package_install:*`
 - Allow `pip` but deny `apt`? → allow `capability:package_install:pip`, deny `capability:package_install:apt`
 - Allow Python scripts but deny Node? → allow `capability:script_execution:python`, deny `capability:script_execution:node`
+- Fast-path obviously read-only commands (no AE call)? → allow on `capability:read_only:*` when no deny capabilities fire
 - Deny all listeners? → deny `capability:network_bind`
+- Deny any file writes via shell redirection? → deny `capability:filesystem_write`
 - Deny any code touching system paths? → deny `FILE_SYSTEM_ESCAPE_OPEN`
 - Flag any code that references runtime internals? → deny `REFERENCES_INTENTFRAME`
 - Deny commands that stream code into an interpreter? → deny `capability:stdin_exec` or `edge:piped_stdin`

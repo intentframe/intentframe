@@ -180,6 +180,7 @@ def _run(
     # pattern rechecks (also verdict-bearing).
     sub_commands, structural_signals, indirections = decompose(command)
     signals.extend(structural_signals)
+    structural_signals_tuple = tuple(structural_signals)
 
     for sub in sub_commands:
         v, sigs = match_patterns(normalize(sub))
@@ -253,6 +254,7 @@ def _run(
         normalized,
         sub_commands=tuple(sub_commands),
         indirections=tuple(indirections),
+        structural_signals=structural_signals_tuple,
     )
     signals.extend(capability_signals)
 

@@ -29,7 +29,41 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
     capability:script_execution:shell        — `bash foo.sh` / `sh` / `zsh` / `ksh` / `dash`
     capability:script_execution:local_binary — `./foo` / `./bin/tool`
 
+    capability:read_only:filesystem_list   — ls / tree / stat / file / du / df / lsattr / getfacl
+                                               / namei / pathchk / findmnt / mountpoint / lsblk
+                                               / blkid / find (safe flags)
+    capability:read_only:filesystem_read   — cat / head / tail / less / more / wc / hexdump / xxd
+                                               / od / nl / tac / rev / md5sum / sha*sum / b2sum
+                                               / shasum / cksum / sum
+    capability:read_only:search            — grep / egrep / fgrep / rg / ack / jq / yq / xmllint
+                                               (no --output)
+    capability:read_only:process_inspect   — ps / top / htop / lsof / pgrep / pidof / uptime / w
+                                               / free / vmstat / iostat / mpstat / ipcs / nproc
+                                               / arch / last / who / users / getent / cal / ncal
+    capability:read_only:system_info       — uname / whoami / id / hostname / date / pwd / env
+                                               / which / man / info / apropos / tput / alias
+                                               / clear / reset / seq / factor / printf
+                                               / sysctl (no -w / -p) / ulimit (no value) / stty
+                                               (bare / -a / -g)
+    capability:read_only:vcs_inspect       — git / hg / svn / fossil / bzr read-only sub-commands
+    capability:read_only:text_transform    — sort (no -o) / sdiff (no -o) / uniq (≤1 positional)
+                                               / cut / paste / join / tr / column / fold / fmt
+                                               / pr / expand / unexpand / comm / diff / diff3
+                                               / cmp / colordiff / delta
+    capability:read_only:network_inspect   — netstat / ss / arp (no -s / -d) / ip <obj> show|list
+                                               / route (no add / del / flush) / ifconfig (inspect)
+    capability:read_only:archive_inspect   — tar -t*f / --list / unzip -l|-v|-Z|-t|-p|-c
+                                               / zipinfo / (gzip|bzip2|xz|zstd) -l|-t / zcat
+                                               / bzcat / xzcat / zstdcat / z-less|more|grep
+                                               family
+    capability:read_only:container_inspect — docker / podman (ps|images|logs|inspect|info|version
+                                               |history|port|diff|top|stats|events|network ls
+                                               |volume ls) / kubectl (get|describe|logs|top
+                                               |version|api-resources|explain|config view
+                                               |cluster-info|auth can-i)
+
     capability:compilation       — compiles/links code (gcc/clang/make/...)
+    capability:filesystem_write  — writes to a file via shell redirection or tee
     capability:network_bind      — binds a local network port/listener
     capability:background_exec   — backgrounds a process (nohup/&/screen)
     capability:download_and_exec — fetches a remote payload and pipes to a shell
@@ -42,11 +76,22 @@ Each hit produces a Signal with check="capability" and signal_id set to
 the capability tag.  Multiple capabilities per command are expected;
 they are not mutually exclusive.  Policy can match exact tags or use
 prefix matching on the `:` boundary (e.g. `capability:package_install:*`).
+
+`capability:read_only:*` is a positive fact family: it fires only when
+the command is structurally a bare single-head invocation (bashlex
+reports exactly one sub-command, no interpreter indirection, and no
+shell composition / redirect tokens).  Consumers — notably the
+intentframe-side deterministic Guardian — use the combination
+``verdict == SAFE`` + at least one ``capability:read_only:*`` + no
+deny-listed capabilities + no edge/code-intel signals as a fast-path
+ALLOW rule that skips the AE LLM call.  The tag still does not change
+the verdict — that stability guarantee is preserved.
 """
 
 from __future__ import annotations
 
 import re
+import shlex
 
 from command_shield.verdict import Signal
 
@@ -62,6 +107,8 @@ CAPABILITY_BINARY_DOWNLOAD = "capability:binary_download"
 CAPABILITY_PROCESS_SIGNAL = "capability:process_signal"
 CAPABILITY_SPAWNS_PROCESS = "capability:spawns_process"
 CAPABILITY_STDIN_EXEC = "capability:stdin_exec"
+CAPABILITY_FILESYSTEM_WRITE = "capability:filesystem_write"
+CAPABILITY_READ_ONLY = "capability:read_only"
 
 
 # ── Detection rules ─────────────────────────────────────────────────
@@ -234,7 +281,407 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         CAPABILITY_SPAWNS_PROCESS,
         "Command spawns or delegates to another process",
     ),
+    # Filesystem write via shell redirection or `tee`.  The leading
+    # boundary `(?:^|[\s;&|])` ensures a literal `>` in a quoted arg
+    # (e.g. `grep "a>b" f`) does NOT match after shlex has stripped
+    # the quotes — the `>` would be preceded by a word character.
+    # Writes to `/dev/null`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/*`
+    # are excluded as benign sinks; writes to other `/dev/*` paths are
+    # already caught by catastrophic patterns.
+    (
+        re.compile(
+            r"(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*"
+            r"(?!/dev/(?:null|stdout|stderr|fd/\d+)(?:\s|$))\S"
+            r"|\|\s*tee\b"
+        ),
+        CAPABILITY_FILESYSTEM_WRITE,
+        "Command writes to a file via shell redirection or tee",
+    ),
 )
+
+
+# ── Read-only family ─────────────────────────────────────────────────
+#
+# These rules are only evaluated when the command is structurally a
+# bare single-head invocation — see `_safe_for_read_only` for the full
+# gate.  Each regex is anchored with ``\A…\Z`` and matches the entire
+# normalized command, so the presence of any shell composition or
+# write redirect already disqualifies the command at the gate.
+#
+# Rules that accept arguments are deliberately permissive about what
+# positional arguments look like (paths, globs, regex patterns) — the
+# safety invariants come from the gate, not from per-argument parsing.
+# Flags with known destructive modes (e.g. `find -delete`, `find
+# -exec`, `sed -i`) are excluded via negative lookahead so those
+# commands never receive a read-only tag.
+
+_READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    # ── filesystem_list ──────────────────────────────────────────────
+    # `ls` / `tree` / `stat` / `file` / `du` / `df` plus metadata tools:
+    # `lsattr` (ext-attrs), `getfacl` (ACLs), `namei` (path resolution),
+    # `pathchk` (portable-name check), `findmnt` / `mountpoint` (mount
+    # inspection), `lsblk` / `blkid` (block-device inspection).
+    (
+        re.compile(
+            r"\A(?:ls|tree|stat|file|du|df|lsattr|getfacl|namei|pathchk"
+            r"|findmnt|mountpoint|lsblk|blkid)"
+            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "filesystem_list",
+    ),
+    # `find` — excluded when any write/exec flag is present.
+    (
+        re.compile(
+            r"\Afind"
+            r"(?!.*\s-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)\b)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "filesystem_list",
+    ),
+
+    # ── filesystem_read ──────────────────────────────────────────────
+    # File readers.  `sed` and `awk` are intentionally NOT included —
+    # both support in-place write modes (`sed -i`, `awk -i inplace`).
+    # Hashers (`md5sum`, `sha*sum`, `b2sum`, `shasum`, `cksum`, `sum`)
+    # are read-only computations over file contents.
+    (
+        re.compile(
+            r"\A(?:cat|head|tail|less|more|wc|hexdump|xxd|od|nl|tac|rev"
+            r"|md5sum|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum"
+            r"|b2sum|shasum|cksum|sum)"
+            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "filesystem_read",
+    ),
+
+    # ── search ───────────────────────────────────────────────────────
+    # Content search.  `grep -P` with `(?{...})` perl-embed requires
+    # `use re 'eval'` which grep does not enable, so it is safe as a
+    # read-only operation from grep's side.  Structured-data queries
+    # (`jq`, `yq`) have no in-place write mode; `xmllint` DOES have
+    # `--output` so its write form is excluded via negative lookahead.
+    (
+        re.compile(
+            r"\A(?:grep|egrep|fgrep|rg|ack|jq|yq)"
+            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "search",
+    ),
+    # `xmllint` — excluded when `--output` / `-o` is present.
+    (
+        re.compile(
+            r"\Axmllint"
+            r"(?!(?:.*\s)(?:--output\b|-o\b))"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "search",
+    ),
+
+    # ── process_inspect ──────────────────────────────────────────────
+    # Process / runtime / host-activity inspection.  `dmesg` typically
+    # requires root on Linux and is intentionally omitted to keep the
+    # tag trustworthy for non-privileged agents.
+    (
+        re.compile(
+            r"\A(?:ps|top|htop|lsof|pgrep|pidof|uptime|w|jobs|fg|bg"
+            r"|free|vmstat|iostat|mpstat|ipcs|nproc|arch"
+            r"|last|lastlog|who|users|finger|getent|cal|ncal)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "process_inspect",
+    ),
+
+    # ── system_info ──────────────────────────────────────────────────
+    # Identity / environment / docs / terminal-query tools.  Several
+    # binaries here share a name with writers (`sysctl`, `stty`,
+    # `ulimit`); those get separate rules below that positively match
+    # only the read forms.
+    (
+        re.compile(
+            r"\A(?:uname|whoami|id|hostname|date|pwd|env|printenv|echo"
+            r"|true|false|which|whereis|type|history|readlink|basename"
+            r"|dirname|realpath|locale|tty|groups"
+            r"|man|info|apropos|whatis|tldr|tput"
+            r"|alias|clear|reset"
+            r"|seq|factor|printf)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "system_info",
+    ),
+    # `sysctl` — read forms only.  Excludes `-w|--write` (set value)
+    # and `-p|--load` (load values from file).
+    (
+        re.compile(
+            r"\Asysctl"
+            r"(?!(?:.*\s)(?:-w\b|--write\b|-p\b|--load\b))"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "system_info",
+    ),
+    # `ulimit` — bare invocation or a single inspection flag (no
+    # trailing value).  `ulimit -n 4096` (value-bearing) is rejected.
+    (
+        re.compile(r"\Aulimit(?:\s+-[A-Za-z])?\s*\Z"),
+        "system_info",
+    ),
+    # `stty` — bare / `-a` / `-g` (dump settings in restoreable form).
+    # Any other form mutates terminal attributes.
+    (
+        re.compile(r"\Astty(?:\s+(?:-a|--all|-g|--save))?\s*\Z"),
+        "system_info",
+    ),
+
+    # ── vcs_inspect ──────────────────────────────────────────────────
+    # Git read-only sub-commands.  `git config --get` / `--list` only;
+    # `git config key value` (write) is rejected.
+    (
+        re.compile(
+            r"\Agit\s+(?:status|log|diff|show|branch|remote|rev-parse"
+            r"|ls-files|ls-tree|ls-remote|describe|blame|shortlog"
+            r"|reflog|stash\s+list|tag(?:\s+-l)?|for-each-ref"
+            r"|config\s+(?:--get|--list|-l))"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "vcs_inspect",
+    ),
+    # Mercurial read-only sub-commands.
+    (
+        re.compile(
+            r"\Ahg\s+(?:status|st|log|diff|cat|annotate|branch|manifest"
+            r"|tip|summary|heads|parents|identify|paths|showconfig)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "vcs_inspect",
+    ),
+    # Subversion read-only sub-commands.
+    (
+        re.compile(
+            r"\Asvn\s+(?:status|st|log|diff|di|info|list|ls|cat"
+            r"|propget|pg|propdump|pd|proplist|pl|blame|annotate|praise)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "vcs_inspect",
+    ),
+    # Fossil read-only sub-commands.
+    (
+        re.compile(
+            r"\Afossil\s+(?:status|timeline|info|ls|finfo|branch|diff)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "vcs_inspect",
+    ),
+    # Bazaar read-only sub-commands.
+    (
+        re.compile(
+            r"\Abzr\s+(?:status|st|log|diff|info|ls|cat|annotate)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "vcs_inspect",
+    ),
+
+    # ── text_transform ───────────────────────────────────────────────
+    # Pure stdin/file → stdout processors.  `sed` / `awk` / general-
+    # purpose interpreters are deliberately excluded because their
+    # argument body can do anything.
+    #
+    # `sort` / `sdiff` have `-o outfile` write modes; excluded via
+    # negative lookahead.  `uniq` has a two-positional write form
+    # (`uniq input output`); handled with its own stricter rule.
+    (
+        re.compile(
+            r"\A(?:sort|sdiff)"
+            r"(?!(?:.*\s)(?:-o\b|--output\b))"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "text_transform",
+    ),
+    (
+        re.compile(
+            r"\Auniq"
+            # Any number of flags (with optional attached or numeric
+            # argument for -f/-s/-w/-D/-C).
+            r"(?:"
+            r"\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?"
+            r"|\s+-[fsDCw]\s+\d+"
+            r")*"
+            # At most ONE positional (the input file); forbidding a
+            # second positional rejects `uniq input output`.
+            r"(?:\s+[^-][^\s]*)?\s*\Z",
+        ),
+        "text_transform",
+    ),
+    (
+        re.compile(
+            r"\A(?:cut|paste|join|tr|column|fold|fmt|pr|expand|unexpand"
+            r"|comm|diff|diff3|cmp|colordiff|delta)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "text_transform",
+    ),
+
+    # ── network_inspect ──────────────────────────────────────────────
+    # Local network-state inspection with no outbound traffic.  Tools
+    # that actively probe remote hosts (`ping`, `traceroute`, `dig`,
+    # `nmap`, `curl`, `wget`) are deliberately NOT tagged here — they
+    # belong to a separate `network_probe` family if/when desired.
+    (
+        re.compile(
+            r"\A(?:netstat|ss)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "network_inspect",
+    ),
+    # `arp` — excluded on `-s` (add entry) / `-d` (delete entry).
+    (
+        re.compile(
+            r"\Aarp"
+            r"(?!(?:.*\s)-[sd]\b)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "network_inspect",
+    ),
+    # `ip <obj> show|list|get`.  Explicit verb-discrimination rejects
+    # `ip addr add`, `ip route del`, etc.
+    (
+        re.compile(
+            r"\Aip(?:\s+-\S+)*"
+            r"\s+(?:addr|address|link|route|neigh|neighbour|rule"
+            r"|tunnel|netns|xfrm|maddr|mroute|tcp_metrics|token)"
+            r"\s+(?:show|list|s|l|get|save)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "network_inspect",
+    ),
+    # `route` — excluded on `add|del|delete|flush|change|replace`.
+    (
+        re.compile(
+            r"\Aroute"
+            r"(?!(?:.*\s)(?:add|del|delete|flush|change|replace)\b)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "network_inspect",
+    ),
+    # `ifconfig` — safe forms: bare, `-a|-s|-v`, or a single interface
+    # name.  Any trailing modification verb (`up|down|<ip>|mtu|...`)
+    # takes a second token and fails the end-anchor.
+    (
+        re.compile(
+            r"\Aifconfig(?:\s+(?:-[asv]|[a-zA-Z][a-zA-Z0-9]+))?\s*\Z",
+        ),
+        "network_inspect",
+    ),
+
+    # ── archive_inspect ──────────────────────────────────────────────
+    # List contents of an archive without extracting.
+    #
+    # `tar` mode letters are exclusive; the negative lookahead rejects
+    # any bundle containing `c|x|r|A|u` or the long-form write verbs.
+    # `f?` allows the rare stdin-driven `tar -t` form.
+    (
+        re.compile(
+            r"\Atar"
+            r"(?!(?:.*\s)(?:-[a-zA-Z]*[cxrAu][a-zA-Z]*\b"
+            r"|--(?:create|extract|append|update|concatenate|catenate|delete)\b))"
+            r"\s+(?:-[a-zA-Z]*t[a-zA-Z]*|--list)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "archive_inspect",
+    ),
+    # `unzip` with a safe mode flag (list/verbose/zipinfo/test/stream).
+    # Bundle may combine only letters from `[lvZtpcq]`, rejecting
+    # extraction modifiers (`-o|-n|-d|-j`).
+    (
+        re.compile(
+            r"\Aunzip\s+-[lvZtpcq]+"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "archive_inspect",
+    ),
+    (
+        re.compile(r"\Azipinfo(?:\s+[^\s]+)+\s*\Z"),
+        "archive_inspect",
+    ),
+    # Compression list / test modes.
+    (
+        re.compile(
+            r"\A(?:gzip|bzip2|xz|zstd|lzma)"
+            r"\s+(?:-l|--list|-t|--test|-tv)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "archive_inspect",
+    ),
+    # Streaming decompressors that write to stdout (cat/less/more/grep
+    # on compressed archives).  None of these write back to disk.
+    (
+        re.compile(
+            r"\A(?:zcat|bzcat|xzcat|zstdcat|lz4cat"
+            r"|zless|zmore|bzless|bzmore|xzless|xzmore|zstdless|zstdmore"
+            r"|zgrep|zegrep|zfgrep|bzgrep|xzgrep|zstdgrep)"
+            r"(?:\s+[^\s]+)+\s*\Z",
+        ),
+        "archive_inspect",
+    ),
+
+    # ── container_inspect ────────────────────────────────────────────
+    # Read-only container-runtime and cluster queries.  `docker run` /
+    # `docker exec` / `kubectl apply` / `kubectl exec` / `kubectl
+    # delete` etc. are NOT in the subcommand list and therefore do not
+    # match; `docker exec` / `kubectl exec` also get tagged as
+    # `capability:spawns_process` which the gate rejects separately.
+    (
+        re.compile(
+            r"\A(?:docker|podman)\s+"
+            r"(?:ps|images|image\s+(?:ls|inspect|history)"
+            r"|logs|inspect|info|version|history|port|diff|top|stats"
+            r"|events|network\s+(?:ls|inspect)"
+            r"|volume\s+(?:ls|inspect)"
+            r"|container\s+(?:ls|inspect|logs|top|diff|port|stats)"
+            r"|system\s+(?:df|info|events))"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "container_inspect",
+    ),
+    (
+        re.compile(
+            r"\Akubectl\s+"
+            r"(?:get|describe|logs|top|version"
+            r"|api-resources|api-versions|explain"
+            r"|config\s+(?:view|get-contexts|current-context)"
+            r"|cluster-info|auth\s+can-i)"
+            r"(?:\s+[^\s]+)*\s*\Z",
+        ),
+        "container_inspect",
+    ),
+)
+
+
+# Bare shell metacharacter tokens.  When any of these appears as a
+# standalone token after re-tokenising the normalized command, we
+# assume shell composition is present and skip read-only emission.
+# (Quoted occurrences of these characters become part of a word, not
+# a standalone token, so this check is quote-aware.)
+_SHELL_COMPOSITION_TOKENS: frozenset[str] = frozenset({
+    "|", "||", "&", "&&", ";", ";;",
+    ">", ">>", "<", "<<", "<<<",
+    "&>", "2>", "2>>", "|&",
+})
+
+
+# Structural signal IDs that indicate dynamic content — any of these
+# disqualifies the command from a read-only fast-path because the
+# actual execution shape cannot be decided statically.
+_DYNAMIC_STRUCTURAL_IDS: frozenset[str] = frozenset({
+    "command-substitution",
+    "backtick-substitution",
+    "process-substitution",
+    "variable-expansion",
+    "interpreter-indirection",
+    "parse-failure",
+    "shlex-failure",
+})
 
 
 def classify_capabilities(
@@ -242,6 +689,7 @@ def classify_capabilities(
     *,
     sub_commands: tuple[str, ...] = (),
     indirections: tuple[str, ...] = (),
+    structural_signals: tuple[Signal, ...] = (),
 ) -> tuple[tuple[str, ...], tuple[Signal, ...]]:
     """Classify *command* into zero or more capability tags.
 
@@ -250,6 +698,12 @@ def classify_capabilities(
     (one per distinct capability).  Scans the normalized command,
     sub-commands, and indirection payloads so hidden shells still pay
     their tax.
+
+    ``structural_signals`` is optional context from step 4 — when
+    supplied, it is used by the read-only gate to reject commands that
+    already produced dynamic-content signals (command substitution,
+    variable expansion, parse failure, …).  Omitting it simply makes
+    the gate more conservative; it never falsely enables read-only.
     """
     if not command:
         return (), ()
@@ -274,6 +728,97 @@ def classify_capabilities(
             )
             break
 
+    if _safe_for_read_only(
+        command,
+        sub_commands=sub_commands,
+        indirections=indirections,
+        structural_signals=structural_signals,
+        emitted=seen,
+    ):
+        for rx, suffix in _READ_ONLY_RULES:
+            m = rx.match(command)
+            if m is None:
+                continue
+            cap_id = f"{CAPABILITY_READ_ONLY}:{suffix}"
+            if cap_id in seen:
+                continue
+            seen[cap_id] = Signal(
+                check="capability",
+                signal_id=cap_id,
+                description=(
+                    f"Command is a bare read-only {suffix.replace('_', ' ')} "
+                    f"invocation (no composition / redirect / indirection)"
+                ),
+                evidence=m.group()[:120],
+            )
+
     capabilities = tuple(seen.keys())
     signals = tuple(seen.values())
     return capabilities, signals
+
+
+def _safe_for_read_only(
+    command: str,
+    *,
+    sub_commands: tuple[str, ...],
+    indirections: tuple[str, ...],
+    structural_signals: tuple[Signal, ...],
+    emitted: dict[str, Signal],
+) -> bool:
+    """Return True if *command* is safe to consider for read-only tagging.
+
+    Required invariants:
+
+    1. No interpreter indirection payloads (`bash -c "..."`, `python -c ...`).
+    2. bashlex sees exactly one sub-command (no pipes / sequences).
+    3. No dynamic structural signal (command substitution, process
+       substitution, variable expansion, parse failure).
+    4. No bare shell-composition or redirect tokens in the
+       re-tokenised normalized command.
+    5. No already-emitted "unsafe" capability (stdin_exec,
+       filesystem_write, spawns_process, network_bind,
+       background_exec, download_and_exec, process_signal, or any
+       package_install / script_execution / compilation).
+
+    Any single failure disqualifies read-only emission.
+    """
+    if indirections:
+        return False
+    if len(sub_commands) != 1:
+        return False
+    for sig in structural_signals:
+        if sig.signal_id in _DYNAMIC_STRUCTURAL_IDS:
+            return False
+
+    try:
+        toks = shlex.split(command)
+    except ValueError:
+        return False
+    for tok in toks:
+        if tok in _SHELL_COMPOSITION_TOKENS:
+            return False
+
+    for cap_id in emitted:
+        # Any refined script_execution / package_install / read-only-
+        # incompatible tag means this command is doing more than
+        # passive inspection.  Keep the list explicit so future
+        # read-only families (e.g. network_read) don't accidentally
+        # get blocked by siblings in the same namespace.
+        if cap_id in {
+            CAPABILITY_STDIN_EXEC,
+            CAPABILITY_FILESYSTEM_WRITE,
+            CAPABILITY_SPAWNS_PROCESS,
+            CAPABILITY_NETWORK_BIND,
+            CAPABILITY_BACKGROUND_EXEC,
+            CAPABILITY_DOWNLOAD_AND_EXEC,
+            CAPABILITY_BINARY_DOWNLOAD,
+            CAPABILITY_PROCESS_SIGNAL,
+            CAPABILITY_COMPILATION,
+        }:
+            return False
+        if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
+            return False
+
+    return True
