@@ -1,25 +1,43 @@
 """
 Prompt library — versioned bodies of the AE and Guardian system prompts.
 
-Bundle C (C1) establishes the library with two prompt ids per component
-and three lane aliases on the AE side:
+The prompt-specialisation & criticality-routing refactor establishes the
+library with two prompt ids for Guardian and four prompt ids for the
+Analysis Engine:
 
 Analysis Engine
-    ``standard``                    — byte-identical to the pre-Bundle-C body
-    ``critical_generic``            — standard body + a focused critical
-                                      overlay (stricter scrutiny)
-    ``critical_network_probe``      — aliased to ``critical_generic`` in C1
-    ``critical_network_mutation``   — aliased to ``critical_generic`` in C1
+    ``standard``                    — byte-identical to the pre-specialisation baseline
+    ``critical_generic``            — **initial rollout**: aliased to ``standard``
+                                      (overlay body is currently empty —
+                                      see initial-rollout content policy below)
+    ``critical_network_probe``      — aliased to ``critical_generic``
+    ``critical_network_mutation``   — aliased to ``critical_generic``
 
 Guardian
-    ``standard``                    — byte-identical to the pre-Bundle-C body
-    ``critical``                    — standard body + a focused critical
-                                      overlay (stricter scrutiny)
+    ``standard``                    — byte-identical to the pre-specialisation baseline
+    ``critical``                    — **initial rollout**: aliased to ``standard``
+                                      (overlay body is currently empty —
+                                      see initial-rollout content policy below)
 
-The per-lane specialisation for network_probe vs network_mutation is
-deferred to C2/C3 so Bundle C's AI-behaviour change is confined to a
-single, additive overlay that moves judgement in the safer direction
-only (harder to ALLOW; never harder to BLOCK).
+Initial-rollout content policy — plumbing lands, bodies are deferred
+---------------------------------------------------------------------
+The routing infrastructure for every critical lane is fully wired:
+``DefaultPromptStrategy`` selects the lane, the engines hold one
+:class:`Agent` per prompt id, ``last_prompt_id`` flows into the audit
+log, unknown ids fail-closed to ``standard`` with a warning.
+
+However the **text content** of every critical lane is intentionally
+equal to ``standard`` in this initial rollout — the ``_CRITICAL_OVERLAY``
+constants in ``analysis.py`` and ``guardian.py`` are ``""``.  This means
+production LLM behaviour is byte-identical to the pre-specialisation
+baseline for every action type while the routing seam is ready for a
+later PR to author bespoke overlays without touching any engine /
+pipeline / strategy / audit code.
+
+Six tests in ``tests/test_prompt_library.py`` are marked
+``@pytest.mark.xfail(strict=False, ...)`` as living placeholders for
+that work — when the overlays are authored they will xpass and can
+then have the marker removed.
 
 Contract
 --------

@@ -1,7 +1,8 @@
 """Regression: ``ae_prompt_id`` / ``guardian_prompt_id`` must never leak
 across requests.
 
-Bundle C added observability fields on the AE and Guardian engines
+The prompt-specialisation & criticality-routing refactor added
+observability fields on the AE and Guardian engines
 (``last_prompt_id``) that the pipeline copies into the audit entry.
 The engines only assign these attributes inside their own ``analyze()``
 / ``validate()`` methods, which means any request that short-circuits

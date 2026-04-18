@@ -409,10 +409,10 @@ class TestCommandIntelPlumbing:
     """Pipeline always builds CommandIntel for RUN_COMMAND and forwards
     it to both AE and AIGuardian when they're invoked.
 
-    After Bundle B, AE + AIGuardian are only called when DG returns
-    UNDECIDED.  We use ``CMD_UNDECIDED`` for assertions that need to
-    observe AE/Guardian call kwargs; fast-pathed commands skip both
-    (that's the whole point — no AE call to inspect).
+    After the pre-AE deterministic pass, AE + AIGuardian are only called
+    when DG returns UNDECIDED.  We use ``CMD_UNDECIDED`` for assertions
+    that need to observe AE/Guardian call kwargs; fast-pathed commands
+    skip both (that's the whole point — no AE call to inspect).
     """
 
     def _intel_from(self, engine_or_guardian) -> CommandIntel | None:
@@ -490,7 +490,7 @@ class TestCommandIntelPlumbing:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# DeterministicGuardian pipeline wiring (Bundle B / Phase 4)
+# DeterministicGuardian pipeline wiring (pre-AE deterministic pass)
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestDeterministicGuardianPipelineFlow:

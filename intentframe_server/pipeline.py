@@ -682,7 +682,7 @@ class IntentFrameRuntime:
         if dg_matched_gate:
             audit_entry["matched_gate"] = dg_matched_gate
 
-        # Bundle C — record which AE / Guardian prompt lane ran.
+        # Prompt-lane audit — record which AE / Guardian prompt lane ran.
         # `last_prompt_id` is populated by the engines when (and only
         # when) an AI call was made; deterministic and fast-path
         # outcomes leave it at None, so absent fields here correctly

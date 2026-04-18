@@ -188,5 +188,63 @@ The pipeline's intelligence is concentrated where the bombs are, not spread thin
 ## Status
 
 - **Current (V1/MVP):** Single AE + single Guardian. Proved the architecture works. Validated by milestones and 24 attack tests.
-- **Next (OSS release):** Specialised routing. Option A (same components, different prompts) as first step. Surgical change in `pipeline.py`.
-- **Future:** Option B (separate instances) when critical path needs fine-tuned models or different infrastructure.
+- **Shipped (commit `e705d57`) — Option A plumbing (prompt specialisation & criticality routing):** See "What shipped" below.
+- **Next (OSS release):** Author the `_CRITICAL_OVERLAY` bodies for AE (`critical_generic` + sub-lanes) and Guardian (`critical`).  Zero code change — only edit `intentframe_components/prompt/library/{analysis,guardian}.py` and remove the `xfail` markers in `tests/test_prompt_library.py`.
+- **Future:** Option B (separate-engine-instances architecture) when the critical path needs fine-tuned models or different infrastructure.
+
+---
+
+## What shipped (prompt specialisation & criticality routing)
+
+Commit `e705d57` ("refactor pipeline prompt strategy and routing") lands
+**the full routing plumbing under Option A with the overlay content
+intentionally neutralised to the empty string**.  The production LLM sees
+byte-identical prompts to the pre-specialisation baseline for every action
+type, while every seam needed to later turn on specialised bodies is live
+and covered by tests.
+
+### Components added
+
+| Module | Purpose |
+|---|---|
+| `intentframe_components/routing/criticality.py` | `CRITICAL_ACTIONS` frozenset + `is_critical()` helper — single source of truth for which action types ride the critical lane. |
+| `intentframe_components/prompt/library/analysis.py` | AE prompt bodies: `standard`, `critical_generic`, `critical_network_probe`, `critical_network_mutation`. `_CRITICAL_OVERLAY = ""` in initial rollout. |
+| `intentframe_components/prompt/library/guardian.py` | Guardian prompt bodies: `standard`, `critical`. `_CRITICAL_OVERLAY = ""` in initial rollout. |
+| `intentframe_components/prompt/strategy.py` | `PromptStrategy` Protocol + `DefaultPromptStrategy` — deterministic selection of AE / Guardian prompt ids from `intent.action` and `command_intel.capabilities`. |
+| `AIAnalysisEngine`, `AIGuardian` | Now accept `prompt_strategy` at construction, hold one `Agent` per prompt id, and expose `last_prompt_id` for audit. |
+| `intentframe_server/pipeline.py` | Records `ae_prompt_id` / `guardian_prompt_id` in the audit entry when the AI path ran; resets the engine-side `last_prompt_id` at the start of every request so deterministic / fast-path outcomes never inherit stale values. |
+
+### Tests added
+
+| File | What it pins |
+|---|---|
+| `tests/test_prompt_strategy.py` | AE routing matrix (RUN_COMMAND × capability sub-tags, critical non-command actions, non-critical actions), Guardian routing matrix, precedence (mutation > probe > generic), fail-closed when `command_intel` is missing on RUN_COMMAND, drift guard `CRITICAL_ACTIONS ∩ _PASSIVE_READ_ACTIONS == ∅`. |
+| `tests/test_prompt_library.py` | Shape (all ids present, non-empty, read-only mapping), standard-body keyword invariants, critical-overlay invariants (6 tests `xfail(strict=False)` as living placeholders for the initial rollout), aliasing of probe / mutation lanes. |
+| `tests/test_audit_prompt_id_reset.py` | Regression: deterministic-ALLOW and deterministic-BLOCK audit entries must not carry `ae_prompt_id` / `guardian_prompt_id` from a preceding AI-path request. |
+
+### Routing wired end-to-end
+
+Analysis Engine (precedence — strictest first):
+
+1. `critical_network_mutation` — RUN_COMMAND + any of `capability:network_probe:{http_mutate, http_download, port_scan, file_transfer}`
+2. `critical_network_probe` — RUN_COMMAND + any of `capability:network_probe:{icmp, trace, dns, whois, http_get}`
+3. `critical_generic` — action ∈ `CRITICAL_ACTIONS` (includes RUN_COMMAND without known sub-tags, and RUN_COMMAND with missing `command_intel` — fail-closed)
+4. `standard` — everything else
+
+Guardian:
+
+1. `critical` — action ∈ `CRITICAL_ACTIONS`
+2. `standard` — everything else
+
+### What is deliberately deferred
+
+- **Overlay text.** `_CRITICAL_OVERLAY` is `""` in both libraries.  The commented-out drafts in `analysis.py` and `guardian.py` capture the initial design discussion — keep, rewrite, or replace when authoring.
+- **Probe / mutation sub-lane specialisation.** `critical_network_probe` and `critical_network_mutation` alias `critical_generic` in the initial rollout.  Per-lane overlay bodies will replace them without any engine / strategy / test change beyond the library file and `tests/test_prompt_library.py::TestInitialRolloutAliasing` (whose docstring says to delete those assertions when the alias ends).
+- **Model tiering.** Every lane currently uses the same model.  The seams (one `Agent` per id, lane name in `Agent.name`) are ready for per-lane model configuration when wanted.
+
+### Guardrails against regression
+
+- `DefaultPromptStrategy` is pure and sync → trivially testable without spinning up agents.
+- Unknown prompt ids fall back to `"standard"` with a warning log, never crash (`_resolve_prompt_id` in both engines).
+- `last_prompt_id` is reset at two levels: per-request in `pipeline._process_intent_impl` (covers short-circuits) **and** on every `analyze()` / `validate()` entry (covers the AI path).  Either reset alone would fix the original audit-leak bug; both together make the invariant independent of call-site order.
+- The audit fields are only added when `last_prompt_id` is set, so absent fields correctly mean "no AI prompt was used" — they do not ambiguate between "stale" and "clean".

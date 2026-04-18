@@ -8,6 +8,24 @@ lives on the AE side — Guardian's job is policy enforcement, not
 command-shape reasoning, so an extra lane would dilute focus.
 
 Every prompt id must produce :class:`AIGuardianOutput`.
+
+Initial-rollout content policy — ``critical`` aliases ``standard``
+------------------------------------------------------------------
+Symmetric with the AE library: ``_CRITICAL_OVERLAY = ""`` so the
+``critical`` body is byte-identical to ``standard`` in this initial
+rollout.  The routing plumbing is live (``DefaultPromptStrategy``
+selects ``critical`` for actions in :data:`CRITICAL_ACTIONS`, the
+Guardian engine holds one :class:`Agent` per id, ``last_prompt_id``
+feeds the audit log), but the text change is deferred to a later PR
+so the prompt-specialisation refactor ships zero production
+LLM-behaviour change.
+
+To author a critical body later:
+    1. Replace the ``_CRITICAL_OVERLAY = ""`` assignment with the
+       desired overlay string (the commented-out block above is the
+       draft from the initial design discussion — keep or rewrite).
+    2. Remove the ``@pytest.mark.xfail`` markers on the overlay-
+       content tests in ``tests/test_prompt_library.py``.
 """
 
 from __future__ import annotations
@@ -17,7 +35,7 @@ from typing import Mapping
 
 
 # ────────────────────────────────────────────────────────────────
-# STANDARD — byte-identical to the pre-Bundle-C body
+# STANDARD — byte-identical to the pre-specialisation baseline
 # ────────────────────────────────────────────────────────────────
 # If you're touching this string, you are changing the production
 # Guardian prompt.  tests/test_prompt_hardening.py asserts on a

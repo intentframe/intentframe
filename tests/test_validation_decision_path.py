@@ -1,4 +1,4 @@
-"""Tests for ValidationResult.decision_path plumbing (Bundle A bug fix).
+"""Tests for ValidationResult.decision_path plumbing.
 
 The pipeline used to detect fast-path decisions via a brittle string
 check on ``validation.message`` (``"fast-path" in message.lower()``).
@@ -153,8 +153,8 @@ class TestPipelineReadsDecisionPath:
         assert runtime.audit_log[0]["decision_path"] == "ai_path"
 
     def test_deterministic_decision_in_audit(self):
-        """Reserved value is preserved end-to-end — matters for Bundle B
-        when DeterministicGuardian starts emitting it."""
+        """Reserved value is preserved end-to-end — required by
+        DeterministicGuardian which emits ``decision_path="deterministic"``."""
         validation = ValidationResult(
             decision=Decision.ALLOW,
             intent=_intent(),

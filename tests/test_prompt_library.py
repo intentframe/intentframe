@@ -1,4 +1,4 @@
-"""Unit tests for Bundle C — prompt library invariants.
+"""Unit tests for the prompt library — structural and content invariants.
 
 These tests pin the contract between the prompt bodies and the rest of
 the system.  They intentionally do **not** pin the exact text — prompt
@@ -15,16 +15,30 @@ invariants that the engines and tests depend on:
     decide" invariant (still says Guardian is the decider) and does
     not introduce an allow/block verdict into the AE prompt.
   - ``critical_network_probe`` and ``critical_network_mutation`` are
-    aliased to ``critical_generic`` in C1 (byte-identical).  C2/C3 will
-    replace them; when they do, the "alias" test should be deleted
-    rather than mechanically updated.
+    aliased to ``critical_generic`` in the initial rollout (byte-identical).
+    Per-lane overlay bodies will replace them later; when they do, the
+    "alias" test should be deleted rather than mechanically updated.
   - Guardian's ``critical`` body is a strict superset of ``standard``
     with symmetric critical-overlay properties.
   - ``_base_instructions()`` on both engines still returns the
     ``standard`` body — the back-compat promise.
+
+Placeholder tests for overlay content (initial rollout)
+-------------------------------------------------------
+The six tests that assert on critical-overlay *content* (length
+strictly greater than standard, "CRITICAL-ACTION OVERLAY" marker,
+"understand/decide" / "enforce/analyse" framing) are marked
+``@pytest.mark.xfail(strict=False, ...)`` because ``_CRITICAL_OVERLAY``
+is intentionally ``""`` in the initial rollout — the routing plumbing
+ships now, the overlay bodies ship later.  ``strict=False`` means: when
+the overlays are authored and the tests start passing, pytest will
+report them as XPASS rather than failing the suite, giving the author
+a clear signal to remove the markers.
 """
 
 from __future__ import annotations
+
+import pytest
 
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
@@ -33,6 +47,21 @@ from intentframe_components.prompt.library import (
     ANALYSIS_PROMPT_IDS,
     GUARDIAN_PROMPTS,
     GUARDIAN_PROMPT_IDS,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Placeholder marker — remove from each test below when the
+# corresponding overlay body is authored (see library/__init__.py).
+# ═══════════════════════════════════════════════════════════════════════
+
+_OVERLAY_PLACEHOLDER = pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "_CRITICAL_OVERLAY is intentionally empty in the initial rollout; "
+        "routing / audit plumbing ships now, overlay bodies deferred to a "
+        "later PR.  Remove this marker when the overlay is authored."
+    ),
 )
 
 
@@ -115,19 +144,24 @@ class TestAECriticalOverlay:
     def test_critical_generic_starts_with_standard_body(self):
         # Additive: critical_generic must contain the entire standard
         # body verbatim as a prefix.  No rewrites of inherited rules.
+        # Passes trivially while overlay is empty (critical_generic ==
+        # standard).  Remains the correct invariant once the overlay is authored.
         assert ANALYSIS_PROMPTS["critical_generic"].startswith(
             ANALYSIS_PROMPTS["standard"],
         )
 
+    @_OVERLAY_PLACEHOLDER
     def test_critical_generic_is_strictly_longer_than_standard(self):
         assert len(ANALYSIS_PROMPTS["critical_generic"]) > len(
             ANALYSIS_PROMPTS["standard"],
         )
 
+    @_OVERLAY_PLACEHOLDER
     def test_critical_overlay_mentions_critical_action_framing(self):
         overlay = ANALYSIS_PROMPTS["critical_generic"][len(ANALYSIS_PROMPTS["standard"]):]
         assert "CRITICAL-ACTION OVERLAY" in overlay
 
+    @_OVERLAY_PLACEHOLDER
     def test_critical_overlay_preserves_understand_not_decide(self):
         # The core invariant from concepts/core/layers/03-analysis-engine.md:
         # AE never makes an ALLOW/BLOCK decision.  The overlay must
@@ -159,15 +193,19 @@ class TestAECriticalOverlay:
 
 class TestGuardianCriticalOverlay:
     def test_critical_starts_with_standard_body(self):
+        # Passes trivially while overlay is empty (critical == standard).
         assert GUARDIAN_PROMPTS["critical"].startswith(GUARDIAN_PROMPTS["standard"])
 
+    @_OVERLAY_PLACEHOLDER
     def test_critical_is_strictly_longer_than_standard(self):
         assert len(GUARDIAN_PROMPTS["critical"]) > len(GUARDIAN_PROMPTS["standard"])
 
+    @_OVERLAY_PLACEHOLDER
     def test_critical_overlay_mentions_critical_action_framing(self):
         overlay = GUARDIAN_PROMPTS["critical"][len(GUARDIAN_PROMPTS["standard"]):]
         assert "CRITICAL-ACTION OVERLAY" in overlay
 
+    @_OVERLAY_PLACEHOLDER
     def test_critical_overlay_preserves_enforce_not_analyse(self):
         overlay = GUARDIAN_PROMPTS["critical"][len(GUARDIAN_PROMPTS["standard"]):]
         lowered = overlay.lower()
@@ -178,24 +216,24 @@ class TestGuardianCriticalOverlay:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# C1 aliasing (delete this class when C2/C3 specialises these lanes)
+# Initial-rollout aliasing (delete this class when per-lane overlay
+# bodies are authored for probe / mutation lanes)
 # ═══════════════════════════════════════════════════════════════════════
 
-class TestC1Aliasing:
-    """C1 ships probe / mutation lanes aliased to critical_generic.
+class TestInitialRolloutAliasing:
+    """Probe / mutation lanes are aliased to critical_generic on initial rollout.
 
-    These tests document that intentionally.  When C2 or C3 replaces
-    either lane with a purpose-built body, delete the corresponding
-    assertion here rather than mechanically updating it — the whole
-    point is that the alias is a temporary state.
+    These tests document that intentionally.  When per-lane overlay bodies
+    replace either lane, delete the corresponding assertion here rather than
+    mechanically updating it — the whole point is that the alias is temporary.
     """
 
-    def test_probe_lane_aliased_to_critical_generic_in_c1(self):
+    def test_probe_lane_aliased_to_critical_generic(self):
         assert ANALYSIS_PROMPTS["critical_network_probe"] == ANALYSIS_PROMPTS[
             "critical_generic"
         ]
 
-    def test_mutation_lane_aliased_to_critical_generic_in_c1(self):
+    def test_mutation_lane_aliased_to_critical_generic(self):
         assert ANALYSIS_PROMPTS["critical_network_mutation"] == ANALYSIS_PROMPTS[
             "critical_generic"
         ]

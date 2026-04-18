@@ -6,14 +6,14 @@ Analysis Engine and Guardian should use for a given intent.  It is
 deliberately kept outside both engines so:
 
 - Routing can be tested without instantiating any :class:`Agent`.
-- A future Bundle D (separate engine instances) can reuse the same
-  routing decisions by consuming the prompt id and dispatching to
-  a different engine.
+- A future per-criticality-engine architecture (separate engine instances)
+  can reuse the same routing decisions by consuming the prompt id and
+  dispatching to a different engine.
 - Third parties can ship their own :class:`PromptStrategy` by
   satisfying the Protocol, without touching the engines.
 
-Routing model (C1)
-------------------
+Routing model (initial rollout — overlay bodies empty, routing live)
+---------------------------------------------------------------------
 Analysis Engine ids, in precedence order (strictest wins):
 
     critical_network_mutation   (RUN_COMMAND + capability:network_probe:{http_mutate, http_download, port_scan, file_transfer})
@@ -123,7 +123,7 @@ class PromptStrategy(Protocol):
 
         ``analysis`` is passed so future strategies can route on
         AE-classified risk / domains (e.g. finance → finance prompt).
-        The C1 default strategy ignores it beyond action-type checks.
+        The default strategy ignores it beyond action-type checks.
         """
         ...
 
@@ -190,7 +190,7 @@ class DefaultPromptStrategy:
         command_intel: CommandIntel | None,
     ) -> str:
         # analysis and command_intel are accepted for future strategies
-        # (e.g. finance-domain Guardian prompt); the C1 default routes
+        # (e.g. finance-domain Guardian prompt); the default strategy routes
         # purely on action criticality.
         del analysis, command_intel
 

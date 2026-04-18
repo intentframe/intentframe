@@ -1,4 +1,4 @@
-"""Unit tests for Bundle C — prompt-id routing (DefaultPromptStrategy).
+"""Unit tests for prompt-id routing (DefaultPromptStrategy).
 
 Covers:
   - AE routing matrix (standard vs critical_generic vs critical_network_probe
@@ -184,8 +184,8 @@ class TestGuardianRouting:
             None,
         ) == "critical"
 
-    def test_guardian_ignores_command_intel_and_analysis_in_c1(self):
-        # C1 contract: Guardian routing is purely action-type driven.
+    def test_guardian_ignores_command_intel_and_analysis(self):
+        # Guardian routing is purely action-type driven.
         # Passing analysis / command_intel must not change the outcome.
         caps = _intel("capability:network_probe:http_mutate")
         assert STRATEGY.select_guardian_prompt_id(
@@ -201,7 +201,7 @@ class TestLibraryIntegrity:
     def test_ae_strategy_returns_only_known_ids(self):
         # Every RUN_COMMAND permutation the strategy can produce must
         # resolve to a real body in the library.  The engine has a
-        # fail-closed fallback, but in C1 the default strategy must
+        # fail-closed fallback, but the default strategy must
         # never need to trigger it.
         for action in ActionType:
             pid = STRATEGY.select_ae_prompt_id(_intent(action, "x"), None)

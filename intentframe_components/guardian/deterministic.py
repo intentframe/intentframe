@@ -140,9 +140,9 @@ class DeterministicGuardian:
 
         ``active_domains`` and ``execution_context`` are accepted for
         forward-compatibility with richer gates; today the six rules
-        below ignore them.  Carrying the parameters means Bundle B
-        can wire DG into the pipeline without another signature
-        change when a future rule needs them.
+        below ignore them.  Carrying the parameters means DG can be
+        wired into the pipeline without another signature change when
+        a future rule needs them.
         """
         del active_domains, execution_context  # reserved; see docstring
 

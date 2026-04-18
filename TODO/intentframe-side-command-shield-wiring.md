@@ -1,6 +1,29 @@
 # IntentFrame-Side Command Shield Wiring
 
-> `command_shield` now emits rich capability, edge, and code-intel signals. None of them are wired into the IntentFrame consumer side yet. This TODO captures the four sequential gaps that must be closed to convert those signals from latent facts into actual LLM-cost reductions and stronger deterministic security.
+> `command_shield` emits rich capability, edge, and code-intel signals. This TODO captured the four sequential gaps that had to close for the consumer side to convert those signals into real LLM-cost reductions and stronger deterministic security.
+>
+> **Status (post-commit `a9866cc` "update new command shield and deterministic gate in intentframe" + `b7e146e` "update new composition capability" + `e705d57` "refactor pipeline prompt strategy and routing"): all four gaps are CLOSED.** The detailed sections below are preserved as the design record; the "Shipped" summary immediately after this paragraph captures the current state.
+
+---
+
+## Shipped (summary)
+
+| Gap | Shipped in | What landed |
+|---|---|---|
+| 0   | command_shield v2 | `capability:read_only:*` (10 single-head sub-tags + `composition` aggregate) and `capability:filesystem_write` emitted under strict structural gates, with trusted-path head normalisation. |
+| 0.5 | command_shield v2 | `capability:network_probe:*` family (9 sub-tags) emitted under the same structural-bareness predicate as `read_only:*`. |
+| 0.6 | command_shield v2 | `capability:read_only:composition` and trusted-path head normalisation — transparent to consumers via prefix match. |
+| 1   | pipeline.py | `report.signals` is now forwarded to AE for all non-catastrophic verdicts (not just `NEEDS_REVIEW`). |
+| 2   | policy_registry/constraints/terminal.py | `TerminalConstraints` gained `allow_capabilities` and `deny_capabilities`; policy matching supports prefix wildcards on the `:` boundary. |
+| 3   | guardian/checkers/terminal.py | `TerminalChecker` evaluates `deny_capabilities` / `allow_capabilities` against `report.capabilities` via a side-channel `CommandIntel` (Option B ended up cleaner in practice than Option A). |
+| 4   | guardian/deterministic.py + pipeline.py | `DeterministicGuardian` runs as a pre-AE pass; emits BLOCK / ALLOW / UNDECIDED; ALLOW short-circuit keyed off `capability:read_only:*` with the full disqualifier set (filesystem_write, stdin_exec, network_bind, background_exec, download_and_exec, process_signal, spawns_process, any `network_probe:*`, any deny-capability hit, any `edge:*` signal, any `code_intel` finding). Both `DeterministicGuardian.BLOCK` and `ALLOW` completely skip AE + AI Guardian. |
+| 5   | prompt/strategy.py + prompt/library/ + engines | `RUN_COMMAND` AI-path traffic is routed to specialised AE lanes keyed on `capability:network_probe:*` sub-tags (`critical_network_probe` for `{icmp, trace, dns, whois, http_get}`, `critical_network_mutation` for `{http_mutate, http_download, port_scan, file_transfer}`, `critical_generic` otherwise). Guardian similarly routes to a `critical` lane for any action in `CRITICAL_ACTIONS`. Lane **bodies** are neutralised in the initial rollout (overlay content = `""`; see `TODO/AE_Guardian_specialisation_routes.md` — "What shipped"); lane **routing, audit recording, and fail-closed fallback** are live. |
+
+See `intentframe_server/pipeline.py` (`_process_intent_impl`) for the end-to-end sequence and `intentframe_components/guardian/deterministic.py` for the fast-path short-circuit rule in code form. `tests/test_pipeline_shield.py`, `tests/test_deterministic_guardian.py`, `tests/test_prompt_strategy.py`, and `tests/test_audit_prompt_id_reset.py` pin the behaviour.
+
+---
+
+## Original context (preserved as the design record)
 
 ---
 
@@ -329,20 +352,21 @@ Rough aggregate: **70–85% of total intent traffic** avoids an AE LLM call. For
 
 ---
 
-## Suggested Implementation Order
+## Suggested Implementation Order (historical)
 
-| Step | Change | Risk |
-|---|---|---|
-| 0 | **(Done)** Add `capability:read_only:*` + `capability:filesystem_write` tags to `command_shield.classifier` | — |
-| 0.5 | **(Done)** Add `capability:network_probe:*` family to `command_shield.classifier` (9 sub-tags, same structural gate as read_only) | — |
-| 0.6 | **(Done)** Add `capability:read_only:composition` + trusted-path head normalisation to `command_shield.classifier` (covers pipe / `cd &&` / chain / mixed-joiner compositions and absolute paths from trusted `bin` directories — transparent to consumers via prefix match) | — |
-| 1 | Always forward `report.signals` to AE (Gap 1) | Low — AE already handles extra signals gracefully |
-| 2 | Add `allow_capabilities`/`deny_capabilities` to `TerminalConstraints` (Gap 2) | Low — additive fields, existing policy unaffected |
-| 3 | Extend `TerminalChecker` to evaluate capabilities (Gap 3) | Low — pure addition to checker logic |
-| 4 | Wire capability deny-check to existing Jarvis policy for immediate wins | Low — just populate the new fields in user policy |
-| 5 | Extract and run deterministic Guardian pre-pass before AE (Gap 4) — includes the read-only ALLOW short-circuit above | Medium — pipeline reorder, needs careful testing of UNDECIDED boundary |
+| Step | Change | Risk | Status |
+|---|---|---|---|
+| 0 | Add `capability:read_only:*` + `capability:filesystem_write` tags to `command_shield.classifier` | — | **Done** |
+| 0.5 | Add `capability:network_probe:*` family to `command_shield.classifier` (9 sub-tags, same structural gate as read_only) | — | **Done** |
+| 0.6 | Add `capability:read_only:composition` + trusted-path head normalisation to `command_shield.classifier` | — | **Done** |
+| 1 | Always forward `report.signals` to AE (Gap 1) | Low — AE already handles extra signals gracefully | **Done** |
+| 2 | Add `allow_capabilities`/`deny_capabilities` to `TerminalConstraints` (Gap 2) | Low — additive fields, existing policy unaffected | **Done** |
+| 3 | Extend `TerminalChecker` to evaluate capabilities (Gap 3) | Low — pure addition to checker logic | **Done** |
+| 4 | Wire capability deny-check to per-agent policy (e.g. Jarvis) for immediate wins | Low — just populate the new fields in user policy | **Done** (policy files shipped) |
+| 5 | Extract and run deterministic Guardian pre-pass before AE (Gap 4) — includes the read-only ALLOW short-circuit above | Medium — pipeline reorder, needs careful testing of UNDECIDED boundary | **Done** |
+| 6 | Author per-lane overlay bodies for `critical_network_probe` / `critical_network_mutation` / `critical_generic` (AE) + `critical` (Guardian) | Medium — prompt edits need red-team coverage | **Plumbing done** (commit `e705d57`, prompt-specialisation & criticality-routing refactor); **overlay bodies deferred** — see `TODO/AE_Guardian_specialisation_routes.md` |
 
-Steps 1–4 are independently shippable with no risk to existing behaviour. Step 5 is the larger refactor but has the biggest latency/cost impact.
+All structural work is shipped. The only remaining work is authoring the critical-lane overlay bodies (step 6) — a pure content edit in `intentframe_components/prompt/library/{analysis,guardian}.py`, guarded by the `xfail`-marked placeholder tests in `tests/test_prompt_library.py`.
 
 ---
 

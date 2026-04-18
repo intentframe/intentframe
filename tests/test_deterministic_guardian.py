@@ -1,4 +1,4 @@
-"""Unit tests for DeterministicGuardian (Bundle B / Phase 4).
+"""Unit tests for DeterministicGuardian (pre-AE deterministic pass).
 
 Covers the six rules of the pre-AE pass:
 

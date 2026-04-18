@@ -243,7 +243,7 @@ class AIAnalysisEngine(AnalysisEngine):
         self.verbose = verbose
         self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
 
-        # Build one Agent per prompt id.  N is tiny (≤4 for C1), Agents
+        # Build one Agent per prompt id.  N is tiny (4 in the current library), Agents
         # are cheap, and this keeps per-request selection an O(1) dict
         # lookup with zero allocation.  The role preamble and hardening
         # wrapper are identical across ids — only the base_instructions

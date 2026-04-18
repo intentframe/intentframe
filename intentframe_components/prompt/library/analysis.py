@@ -10,19 +10,19 @@ same hardening invariants.
 ``ANALYSIS_PROMPT_IDS`` freezes the set of recognised ids so the engine
 and strategy can validate lookups without scanning the mapping keys.
 
-C1 content policy — all lanes alias to _STANDARD
-------------------------------------------------
-The routing / plumbing for critical lanes (``critical_generic``,
+Initial-rollout content policy — all critical lanes alias to _STANDARD
+----------------------------------------------------------------------
+The routing plumbing for critical lanes (``critical_generic``,
 ``critical_network_probe``, ``critical_network_mutation``) is fully
-wired end-to-end in Bundle C: strategy selection, per-lane Agent
-objects, audit-log recording of the chosen lane, fail-closed fallback.
+wired end-to-end: strategy selection, per-lane Agent objects,
+audit-log recording of the chosen lane, fail-closed fallback.
 
 However, the **content** of every critical lane is intentionally
-aliased to the standard body in C1.  That means production LLM
-behaviour is byte-identical to pre-Bundle-C for every action type,
-while the routing infrastructure is ready for a later PR to author
-bespoke critical overlays without touching any engine / pipeline /
-test code.
+aliased to the standard body in this initial rollout.  That means
+production LLM behaviour is byte-identical to the pre-specialisation
+baseline for every action type, while the routing infrastructure is
+ready for a later PR to author bespoke critical overlays without
+touching any engine / pipeline / test code.
 
 To author a critical body later:
     1. Define a new module-level constant (e.g. ``_CRITICAL_GENERIC``)
@@ -39,7 +39,7 @@ from typing import Mapping
 
 
 # ────────────────────────────────────────────────────────────────
-# STANDARD — byte-identical to the pre-Bundle-C body
+# STANDARD — byte-identical to the pre-specialisation baseline
 # ────────────────────────────────────────────────────────────────
 # If you're touching this string, you are changing the production
 # AE prompt.  All tests that assert on keyword fragments (e.g.
@@ -193,8 +193,8 @@ _CRITICAL_GENERIC = _STANDARD + _CRITICAL_OVERLAY
 ANALYSIS_PROMPTS: Mapping[str, str] = MappingProxyType({
     "standard": _STANDARD,
     "critical_generic": _CRITICAL_GENERIC,
-    # C1: probe and mutation lanes are aliased to critical_generic.
-    # C2/C3 will replace these with purpose-built bodies.
+    # Initial rollout: probe and mutation lanes are aliased to critical_generic.
+    # Per-lane overlay bodies will replace these in a later PR.
     "critical_network_probe": _CRITICAL_GENERIC,
     "critical_network_mutation": _CRITICAL_GENERIC,
 })
