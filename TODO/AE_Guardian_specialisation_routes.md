@@ -130,6 +130,49 @@ The routing is a simple set lookup — same pattern as `_PASSIVE_READ_ACTIONS` b
 
 ---
 
+## Sub-routing inside the Critical path: the network-probe lane
+
+Within `RUN_COMMAND` (already on the critical path), `command_shield`
+now emits a `capability:network_probe:*` family that splits the
+critical-path traffic further.  Rather than routing every outbound-
+traffic command through the single generic critical AE, the critical
+pipeline can apply a second, zero-overhead deterministic routing step
+based on the capability tags:
+
+| `network_probe:*` sub-tag | Route |
+|---|---|
+| `icmp`, `trace`, `dns`, `whois` | **Probe-lane AE** — lightweight critical prompt that knows the command is a local / informational probe. Fast model, short prompt. Deterministic ALLOW if policy permits the specific family against the target (e.g. corp DNS). |
+| `http_get` | **Probe-lane AE** + URL/domain allow-list check. Fast-path ALLOW if the URL is on a per-tool allow-list; otherwise the probe-lane prompt evaluates the full context. |
+| `http_mutate`, `http_download` | **Network-mutation AE** — stricter critical prompt. Must reason about the target URL, request body, and data-exfiltration risk. Never deterministic ALLOW. |
+| `port_scan`, `file_transfer` | **Network-mutation AE** — plus a reminder in the prompt that this pattern is a common exfiltration / lateral-movement shape. Never deterministic ALLOW. |
+
+Why this matters:
+
+- **Prompt specialisation.** The probe-lane prompt can be ~30% the
+  size of the generic critical prompt because it knows the command
+  shape: no code-content inspection, no write-then-execute reasoning,
+  just domain/URL policy.  The network-mutation prompt, conversely,
+  leans in on exfiltration heuristics.
+- **Model tiering.** Probe lane can use the fast/cheap model; network-
+  mutation lane deserves the deeper model.
+- **Zero routing cost.** Just like the primary critical/standard
+  split, this is a dictionary lookup on `report.capabilities` — no
+  extra LLM call to decide routing.
+- **Fast-path is still possible for innocuous probes.** A dev laptop
+  policy might deterministically ALLOW `network_probe:dns` and
+  `network_probe:icmp` without AE at all.  `command_shield` emits the
+  tags under the same strict structural gate as `read_only:*`, so
+  they're trustworthy for deterministic use.
+
+Implementation is additive on top of Option A: the `AnalysisEngine`
+picks one of three prompts (`standard`, `critical_generic`,
+`critical_network_probe`, `critical_network_mutation`) based on the
+action type plus the capability tags, with everything else unchanged.
+Under Option B this becomes two separate engine instances inside the
+critical path (`CriticalProbeEngine`, `CriticalMutationEngine`).
+
+---
+
 ## Relationship to Prevention-First Philosophy
 
 This fits naturally with the prevention-first model from [Execution-Security-Model.md](../concepts/extras/Execution-Security-Model.md):
