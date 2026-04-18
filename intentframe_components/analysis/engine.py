@@ -35,7 +35,19 @@ from intentframe_core.enums import Reversibility, RiskLevel
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
+from intentframe_components.prompt.library import (
+    ANALYSIS_PROMPT_IDS,
+    ANALYSIS_PROMPTS,
+)
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
+from intentframe_components.prompt.strategy import (
+    DefaultPromptStrategy,
+    PromptStrategy,
+)
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -225,96 +237,52 @@ class AIAnalysisEngine(AnalysisEngine):
         self,
         model: str = "gpt-4o-mini",
         verbose: bool = True,
+        prompt_strategy: PromptStrategy | None = None,
     ):
         self.model = model
         self.verbose = verbose
+        self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
 
-        self._agent = Agent(
-            name="Analysis Engine",
-            instructions=self._hardener.harden_system_prompt(
-                base_instructions=self._base_instructions(),
-                role_preamble=ANALYSIS_ENGINE_ROLE,
-            ),
-            model=self.model,
-            output_type=AIAnalysisOutput,
-            model_settings=ModelSettings(temperature=0),
-        )
-    
+        # Build one Agent per prompt id.  N is tiny (≤4 for C1), Agents
+        # are cheap, and this keeps per-request selection an O(1) dict
+        # lookup with zero allocation.  The role preamble and hardening
+        # wrapper are identical across ids — only the base_instructions
+        # body differs per lane.
+        self._agents: dict[str, Agent] = {
+            pid: Agent(
+                name=f"Analysis Engine ({pid})",
+                instructions=self._hardener.harden_system_prompt(
+                    base_instructions=body,
+                    role_preamble=ANALYSIS_ENGINE_ROLE,
+                ),
+                model=self.model,
+                output_type=AIAnalysisOutput,
+                model_settings=ModelSettings(temperature=0),
+            )
+            for pid, body in ANALYSIS_PROMPTS.items()
+        }
+        # Back-compat: tests and callers that reach for `self._agent`
+        # get the standard lane.  The default for anything that doesn't
+        # know about prompt routing.
+        self._agent = self._agents["standard"]
+
+        # Last-used prompt id, populated by analyze().  The pipeline
+        # reads this for audit only; concurrent writes are bounded by
+        # the runtime's per-request asyncio.Lock.  Reset at the start
+        # of every analyze() call so stale values never leak across
+        # requests.
+        self.last_prompt_id: str | None = None
+
     @staticmethod
     def _base_instructions() -> str:
-        return """
-You examine an action request and produce a factual analysis of what it will really do.
-Approach every request as a skeptical security expert — verify, do not assume.
+        """Return the standard-lane AE system-prompt body.
 
-You receive three untrusted components in each request:
-- Target: where the action is directed (a file path, email address, URL, etc.)
-- Reason: the agent's narrative claim about why it is taking this action
-- Data: key-value pairs carrying the action's payload (amounts, recipients, dates, etc.)
-
-Your responsibilities:
-1. Describe the actual behavior of the action (what changes, what is accessed)
-2. Describe the scope of resources touched (requested vs actual)
-3. Classify which semantic domains this action falls under (see rules below)
-4. Identify hidden behaviors (see rules below)
-5. Cross-check consistency across reason, target, and data (see rules below)
-6. Determine reversibility (can it be undone)
-7. Assess risk based on the direct impact of this action
-8. Provide confidence in your analysis
-
-Your job is factual analysis — describe what you observe, not what should be done about it.
-
-Semantic domains — classify what this action MEANS at a human level:
-- Tag the action with domains like: spending, communication, deletion, data_access,
-  data_modification, scheduling, execution, etc.
-- Base this on what the action ACTUALLY DOES, not its ActionType.
-- Be comprehensive: if an action can be part of multiple domains, include all relevant domains.
-- Examples (but not exhaustive):
-  HTTP_POST to stripe.com/charges → ["spending"]
-  HTTP_POST to slack.com/messages → ["communication"]
-  APPEND_ROW with amount data to an expense tracker → ["spending", "data_modification"]
-  DELETE_FILE → ["deletion"]
-  READ_FILE → ["data_access"]
-- Return an empty list only if the action genuinely doesn't fall under any domain.
-
-Hidden behaviors — STRICT rules:
-- A hidden behavior is something the action WILL DO or CARRY that the agent DID NOT STATE,
-  or that contradicts what the agent stated.
-  Example: agent says "send email" but the action also CC's an admin → hidden behavior.
-  Example: agent says "delete file" but the action also wipes audit metadata → hidden behavior.
-  Example: agent says "routine $10 purchase" but data.amount is 4999 → hidden behavior
-    (discrepancy between claimed and actual values).
-  Example: a data field contains content unrelated to what its key name implies
-    (configuration data, encoded payloads, system dumps where a simple label belongs)
-    → hidden behavior.
-- Do NOT report speculative side effects. If appending to a file, do NOT imagine
-  that "linked reports might update" or "other systems might react." You cannot see
-  those systems. Report only what THIS action does on THIS target.
-- Do NOT report normal, expected consequences of the stated action.
-  Writing to a file creates/modifies the file — that is the stated intent, not hidden.
-- If there are no hidden behaviors, return an EMPTY list. An empty list is the correct
-  answer for most straightforward actions.
-
-Data integrity — cross-check consistency across the three untrusted components:
-- Reason vs Data: if the reason mentions specific values (e.g.amounts, recipients, counts,
-  dates), verify they match the corresponding fields in the data. A reason claiming one
-  value when the data carries a significantly different value is a discrepancy — report
-  it as a hidden_behavior.
-- Key vs Value: each value in the data should be semantically appropriate for what its
-  key name implies. If a value contains content that does not belong in that type of
-  field (e.g. structured system data, configuration, encoded content, or technical
-  dumps in a field whose key suggests a simple label, name, or category), report it
-  as a hidden_behavior.
-- Reason vs Target: verify that the target makes sense for what the reason describes.
-- If the reason describes a small or routine operation but the data carries significantly
-  different values or volumes, report the discrepancy.
-
-For risk_level and risk_reason:
-- Assess based on the direct impact of THIS action (how much would change if executed)
-- Do not speculate about downstream systems or theoretical cascading effects
-
-For recommendation:
-- Provide a neutral summary of what you observed (no allow/block language)
-"""
+        Kept as a thin facade over :data:`ANALYSIS_PROMPTS` so existing
+        tests and external callers that reach for this static method
+        keep working unchanged.  The full set of lane bodies lives in
+        :mod:`intentframe_components.prompt.library.analysis`.
+        """
+        return ANALYSIS_PROMPTS["standard"]
 
     # ── Fast-path logic ─────────────────────────────────────────────
 
@@ -436,6 +404,10 @@ For recommendation:
         as trusted context when the executor runs as root so the AE
         accounts for elevated blast radius.
         """
+        # Reset before any early return so stale prompt ids from a
+        # previous request never leak into audit on fast-path cases.
+        self.last_prompt_id = None
+
         # ── Fast path: safe read-only ────────────────────────────────
         fast = self._try_fast_path(intent, safe_actions or set())
         if fast is not None:
@@ -460,16 +432,48 @@ For recommendation:
             active_domains=active_domains,
             execution_context=execution_context,
         )
-        
+
+        prompt_id = self._resolve_prompt_id(intent, command_intel)
+        self.last_prompt_id = prompt_id
+        agent = self._agents[prompt_id]
+
         if self.verbose:
-            print(f"    │  AI analyzing: {intent.action.value}...")
-        
-        result = await Runner.run(self._agent, prompt)
-        
+            print(f"    │  AI analyzing: {intent.action.value} (prompt={prompt_id})...")
+
+        result = await Runner.run(agent, prompt)
+
         return self._convert_to_report(
             intent, result.final_output,
             terminal_command_signals=terminal_command_signals,
         )
+
+    def _resolve_prompt_id(
+        self,
+        intent: IntentFrame,
+        command_intel: CommandIntel | None,
+    ) -> str:
+        """Ask the strategy for a prompt id, fail-closed on unknowns.
+
+        A strategy that returns an id we don't know about (typo,
+        third-party extension lagging behind a prompt-library bump)
+        is downgraded to ``standard`` with a warning log rather than
+        raising.  Hard-crashing the AE on an unknown id would turn a
+        config bug into a safety incident; ``standard`` is safe by
+        construction.
+        """
+        try:
+            pid = self._prompt_strategy.select_ae_prompt_id(intent, command_intel)
+        except Exception:
+            logger.exception("AE prompt strategy raised; falling back to 'standard'")
+            return "standard"
+
+        if pid not in ANALYSIS_PROMPT_IDS:
+            logger.warning(
+                "AE prompt strategy returned unknown id %r; falling back to 'standard'",
+                pid,
+            )
+            return "standard"
+        return pid
     
     def _build_analysis_prompt(
         self,

@@ -1,0 +1,205 @@
+"""
+Prompt-id strategy — deterministic routing to AE/Guardian prompt lanes.
+
+This module is the single place that decides which prompt id the
+Analysis Engine and Guardian should use for a given intent.  It is
+deliberately kept outside both engines so:
+
+- Routing can be tested without instantiating any :class:`Agent`.
+- A future Bundle D (separate engine instances) can reuse the same
+  routing decisions by consuming the prompt id and dispatching to
+  a different engine.
+- Third parties can ship their own :class:`PromptStrategy` by
+  satisfying the Protocol, without touching the engines.
+
+Routing model (C1)
+------------------
+Analysis Engine ids, in precedence order (strictest wins):
+
+    critical_network_mutation   (RUN_COMMAND + capability:network_probe:{http_mutate, http_download, port_scan, file_transfer})
+    critical_network_probe      (RUN_COMMAND + capability:network_probe:{icmp, trace, dns, whois, http_get})
+    critical_generic            (action ∈ CRITICAL_ACTIONS)
+    standard                    (everything else)
+
+Guardian ids:
+
+    critical                    (action ∈ CRITICAL_ACTIONS)
+    standard                    (everything else)
+
+Fail-closed
+-----------
+If ``command_intel`` is ``None`` for a RUN_COMMAND, we route to
+``critical_generic``, not ``standard``.  A missing ``CommandIntel`` on
+a RUN_COMMAND indicates a plumbing bug somewhere upstream; the safe
+default is the stricter overlay.
+"""
+
+from __future__ import annotations
+
+from typing import Protocol
+
+from action_registry.types import ActionType
+from intentframe_core.types import AnalysisReport, CommandIntel, IntentFrame
+from intentframe_components.routing.criticality import is_critical
+
+
+# ────────────────────────────────────────────────────────────────
+# Capability sub-tags — the sub-routing lookup tables
+# ────────────────────────────────────────────────────────────────
+# Precedence is encoded by the order we check: mutation before
+# probe before generic.  Keep these sets aligned with the
+# capability tags emitted by command_shield.classifier.
+
+_NETWORK_MUTATION_SUBTAGS: frozenset[str] = frozenset({
+    "http_mutate",
+    "http_download",
+    "port_scan",
+    "file_transfer",
+})
+
+_NETWORK_PROBE_SUBTAGS: frozenset[str] = frozenset({
+    "icmp",
+    "trace",
+    "dns",
+    "whois",
+    "http_get",
+})
+
+_NETWORK_PROBE_PREFIX = "capability:network_probe:"
+
+
+def _has_network_mutation(caps: tuple[str, ...]) -> bool:
+    """Return True if any cap is a network_probe mutation sub-tag."""
+    for cap in caps:
+        if not cap.startswith(_NETWORK_PROBE_PREFIX):
+            continue
+        sub = cap[len(_NETWORK_PROBE_PREFIX):]
+        if sub in _NETWORK_MUTATION_SUBTAGS:
+            return True
+    return False
+
+
+def _has_network_probe(caps: tuple[str, ...]) -> bool:
+    """Return True if any cap is a network_probe non-mutation sub-tag."""
+    for cap in caps:
+        if not cap.startswith(_NETWORK_PROBE_PREFIX):
+            continue
+        sub = cap[len(_NETWORK_PROBE_PREFIX):]
+        if sub in _NETWORK_PROBE_SUBTAGS:
+            return True
+    return False
+
+
+# ────────────────────────────────────────────────────────────────
+# Protocol
+# ────────────────────────────────────────────────────────────────
+
+class PromptStrategy(Protocol):
+    """Contract for routing intents to AE/Guardian prompt ids.
+
+    A strategy is sync and pure: given the same inputs it must return
+    the same prompt id, every time.  It does not perform IO and does
+    not mutate its inputs.
+
+    The engines hold a reference to exactly one strategy instance at
+    construction time; the strategy is consulted once per request.
+    """
+
+    def select_ae_prompt_id(
+        self,
+        intent: IntentFrame,
+        command_intel: CommandIntel | None,
+    ) -> str:
+        """Return the AE prompt id for this request."""
+        ...
+
+    def select_guardian_prompt_id(
+        self,
+        intent: IntentFrame,
+        analysis: AnalysisReport,
+        command_intel: CommandIntel | None,
+    ) -> str:
+        """Return the Guardian prompt id for this request.
+
+        ``analysis`` is passed so future strategies can route on
+        AE-classified risk / domains (e.g. finance → finance prompt).
+        The C1 default strategy ignores it beyond action-type checks.
+        """
+        ...
+
+
+# ────────────────────────────────────────────────────────────────
+# Default implementation
+# ────────────────────────────────────────────────────────────────
+
+class DefaultPromptStrategy:
+    """Deterministic, capability-aware prompt-id selector.
+
+    This is the production default baked into both engines.  It is
+    stateless and safe to share across requests / threads.
+    """
+
+    # Explicit precedence table.  Do not rely on Python dict
+    # ordering — these are ordered predicates.  The first predicate
+    # that matches wins.
+    _AE_PRECEDENCE: tuple[str, ...] = (
+        "critical_network_mutation",
+        "critical_network_probe",
+        "critical_generic",
+        "standard",
+    )
+
+    _GUARDIAN_PRECEDENCE: tuple[str, ...] = (
+        "critical",
+        "standard",
+    )
+
+    # ── AE ──────────────────────────────────────────────────────
+
+    def select_ae_prompt_id(
+        self,
+        intent: IntentFrame,
+        command_intel: CommandIntel | None,
+    ) -> str:
+        action_value = intent.action.value
+
+        # RUN_COMMAND sub-routing lives on the AE side only.
+        if action_value == ActionType.RUN_COMMAND.value:
+            caps = command_intel.capabilities if command_intel else ()
+            if _has_network_mutation(caps):
+                return "critical_network_mutation"
+            if _has_network_probe(caps):
+                return "critical_network_probe"
+            # RUN_COMMAND without known network sub-tags (or with no
+            # command_intel at all) falls through to the generic
+            # critical prompt.  This is the fail-closed default for
+            # a missing-intel plumbing bug.
+            return "critical_generic"
+
+        if is_critical(action_value):
+            return "critical_generic"
+
+        return "standard"
+
+    # ── Guardian ────────────────────────────────────────────────
+
+    def select_guardian_prompt_id(
+        self,
+        intent: IntentFrame,
+        analysis: AnalysisReport,
+        command_intel: CommandIntel | None,
+    ) -> str:
+        # analysis and command_intel are accepted for future strategies
+        # (e.g. finance-domain Guardian prompt); the C1 default routes
+        # purely on action criticality.
+        del analysis, command_intel
+
+        if is_critical(intent.action.value):
+            return "critical"
+        return "standard"
+
+
+__all__ = [
+    "PromptStrategy",
+    "DefaultPromptStrategy",
+]

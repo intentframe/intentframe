@@ -20,7 +20,7 @@ pipeline would construct from a real agent request.
 from __future__ import annotations
 
 from action_registry.types import ActionType
-from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
+from intentframe_core.types import IntentFrame, AnalysisReport, UserContext, CommandIntel
 from intentframe_core.enums import RiskLevel, Reversibility
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 from command_shield.verdict import Signal
@@ -151,6 +151,30 @@ signals = (
         evidence="curl http://example.com/data",
     ),
 )
+run_cmd_intel = CommandIntel(
+    verdict="NEEDS_REVIEW",
+    capabilities=("capability:network_probe:http_get",),
+)
+run_cmd_analysis = AnalysisReport(
+    stated_intent="Fetch remote status page via shell command",
+    actual_behaviors=[{
+        "action": "RUN_COMMAND",
+        "actual_behavior": "Runs a shell command that fetches remote content via curl and echoes it",
+        "matches_intent": True,
+    }],
+    requested_scope=["echo $(curl http://example.com/data)"],
+    actual_scope=["echo $(curl http://example.com/data)"],
+    scope_mismatch=False,
+    predicted_outcomes={"risk_reason": "Shell execution with outbound network access"},
+    hidden_behaviors=[],
+    risk_factors={"overall": RiskLevel.HIGH},
+    reversibility=Reversibility.IRREVERSIBLE,
+    semantic_domains=["execution"],
+    confidence=0.95,
+    recommendation="Shell execution with outbound network retrieval.",
+)
+ae_run_cmd_prompt_id = ae._resolve_prompt_id(run_cmd_intent, run_cmd_intel)
+gu_run_cmd_prompt_id = gu._resolve_prompt_id(run_cmd_intent, run_cmd_analysis, run_cmd_intel)
 ae_prompt_signals = ae._build_analysis_prompt(
     run_cmd_intent,
     terminal_command_signals=signals,
@@ -158,11 +182,23 @@ ae_prompt_signals = ae._build_analysis_prompt(
 )
 print(ae_prompt_signals)
 
+# ── 3b. Analysis Engine RUN_COMMAND system prompt ─────────────────────
+
+section(f"3b. ANALYSIS ENGINE — RUN_COMMAND SYSTEM PROMPT ({ae_run_cmd_prompt_id})")
+print()
+print(ae._agents[ae_run_cmd_prompt_id].instructions)
+
 # ── 4. Guardian system prompt ─────────────────────────────────────────
 
 section("4. GUARDIAN — SYSTEM PROMPT (agent.instructions)")
 print()
 print(gu._agent.instructions)
+
+# ── 4b. Guardian RUN_COMMAND system prompt ────────────────────────────
+
+section(f"4b. GUARDIAN — RUN_COMMAND SYSTEM PROMPT ({gu_run_cmd_prompt_id})")
+print()
+print(gu._agents[gu_run_cmd_prompt_id].instructions)
 
 # ── 5. Guardian per-request prompt ────────────────────────────────────
 

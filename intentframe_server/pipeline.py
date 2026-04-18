@@ -398,6 +398,15 @@ class IntentFrameRuntime:
         self._request_counter += 1
         req_num = self._request_counter
 
+        # Per-request invariant: every intent starts with a clean
+        # observability slate.  Engines only set ``last_prompt_id``
+        # when their AI path actually runs, so paths that short-circuit
+        # before AE / Guardian (deterministic ALLOW, command-shield
+        # catastrophic BLOCK, any future fast-path) must not inherit
+        # stale values from a prior request in the same runtime.
+        self.analysis_engine.last_prompt_id = None
+        self.guardian.last_prompt_id = None
+
         if self.verbose:
             reason = intent.reason or ""
 
@@ -672,6 +681,19 @@ class IntentFrameRuntime:
         }
         if dg_matched_gate:
             audit_entry["matched_gate"] = dg_matched_gate
+
+        # Bundle C — record which AE / Guardian prompt lane ran.
+        # `last_prompt_id` is populated by the engines when (and only
+        # when) an AI call was made; deterministic and fast-path
+        # outcomes leave it at None, so absent fields here correctly
+        # reflect "no AI prompt was used".  Audit-only — no change
+        # to AnalysisReport / ValidationResult surface.
+        ae_prompt_id = getattr(self.analysis_engine, "last_prompt_id", None)
+        if ae_prompt_id:
+            audit_entry["ae_prompt_id"] = ae_prompt_id
+        guardian_prompt_id = getattr(self.guardian, "last_prompt_id", None)
+        if guardian_prompt_id:
+            audit_entry["guardian_prompt_id"] = guardian_prompt_id
         
         if validation.decision == Decision.ALLOW:
             # ───────────────────────────────────────────────────────────
