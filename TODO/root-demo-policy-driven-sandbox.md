@@ -252,3 +252,16 @@ In short:
 **Do not teach IntentFrame how to escalate.**
 
 **Teach the demo profile that it already has root, give it `/`, and keep the sandbox minimal.**
+
+
+-----
+#### New Concrete "ready-to-hand-root" checklist
+Before giving the executor a root handle on a real Mac with any persistent state, all of these should be done:
+
+Phase 7a shipped — WRITE_FILE payload inspection + destination sensitivity policy + DG branch that rejects fast-path on auto-load/startup/runtime-shape targets. This closes the single biggest gap.
+Phase 7c shipped — per-intent sandbox-template selection in policy + non-overridable deny-path list hardened for root (LaunchAgents, LaunchDaemons, /etc, /System, sshd configs, sudoers, PAM, kexts, ~/Library/Keychains, ~/Library/Messages, ~/Library/Mail, ~/.ssh, ~/.gnupg, shell rc files).
+Bundle C overlay bodies authored for critical_generic, critical_network_mutation, critical_network_probe, and Guardian's critical. Today the AI depth for "root RUN_COMMAND" is the same as for "list calendars" prompt-wise.
+Root demo profile — a separate UserContext / policy profile whose allow_capabilities is a short, explicit list (capability:read_only:*, capability:package_install:brew maybe) and whose deny_capabilities covers network_bind, background_exec, process_signal, download_and_exec, and the network_probe:{http_mutate,http_download,port_scan,file_transfer} family as a floor.
+Red-team corpus run against the root profile specifically — the existing 24-attack test set was built before Bundles A–C and doesn't exercise capability edges, composition fast-path, or WRITE_FILE payload. At least a dozen new attacks: persistence (LaunchAgent plist, crontab, shell rc, .pth), privilege (sudoers, sshd_config, PAM), egress (reverse shell via curl | sh, nc -e, bash -i >& /dev/tcp), interpreter indirection, and TCC-circumvention paths.
+Audit-side verification — every matched_gate and decision_path value makes sense in the trace, and ae_prompt_id = critical_* fires on every RUN_COMMAND that went UNDECIDED.
+
