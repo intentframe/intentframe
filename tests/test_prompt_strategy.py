@@ -84,35 +84,6 @@ STRATEGY = DefaultPromptStrategy()
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Placeholder marker — payload-aware WRITE_FILE lanes
-# ═══════════════════════════════════════════════════════════════════════
-# WRITE_FILE currently routes flat to ``critical_write_file``.  A future
-# split will route positively-classified code payloads to a dedicated
-# ``critical_write_file_code`` lane, and passive / document-like payloads
-# on benign destinations to ``standard``.  The tests below codify that
-# future contract so that when per-lane overlay bodies are authored:
-#
-#   1. Add the new lane(s) to ``ANALYSIS_PROMPTS``.
-#   2. Teach ``DefaultPromptStrategy.select_ae_prompt_id`` to branch on
-#      ``file_intel``.
-#   3. Remove this marker.
-#
-# ``strict=False`` so XPASS does not fail the suite — it's a hint to the
-# author, not a gate.
-_WRITE_FILE_LANE_PLACEHOLDER = pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "WRITE_FILE routing is flat today — every write lands in "
-        "``critical_write_file``.  Payload-aware lanes "
-        "(``critical_write_file_code`` for code payloads, ``standard`` for "
-        "passive docs on benign destinations) are deferred until per-lane "
-        "overlay bodies are authored.  Remove this marker when the split "
-        "ships."
-    ),
-)
-
-
-# ═══════════════════════════════════════════════════════════════════════
 # AE routing
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -213,115 +184,20 @@ class TestAERouting:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# WRITE_FILE AE routing — flat today, payload-aware tomorrow
+# WRITE_FILE AE routing — single dedicated write-file lane
 # ═══════════════════════════════════════════════════════════════════════
 # Current behaviour: every WRITE_FILE routes to ``critical_write_file``
-# regardless of payload shape or destination.  ``FileIntel`` is accepted
-# on the strategy signature and forwarded into the AE payload as
-# context, but it does not influence prompt-id selection.
-#
-# Future behaviour (guarded by ``_WRITE_FILE_LANE_PLACEHOLDER`` xfails):
-#
-#   critical_write_file_code — payload positively classified as code
-#       (language in CODE_LANGUAGES, OR code-intel findings present).
-#       Wins over the generic critical lane even when the destination
-#       is also a sensitive system path — "what the code does" is the
-#       more specific concern.
-#
-#   critical_write_file — opaque payloads (binary / oversized /
-#       missing FileIntel), and anything else that doesn't positively
-#       classify as code.
-#
-#   standard — passive document-like payloads (text / markdown / json
-#       with no code signals) on benign destinations.
+# regardless of payload shape or destination. ``FileIntel`` is forwarded
+# into the AE payload as trusted context, but it does not influence
+# prompt-id selection.
 #
 # Sensitive-path destinations are BLOCKed pre-AE by
 # :class:`DeterministicGuardian` in the main pipeline, so those cases
-# never reach the strategy through the normal path.  The strategy
-# still routes them to ``critical_write_file`` as defense in depth
-# for callers that invoke the strategy directly (tests, tools) — that
-# contract is asserted in ``test_sensitive_path_destinations_route_to_critical``
-# below and holds today because every WRITE_FILE lands there anyway.
+# never reach the strategy through the normal path. The strategy still
+# routes them to ``critical_write_file`` as defense in depth for callers
+# that invoke the strategy directly (tests, tools).
 
 class TestWriteFileAERouting:
-    # ── passive payloads on benign destinations → standard ──────
-    # xfail: today every WRITE_FILE lands in ``critical_write_file``.
-    # Passes once a ``standard`` fast-path for passive docs ships.
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_passive_text_md_routes_to_standard(self):
-        fi = _file_intel(language=None, size_bytes=120)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/notes.md"), None, fi,
-        ) == "standard"
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_passive_json_routes_to_standard(self):
-        fi = _file_intel(language=None, size_bytes=40)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/data/config.json"), None, fi,
-        ) == "standard"
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_benign_extension_on_benign_destination_routes_to_standard(self):
-        fi = _file_intel(language=None, size_bytes=10)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/report.txt"), None, fi,
-        ) == "standard"
-
-    # ── positively-classified code → critical_write_file_code ───
-    # xfail: the ``critical_write_file_code`` lane does not exist yet.
-    # Passes once the code lane is added to ``ANALYSIS_PROMPTS`` and
-    # the strategy learns to branch on ``file_intel.language`` /
-    # ``file_intel.has_code_intel_findings``.
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_python_payload_routes_to_code_lane(self):
-        fi = _file_intel(language="python", size_bytes=300)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/notes.md"), None, fi,
-        ) == "critical_write_file_code"
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_shell_payload_routes_to_code_lane(self):
-        fi = _file_intel(language="shell", size_bytes=200)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/scripts/x.sh"), None, fi,
-        ) == "critical_write_file_code"
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_javascript_payload_routes_to_code_lane(self):
-        fi = _file_intel(language="javascript", size_bytes=200)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/scripts/x.js"), None, fi,
-        ) == "critical_write_file_code"
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_code_intel_findings_route_to_code_lane(self):
-        # Findings without a known code language are still a positive
-        # code signal — ``command_shield`` flagged something executable.
-        fi = _file_intel(
-            language=None,
-            has_code_intel_findings=True,
-            code_intel_finding_ids=("EVAL_USE",),
-            size_bytes=50,
-        )
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, fi,
-        ) == "critical_write_file_code"
-
-    @_WRITE_FILE_LANE_PLACEHOLDER
-    def test_code_payload_on_autoload_destination_prefers_code_lane(self):
-        # Both triggers fire — a Python file written to a sensitive
-        # system path.  "What the code does" is the more specific
-        # concern, so the code lane wins over the generic critical lane.
-        fi = _file_intel(language="python", size_bytes=500)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/.zshrc.d/x.py"), None, fi,
-        ) == "critical_write_file_code"
-
-    # ── opaque payloads → critical_write_file (non-code) ────────
-
     def test_binary_payload_routes_to_critical_write_file(self):
         fi = _file_intel(language="binary", is_binary=True, size_bytes=1024)
         assert STRATEGY.select_ae_prompt_id(
