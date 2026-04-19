@@ -167,6 +167,24 @@ def build_gateway(
         if sandbox_engine and sandbox_engine.available():
             sandbox_planner = SandboxPlanner(config.sandbox)
             logger.info("Sandbox engine: %s", type(sandbox_engine).__name__)
+            if (
+                config.sandbox.executor_venv_required
+                and sandbox_planner.executor_venv_path is None
+            ):
+                from executor.sandbox.venv import resolve_executor_venv_path
+                resolved = resolve_executor_venv_path(config.sandbox)
+                raise ConfigurationError(
+                    "Executor venv is required but not usable. "
+                    "Expected a Python venv with bin/python3 at: "
+                    f"{resolved or '<unresolved>'}. "
+                    "Run `bash intentframe_setup.sh` to provision it, or "
+                    "set `sandbox.executor_venv_required: false` to allow "
+                    "fallback to system python3.",
+                    details={
+                        "resolved_path": resolved,
+                        "configured_path": config.sandbox.executor_venv_path,
+                    },
+                )
         else:
             logger.warning(
                 "Sandbox enabled but engine unavailable on this platform "

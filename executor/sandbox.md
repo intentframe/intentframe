@@ -87,6 +87,8 @@ sandbox:
     - file_read_only
     - file_read_write
     - network_outbound
+  # executor_venv_path: null           # auto-resolve to ~/.intentframe-venvs/executor
+  # executor_venv_required: true       # fail-closed at startup if missing
 ```
 
 ### Fields
@@ -97,6 +99,19 @@ sandbox:
 | `allowed_templates` | All commands run under the highest-privilege template in this list. |
 | `working_directory` | Default cwd for sandboxed commands. Expanded via `os.path.expanduser()` at runtime. Defaults to `~/`. |
 | `allowed_write_paths` | Paths where sandboxed commands can write. Expanded + canonicalized at runtime. Defaults to `["~/"]`. |
+| `executor_venv_path` | Absolute path to the executor's dedicated Python venv. `None` = auto-resolve to `<owner_home>/.intentframe-venvs/executor`. Owner is `SUDO_USER` if set, else the running uid's HOME; bare root with no `SUDO_USER` resolves to `None`. Provisioned by `intentframe_setup.sh` via `uv venv --seed`. Must not sit under any `NON_NEGOTIABLE_DENY_ACCESS` entry (e.g. `~/.intentframe/`); the planner rejects such paths at startup because the sandbox would deny reads on `bin/python3`, breaking exec. |
+| `executor_venv_required` | Default `True`. When `True`, executor startup fails if the venv is missing or lacks `bin/python3`. Set `False` to fall back silently to system `python3`. |
+
+### Executor venv exposure
+
+When `executor_venv_path` resolves to a usable venv, the macOS sandbox engine adds four env overrides for every `RUN_COMMAND` subprocess:
+
+- `PATH` — `<venv>/bin` prepended to the `/etc/paths`-derived system PATH, so `python`, `python3`, `pip`, and `uv pip` resolve into the venv
+- `VIRTUAL_ENV` — set to the venv path, so `pip install X` lands in the venv rather than `<repo>/.venv` or user-site
+- `PYTHONNOUSERSITE=1` — blocks `pip install --user` escapes to `~/Library/Python/...`
+- `PYTHONHOME` — never set (venvs break if it is)
+
+This is the **only** explicit pathway a venv reaches sandboxed commands. The `command_shield.env.clean_env()` whitelist still drops `VIRTUAL_ENV` from the parent environment, so a venv activated in the shell that launched the gateway does **not** leak into `RUN_COMMAND` — only the executor-configured venv does.
 
 ### Template selection
 

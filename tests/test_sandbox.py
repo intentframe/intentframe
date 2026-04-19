@@ -331,11 +331,15 @@ class TestPathing:
 def _make_planner(
     allowed: list[str] | None = None,
     write_paths: list[str] | None = None,
+    executor_venv_path: str | None = None,
+    executor_venv_required: bool = False,
 ) -> SandboxPlanner:
     cfg = SandboxConfig(
         enabled=True,
         allowed_templates=allowed or ["pure_compute", "file_read_only", "file_read_write"],
         allowed_write_paths=write_paths or ["~/"],
+        executor_venv_path=executor_venv_path,
+        executor_venv_required=executor_venv_required,
     )
     return SandboxPlanner(cfg)
 
@@ -1620,3 +1624,465 @@ class TestEndToEnd:
             result = _exec_sandboxed(self.engine.wrap(f"cp {src} {dst}", plan))
             assert result.returncode == 0
             assert dst.read_text() == "e2e_content"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Executor venv: resolution, plan threading, engine overrides, enforcement
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _fake_venv(root: str) -> str:
+    """Create a minimal venv-shaped directory with an exec'able bin/python3.
+
+    Just enough structure for validate_executor_venv() and `which python3`
+    inside the sandbox to succeed. Not a real venv — tests that need to
+    actually run Python should create one via ``uv venv`` in a tmpdir.
+    """
+    bin_dir = Path(root) / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    py3 = bin_dir / "python3"
+    py3.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
+    py3.chmod(0o755)
+    py = bin_dir / "python"
+    py.symlink_to(py3)
+    return os.path.realpath(root)
+
+
+class TestExecutorVenvResolver:
+    """SUDO_USER → uid HOME → None fallback chain, plus config override."""
+
+    def test_explicit_config_path_is_returned_absolute(self, tmp_path, monkeypatch) -> None:
+        from executor.sandbox.venv import resolve_executor_venv_path
+        cfg = SandboxConfig(executor_venv_path=str(tmp_path))
+        monkeypatch.delenv("SUDO_USER", raising=False)
+        resolved = resolve_executor_venv_path(cfg)
+        assert resolved == os.path.realpath(str(tmp_path))
+
+    def test_explicit_tilde_path_expands_against_owner_home(self, monkeypatch) -> None:
+        from executor.sandbox.venv import resolve_executor_venv_path
+        cfg = SandboxConfig(executor_venv_path="~/custom-venv")
+        monkeypatch.delenv("SUDO_USER", raising=False)
+        resolved = resolve_executor_venv_path(cfg)
+        assert resolved is not None
+        assert "custom-venv" in resolved
+        assert os.path.isabs(resolved)
+
+    def test_default_path_when_unconfigured(self, monkeypatch) -> None:
+        from executor.sandbox.venv import resolve_executor_venv_path
+        cfg = SandboxConfig()
+        monkeypatch.delenv("SUDO_USER", raising=False)
+        resolved = resolve_executor_venv_path(cfg)
+        # Must be absolute and contain the conventional suffix.
+        assert resolved is not None
+        assert resolved.endswith(".intentframe-venvs/executor")
+        assert os.path.isabs(resolved)
+
+    def test_sudo_user_overrides_current_home(self, monkeypatch) -> None:
+        """When SUDO_USER is set, it's the authoritative owner."""
+        import pwd
+        from executor.sandbox.venv import resolve_executor_venv_path
+        me = pwd.getpwuid(os.getuid())
+        monkeypatch.setenv("SUDO_USER", me.pw_name)
+        monkeypatch.setenv("HOME", "/tmp/nonsense-home")
+        cfg = SandboxConfig()
+        resolved = resolve_executor_venv_path(cfg)
+        assert resolved is not None
+        assert resolved.startswith(os.path.realpath(me.pw_dir))
+
+    def test_bogus_sudo_user_falls_back_to_uid_home(self, monkeypatch) -> None:
+        from executor.sandbox.venv import resolve_executor_venv_path
+        monkeypatch.setenv("SUDO_USER", "definitely-not-a-real-user-xyz-1234")
+        cfg = SandboxConfig()
+        resolved = resolve_executor_venv_path(cfg)
+        # Falls back to uid-based HOME (which exists on the test machine).
+        assert resolved is not None
+
+
+class TestExecutorVenvValidator:
+    def test_missing_dir_rejected(self, tmp_path) -> None:
+        from executor.sandbox.venv import validate_executor_venv
+        assert validate_executor_venv(str(tmp_path / "does-not-exist")) is False
+
+    def test_dir_without_python_rejected(self, tmp_path) -> None:
+        from executor.sandbox.venv import validate_executor_venv
+        (tmp_path / "bin").mkdir()
+        assert validate_executor_venv(str(tmp_path)) is False
+
+    def test_valid_fake_venv_accepted(self, tmp_path) -> None:
+        from executor.sandbox.venv import validate_executor_venv
+        path = _fake_venv(str(tmp_path / "venv"))
+        assert validate_executor_venv(path) is True
+
+
+class TestExecutionPlanVenvThreading:
+    """SandboxPlanner threads the resolved path onto every ExecutionPlan."""
+
+    def test_default_plan_has_no_venv_when_none_exists(self, monkeypatch) -> None:
+        monkeypatch.delenv("SUDO_USER", raising=False)
+        planner = _make_planner()
+        plan = planner.plan()
+        # Default HOME path likely doesn't have a venv in CI/dev --
+        # planner resolves to None rather than a non-existent path.
+        assert plan.executor_venv_path is None or os.path.isabs(plan.executor_venv_path)
+
+    def test_explicit_venv_surfaces_on_plan(self, tmp_path) -> None:
+        venv = _fake_venv(str(tmp_path / "v"))
+        planner = _make_planner(executor_venv_path=venv)
+        plan = planner.plan()
+        assert plan.executor_venv_path == venv
+
+    def test_missing_required_venv_resolves_to_none(self, tmp_path, caplog) -> None:
+        """executor_venv_required=True: missing venv logs an error; planner
+        returns None and main.py is responsible for fail-closed behavior."""
+        import logging
+        missing = str(tmp_path / "not-a-venv")
+        with caplog.at_level(logging.ERROR, logger="executor.sandbox.planner"):
+            planner = _make_planner(
+                executor_venv_path=missing,
+                executor_venv_required=True,
+            )
+        assert planner.executor_venv_path is None
+        assert "missing or unusable" in caplog.text
+
+    def test_missing_optional_venv_warns(self, tmp_path, caplog) -> None:
+        import logging
+        missing = str(tmp_path / "not-a-venv")
+        with caplog.at_level(logging.WARNING, logger="executor.sandbox.planner"):
+            planner = _make_planner(
+                executor_venv_path=missing,
+                executor_venv_required=False,
+            )
+        assert planner.executor_venv_path is None
+        assert "fall back" in caplog.text
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestMacOSEngineVenvOverrides:
+    """Engine adds VIRTUAL_ENV, PATH prepend, PYTHONNOUSERSITE when venv set."""
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    def test_no_venv_means_no_venv_env_vars(self) -> None:
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=None,
+        )
+        wrapped = self.engine.wrap("echo ok", plan)
+        assert "VIRTUAL_ENV" not in wrapped.env_overrides
+        assert "PYTHONNOUSERSITE" not in wrapped.env_overrides
+        # PATH still rewritten to system path (not inherited).
+        assert "PATH" in wrapped.env_overrides
+
+    def test_venv_sets_all_overrides(self, tmp_path) -> None:
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        wrapped = self.engine.wrap("echo ok", plan)
+        assert wrapped.env_overrides["VIRTUAL_ENV"] == venv
+        assert wrapped.env_overrides["PYTHONNOUSERSITE"] == "1"
+        assert wrapped.env_overrides["PATH"].startswith(f"{venv}/bin:")
+
+    def test_pythonhome_not_leaked_via_overrides(self, tmp_path) -> None:
+        """PYTHONHOME must never be set by the engine -- venvs break if it is."""
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        wrapped = self.engine.wrap("echo ok", plan)
+        assert "PYTHONHOME" not in wrapped.env_overrides
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestSeatbeltVenvEnforcement:
+    """Real sandbox-exec: which python3 resolves to the venv, env vars are set."""
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    def test_which_python3_resolves_to_venv(self, tmp_path) -> None:
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        result = _exec_sandboxed(self.engine.wrap("command -v python3", plan))
+        assert result.returncode == 0
+        assert result.stdout.strip() == f"{venv}/bin/python3"
+
+    def test_which_python_resolves_to_venv(self, tmp_path) -> None:
+        """With a venv, bare `python` is available (normally missing on macOS)."""
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        result = _exec_sandboxed(self.engine.wrap("command -v python", plan))
+        assert result.returncode == 0
+        assert result.stdout.strip() == f"{venv}/bin/python"
+
+    def test_virtual_env_visible_in_subprocess(self, tmp_path) -> None:
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        result = _exec_sandboxed(
+            self.engine.wrap('printf "%s" "$VIRTUAL_ENV"', plan)
+        )
+        assert result.returncode == 0
+        assert result.stdout == venv
+
+    def test_pythonnousersite_set(self, tmp_path) -> None:
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        result = _exec_sandboxed(
+            self.engine.wrap('printf "%s" "$PYTHONNOUSERSITE"', plan)
+        )
+        assert result.returncode == 0
+        assert result.stdout == "1"
+
+    def test_pythonhome_not_set_in_subprocess(self, tmp_path) -> None:
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+        )
+        result = _exec_sandboxed(
+            self.engine.wrap(
+                'if [ -z "${PYTHONHOME+set}" ]; then echo unset; else echo set; fi',
+                plan,
+            )
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "unset"
+
+    def test_without_venv_python3_is_system(self) -> None:
+        """Backwards-compat: no venv path → which python3 is system path."""
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=None,
+        )
+        result = _exec_sandboxed(self.engine.wrap("command -v python3", plan))
+        assert result.returncode == 0
+        assert result.stdout.strip() in ("/usr/bin/python3", "/opt/homebrew/bin/python3")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Deny-access collision: venv nested under a deny subpath is rejected / broken
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# The default venv location was historically ``~/.intentframe/venvs/executor``.
+# That path falls under ``NON_NEGOTIABLE_DENY_ACCESS`` (``~/.intentframe``),
+# which means every sandbox template (up to and including ``UNRESTRICTED``)
+# denies reads on the interpreter binary. ``exec`` then fails with
+# "Operation not permitted" even though the rest of the sandbox is wide
+# open.
+#
+# We now default to ``~/.intentframe-venvs/executor`` (sibling directory,
+# outside the deny perimeter) and the planner rejects any configured path
+# that would re-introduce the collision. These tests pin both behaviors.
+
+
+class TestPlannerRejectsVenvUnderDenyAccess:
+    """Planner config cross-check: reject venv nested under a deny path."""
+
+    def test_venv_under_explicit_deny_access_resolves_to_none(
+        self, tmp_path, monkeypatch, caplog,
+    ) -> None:
+        """A real usable venv sitting under a deny-access subpath must be
+        rejected at planner construction so RUN_COMMAND never tries to exec
+        an unreadable binary. This reproduces the original bug: the path
+        was a valid venv, but the sandbox would deny reads on it."""
+        import logging
+        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+
+        denied_root = tmp_path / "denied"
+        denied_root.mkdir()
+        venv = _fake_venv(str(denied_root / "venvs" / "executor"))
+
+        monkeypatch.setattr(
+            "executor.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            NON_NEGOTIABLE_DENY_ACCESS + (str(denied_root),),
+        )
+
+        with caplog.at_level(logging.ERROR, logger="executor.sandbox.planner"):
+            planner = _make_planner(
+                executor_venv_path=venv,
+                executor_venv_required=True,
+            )
+        assert planner.executor_venv_path is None
+        assert "deny-access" in caplog.text.lower() or "denied" in caplog.text.lower()
+
+    def test_venv_outside_deny_access_is_kept(
+        self, tmp_path, monkeypatch,
+    ) -> None:
+        """Sanity check: a venv that doesn't collide with any deny path
+        passes the cross-check and surfaces on the plan. Ensures the
+        guard isn't rejecting every venv."""
+        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+
+        venv = _fake_venv(str(tmp_path / "clean-venv"))
+        elsewhere = tmp_path / "other"
+        elsewhere.mkdir()
+
+        monkeypatch.setattr(
+            "executor.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            NON_NEGOTIABLE_DENY_ACCESS + (str(elsewhere),),
+        )
+        planner = _make_planner(
+            executor_venv_path=venv,
+            executor_venv_required=True,
+        )
+        assert planner.executor_venv_path == venv
+
+    def test_prefix_match_does_not_overreach(
+        self, tmp_path, monkeypatch,
+    ) -> None:
+        """``/a/bad`` must not be treated as under ``/a/b``. Pure-prefix
+        collision would be a bug (rejects legitimate paths)."""
+        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+
+        deny = tmp_path / "deny"
+        deny.mkdir()
+        sibling = tmp_path / "denyx"  # same prefix, different directory
+        sibling.mkdir()
+        venv = _fake_venv(str(sibling / "venv"))
+
+        monkeypatch.setattr(
+            "executor.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            NON_NEGOTIABLE_DENY_ACCESS + (str(deny),),
+        )
+        planner = _make_planner(
+            executor_venv_path=venv,
+            executor_venv_required=True,
+        )
+        assert planner.executor_venv_path == venv
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestSeatbeltProductionDenyBehavior:
+    """End-to-end: the deny-access rule actually denies interpreter reads,
+    and the default-shaped path (sibling of the deny subpath) works.
+
+    Uses real ``sandbox-exec`` + a fake venv, with a manually-constructed
+    ``ExecutionPlan`` carrying the production-shape ``deny_access_paths``
+    relative to a tmpdir so the test doesn't touch the user's real HOME.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    def test_deny_access_actually_blocks_venv_exec(self, tmp_path) -> None:
+        """Build a production-shape layout: a "home" with a denied
+        runtime-internals subdir and a sibling venvs dir. Put the venv
+        inside the denied subdir and confirm exec of its python3 fails.
+
+        This is the regression test for the original bug -- it verifies
+        the deny rule *actually bites*, which is the premise behind
+        relocating the default venv path."""
+        home = tmp_path / "home"
+        home.mkdir()
+        denied = home / ".intentframe"        # mirrors production deny subpath
+        denied.mkdir()
+        venv_in_deny = _fake_venv(str(denied / "venvs" / "executor"))
+
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(),
+            allowed_write_paths=(),
+            deny_write_paths=(),
+            deny_access_paths=(str(denied),),
+            executor_venv_path=venv_in_deny,
+        )
+        wrapped = self.engine.wrap(f"{venv_in_deny}/bin/python3 -c 'print(1)'", plan)
+        result = _exec_sandboxed(wrapped)
+        # The kernel denies reads on the binary, so either the shell
+        # reports it can't execute, or sandbox-exec itself bails. Either
+        # way, exit code is non-zero and production would fail.
+        assert result.returncode != 0, (
+            "expected exec failure when venv is under deny_access_paths; "
+            f"got rc=0 stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
+
+    def test_default_shape_path_execs_through_deny_rule(self, tmp_path) -> None:
+        """Mirror of production: deny is ``~/.intentframe``, venv is at
+        ``~/.intentframe-venvs/executor`` (sibling, outside deny). Exec
+        must succeed. This is the whole reason the default moved."""
+        home = tmp_path / "home"
+        home.mkdir()
+        denied = home / ".intentframe"
+        denied.mkdir()
+        venv_outside = _fake_venv(str(home / ".intentframe-venvs" / "executor"))
+
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(),
+            allowed_write_paths=(),
+            deny_write_paths=(),
+            deny_access_paths=(str(denied),),
+            executor_venv_path=venv_outside,
+        )
+        result = _exec_sandboxed(self.engine.wrap("command -v python3", plan))
+        assert result.returncode == 0, (
+            f"expected exec to succeed with venv outside deny perimeter; "
+            f"stderr={result.stderr!r}"
+        )
+        assert result.stdout.strip() == f"{venv_outside}/bin/python3"
+
+    def test_default_resolved_path_does_not_collide_with_production_deny(
+        self,
+    ) -> None:
+        """Static assertion: the default relative path the venv module
+        picks must not start with any production deny-access entry.
+        Protects against someone accidentally changing the default back
+        to under ``~/.intentframe/``."""
+        from executor.sandbox.venv import _DEFAULT_VENV_RELATIVE
+        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+
+        for deny in NON_NEGOTIABLE_DENY_ACCESS:
+            # Normalize: deny entries use ~ prefix; compare relative parts.
+            deny_rel = deny.lstrip("~").lstrip("/")
+            assert not _DEFAULT_VENV_RELATIVE.startswith(deny_rel + "/"), (
+                f"default venv path {_DEFAULT_VENV_RELATIVE!r} is nested "
+                f"under deny-access path {deny!r} -- exec would fail at runtime"
+            )
+            assert _DEFAULT_VENV_RELATIVE != deny_rel, (
+                f"default venv path equals deny-access path {deny!r}"
+            )

@@ -243,16 +243,23 @@ class MacOSSandboxEngine(SandboxEngine):
         _ensure_sandbox_tmpdir()
         profile = generate_sandbox_profile(plan)
 
+        env_overrides: dict[str, str] = {
+            "TMPDIR": os.path.realpath(SANDBOX_TMPDIR),
+            "PATH": _system_path(),
+        }
+        if plan.executor_venv_path:
+            venv = plan.executor_venv_path
+            env_overrides["PATH"] = f"{venv}/bin:" + env_overrides["PATH"]
+            env_overrides["VIRTUAL_ENV"] = venv
+            env_overrides["PYTHONNOUSERSITE"] = "1"
+
         return SandboxedCommand(
             argv=[
                 self._sandbox_exec,
                 "-p", profile,
                 "/bin/sh", "-c", command,
             ],
-            env_overrides={
-                "TMPDIR": os.path.realpath(SANDBOX_TMPDIR),
-                "PATH": _system_path(),
-            },
+            env_overrides=env_overrides,
         )
 
 

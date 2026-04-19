@@ -200,6 +200,27 @@ class SandboxConfig(BaseModel):
         default_factory=lambda: ["~/"],
         description="Paths where sandboxed commands can write. Expanded at runtime.",
     )
+    executor_venv_path: str | None = Field(
+        default=None,
+        description=(
+            "Absolute path to the executor's dedicated Python venv. When set "
+            "(or auto-resolved from the owning user's HOME), sandboxed "
+            "RUN_COMMAND gets VIRTUAL_ENV, a <venv>/bin-prefixed PATH, and "
+            "PYTHONNOUSERSITE=1 so 'python', 'python3', 'pip', and 'uv pip' "
+            "resolve to this venv. Package installs land here, never in the "
+            "source-code venv or user-site. None + auto-resolution disabled "
+            "means sandboxed Python falls back to system python3."
+        ),
+    )
+    executor_venv_required: bool = Field(
+        default=True,
+        description=(
+            "If True, the executor fails to start when the resolved venv is "
+            "missing or lacks bin/python3. Recommended: True (fail loud at "
+            "startup rather than silent wrong-Python at first RUN_COMMAND). "
+            "Set False for minimal dev setups that want system python3."
+        ),
+    )
 
 
 class StorageConfig(BaseModel):

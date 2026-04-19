@@ -223,18 +223,36 @@ Instead, each agent (or task/session) should get a dedicated Python environment 
 - clearer policy boundaries for Python execution,
 - easier future support for "this agent can use Python, but only inside its own env."
 
-### Important current constraint
+### Current state (implemented)
 
-Today the shell sandbox intentionally strips the executor venv from `PATH` and resolves sandboxed `python3` to system Python.
+The executor now has a dedicated venv at `~/.intentframe-venvs/executor` (sibling of `~/.intentframe/`, not nested under it — the latter is in `NON_NEGOTIABLE_DENY_ACCESS` and would make `exec` of the venv's `python3` fail in the sandbox). Provisioned by `intentframe_setup.sh` via `uv venv --seed`. The path is configurable via `--executor-venv` (setup flag), `INTENTFRAME_EXECUTOR_VENV` (env var), or `sandbox.executor_venv_path` (runtime). The macOS sandbox engine explicitly exposes that venv to sandboxed `RUN_COMMAND` via env overrides:
 
-That is the right default.
+- `PATH` is prepended with `<venv>/bin` on top of the system-derived `PATH` from `/etc/paths`.
+- `VIRTUAL_ENV` is set to the venv path.
+- `PYTHONNOUSERSITE=1` is set to block `pip install --user` escapes.
+- `PYTHONHOME` is never set (venvs break if it is).
 
-A future per-agent Python env should therefore be:
+This means in the normal case `python`, `python3`, `pip`, and `uv pip install` all resolve to the executor venv. `<repo>/.venv` (the gateway's venv) and `~/Library/Python/...` (user site) are structurally protected from pollution. The config knobs are `sandbox.executor_venv_path` (absolute path, `None` = auto-resolve) and `sandbox.executor_venv_required` (default `True` → fail-closed at startup if the venv is missing).
 
-- explicitly provisioned,
-- explicitly mounted / allowed,
-- explicitly invoked,
-- not inherited accidentally through ambient `PATH`.
+Path resolution is identity-aware: it uses `SUDO_USER` if present, else the current uid's HOME, so the design works whether the executor runs as a regular user or as root. Bare root with no `SUDO_USER` fails loud rather than silently picking `/var/root/`.
+
+The planner also cross-checks the resolved venv path against `NON_NEGOTIABLE_DENY_ACCESS` at startup: a venv path nested under any deny-access subpath is rejected (returns `None`), which triggers fail-closed when `executor_venv_required=True`. This catches the "default path inside the deny perimeter" footgun deterministically at startup rather than at first `RUN_COMMAND`. `intentframe_setup.sh` mirrors the same guardrail.
+
+Uninstall is handled by `intentframe_uninstall.sh` — it removes `~/.intentframe-venvs/` and `~/.intentframe/` (interactive confirm unless `--yes`), and optionally the signing cert (`--remove-cert`) and keychain vault entries (`--remove-keychain-vault`). TCC grants remain a manual cleanup step (macOS doesn't expose a programmatic API).
+
+### Unchanged constraints
+
+- `command_shield/env.py` whitelist still drops `VIRTUAL_ENV` and friends from the parent env. The venv exposure is an **explicit override** added by the sandbox engine, not inheritance from whatever was activated in the parent shell.
+- `_system_path()` still replaces `PATH` with `/etc/paths`-derived values. The venv prepend sits **on top** of that, so regular binaries (`git`, `rg`, `grep`, etc.) still resolve normally.
+- Absolute-interpreter bypasses (`/usr/bin/python3 foo.py`) are not blocked by this design — they're a `command_shield.inspect_code(...)` concern, handled by a separate layer.
+
+### Per-agent: next
+
+Now that the plumbing is "plan carries an absolute venv path, engine adds env overrides", per-agent venvs are a substitution, not new plumbing:
+
+- agent session lifecycle manager creates `~/.intentframe-venvs/agent-<id>`,
+- planner pulls venv path from agent context instead of `SandboxConfig.executor_venv_path`,
+- add an explicit `install_package` tool separate from `RUN_COMMAND`.
 
 ---
 
@@ -245,16 +263,19 @@ A future per-agent Python env should therefore be:
 - add write-file policy that distinguishes passive files from executable/runtime-shaping files
 - use `inspect_code(...)` for deterministic payload triage
 - add path sensitivity rules for persistence, startup, secrets, workflows, and product internals
+- fix `SandboxConfig.working_directory` to use the same identity-aware expansion as the executor venv (currently `os.path.expanduser` in `terminal.py` resolves against whatever HOME the executor process has — wrong under bare root)
 
 ### Mid-term
 
 - create a dedicated `WRITE_FILE` critical-path route when the write creates executable code or touches sensitive paths
 - feed `inspect_code(...)` findings into Guardian as structured signals
+- `command_shield.inspect_code(...)` should flag absolute-interpreter invocations (`/usr/bin/python3 …`) and absolute-shebang scripts as signals, since those bypass the executor-venv PATH steering
 
 ### Longer-term
 
-- provision a per-agent Python environment
+- provision a per-agent Python environment (plumbing already in place: swap the venv path on the plan)
 - constrain Python package installs and execution to that environment
+- add an explicit `install_package` tool so free-form `pip install` in `RUN_COMMAND` can be deprecated
 - make "agent can write Python here and run it there" an explicit, inspectable policy decision
 
 ---

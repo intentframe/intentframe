@@ -25,6 +25,7 @@ from executor.sandbox.templates import (
     SandboxTemplate,
     TEMPLATE_ORDER,
 )
+from executor.sandbox.venv import resolve_executor_venv_path, validate_executor_venv
 
 _TEMPLATE_RANK = {t: i for i, t in enumerate(TEMPLATE_ORDER)}
 
@@ -42,6 +43,7 @@ class ExecutionPlan:
     deny_write_paths: tuple[str, ...]
     deny_access_paths: tuple[str, ...]
     working_directory: str | None = None
+    executor_venv_path: str | None = None
 
 
 class SandboxPlanner:
@@ -80,10 +82,19 @@ class SandboxPlanner:
             canonical_sandbox_path(p) for p in NON_NEGOTIABLE_DENY_ACCESS
         )
 
+        self._executor_venv_path = self._resolve_executor_venv(
+            config, self._deny_access
+        )
+
     @property
     def template(self) -> SandboxTemplate:
         """The single template applied to all commands."""
         return self._template
+
+    @property
+    def executor_venv_path(self) -> str | None:
+        """Resolved absolute path to the executor venv, or ``None``."""
+        return self._executor_venv_path
 
     def plan(self, working_directory: str | None = None) -> ExecutionPlan:
         """Produce an ``ExecutionPlan`` using the config-driven template."""
@@ -100,6 +111,7 @@ class SandboxPlanner:
             deny_write_paths=self._deny_write,
             deny_access_paths=self._deny_access,
             working_directory=working_directory,
+            executor_venv_path=self._executor_venv_path,
         )
 
     # ------------------------------------------------------------------
@@ -123,3 +135,83 @@ class SandboxPlanner:
             if canon not in paths:
                 paths.append(canon)
         return paths
+
+    @staticmethod
+    def _resolve_executor_venv(
+        config: SandboxConfig, deny_access: tuple[str, ...],
+    ) -> str | None:
+        """Resolve + validate the executor venv path (once, at startup).
+
+        Returns ``None`` when:
+          1. The path cannot be resolved (bare root + no SUDO_USER).
+          2. The venv is missing / lacks ``bin/python3``.
+          3. The resolved path sits under a non-negotiable deny-access
+             subpath -- the sandbox would deny reads on the interpreter
+             binary, making ``exec`` fail with "Operation not permitted"
+             even under UNRESTRICTED. This is a config mistake (e.g.
+             nesting the venv under ``~/.intentframe``) and we fail
+             loud rather than ship a broken deployment.
+
+        Cases (1) and (2) log an error when
+        ``executor_venv_required=True``; case (3) always logs an
+        error. The startup layer
+        (``executor.main.build_gateway``) is responsible for turning
+        ``None`` + ``executor_venv_required=True`` into a fail-closed
+        ConfigurationError.
+        """
+        path = resolve_executor_venv_path(config)
+        if path is None:
+            if config.executor_venv_required:
+                logger.error(
+                    "Executor venv unresolved (no SUDO_USER, running as "
+                    "root, and sandbox.executor_venv_path not set). "
+                    "Sandboxed RUN_COMMAND will have no Python venv."
+                )
+            return None
+
+        if not validate_executor_venv(path):
+            if config.executor_venv_required:
+                logger.error(
+                    "Executor venv missing or unusable at %s -- expected "
+                    "<venv>/bin/python3. Provision via intentframe_setup.sh.",
+                    path,
+                )
+                return None
+            logger.warning(
+                "Executor venv not found at %s; sandboxed Python will fall "
+                "back to system python3 (executor_venv_required=False).",
+                path,
+            )
+            return None
+
+        collision = _find_deny_collision(path, deny_access)
+        if collision is not None:
+            logger.error(
+                "Executor venv %s is nested under deny-access path %s. "
+                "The sandbox would deny reads on bin/python3, making exec "
+                "fail. Move the venv outside that subpath (default: "
+                "~/.intentframe-venvs/executor).",
+                path, collision,
+            )
+            return None
+
+        logger.info("Executor venv: %s", path)
+        return path
+
+
+def _find_deny_collision(
+    venv_path: str, deny_access: tuple[str, ...],
+) -> str | None:
+    """Return the deny-access entry that contains *venv_path*, or ``None``.
+
+    Uses prefix matching on canonical paths with an explicit separator
+    to avoid ``/a/bad`` matching ``/a/b``. Both sides are already
+    canonicalized (realpath-resolved) by the callers, so this is a
+    pure string comparison.
+    """
+    venv = venv_path.rstrip(os.sep)
+    for deny in deny_access:
+        d = deny.rstrip(os.sep)
+        if venv == d or venv.startswith(d + os.sep):
+            return deny
+    return None
