@@ -10,6 +10,7 @@ from intentframe_core.types import (
     AnalysisReport,
     CommandIntel,
     ExecutionContext,
+    FileIntel,
     IntentFrame,
 )
 
@@ -45,6 +46,7 @@ class AnalysisEngine(ABC):
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
         command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -86,5 +88,13 @@ class AnalysisEngine(ABC):
                 every other action.  Additive context — Phase 1 wiring
                 forwards it but existing implementations need not
                 consume it yet.
+            file_intel: Bounded summary of ``inspect_code`` facts for
+                the WRITE_FILE payload (language, binary/oversized
+                flags, code-intel findings).  Populated only for
+                WRITE_FILE intents; ``None`` for every other action.
+                Consumed by the prompt strategy to route WRITE_FILE to
+                the ``critical_write_file`` AE lane when the payload is
+                code-like and by the critical prompt body to ground
+                reasoning in deterministic payload facts.
         """
         pass

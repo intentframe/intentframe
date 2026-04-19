@@ -18,6 +18,7 @@ Analysis Engine ids, in precedence order (strictest wins):
 
     critical_network_mutation   (RUN_COMMAND + capability:network_probe:{http_mutate, http_download, port_scan, file_transfer})
     critical_network_probe      (RUN_COMMAND + capability:network_probe:{icmp, trace, dns, whois, http_get})
+    critical_write_file         (action == WRITE_FILE — every write)
     critical_generic            (action ∈ CRITICAL_ACTIONS)
     standard                    (everything else)
 
@@ -32,6 +33,18 @@ If ``command_intel`` is ``None`` for a RUN_COMMAND, we route to
 ``critical_generic``, not ``standard``.  A missing ``CommandIntel`` on
 a RUN_COMMAND indicates a plumbing bug somewhere upstream; the safe
 default is the stricter overlay.
+
+Role of ``file_intel``
+----------------------
+``file_intel`` is accepted on both ``select_ae_prompt_id`` and
+``select_guardian_prompt_id`` strictly as context that the engines
+forward into their prompts (payload language, binary / oversized flags,
+code-intel findings).  The default strategy does **not** consult it to
+pick a prompt id — every WRITE_FILE lands in ``critical_write_file``
+regardless of payload shape.  Content-aware lanes (e.g. a future
+``critical_write_file_code``) are deferred until per-lane overlay
+bodies are authored; until then, payload-aware routing would just
+switch between aliases of the same body and buy nothing.
 """
 
 from __future__ import annotations
@@ -39,7 +52,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from action_registry.types import ActionType
-from intentframe_core.types import AnalysisReport, CommandIntel, IntentFrame
+from intentframe_core.types import AnalysisReport, CommandIntel, FileIntel, IntentFrame
 from intentframe_components.routing.criticality import is_critical
 
 
@@ -90,6 +103,13 @@ def _has_network_probe(caps: tuple[str, ...]) -> bool:
     return False
 
 
+# WRITE_FILE destination heuristics live in
+# :mod:`intentframe_components.heuristics.file_payload`.  The default
+# strategy no longer calls into them — WRITE_FILE routes flat to
+# ``critical_write_file`` — but :class:`DeterministicGuardian` still
+# consumes ``is_sensitive_write_path`` from that module as a BLOCK rule.
+
+
 # ────────────────────────────────────────────────────────────────
 # Protocol
 # ────────────────────────────────────────────────────────────────
@@ -109,8 +129,18 @@ class PromptStrategy(Protocol):
         self,
         intent: IntentFrame,
         command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
     ) -> str:
-        """Return the AE prompt id for this request."""
+        """Return the AE prompt id for this request.
+
+        ``file_intel`` is populated only for WRITE_FILE intents and
+        carries payload facts from :func:`command_shield.inspect_code`
+        (language, binary/oversized flags, code-intel findings).  The
+        default strategy does not route on it — it is accepted on the
+        Protocol so the engines can hand the same value to AE's
+        payload builder, and so a future custom strategy can split
+        WRITE_FILE into payload-aware lanes without a signature change.
+        """
         ...
 
     def select_guardian_prompt_id(
@@ -118,6 +148,7 @@ class PromptStrategy(Protocol):
         intent: IntentFrame,
         analysis: AnalysisReport,
         command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
     ) -> str:
         """Return the Guardian prompt id for this request.
 
@@ -145,6 +176,7 @@ class DefaultPromptStrategy:
     _AE_PRECEDENCE: tuple[str, ...] = (
         "critical_network_mutation",
         "critical_network_probe",
+        "critical_write_file",
         "critical_generic",
         "standard",
     )
@@ -160,7 +192,14 @@ class DefaultPromptStrategy:
         self,
         intent: IntentFrame,
         command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
     ) -> str:
+        # ``file_intel`` is accepted on the Protocol so engines can pass
+        # it through; the default strategy does not route on it.  WRITE_FILE
+        # lands in ``critical_write_file`` unconditionally — payload-aware
+        # sub-lanes are deferred until per-lane overlay bodies exist.
+        del file_intel
+
         action_value = intent.action.value
 
         # RUN_COMMAND sub-routing lives on the AE side only.
@@ -176,6 +215,9 @@ class DefaultPromptStrategy:
             # a missing-intel plumbing bug.
             return "critical_generic"
 
+        if action_value == ActionType.WRITE_FILE.value:
+            return "critical_write_file"
+
         if is_critical(action_value):
             return "critical_generic"
 
@@ -188,11 +230,13 @@ class DefaultPromptStrategy:
         intent: IntentFrame,
         analysis: AnalysisReport,
         command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
     ) -> str:
-        # analysis and command_intel are accepted for future strategies
-        # (e.g. finance-domain Guardian prompt); the default strategy routes
-        # purely on action criticality.
-        del analysis, command_intel
+        # analysis, command_intel, and file_intel are accepted for future
+        # strategies (e.g. finance-domain Guardian prompt, payload-aware
+        # Guardian lanes); the default strategy routes purely on action
+        # criticality.
+        del analysis, command_intel, file_intel
 
         if is_critical(intent.action.value):
             return "critical"

@@ -29,6 +29,7 @@ from intentframe_core.types import (
     AnalysisReport,
     CommandIntel,
     ExecutionContext,
+    FileIntel,
     IntentFrame,
 )
 from intentframe_core.enums import Reversibility, RiskLevel
@@ -381,6 +382,7 @@ class AIAnalysisEngine(AnalysisEngine):
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
         command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -431,9 +433,10 @@ class AIAnalysisEngine(AnalysisEngine):
             terminal_command_signals=terminal_command_signals,
             active_domains=active_domains,
             execution_context=execution_context,
+            file_intel=file_intel,
         )
 
-        prompt_id = self._resolve_prompt_id(intent, command_intel)
+        prompt_id = self._resolve_prompt_id(intent, command_intel, file_intel)
         self.last_prompt_id = prompt_id
         agent = self._agents[prompt_id]
 
@@ -451,6 +454,7 @@ class AIAnalysisEngine(AnalysisEngine):
         self,
         intent: IntentFrame,
         command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
     ) -> str:
         """Ask the strategy for a prompt id, fail-closed on unknowns.
 
@@ -462,7 +466,9 @@ class AIAnalysisEngine(AnalysisEngine):
         construction.
         """
         try:
-            pid = self._prompt_strategy.select_ae_prompt_id(intent, command_intel)
+            pid = self._prompt_strategy.select_ae_prompt_id(
+                intent, command_intel, file_intel,
+            )
         except Exception:
             logger.exception("AE prompt strategy raised; falling back to 'standard'")
             return "standard"
@@ -481,12 +487,15 @@ class AIAnalysisEngine(AnalysisEngine):
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
+        file_intel: FileIntel | None = None,
     ) -> str:
         """Build a hardened prompt for the AI agent.
 
         Trusted section: action (enum-validated), agent metadata,
         task description, active domains, terminal command signals
-        (from command_shield), execution privilege level.
+        (from command_shield), execution privilege level, and — for
+        WRITE_FILE intents — a deterministic payload-intel summary
+        from :func:`command_shield.inspect_code`.
         Untrusted section: target, reason, data — the fields the agent
         LLM actually controls.
         """
@@ -512,6 +521,35 @@ class AIAnalysisEngine(AnalysisEngine):
                 if sig.evidence:
                     line += f"  (evidence: {sig.evidence[:120]})"
                 context_lines.append(line)
+
+        if file_intel is not None:
+            # Inject payload-side facts as TRUSTED context.  Mirror of the
+            # terminal-command signals block, but scoped to WRITE_FILE
+            # payloads.  The AE routes to ``critical_write_file`` when the
+            # payload looks code-like; once there, the prompt body needs
+            # the structured facts so reasoning stays grounded in
+            # deterministic output rather than re-sniffing the raw bytes.
+            context_lines.append(
+                "\nWRITE_FILE — PAYLOAD SIGNALS:\n"
+                "Before this intent reached you, deterministic code inspection "
+                "(language sniff, binary guard, AST / regex analyzers) produced "
+                "the facts below.  Factor them into your hidden-behavior and "
+                "risk analysis — especially language/extension mismatches, "
+                "findings on code payloads, and oversized / binary content:"
+            )
+            context_lines.append(
+                f"  - language={file_intel.language or 'unknown'} "
+                f"is_binary={file_intel.is_binary} "
+                f"is_oversized={file_intel.is_oversized} "
+                f"size_bytes={file_intel.size_bytes}"
+            )
+            if file_intel.signal_ids:
+                context_lines.append(
+                    f"  - signals: {', '.join(file_intel.signal_ids)}"
+                )
+            if file_intel.has_code_intel_findings:
+                ids = ", ".join(file_intel.code_intel_finding_ids) or "(unnamed)"
+                context_lines.append(f"  - code-intel findings: {ids}")
 
         trusted_sections["Context"] = "\n".join(context_lines)
 

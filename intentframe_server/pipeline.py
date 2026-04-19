@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Optional
 
 from action_registry.types import ActionType
-from command_shield import Verdict, inspect_command as shield_inspect
+from command_shield import Verdict, inspect_code as shield_inspect_code, inspect_command as shield_inspect
 from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
@@ -44,6 +44,7 @@ from intentframe_core.types import (
     CommandIntel,
     ExecutionContext,
     ExecutionResult,
+    FileIntel,
     IntentFrame,
     AgentCapabilities,
     RuntimeContext,
@@ -63,6 +64,56 @@ from resource_registry.client import ResourceRegistryClient
 logger = logging.getLogger(__name__)
 
 _executor_logger: logging.Logger | None = None
+
+
+def _build_file_intel(content: str, target: str | None) -> FileIntel:
+    """Run ``command_shield.inspect_code`` on a WRITE_FILE payload and summarize.
+
+    Mirrors the RUN_COMMAND ``CommandIntel`` construction below — the
+    full :class:`CodeReport` stays on the pipeline-local variable and
+    only a narrow, pydantic-friendly summary is forwarded to DG / AE /
+    Guardian.  Sizing and finding bounds are enforced by
+    :class:`FileIntel` itself on construction so a runaway upstream
+    report cannot swell the downstream payload.
+
+    ``target`` is passed as ``source_path`` to ``inspect_code`` so
+    extension-based language sniffing works (e.g. a .py virtual path
+    tells the sniffer to AST-parse before falling back to content
+    heuristics).  Exceptions are swallowed to ``None`` — a broken
+    inspector must not fail-open the pipeline; downstream consumers
+    treat missing FileIntel as "unknown" (fail-closed into the
+    critical_write_file lane in the default strategy).
+    """
+    try:
+        report = shield_inspect_code(content, source_path=target)
+    except Exception:  # noqa: BLE001 — defensive; log and return minimal intel
+        logger.exception("FileIntel: inspect_code raised — using empty intel")
+        return FileIntel(
+            language=None,
+            is_binary=False,
+            is_oversized=False,
+            size_bytes=len(content.encode("utf-8", errors="replace")),
+        )
+
+    signal_ids = tuple(s.signal_id for s in report.signals)
+    is_oversized = "CODE_TOO_LARGE" in signal_ids
+    is_binary = report.language == "binary"
+
+    finding_ids: tuple[str, ...] = ()
+    if report.code_intel is not None and report.code_intel.findings:
+        finding_ids = tuple(
+            getattr(f, "finding_id", "") for f in report.code_intel.findings
+        )
+
+    return FileIntel(
+        language=report.language,
+        is_binary=is_binary,
+        is_oversized=is_oversized,
+        size_bytes=len(content.encode("utf-8", errors="replace")),
+        has_code_intel_findings=bool(finding_ids),
+        code_intel_finding_ids=finding_ids,
+        signal_ids=signal_ids,
+    )
 
 
 def _get_executor_logger() -> logging.Logger:
@@ -521,6 +572,39 @@ class IntentFrameRuntime:
                 )
 
         # ═══════════════════════════════════════════════════════════════
+        # LAYER 2b: FILE SHIELD - Deterministic payload inspection
+        # ═══════════════════════════════════════════════════════════════
+        # Symmetric with the RUN_COMMAND CommandIntel block above, but
+        # for WRITE_FILE.  Calls ``command_shield.inspect_code`` on the
+        # payload to derive a bounded ``FileIntel`` summary (language,
+        # binary / oversized flags, findings).  The full ``CodeReport``
+        # stays pipeline-local; downstream consumers (DG, AE, strategy)
+        # only see the summary.
+        #
+        # Cheap by design: inspect_code is sync, no LLM, and runs on
+        # the payload the agent is already sending.  No inspection for
+        # absent / non-string content — FileIntel stays ``None`` and
+        # downstream "missing intel on a WRITE_FILE" heuristics (the
+        # critical-payload fail-closed in DefaultPromptStrategy) handle
+        # that case.
+        file_intel: FileIntel | None = None
+        if intent.action.value == ActionType.WRITE_FILE.value:
+            data = intent.data or {}
+            content = data.get("content")
+            if isinstance(content, str):
+                file_intel = _build_file_intel(content, intent.target)
+
+                if self.verbose and file_intel is not None:
+                    print(f"    ┌──────────────────────────────────────────────────────────┐")
+                    print(f"    │  FILE SHIELD: Deterministic payload inspection           │")
+                    print(f"    │  Language: {(file_intel.language or 'unknown'):<45} │")
+                    print(f"    │  Binary: {str(file_intel.is_binary):<8} Oversized: {str(file_intel.is_oversized):<8} Size: {file_intel.size_bytes:<14} │")
+                    if file_intel.has_code_intel_findings:
+                        ids = ", ".join(file_intel.code_intel_finding_ids)[:40]
+                        print(f"    │  Findings: {ids:<45} │")
+                    print(f"    └──────────────────────────────────────────────────────────┘")
+
+        # ═══════════════════════════════════════════════════════════════
         # CONTEXT ENRICHMENT — deterministic metadata from system sources
         # ═══════════════════════════════════════════════════════════════
         intent = await enrich_email_intent(intent)
@@ -617,6 +701,7 @@ class IntentFrameRuntime:
                 active_domains=active_domains,
                 execution_context=self._execution_context,
                 command_intel=command_intel,
+                file_intel=file_intel,
             )
 
             if self.verbose:
@@ -649,6 +734,7 @@ class IntentFrameRuntime:
                 active_domains=active_domains,
                 execution_context=self._execution_context,
                 command_intel=command_intel,
+                file_intel=file_intel,
             )
         
         # ═══════════════════════════════════════════════════════════════

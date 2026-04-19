@@ -104,11 +104,11 @@ class FilesAdapter(CapabilityAdapter):
             return ExecutionResult(success=True, data={"path": path, "row": row})
 
         if action == "DELETE_FILE":
-            mount, real_path = self._vfs.resolver.resolve(path)
-            if not mount.writable:
-                return ExecutionResult(success=False, error=f"Mount is read-only: {path}")
-            if real_path.exists():
-                real_path.unlink()
+            # Delegated to the VFS so the deny-write floor applies symmetrically
+            # with WRITE_FILE (see executor/platforms/macos/virtual_filesystem.py
+            # and resource_registry/floor.py).  Previously this adapter reached
+            # into the resolver directly and bypassed the floor entirely.
+            self._vfs.delete_file(path)
             return ExecutionResult(success=True, data={"path": path, "deleted": True})
 
         return ExecutionResult(success=False, error=f"Unknown file action: {action}")

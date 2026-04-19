@@ -179,6 +179,9 @@ For recommendation:
 
 _CRITICAL_OVERLAY = ""
 
+_CRITICAL_WRITE_FILE_OVERLAY = ""
+
+
 
 # ────────────────────────────────────────────────────────────────
 # Public mapping
@@ -188,6 +191,7 @@ _CRITICAL_OVERLAY = ""
 # library in place.
 
 _CRITICAL_GENERIC = _STANDARD + _CRITICAL_OVERLAY
+_CRITICAL_WRITE_FILE = _STANDARD + _CRITICAL_WRITE_FILE_OVERLAY
 
 
 ANALYSIS_PROMPTS: Mapping[str, str] = MappingProxyType({
@@ -197,6 +201,8 @@ ANALYSIS_PROMPTS: Mapping[str, str] = MappingProxyType({
     # Per-lane overlay bodies will replace these in a later PR.
     "critical_network_probe": _CRITICAL_GENERIC,
     "critical_network_mutation": _CRITICAL_GENERIC,
+
+    "critical_write_file": _CRITICAL_WRITE_FILE,
 })
 
 ANALYSIS_PROMPT_IDS: frozenset[str] = frozenset(ANALYSIS_PROMPTS.keys())

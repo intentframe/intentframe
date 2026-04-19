@@ -28,7 +28,7 @@ from intentframe_components.prompt.library import (
 from intentframe_components.prompt.strategy import DefaultPromptStrategy
 from intentframe_components.routing.criticality import CRITICAL_ACTIONS, is_critical
 from intentframe_core.enums import Reversibility, RiskLevel
-from intentframe_core.types import AnalysisReport, CommandIntel, IntentFrame
+from intentframe_core.types import AnalysisReport, CommandIntel, FileIntel, IntentFrame
 
 
 # ───────────────────────────── helpers ─────────────────────────────
@@ -49,6 +49,27 @@ def _intel(*capabilities: str) -> CommandIntel:
     )
 
 
+def _file_intel(
+    *,
+    language: str | None = None,
+    is_binary: bool = False,
+    is_oversized: bool = False,
+    size_bytes: int = 0,
+    has_code_intel_findings: bool = False,
+    code_intel_finding_ids: tuple[str, ...] = (),
+    signal_ids: tuple[str, ...] = (),
+) -> FileIntel:
+    return FileIntel(
+        language=language,
+        is_binary=is_binary,
+        is_oversized=is_oversized,
+        size_bytes=size_bytes,
+        has_code_intel_findings=has_code_intel_findings,
+        code_intel_finding_ids=code_intel_finding_ids,
+        signal_ids=signal_ids,
+    )
+
+
 def _analysis() -> AnalysisReport:
     return AnalysisReport(
         stated_intent="test",
@@ -63,6 +84,35 @@ STRATEGY = DefaultPromptStrategy()
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Placeholder marker — payload-aware WRITE_FILE lanes
+# ═══════════════════════════════════════════════════════════════════════
+# WRITE_FILE currently routes flat to ``critical_write_file``.  A future
+# split will route positively-classified code payloads to a dedicated
+# ``critical_write_file_code`` lane, and passive / document-like payloads
+# on benign destinations to ``standard``.  The tests below codify that
+# future contract so that when per-lane overlay bodies are authored:
+#
+#   1. Add the new lane(s) to ``ANALYSIS_PROMPTS``.
+#   2. Teach ``DefaultPromptStrategy.select_ae_prompt_id`` to branch on
+#      ``file_intel``.
+#   3. Remove this marker.
+#
+# ``strict=False`` so XPASS does not fail the suite — it's a hint to the
+# author, not a gate.
+_WRITE_FILE_LANE_PLACEHOLDER = pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "WRITE_FILE routing is flat today — every write lands in "
+        "``critical_write_file``.  Payload-aware lanes "
+        "(``critical_write_file_code`` for code payloads, ``standard`` for "
+        "passive docs on benign destinations) are deferred until per-lane "
+        "overlay bodies are authored.  Remove this marker when the split "
+        "ships."
+    ),
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # AE routing
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -72,10 +122,15 @@ class TestAERouting:
             _intent(ActionType.LIST_CALENDARS), None,
         ) == "standard"
 
-    def test_non_critical_write_action_routes_to_standard(self):
+    def test_write_file_with_no_file_intel_routes_to_critical_write_file(self):
+        # Fail-closed: a missing FileIntel on WRITE_FILE means upstream
+        # plumbing is broken (the pipeline must compute FileIntel
+        # whenever ``data.content`` is a string).  Safer default is
+        # the payload-aware overlay than the standard prompt — the
+        # symmetric stance for RUN_COMMAND with no CommandIntel below.
         assert STRATEGY.select_ae_prompt_id(
             _intent(ActionType.WRITE_FILE, "/tmp/x"), None,
-        ) == "standard"
+        ) == "critical_write_file"
 
     @pytest.mark.parametrize("action", [
         ActionType.PAY_INVOICE,
@@ -155,6 +210,161 @@ class TestAERouting:
         assert STRATEGY.select_ae_prompt_id(
             _intent(ActionType.RUN_COMMAND, "cmd"), caps,
         ) == "critical_generic"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# WRITE_FILE AE routing — flat today, payload-aware tomorrow
+# ═══════════════════════════════════════════════════════════════════════
+# Current behaviour: every WRITE_FILE routes to ``critical_write_file``
+# regardless of payload shape or destination.  ``FileIntel`` is accepted
+# on the strategy signature and forwarded into the AE payload as
+# context, but it does not influence prompt-id selection.
+#
+# Future behaviour (guarded by ``_WRITE_FILE_LANE_PLACEHOLDER`` xfails):
+#
+#   critical_write_file_code — payload positively classified as code
+#       (language in CODE_LANGUAGES, OR code-intel findings present).
+#       Wins over the generic critical lane even when the destination
+#       is also a sensitive system path — "what the code does" is the
+#       more specific concern.
+#
+#   critical_write_file — opaque payloads (binary / oversized /
+#       missing FileIntel), and anything else that doesn't positively
+#       classify as code.
+#
+#   standard — passive document-like payloads (text / markdown / json
+#       with no code signals) on benign destinations.
+#
+# Sensitive-path destinations are BLOCKed pre-AE by
+# :class:`DeterministicGuardian` in the main pipeline, so those cases
+# never reach the strategy through the normal path.  The strategy
+# still routes them to ``critical_write_file`` as defense in depth
+# for callers that invoke the strategy directly (tests, tools) — that
+# contract is asserted in ``test_sensitive_path_destinations_route_to_critical``
+# below and holds today because every WRITE_FILE lands there anyway.
+
+class TestWriteFileAERouting:
+    # ── passive payloads on benign destinations → standard ──────
+    # xfail: today every WRITE_FILE lands in ``critical_write_file``.
+    # Passes once a ``standard`` fast-path for passive docs ships.
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_passive_text_md_routes_to_standard(self):
+        fi = _file_intel(language=None, size_bytes=120)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/notes.md"), None, fi,
+        ) == "standard"
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_passive_json_routes_to_standard(self):
+        fi = _file_intel(language=None, size_bytes=40)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/data/config.json"), None, fi,
+        ) == "standard"
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_benign_extension_on_benign_destination_routes_to_standard(self):
+        fi = _file_intel(language=None, size_bytes=10)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/report.txt"), None, fi,
+        ) == "standard"
+
+    # ── positively-classified code → critical_write_file_code ───
+    # xfail: the ``critical_write_file_code`` lane does not exist yet.
+    # Passes once the code lane is added to ``ANALYSIS_PROMPTS`` and
+    # the strategy learns to branch on ``file_intel.language`` /
+    # ``file_intel.has_code_intel_findings``.
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_python_payload_routes_to_code_lane(self):
+        fi = _file_intel(language="python", size_bytes=300)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/notes.md"), None, fi,
+        ) == "critical_write_file_code"
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_shell_payload_routes_to_code_lane(self):
+        fi = _file_intel(language="shell", size_bytes=200)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/scripts/x.sh"), None, fi,
+        ) == "critical_write_file_code"
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_javascript_payload_routes_to_code_lane(self):
+        fi = _file_intel(language="javascript", size_bytes=200)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/scripts/x.js"), None, fi,
+        ) == "critical_write_file_code"
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_code_intel_findings_route_to_code_lane(self):
+        # Findings without a known code language are still a positive
+        # code signal — ``command_shield`` flagged something executable.
+        fi = _file_intel(
+            language=None,
+            has_code_intel_findings=True,
+            code_intel_finding_ids=("EVAL_USE",),
+            size_bytes=50,
+        )
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, fi,
+        ) == "critical_write_file_code"
+
+    @_WRITE_FILE_LANE_PLACEHOLDER
+    def test_code_payload_on_autoload_destination_prefers_code_lane(self):
+        # Both triggers fire — a Python file written to a sensitive
+        # system path.  "What the code does" is the more specific
+        # concern, so the code lane wins over the generic critical lane.
+        fi = _file_intel(language="python", size_bytes=500)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/.zshrc.d/x.py"), None, fi,
+        ) == "critical_write_file_code"
+
+    # ── opaque payloads → critical_write_file (non-code) ────────
+
+    def test_binary_payload_routes_to_critical_write_file(self):
+        fi = _file_intel(language="binary", is_binary=True, size_bytes=1024)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, fi,
+        ) == "critical_write_file"
+
+    def test_oversized_payload_routes_to_critical_write_file(self):
+        fi = _file_intel(is_oversized=True, size_bytes=10_000_000)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, fi,
+        ) == "critical_write_file"
+
+    def test_missing_file_intel_routes_to_critical_write_file(self):
+        # Fail-closed: no deterministic evidence about the payload.
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, None,
+        ) == "critical_write_file"
+
+    # ── destination-side defense in depth ───────────────────────
+    # In the main pipeline these destinations are BLOCKed pre-AE by
+    # :class:`DeterministicGuardian` (see
+    # ``tests/test_deterministic_guardian.py::TestWriteFileAutoLoadBlock``).
+    # The strategy still routes them to the critical lane for callers
+    # that bypass DG — if a direct caller somehow lands a WRITE_FILE
+    # with one of these targets at the strategy, we pick the strict
+    # overlay rather than standard.
+
+    @pytest.mark.parametrize("target", [
+        "/home/.zshrc",
+        "/home/.bashrc",
+        "/home/.profile",
+        "/home/library/launchagents/com.example.plist",
+        "/home/.ssh/authorized_keys",
+        "/home/.git/hooks/pre-commit",
+        "/etc/sudoers",
+        "/home/project/site-packages/evil.pth",
+        "/home/project/sitecustomize.py",
+    ])
+    def test_sensitive_path_destinations_route_to_critical(self, target):
+        fi = _file_intel(language=None, size_bytes=10)
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_FILE, target), None, fi,
+        ) == "critical_write_file"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -249,20 +459,20 @@ class TestCriticalityDriftGuard:
 class _BadStrategy:
     """Strategy that returns an id unknown to the library."""
 
-    def select_ae_prompt_id(self, intent, command_intel):
+    def select_ae_prompt_id(self, intent, command_intel, file_intel=None):
         return "not_a_real_id"
 
-    def select_guardian_prompt_id(self, intent, analysis, command_intel):
+    def select_guardian_prompt_id(self, intent, analysis, command_intel, file_intel=None):
         return "also_bogus"
 
 
 class _RaisingStrategy:
     """Strategy whose selector raises — simulates a plugin bug."""
 
-    def select_ae_prompt_id(self, intent, command_intel):
+    def select_ae_prompt_id(self, intent, command_intel, file_intel=None):
         raise RuntimeError("boom")
 
-    def select_guardian_prompt_id(self, intent, analysis, command_intel):
+    def select_guardian_prompt_id(self, intent, analysis, command_intel, file_intel=None):
         raise RuntimeError("boom")
 
 

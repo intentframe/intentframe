@@ -1,13 +1,19 @@
 """Unit tests for DeterministicGuardian (pre-AE deterministic pass).
 
-Covers the six rules of the pre-AE pass:
+Covers the rules of the pre-AE pass:
 
   1. Permission check          → BLOCK / passthrough
   2. Constraint check          → BLOCK / passthrough
   2.5 Domain module check      → BLOCK / passthrough
+  3. WRITE_FILE sensitive path → BLOCK on known-dangerous destinations
   4. Passive-read ALLOW        → ALLOW on safe passive reads
   5. RUN_COMMAND read-only     → ALLOW on read-only capability tags
-  7. Default                   → UNDECIDED (AE + AIGuardian handle it)
+  6. Default                   → UNDECIDED (AE + AIGuardian handle it)
+
+WRITE_FILE has NO deterministic ALLOW gate: every mutating write pays
+LLM review unless rule 3 fires first (hard BLOCK).  Payload-content
+heuristics (extension / language sniff) are not trusted as evidence of
+benignness under an adversarial agent.
 
 Also covers:
 
@@ -63,6 +69,7 @@ def _intel(
         has_edge_signals=has_edge,
         has_code_intel_findings=has_code,
     )
+
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -271,6 +278,100 @@ class TestReadOnlyFastPath:
             _intent(ActionType.RUN_COMMAND, target="ls"),
             _user(RUN_COMMAND=self.perm),
             command_intel=None,
+        )
+        assert result.decision is DeterministicDecision.UNDECIDED
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# STEP 3 — WRITE_FILE sensitive destination BLOCK
+# ═══════════════════════════════════════════════════════════════════════
+# DG makes one deterministic decision about WRITE_FILE: BLOCK when the
+# virtual target is a sensitive system location (shell startup files,
+# credential stores, privilege config, persistence daemons, Python
+# runtime hooks).  Mirrors the VFS floor at
+# resource_registry.floor.DENY_WRITE_PREFIXES which catches the same
+# families on the canonicalized real path at I/O time — DG fires on
+# the virtual path, pre-AE, so agents don't spend an LLM round-trip
+# on a write we will refuse at I/O anyway.
+#
+# Payload heuristics (extension / sniffed language) do NOT qualify a
+# WRITE_FILE for deterministic ALLOW: every write goes UNDECIDED and
+# pays the LLM round-trip unless the destination trips the block above.
+
+class TestWriteFileSensitivePathBlock:
+    dg = DeterministicGuardian()
+
+    perm_safe = ActionPermission(safe=True)
+
+    def _decide(self, target: str, *, safe: bool = True) -> DeterministicResult:
+        return self.dg.decide(
+            _intent(ActionType.WRITE_FILE, target),
+            _user(WRITE_FILE=self.perm_safe if safe else ActionPermission(safe=False)),
+        )
+
+    # ── BLOCK path ──────────────────────────────────────────────
+
+    @pytest.mark.parametrize("target", [
+        "/home/.zshrc",
+        "/home/.bashrc",
+        "/home/.bash_profile",
+        "/home/.profile",
+        "/home/.zprofile",
+        "/home/.zshenv",
+        "/home/library/launchagents/com.example.plist",
+        "/home/.ssh/authorized_keys",
+        "/home/.ssh/config",
+        "/home/.gnupg/gpg.conf",
+        "/home/.git/hooks/pre-commit",
+        "/etc/sudoers",
+        "/etc/sudoers.d/00-example",
+        "/home/project/site-packages/evil.pth",
+        "/home/project/site-packages/sitecustomize.py",
+        "/home/project/site-packages/usercustomize.py",
+    ])
+    def test_sensitive_destination_blocks(self, target):
+        """Every sensitive system location is a hard BLOCK."""
+        result = self._decide(target)
+        assert result.decision is DeterministicDecision.BLOCK
+        assert result.matched_gate == "write_file_sensitive_path"
+        assert target in result.reason
+
+    def test_sensitive_destination_blocks_regardless_of_permission_safe(self):
+        """``permission.safe`` cannot downgrade a sensitive-path BLOCK."""
+        result = self._decide("/home/.zshrc", safe=False)
+        assert result.decision is DeterministicDecision.BLOCK
+        assert result.matched_gate == "write_file_sensitive_path"
+
+    def test_case_insensitive_match(self):
+        """Fragment match is case-insensitive — catches mixed-case macOS
+        paths like Library/LaunchAgents."""
+        result = self._decide(
+            "/Users/alice/Library/LaunchAgents/com.example.plist"
+        )
+        assert result.decision is DeterministicDecision.BLOCK
+
+    # ── no ALLOW fast-path for WRITE_FILE ───────────────────────
+
+    @pytest.mark.parametrize("target", [
+        "/home/documents/notes.md",
+        "/home/documents/data.json",
+        "/home/documents/config.yaml",
+        "/tmp/output.txt",
+        "/home/documents/README",
+        "/home/documents/file.unknown",
+    ])
+    def test_benign_writes_fall_through_to_undecided(self, target):
+        """Ordinary document / data writes go UNDECIDED — AE + Guardian
+        still run.  No amount of "looks boring" short-circuits the LLM."""
+        result = self._decide(target)
+        assert result.decision is DeterministicDecision.UNDECIDED
+
+    def test_code_payload_with_benign_destination_undecided(self):
+        """Only destination drives the DG BLOCK; payload type does not.
+        A Python file on a non-sensitive path falls through to AE."""
+        result = self.dg.decide(
+            _intent(ActionType.WRITE_FILE, "/home/documents/notes.md"),
+            _user(WRITE_FILE=self.perm_safe),
         )
         assert result.decision is DeterministicDecision.UNDECIDED
 

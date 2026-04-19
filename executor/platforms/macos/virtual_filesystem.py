@@ -22,8 +22,27 @@ from executor.services.virtual_filesystem import (
     MountPointResolver,
     VirtualFileSystem,
 )
+from resource_registry.floor import match_deny_prefix
 
 logger = logging.getLogger(__name__)
+
+
+def _canonical_real_path(real_path: Path) -> str:
+    """Canonical string form of *real_path* safe for prefix matching.
+
+    Used for the deny-write floor check.  The path may not exist yet (the
+    typical case for ``write_file``) so we canonicalize the parent and rejoin
+    the filename — ``Path.resolve()`` on a missing file would fall back to
+    string-level normalization on some Python versions.  Canonicalization
+    is critical because floor prefixes like ``/tmp`` expand to
+    ``/private/tmp`` on macOS; comparing non-canonical strings would miss
+    symlink-based escapes.
+    """
+    try:
+        return str(real_path.resolve(strict=False))
+    except OSError:
+        parent = real_path.parent.resolve(strict=False)
+        return str(parent / real_path.name)
 
 
 class LocalVirtualFileSystem(VirtualFileSystem):
@@ -158,12 +177,37 @@ class LocalVirtualFileSystem(VirtualFileSystem):
         return "\n\n".join(pages)
 
     def write_file(self, virtual_path: str, content: str) -> bool:
-        """Write content to a file."""
+        """Write content to a file.
+
+        Enforces two gates in order:
+
+        1. Mount writability — the VFS mount must be declared ``writable``.
+        2. Non-negotiable deny-write floor — the resolved real path must not
+           fall under :data:`resource_registry.floor.DENY_WRITE_PREFIXES`.
+           This is symmetric with the Seatbelt ``NON_NEGOTIABLE_DENY_WRITE``
+           list enforced for ``RUN_COMMAND`` in
+           ``executor/sandbox/platforms/macos.py``; without this check the
+           VFS would let WRITE_FILE bypass the floor the sandbox otherwise
+           guarantees.
+        """
         mount, real_path = self._resolver.resolve(virtual_path)
 
         if not mount.writable:
             raise VirtualFileSystemError(
                 f"Mount is read-only: {virtual_path}"
+            )
+
+        canonical = _canonical_real_path(real_path)
+        matched = match_deny_prefix(canonical)
+        if matched is not None:
+            logger.warning(
+                "WRITE_FILE blocked by deny-write floor: virtual=%r real=%r prefix=%r",
+                virtual_path,
+                canonical,
+                matched,
+            )
+            raise VirtualFileSystemError(
+                f"Write denied by non-negotiable floor ({matched}): {virtual_path}"
             )
 
         try:
@@ -173,6 +217,43 @@ class LocalVirtualFileSystem(VirtualFileSystem):
         except Exception as exc:
             raise VirtualFileSystemError(
                 f"Failed to write {virtual_path}: {exc}"
+            ) from exc
+
+    def delete_file(self, virtual_path: str) -> bool:
+        """Delete a file under a writable mount, subject to the floor.
+
+        Idempotent: returns ``True`` whether or not the file existed.  The
+        floor check runs even when the target is absent so agents can't use
+        DELETE_FILE to probe protected paths for existence based on the
+        error string.
+        """
+        mount, real_path = self._resolver.resolve(virtual_path)
+
+        if not mount.writable:
+            raise VirtualFileSystemError(
+                f"Mount is read-only: {virtual_path}"
+            )
+
+        canonical = _canonical_real_path(real_path)
+        matched = match_deny_prefix(canonical)
+        if matched is not None:
+            logger.warning(
+                "DELETE_FILE blocked by deny-write floor: virtual=%r real=%r prefix=%r",
+                virtual_path,
+                canonical,
+                matched,
+            )
+            raise VirtualFileSystemError(
+                f"Delete denied by non-negotiable floor ({matched}): {virtual_path}"
+            )
+
+        try:
+            if real_path.exists():
+                real_path.unlink()
+            return True
+        except Exception as exc:
+            raise VirtualFileSystemError(
+                f"Failed to delete {virtual_path}: {exc}"
             ) from exc
 
     def file_exists(self, virtual_path: str) -> bool:

@@ -18,7 +18,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from intentframe_core.types import CommandIntel, IntentFrame
+from intentframe_core.types import CommandIntel, FileIntel, IntentFrame
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ class CheckContext:
     """
 
     command_intel: CommandIntel | None = None
+    file_intel: FileIntel | None = None
 
 
 class ConstraintChecker(ABC):

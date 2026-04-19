@@ -35,6 +35,7 @@ from intentframe_core.types import (
     AnalysisReport,
     CommandIntel,
     ExecutionContext,
+    FileIntel,
     IntentFrame,
     UserContext,
     ValidationResult,
@@ -207,15 +208,18 @@ class AIGuardian(Guardian):
         intent: IntentFrame,
         permission: ActionPermission,
         command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> tuple[bool, str]:
         """Evaluate per-category constraints against the intent.
 
         Dispatches to the registered ConstraintChecker for the constraint type.
         Returns (passed, reason).
 
-        ``command_intel`` is forwarded as ``CheckContext.command_intel``
-        to checkers that can consume it (TerminalChecker).  Checkers
-        that don't care simply ignore the context.
+        ``command_intel`` and ``file_intel`` are forwarded as
+        ``CheckContext`` fields to checkers that can consume them
+        (TerminalChecker uses ``command_intel``; a future payload-aware
+        FileChecker would use ``file_intel``).  Checkers that don't
+        care simply ignore the context.
         """
         from intentframe_components.guardian.checkers.base import CheckContext
 
@@ -224,7 +228,10 @@ class AIGuardian(Guardian):
             return True, ""
         checker = CONSTRAINT_CHECKERS.get(type(constraints))
         if checker:
-            context = CheckContext(command_intel=command_intel)
+            context = CheckContext(
+                command_intel=command_intel,
+                file_intel=file_intel,
+            )
             return checker.check(intent, constraints, context)
         return True, ""
 
@@ -254,6 +261,7 @@ class AIGuardian(Guardian):
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
         command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies.
@@ -290,7 +298,9 @@ class AIGuardian(Guardian):
 
         # ── Step 2: Constraint check (deterministic) ───────────────
         passed, reason = self._check_constraints(
-            intent, permission, command_intel=command_intel,
+            intent, permission,
+            command_intel=command_intel,
+            file_intel=file_intel,
         )
         if not passed:
             if self.verbose:
@@ -342,7 +352,9 @@ class AIGuardian(Guardian):
             execution_context=execution_context,
         )
 
-        prompt_id = self._resolve_prompt_id(intent, analysis, command_intel)
+        prompt_id = self._resolve_prompt_id(
+            intent, analysis, command_intel, file_intel,
+        )
         self.last_prompt_id = prompt_id
         agent = self._agents[prompt_id]
 
@@ -358,6 +370,7 @@ class AIGuardian(Guardian):
         intent: IntentFrame,
         analysis: AnalysisReport,
         command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
     ) -> str:
         """Ask the strategy for a Guardian prompt id, fail-closed.
 
@@ -367,7 +380,7 @@ class AIGuardian(Guardian):
         """
         try:
             pid = self._prompt_strategy.select_guardian_prompt_id(
-                intent, analysis, command_intel,
+                intent, analysis, command_intel, file_intel,
             )
         except Exception:
             logger.exception("Guardian prompt strategy raised; falling back to 'standard'")

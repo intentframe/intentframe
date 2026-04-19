@@ -76,6 +76,7 @@ class TestLibraryShape:
             "critical_generic",
             "critical_network_probe",
             "critical_network_mutation",
+            "critical_write_file",
         })
 
     def test_guardian_has_expected_prompt_ids(self):
@@ -191,6 +192,72 @@ class TestAECriticalOverlay:
             assert phrase not in overlay, f"AE overlay contains directive {phrase!r}"
 
 
+class TestAECriticalWriteFileOverlay:
+    """Symmetric overlay invariants for the ``critical_write_file`` lane.
+
+    Mirrors :class:`TestAECriticalOverlay` for ``critical_generic``.  The
+    xfailed tests document the future body contract: once a real
+    WRITE_FILE-specific overlay is authored (payload context framing,
+    executability reminders, etc.), these tests start passing and the
+    markers come off.
+    """
+
+    def test_critical_write_file_starts_with_standard_body(self):
+        # Additive: critical_write_file must contain the entire standard
+        # body verbatim as a prefix.  Passes trivially while the overlay
+        # is empty (critical_write_file == standard).
+        assert ANALYSIS_PROMPTS["critical_write_file"].startswith(
+            ANALYSIS_PROMPTS["standard"],
+        )
+
+    @_OVERLAY_PLACEHOLDER
+    def test_critical_write_file_is_strictly_longer_than_standard(self):
+        assert len(ANALYSIS_PROMPTS["critical_write_file"]) > len(
+            ANALYSIS_PROMPTS["standard"],
+        )
+
+    @_OVERLAY_PLACEHOLDER
+    def test_critical_write_file_overlay_mentions_write_framing(self):
+        # Pin some identifiable WRITE_FILE framing in the overlay so
+        # authoring accidents (e.g. pasting the RUN_COMMAND overlay
+        # into this lane) are caught.  The exact phrase is not
+        # specified — any of the common markers is acceptable.
+        overlay = ANALYSIS_PROMPTS["critical_write_file"][
+            len(ANALYSIS_PROMPTS["standard"]):
+        ]
+        markers = ("WRITE_FILE", "write_file", "file write")
+        assert any(m in overlay for m in markers), (
+            f"overlay must mention a WRITE_FILE marker; got: {overlay[:120]!r}"
+        )
+
+    @_OVERLAY_PLACEHOLDER
+    def test_critical_write_file_overlay_preserves_understand_not_decide(self):
+        # Same invariant as the generic overlay: AE understands, Guardian
+        # decides.  The overlay must reaffirm this, not undermine it.
+        overlay = ANALYSIS_PROMPTS["critical_write_file"][
+            len(ANALYSIS_PROMPTS["standard"]):
+        ]
+        lowered = overlay.lower()
+        assert "understand" in lowered
+        assert "decide" in lowered
+        assert "Guardian" in overlay
+
+    def test_critical_write_file_overlay_does_not_instruct_ae_to_allow_or_block(self):
+        overlay = ANALYSIS_PROMPTS["critical_write_file"][
+            len(ANALYSIS_PROMPTS["standard"]):
+        ]
+        forbidden = [
+            "you must ALLOW",
+            "you must BLOCK",
+            "you allow",
+            "you block",
+            "You ALLOW",
+            "You BLOCK",
+        ]
+        for phrase in forbidden:
+            assert phrase not in overlay, f"AE overlay contains directive {phrase!r}"
+
+
 class TestGuardianCriticalOverlay:
     def test_critical_starts_with_standard_body(self):
         # Passes trivially while overlay is empty (critical == standard).
@@ -236,4 +303,13 @@ class TestInitialRolloutAliasing:
     def test_mutation_lane_aliased_to_critical_generic(self):
         assert ANALYSIS_PROMPTS["critical_network_mutation"] == ANALYSIS_PROMPTS[
             "critical_generic"
+        ]
+
+    def test_write_file_lane_aliased_to_standard_body(self):
+        # ``critical_write_file`` aliases the standard body directly on
+        # initial rollout (``_CRITICAL_WRITE_FILE_OVERLAY = ""``).  When
+        # a real WRITE_FILE overlay is authored, delete this assertion
+        # and rely on :class:`TestAECriticalWriteFileOverlay` instead.
+        assert ANALYSIS_PROMPTS["critical_write_file"] == ANALYSIS_PROMPTS[
+            "standard"
         ]

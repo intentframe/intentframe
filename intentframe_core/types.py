@@ -26,6 +26,17 @@ COMMAND_INTEL_FINDING_ID_MAX_LEN = 96
 TERMINAL_COMMAND_SIGNALS_MAX_ITEMS = 32
 TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN = 300
 
+# FileIntel mirrors CommandIntel's transitive-injection bounds for the
+# WRITE_FILE side-channel.  Signal / finding id lists are intentionally
+# small: command_shield already clips runaway analyzers at the source
+# and the pipeline only needs a narrow summary — the full CodeReport
+# stays on the pipeline-local variable.
+FILE_INTEL_LANGUAGE_MAX_LEN = 32
+FILE_INTEL_SIGNAL_IDS_MAX_ITEMS = 16
+FILE_INTEL_SIGNAL_ID_MAX_LEN = 96
+FILE_INTEL_FINDING_IDS_MAX_ITEMS = 32
+FILE_INTEL_FINDING_ID_MAX_LEN = 96
+
 
 class CommandIntel(BaseModel):
     """Bounded summary of deterministic facts from command_shield.
@@ -87,6 +98,125 @@ class CommandIntel(BaseModel):
                 COMMAND_INTEL_FINDING_IDS_MAX_ITEMS,
                 COMMAND_INTEL_FINDING_ID_MAX_LEN,
             )
+        super().__init__(**data)
+
+
+class FileIntel(BaseModel):
+    """Bounded summary of deterministic payload facts for WRITE_FILE.
+
+    Sibling of :class:`CommandIntel`: where CommandIntel carries
+    ``command_shield.inspect_command`` output for RUN_COMMAND, FileIntel
+    carries ``command_shield.inspect_code`` output for WRITE_FILE
+    content.  Populated only for WRITE_FILE intents — ``None`` for every
+    other action.
+
+    Consumers:
+      - :class:`DeterministicGuardian` — the passive-write fast-path
+        requires ``not is_binary and not is_oversized and not
+        has_code_intel_findings`` before ALLOWing on a safe-looking
+        extension.  This catches prompt-injection tricks like writing a
+        file named ``notes.md`` whose body sniffs as Python.
+      - :class:`AnalysisEngine` — routing to the ``critical_write_file``
+        AE lane uses ``language`` and ``has_code_intel_findings`` as
+        payload-side triggers (with destination heuristics handled by
+        path-based helpers, not this type).
+
+    Bounds are enforced at construction via the same ``_clip_tuple``
+    pattern CommandIntel uses; an overflowing upstream cannot swell the
+    pipeline payload.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    language: Optional[str] = None
+    """Sniffed language (``"python"``, ``"shell"``, ``"javascript"``,
+    ``"binary"``, ...) or ``None`` when empty / unsniffable content.
+    The ``"binary"`` sentinel is set by ``inspect_code`` when magic
+    bytes / NUL density indicate an artefact, regardless of extension."""
+
+    is_binary: bool = False
+    """True when ``command_shield`` flagged the payload as binary.
+    Redundant with ``language == "binary"`` but exposed as a first-class
+    flag so downstream consumers don't have to magic-string match."""
+
+    is_oversized: bool = False
+    """True when payload length exceeded ``ShieldConfig.max_code_length``.
+    An oversized payload is NOT analysed — ``code_intel_finding_ids``
+    and deep signals will be empty in that case, so consumers must check
+    this flag before drawing conclusions from absence of findings."""
+
+    size_bytes: int = 0
+    """Length of the content string in bytes (UTF-8).  Bounded at
+    construction to a 32-bit positive int — truncation of huge payloads
+    happens upstream, this is just the reported size."""
+
+    has_code_intel_findings: bool = False
+    """True iff ``CodeReport.code_intel.findings`` is non-empty after
+    language-aware analysis.  ``False`` both for "analyzed and clean"
+    AND for "not analyzed" (binary / oversized / out-of-scope language)
+    — consumers that care about the distinction must also check
+    ``is_binary`` / ``is_oversized`` / ``language``."""
+
+    code_intel_finding_ids: tuple[str, ...] = Field(default_factory=tuple)
+    """Finding-id strings from ``CodeReport.code_intel.findings``.
+    Bounded by ``FILE_INTEL_FINDING_IDS_MAX_ITEMS``.  Preserves
+    diagnostic vocabulary without carrying evidence strings."""
+
+    signal_ids: tuple[str, ...] = Field(default_factory=tuple)
+    """Top-level signal ids from ``CodeReport.signals``
+    (e.g. ``"CODE_TOO_LARGE"``, ``"resolved:binary"``,
+    ``"resolved:unsupported-language"``).  Bounded by
+    ``FILE_INTEL_SIGNAL_IDS_MAX_ITEMS``.  Intentionally does NOT carry
+    severity or evidence — those live on the original ``CodeReport``
+    the pipeline keeps thread-local."""
+
+    @classmethod
+    def _clip_tuple(
+        cls,
+        values: tuple[str, ...] | list[str] | None,
+        max_items: int,
+        max_item_len: int,
+    ) -> tuple[str, ...]:
+        if not values:
+            return ()
+        clipped: list[str] = []
+        for v in values[:max_items]:
+            s = str(v)
+            if len(s) > max_item_len:
+                s = s[:max_item_len]
+            clipped.append(s)
+        return tuple(clipped)
+
+    @classmethod
+    def _clip_string(cls, value: Optional[str], max_len: int) -> Optional[str]:
+        if value is None:
+            return None
+        s = str(value)
+        return s[:max_len] if len(s) > max_len else s
+
+    def __init__(self, **data: Any) -> None:
+        if "language" in data:
+            data["language"] = self._clip_string(
+                data["language"], FILE_INTEL_LANGUAGE_MAX_LEN
+            )
+        if "code_intel_finding_ids" in data:
+            data["code_intel_finding_ids"] = self._clip_tuple(
+                data["code_intel_finding_ids"],
+                FILE_INTEL_FINDING_IDS_MAX_ITEMS,
+                FILE_INTEL_FINDING_ID_MAX_LEN,
+            )
+        if "signal_ids" in data:
+            data["signal_ids"] = self._clip_tuple(
+                data["signal_ids"],
+                FILE_INTEL_SIGNAL_IDS_MAX_ITEMS,
+                FILE_INTEL_SIGNAL_ID_MAX_LEN,
+            )
+        if "size_bytes" in data:
+            try:
+                n = int(data["size_bytes"])
+            except (TypeError, ValueError):
+                n = 0
+            data["size_bytes"] = max(0, n)
         super().__init__(**data)
 
 

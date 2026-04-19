@@ -10,6 +10,7 @@ from intentframe_core.types import (
     AnalysisReport,
     CommandIntel,
     ExecutionContext,
+    FileIntel,
     IntentFrame,
     UserContext,
     ValidationResult,
@@ -50,6 +51,7 @@ class Guardian(ABC):
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
         command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies using Analysis Report.
@@ -78,5 +80,10 @@ class Guardian(ABC):
                 every other action.  Consumed by per-category
                 constraint checkers that need capability vocabulary
                 (see TerminalChecker).
+            file_intel: Bounded summary of ``inspect_code`` facts for
+                the WRITE_FILE payload.  Populated only for WRITE_FILE
+                intents; ``None`` for every other action.  Available on
+                :class:`CheckContext` for checkers that want to enforce
+                payload-aware file constraints in the future.
         """
         pass

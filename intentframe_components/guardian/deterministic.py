@@ -50,6 +50,7 @@ from intentframe_core.types import (
 )
 from intentframe_components.guardian.checkers import CheckContext, CONSTRAINT_CHECKERS
 from intentframe_components.guardian.domains import DOMAIN_MODULES
+from intentframe_components.heuristics import is_sensitive_write_path
 from policy_registry.constraints._capability_match import any_tag_matches
 from policy_registry.constraints.terminal import TerminalConstraints
 
@@ -103,6 +104,26 @@ _READ_ONLY_INCOMPATIBLE: frozenset[str] = frozenset({
     "capability:process_signal",
     "capability:spawns_process",
 })
+
+
+# WRITE_FILE intents do NOT get a deterministic ALLOW in DG.  Every
+# write mutates device state, and agent-provided extension / target
+# strings are not trustworthy under prompt injection — "looks like a
+# .md" is an attacker-controlled claim, not evidence.  The only
+# deterministic decision DG makes about a WRITE_FILE is:
+#
+#   - BLOCK when the virtual destination is a sensitive system location
+#     (shell startup files, credential stores, privilege config,
+#     persistence daemons, Python runtime hooks — rule 3 below).
+#     Deterministic deny based on a curated list — peer to the VFS
+#     floor at ``resource_registry.floor``, which catches the same
+#     families on the canonicalized real path at I/O time.  DG blocks
+#     on the virtual path pre-AE so agents do not even get an LLM
+#     round-trip for a write we will refuse at I/O anyway.
+#
+# Any other WRITE_FILE falls through UNDECIDED to AE + AIGuardian.
+# There is no content-based fast-path — the LLM layer is the only
+# route to ALLOW for a mutating write.
 
 
 class DeterministicGuardian:
@@ -206,6 +227,29 @@ class DeterministicGuardian:
                         matched_gate="domain",
                     )
 
+        # ── 3. WRITE_FILE sensitive destination BLOCK ──────────────
+        # Non-negotiable deny for virtual paths that map to sensitive
+        # system locations (shell startup files, credential stores,
+        # privilege config, persistence daemons, Python runtime hooks).
+        # Fires even when user policy nominally allows the destination —
+        # a broad ``allowed_paths`` policy must not license writes into
+        # files the system re-reads on every new shell / login / boot.
+        # Pair of the VFS floor at
+        # ``resource_registry.floor.DENY_WRITE_PREFIXES`` which
+        # enforces the same families on the canonicalized real path at
+        # I/O time; DG blocks on the virtual path so agents don't even
+        # reach the AE round-trip for a write we will refuse anyway.
+        if action == ActionType.WRITE_FILE.value and \
+                is_sensitive_write_path(intent.target):
+            return DeterministicResult(
+                decision=DeterministicDecision.BLOCK,
+                reason=(
+                    f"Write to sensitive system location is not permitted: "
+                    f"{intent.target!r}"
+                ),
+                matched_gate="write_file_sensitive_path",
+            )
+
         # ── 4. Passive-read ALLOW short-circuit ────────────────────
         # Same semantics as AE's _PASSIVE_READ_ACTIONS fast-path, but
         # skips AE + AIGuardian entirely.  Requires permission.safe
@@ -228,13 +272,14 @@ class DeterministicGuardian:
                     matched_gate="run_command_read_only",
                 )
 
-        # ── 7. Otherwise → AI decides ──────────────────────────────
-        # (Step 6 in the design spec — the permission.safe+no-risk
-        # short-circuit — is intentionally NOT implemented here.
-        # AE already covers it for passive reads; applying it more
-        # broadly pre-AE would bypass content inspection for actions
-        # like SEND_EMAIL or ASK_USER even when the user marked them
-        # safe, which weakens social-engineering defense.)
+        # ── 6. Otherwise → AI decides ──────────────────────────────
+        # Every mutating write (WRITE_FILE, DELETE_FILE, etc.), every
+        # user-IO action, and every action without a positive
+        # deterministic-ALLOW gate above falls through here.  There is
+        # no passive-write fast-path: content-based "this looks
+        # inert" checks cannot be made sound under an adversarial
+        # agent (extensions and payload language sniffing are not
+        # trust anchors), so writes always pay the LLM review.
         return DeterministicResult(
             decision=DeterministicDecision.UNDECIDED,
             reason="",
