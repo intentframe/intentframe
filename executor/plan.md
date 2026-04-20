@@ -1212,10 +1212,14 @@ when Jarvis interacts with the OS programmatically.
 
 ### Seed policy coverage
 
-All 43 actions from enabled adapters now have policy entries in
-`jarvis_pa/seed_policies.py` (23 safe + 20 unsafe). Previously only 27 of 45
-were covered, blocking Jarvis from using contacts, reading messages/notes,
-completing reminders, deleting events/notes, and system controls.
+Jarvis's default policy surface now covers all 67 currently declared actions
+(34 safe + 33 unsafe), including the host-file family
+(`READ_HOST_FILE`, `WRITE_HOST_FILE`, `LIST_HOST_DIRECTORY`,
+`DELETE_HOST_FILE`).
+
+At runtime, the default policy is seeded from
+`intentframe_gateway/bootstrap.py`. `jarvis_pa/seed_policies.py` is kept as a
+manual mirror of the same defaults for dev workflows.
 
 ### What this enables next
 
