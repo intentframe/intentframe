@@ -106,6 +106,7 @@ class TestAERouting:
     @pytest.mark.parametrize("action", [
         ActionType.PAY_INVOICE,
         ActionType.DELETE_FILE,
+        ActionType.DELETE_HOST_FILE,
         ActionType.DELETE_EVENT,
         ActionType.DELETE_REMINDER,
         ActionType.DELETE_CONTACT,
@@ -116,6 +117,27 @@ class TestAERouting:
     ])
     def test_non_run_critical_actions_route_to_critical_generic(self, action):
         assert STRATEGY.select_ae_prompt_id(_intent(action), None) == "critical_generic"
+
+    def test_write_host_file_routes_to_critical_write_file_lane(self):
+        # WRITE_HOST_FILE shares the dedicated critical_write_file lane
+        # with WRITE_FILE so the payload-aware prompt is used for both
+        # virtual- and real-path writes.
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(ActionType.WRITE_HOST_FILE, "~/Documents/x.md"), None,
+        ) == "critical_write_file"
+
+    @pytest.mark.parametrize("action", [
+        ActionType.READ_HOST_FILE,
+        ActionType.LIST_HOST_DIRECTORY,
+    ])
+    def test_host_file_reads_route_to_standard(self, action):
+        # Passive-read actions are not in CRITICAL_ACTIONS; the AE
+        # strategy returns "standard" (the DG passive-read fast-path is
+        # what actually skips AE for these — the strategy is defense-in-
+        # depth for direct callers).
+        assert STRATEGY.select_ae_prompt_id(
+            _intent(action, "~/Documents/"), None,
+        ) == "standard"
 
     def test_run_command_with_no_intel_routes_to_critical_generic(self):
         # Fail-closed: a missing CommandIntel on RUN_COMMAND means

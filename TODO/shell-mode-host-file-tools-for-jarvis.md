@@ -4,6 +4,36 @@
 
 ---
 
+## Status: implemented as an additive action family (2026-04-20)
+
+The original recommended first step (*"expose host-file tools only in Jarvis shell mode, stop exposing VFS file tools in shell-enabled Jarvis"*) was softened during planning — see [`host-file-tools_d25c1c55.plan.md`](../.cursor/plans/host-file-tools_d25c1c55.plan.md). What actually shipped:
+
+- **New `HOST_FILE` `ActionCategory`** alongside `FILE`, with four actions: `READ_HOST_FILE`, `WRITE_HOST_FILE`, `DELETE_HOST_FILE`, `LIST_HOST_DIRECTORY`. `APPEND_ROW_HOST` was dropped (host agents synthesize append via read+write; markdown-row semantics stay with the workspace-file product).
+- **`HostFileConstraints(allowed_host_paths)`** — disjoint-field rename vs `FileConstraints.allowed_paths` drives deterministic Pydantic smart-union dispatch; both constraint types gained `extra="forbid"` for defense in depth. Host-file policy patterns now support only two shapes: exact paths and explicit subtree globs (`dir/*`). Trailing-slash shorthand (`dir/`) is rejected at config-load time so the checker cannot silently drift from real-path canonicalization. Pinned by `tests/test_policy_host_constraints_roundtrip.py` and `tests/test_host_file_checker.py`.
+- **`HostFileChecker`** alongside `FileChecker`; dispatch via `CONSTRAINT_CHECKERS[HostFileConstraints]`. Uses `resource_registry.floor.canonicalize_real_path` (the shared `~` expansion + symlink-resolution primitive) — *not* `normalize_virtual_path`. Unlike the VFS checker, it does **not** interpret trailing `/` as a directory-scope marker; subtree access must be expressed explicitly as `dir/*`.
+- **Deterministic Guardian** floor gates `write_host_file_floor` / `delete_host_file_floor` mirror the virtual-path `write_file_sensitive_path` block, calling `match_deny_prefix` on the canonicalized real path.
+- **Executor** has a `HostFilesAdapter` with two independent walls (non-negotiable floor + `HostFilesConfig.allowed_{read,write}_paths` ceiling). `HostFilesConfig` is a **required** field on `ExecutorConfig` — every YAML must declare intent explicitly (empty lists are allowed and pair with the adapter absent from `adapters.enabled`).
+- **Jarvis** surfaces `read_host_file` / `write_host_file` / `list_host_directory` / `delete_host_file` alongside the existing VFS tools. Jarvis is the one profile where both families are visible at the same time — the docstrings are explicit ("uses real host paths, *not* virtual paths"), and onboarding guardrails name the vocabulary split. See the architectural revisiting below.
+- **Deletion domain**: `DELETE_HOST_FILE` registered under `DomainType.DELETION`. `DeletionConstraints` gained a docstring warning about mixing virtual/real vocabularies in a single `allowed_paths` list — the recommendation is `allowed_paths=None` when `DELETE_HOST_FILE` is granted and let per-action `HostFileConstraints` + the DG floor gate carry the path-vocabulary load.
+
+### Revisiting "never expose both families to one agent"
+
+The TODO's Rule 3 ("Never expose both VFS and host-path file tools to one agent profile") was relaxed for Jarvis because:
+
+1. The intent-frame pipeline now guarantees the two vocabularies cannot collide at enforcement time — separate constraint types, separate checkers, separate DG gates, separate adapter walls.
+2. The Jarvis agent context already demands both worldviews (drop a file at a VFS workspace path *and* read a real host file on the user's Desktop); forcing a mode switch would only shift the confusion from the model to the operator.
+3. Docstrings + onboarding advisory explicitly name each family's path vocabulary, and Jarvis's system prompt highlights the distinction.
+
+For non-Jarvis agents (workspace-only / shell-only), the Rule 3 advice still stands — only wire the tool set that matches the profile.
+
+### Followups still tracked
+
+- Shell-deletion-policy gap (see "Important Caveat" below) is unchanged — `rm` inside `RUN_COMMAND` is still a shell string, not a typed `DELETE_HOST_FILE` intent.
+- `DomainType.DELETION` is still one-per-user, so cross-vocabulary `allowed_paths` remains unsafe. A proper fix (split `DomainType.DELETION` into `FILE_DELETION` + `HOST_DELETION`, or re-key by `(domain, category)`) is filed out-of-scope for this plan.
+- No automatic mutual exclusion of VFS vs host tools at the handshake layer — agent developers pick tool sets in `tools.py`, onboarding advisory describes whatever is granted.
+
+---
+
 ## The Problem
 
 Today Jarvis exposes:

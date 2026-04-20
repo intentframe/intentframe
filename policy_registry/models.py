@@ -28,6 +28,7 @@ from policy_registry.constraints import (
     CalendarConstraints,
     EmailConstraints,
     FileConstraints,
+    HostFileConstraints,
     MessageConstraints,
     TerminalConstraints,
 )
@@ -35,8 +36,16 @@ from policy_registry.domains.base import DomainConstraints
 from policy_registry.domains.finance import FinanceConstraints
 from policy_registry.domains.deletion import DeletionConstraints
 
+# Per-action constraint Union.  Undiscriminated: pydantic picks the
+# concrete type by field-set match.  ``FileConstraints`` and
+# ``HostFileConstraints`` deliberately carry disjoint required fields
+# (``allowed_paths`` vs ``allowed_host_paths``) and both set
+# ``extra="forbid"`` so the match is always unambiguous.  See
+# ``tests/test_policy_host_constraints_roundtrip.py`` for the
+# regression pin.
 ConstraintTypes = Union[
     FileConstraints,
+    HostFileConstraints,
     TerminalConstraints,
     EmailConstraints,
     CalendarConstraints,

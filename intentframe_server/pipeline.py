@@ -588,7 +588,10 @@ class IntentFrameRuntime:
         # critical-payload fail-closed in DefaultPromptStrategy) handle
         # that case.
         file_intel: FileIntel | None = None
-        if intent.action.value == ActionType.WRITE_FILE.value:
+        if intent.action.value in {
+            ActionType.WRITE_FILE.value,
+            ActionType.WRITE_HOST_FILE.value,
+        }:
             data = intent.data or {}
             content = data.get("content")
             if isinstance(content, str):

@@ -50,6 +50,41 @@ class _DeleteAction(BaseModel):
     target_path: str       # required by DeletionIntentData domain schema
     irreversible: bool = True  # required by DeletionIntentData domain schema
 
+# ── Host-file actions (real paths, no VFS) ───────────────────────────
+# Mirror _FileAction / _WriteAction / _DeleteAction but bind to the
+# HOST_FILE action family.  ``target`` carries a real host path
+# (``~/Documents/foo.txt``) rather than a virtual one (``/home/foo.txt``).
+
+class _ReadHostFileAction(BaseModel):
+    action: str = "READ_HOST_FILE"
+    target: str
+    reason: str
+    offset: int | None = None
+    limit: int | None = None
+
+class _WriteHostFileAction(BaseModel):
+    action: str = "WRITE_HOST_FILE"
+    target: str
+    content: str
+    reason: str
+
+class _ListHostDirectoryAction(BaseModel):
+    action: str = "LIST_HOST_DIRECTORY"
+    target: str
+    reason: str
+
+class _DeleteHostFileAction(BaseModel):
+    action: str = "DELETE_HOST_FILE"
+    target: str
+    reason: str
+    # DELETE_HOST_FILE is registered in ACTION_DOMAINS as DELETION, so the
+    # DeletionIntentData schema must be satisfied exactly like _DeleteAction.
+    # Populating target_path explicitly (rather than falling back to
+    # intent.target) keeps DeletionModule.check's raw-string path match
+    # deterministic — see the docstring on DeletionConstraints.
+    target_path: str
+    irreversible: bool = True
+
 class _CommandAction(BaseModel):
     action: str = "RUN_COMMAND"
     command: str
@@ -363,6 +398,78 @@ async def list_directory(ctx: RunContextWrapper[AgentContext], path: str, reason
 async def delete_file(ctx: RunContextWrapper[AgentContext], path: str, reason: str) -> str:
     """Delete a file or empty directory."""
     return await _submit(ctx, _DeleteAction(target=path, reason=reason, target_path=path))
+
+
+# ---------------------------------------------------------------------------
+# Host file / directory tools (real paths, no VFS)
+# ---------------------------------------------------------------------------
+#
+# These mirror read_file / write_file / list_directory / delete_file but
+# accept real host paths (e.g. ``~/Documents/foo.txt``) rather than
+# virtual paths (``/home/foo.txt``).  Agents MUST NOT mix the two
+# vocabularies — ``/home/...`` through host tools will not resolve, and
+# ``~/...`` through virtual tools will not pass the VFS resolver.
+
+@function_tool
+async def read_host_file(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    reason: str,
+    offset: int = 0,
+    limit: int = 500,
+) -> str:
+    """Read a file on the host filesystem using a real path (e.g. ``~/Documents/foo.txt``).
+
+    For virtual-filesystem reads use ``read_file`` instead.  Returns up
+    to ``limit`` lines starting at ``offset`` (0-based); response
+    includes ``total_lines`` and ``truncated`` — call again with a
+    higher offset to read more."""
+    return await _submit(ctx, _ReadHostFileAction(
+        target=path, reason=reason, offset=offset, limit=limit,
+    ))
+
+
+@function_tool
+async def write_host_file(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    content: str,
+    reason: str,
+) -> str:
+    """Write content to a file on the host filesystem using a real path
+    (e.g. ``~/Documents/foo.txt``).  Creates parents as needed, overwrites
+    existing files.  For virtual-filesystem writes use ``write_file``."""
+    return await _submit(ctx, _WriteHostFileAction(
+        target=path, content=content, reason=reason,
+    ))
+
+
+@function_tool
+async def list_host_directory(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    reason: str,
+) -> str:
+    """List files and subdirectories at a real host path (e.g. ``~/Documents/``).
+
+    For virtual-filesystem listings use ``list_directory``."""
+    return await _submit(ctx, _ListHostDirectoryAction(
+        target=path, reason=reason,
+    ))
+
+
+@function_tool
+async def delete_host_file(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    reason: str,
+) -> str:
+    """Delete a file on the host filesystem using a real path
+    (e.g. ``~/Documents/foo.txt``).  For virtual-filesystem deletes use
+    ``delete_file``."""
+    return await _submit(ctx, _DeleteHostFileAction(
+        target=path, reason=reason, target_path=path,
+    ))
 
 
 # ---------------------------------------------------------------------------
@@ -865,6 +972,10 @@ ALL_TOOLS: list[Any] = [
     write_file,
     list_directory,
     delete_file,
+    read_host_file,
+    write_host_file,
+    list_host_directory,
+    delete_host_file,
     run_command,
     send_email,
     read_email,

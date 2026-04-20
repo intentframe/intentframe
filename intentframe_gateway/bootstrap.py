@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 SAFE_ACTIONS = [
     "READ_FILE", "LIST_DIRECTORY",
+    "READ_HOST_FILE", "LIST_HOST_DIRECTORY",
     "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
     "GET_CLIPBOARD", "SET_CLIPBOARD",
     "SEARCH_SPOTLIGHT", "SHOW_NOTIFICATION",
@@ -33,6 +34,7 @@ SAFE_ACTIONS = [
 
 UNSAFE_ACTIONS = [
     "WRITE_FILE", "APPEND_ROW", "DELETE_FILE",
+    "WRITE_HOST_FILE", "DELETE_HOST_FILE",
     "RUN_COMMAND",
     "SEND_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL",
     "MARK_READ_EMAIL", "MOVE_EMAIL", "DELETE_EMAIL",
@@ -79,6 +81,21 @@ def _resolve_user_id() -> str:
 def _build_default_policy() -> dict:
     allowed_actions: dict[str, dict] = {}
     home_constraint = {"allowed_paths": ["/home/*"]}
+    # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py):
+    # ``host_path_constraint.allowed_host_paths`` MUST mirror
+    # ``jarvis_pa/executor.yaml::host_files.allowed_write_paths`` (and
+    # by extension the read paths).  The executor YAML is the source
+    # of truth for the adapter floor; this policy is the per-action
+    # allowlist the guardian checks.  If executor.yaml narrows (e.g.
+    # to ``[~/Documents/*, ~/Downloads/*]``), update this list in
+    # lockstep — otherwise adapter and guardian disagree at the path
+    # boundary and users see inconsistent deny reasons.
+    # HostFileConstraints rejects trailing-slash shorthand (``dir/``)
+    # at load time, so use explicit subtree globs only.  The disjoint
+    # field name ``allowed_host_paths`` (vs ``allowed_paths``) is
+    # required — it is what drives Pydantic Union-dispatch to
+    # HostFileConstraints instead of FileConstraints.
+    host_constraint = {"allowed_host_paths": ["~/*"]}
     email_constraint = {
         "allowed_recipients": [],
         "recipient_sources": [{"source": "contacts_all", "filter": "", "enabled": True}],
@@ -94,7 +111,12 @@ def _build_default_policy() -> dict:
     }
 
     for action in SAFE_ACTIONS:
-        constraint = home_constraint if action in ("READ_FILE", "LIST_DIRECTORY") else None
+        if action in ("READ_FILE", "LIST_DIRECTORY"):
+            constraint = home_constraint
+        elif action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
+            constraint = host_constraint
+        else:
+            constraint = None
         allowed_actions[action] = {"safe": True, "constraints": constraint}
 
     for action in UNSAFE_ACTIONS:
@@ -104,6 +126,8 @@ def _build_default_policy() -> dict:
             constraint = message_constraint
         elif action in ("WRITE_FILE", "DELETE_FILE"):
             constraint = home_constraint
+        elif action in ("WRITE_HOST_FILE", "DELETE_HOST_FILE"):
+            constraint = host_constraint
         elif action == "RUN_COMMAND":
             constraint = terminal_constraint
         else:

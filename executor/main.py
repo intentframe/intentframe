@@ -201,6 +201,7 @@ def build_gateway(
         "sandbox_engine": sandbox_engine,
         "sandbox_planner": sandbox_planner,
         "sandbox_config": config.sandbox,
+        "host_files_cfg": config.host_files,
     }
 
     dispatcher = ActionDispatcher()

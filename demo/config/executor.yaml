@@ -48,6 +48,15 @@ adapters:
     - files
     - user_io
 
+# ─── HOST_FILE allowlists (required) ─────────────────────────────────────────
+# Required even when the demo does not enable host-file tools.
+# Use plain roots like ``~/Documents`` if you enable them later.
+# Do not use globs here. Trailing "/" has no special meaning.
+# Empty lists here mean "no host-file access".
+host_files:
+  allowed_read_paths: []
+  allowed_write_paths: []
+
 # ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
 # Demo does not enable the terminal adapter, so sandbox config is omitted.
 # If terminal is added to adapters.enabled, add a sandbox: section here.

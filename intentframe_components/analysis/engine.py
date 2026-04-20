@@ -183,6 +183,9 @@ class AIAnalysisEngine(AnalysisEngine):
         # File
         ActionType.READ_FILE.value,
         ActionType.LIST_DIRECTORY.value,
+        # Host file (real-path parallel family)
+        ActionType.READ_HOST_FILE.value,
+        ActionType.LIST_HOST_DIRECTORY.value,
         # Calendar
         ActionType.LIST_CALENDARS.value,
         ActionType.LIST_EVENTS.value,

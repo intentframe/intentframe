@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from intentframe_components.guardian.checkers.base import CheckContext, ConstraintChecker
 from intentframe_components.guardian.checkers.file import FileChecker
+from intentframe_components.guardian.checkers.host_file import HostFileChecker
 from intentframe_components.guardian.checkers.terminal import TerminalChecker
 from intentframe_components.guardian.checkers.email import EmailChecker
 from intentframe_components.guardian.checkers.message import MessageChecker
@@ -26,12 +27,14 @@ from policy_registry.constraints import (
     BrowserConstraints,
     EmailConstraints,
     FileConstraints,
+    HostFileConstraints,
     MessageConstraints,
     TerminalConstraints,
 )
 
 CONSTRAINT_CHECKERS: dict[type, ConstraintChecker] = {
     FileConstraints: FileChecker(),
+    HostFileConstraints: HostFileChecker(),
     TerminalConstraints: TerminalChecker(),
     EmailConstraints: EmailChecker(),
     MessageConstraints: MessageChecker(),
@@ -47,6 +50,7 @@ __all__ = [
     "BrowserChecker",
     "EmailChecker",
     "FileChecker",
+    "HostFileChecker",
     "MessageChecker",
     "TerminalChecker",
 ]

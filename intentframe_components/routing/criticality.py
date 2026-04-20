@@ -10,15 +10,16 @@ Rationale — always-critical categories:
 
 - Arbitrary-code execution (RUN_COMMAND)
 - Financial impact (PAY_INVOICE)
-- Irreversible data loss (DELETE_FILE, DELETE_EVENT, DELETE_REMINDER,
-  DELETE_CONTACT, DELETE_NOTE, DELETE_EMAIL)
+- Irreversible data loss (DELETE_FILE, DELETE_HOST_FILE, DELETE_EVENT,
+  DELETE_REMINDER, DELETE_CONTACT, DELETE_NOTE, DELETE_EMAIL)
 - External communication / social-engineering vectors (SEND_EMAIL)
 - External network / exfiltration vectors (HTTP_POST)
 
-WRITE_FILE is intentionally **not** in this set — it has its own
-dedicated AE lane (``critical_write_file``).  Every WRITE_FILE rides
-that lane unconditionally; ``FileIntel`` is handed to the AE as
-context inside the payload but does not affect prompt-id selection.
+WRITE_FILE and WRITE_HOST_FILE are intentionally **not** in this set —
+they share a dedicated AE lane (``critical_write_file``).  Every write
+(virtual or host) rides that lane unconditionally; ``FileIntel`` is
+handed to the AE as context inside the payload but does not affect
+prompt-id selection.
 Content-aware WRITE_FILE sub-lanes (e.g. a future
 ``critical_write_file_code`` for positively-classified code payloads)
 are deferred until per-lane overlay bodies are authored — until then,
@@ -46,6 +47,7 @@ CRITICAL_ACTIONS: frozenset[str] = frozenset({
     ActionType.RUN_COMMAND.value,
     ActionType.PAY_INVOICE.value,
     ActionType.DELETE_FILE.value,
+    ActionType.DELETE_HOST_FILE.value,
     ActionType.DELETE_EVENT.value,
     ActionType.DELETE_REMINDER.value,
     ActionType.DELETE_CONTACT.value,

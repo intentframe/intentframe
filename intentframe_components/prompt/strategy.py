@@ -215,7 +215,10 @@ class DefaultPromptStrategy:
             # a missing-intel plumbing bug.
             return "critical_generic"
 
-        if action_value == ActionType.WRITE_FILE.value:
+        if action_value in {
+            ActionType.WRITE_FILE.value,
+            ActionType.WRITE_HOST_FILE.value,
+        }:
             return "critical_write_file"
 
         if is_critical(action_value):

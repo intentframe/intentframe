@@ -10,6 +10,7 @@ consumers (like IntentFrame's Guardian) evaluate them.
 """
 
 from policy_registry.constraints.file import FileConstraints
+from policy_registry.constraints.host_file import HostFileConstraints
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.constraints.email import EmailConstraints, RecipientSource
 from policy_registry.constraints.calendar import CalendarConstraints
@@ -24,6 +25,7 @@ __all__ = [
     "ContactSource",
     "EmailConstraints",
     "FileConstraints",
+    "HostFileConstraints",
     "MessageConstraints",
     "RecipientSource",
     "TerminalConstraints",

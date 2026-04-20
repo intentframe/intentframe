@@ -53,6 +53,7 @@ from intentframe_components.guardian.domains import DOMAIN_MODULES
 from intentframe_components.heuristics import is_sensitive_write_path
 from policy_registry.constraints._capability_match import any_tag_matches
 from policy_registry.constraints.terminal import TerminalConstraints
+from resource_registry.floor import canonicalize_real_path, match_deny_prefix
 
 
 class DeterministicDecision(str, Enum):
@@ -249,6 +250,46 @@ class DeterministicGuardian:
                 ),
                 matched_gate="write_file_sensitive_path",
             )
+
+        # ── 3b. HOST_FILE mutation floor BLOCK ─────────────────────
+        # Parallel to rule 3, but for the HOST_FILE family which speaks
+        # canonicalized real paths directly (no VFS mount indirection).
+        # Uses the shared floor list via ``match_deny_prefix`` — the
+        # exact same primitive the VFS adapter calls post-mount-resolve
+        # for WRITE_FILE / DELETE_FILE / APPEND_ROW.  Running it here
+        # pre-AE means a host-file write/delete aimed at a launchd
+        # plist / shell rc / keychain / ``~/.ssh`` is refused without
+        # an LLM round-trip, matching the WRITE_FILE short-circuit.
+        #
+        # Separate matched_gate ids on purpose: the WRITE_FILE rule is
+        # a virtual-path heuristic (``is_sensitive_write_path``); these
+        # two rules are the canonical-real-path floor.  Audit logs must
+        # distinguish the two signals.
+        if action == ActionType.WRITE_HOST_FILE.value:
+            canonical = canonicalize_real_path(intent.target)
+            matched = match_deny_prefix(canonical)
+            if matched is not None:
+                return DeterministicResult(
+                    decision=DeterministicDecision.BLOCK,
+                    reason=(
+                        f"Write to deny-floor host path is not permitted: "
+                        f"{matched!r}"
+                    ),
+                    matched_gate="write_host_file_floor",
+                )
+
+        if action == ActionType.DELETE_HOST_FILE.value:
+            canonical = canonicalize_real_path(intent.target)
+            matched = match_deny_prefix(canonical)
+            if matched is not None:
+                return DeterministicResult(
+                    decision=DeterministicDecision.BLOCK,
+                    reason=(
+                        f"Delete of deny-floor host path is not permitted: "
+                        f"{matched!r}"
+                    ),
+                    matched_gate="delete_host_file_floor",
+                )
 
         # ── 4. Passive-read ALLOW short-circuit ────────────────────
         # Same semantics as AE's _PASSIVE_READ_ACTIONS fast-path, but

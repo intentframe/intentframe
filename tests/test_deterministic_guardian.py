@@ -377,6 +377,117 @@ class TestWriteFileSensitivePathBlock:
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# STEP 3b — HOST_FILE mutation floor (real-path deny prefixes)
+# ═══════════════════════════════════════════════════════════════════════
+# DG enforces ``resource_registry.floor.DENY_WRITE_PREFIXES`` on
+# ``WRITE_HOST_FILE`` / ``DELETE_HOST_FILE`` before the LLM round-trip.
+# Unlike the virtual-path ``write_file_sensitive_path`` gate (which works
+# on the raw virtual target), the host-file gates canonicalize via
+# :func:`resource_registry.floor.canonicalize_real_path` first, then call
+# :func:`match_deny_prefix`.  Inputs are therefore picked from the actual
+# expanded floor tuple so the test follows the loader, not a static
+# whitelist.
+
+class TestHostFileFloorBlock:
+    dg = DeterministicGuardian()
+
+    def _run(self, action: ActionType, target: str):
+        return self.dg.decide(
+            _intent(action, target),
+            _user(**{action.value: ActionPermission(safe=False)}),
+        )
+
+    def test_write_host_file_deny_floor_blocks(self):
+        # Document the end-to-end flow in one test:
+        #   1. ``/etc/sudoers`` is a raw (agent-supplied) real path.
+        #   2. ``resource_registry.floor`` canonicalizes every entry in
+        #      ``DENY_WRITE_PREFIXES`` at module-load time via
+        #      ``os.path.realpath``.  On macOS ``/etc`` is a symlink to
+        #      ``/private/etc``, so the stored tuple holds
+        #      ``/private/etc/sudoers`` — NOT ``/etc/sudoers``.
+        #   3. The DG host-file gate runs the *same* canonicalizer on
+        #      ``intent.target`` before calling ``match_deny_prefix``,
+        #      so raw ``/etc/sudoers`` resolves to the stored form and
+        #      the prefix compare succeeds.
+        # Pinning both sides of that flow catches symmetry breaks: if
+        # either the floor-load canonicalization or the DG-call
+        # canonicalization drifts, the precondition assertion fails
+        # loudly with a clear diff instead of a generic "expected BLOCK
+        # got UNDECIDED".
+        from resource_registry.floor import (
+            DENY_WRITE_PREFIXES,
+            canonicalize_real_path,
+        )
+        canonical = canonicalize_real_path("/etc/sudoers")
+        assert canonical in DENY_WRITE_PREFIXES or any(
+            canonical == p or canonical.startswith(p + "/")
+            for p in DENY_WRITE_PREFIXES
+        ), (
+            f"canonicalized input {canonical!r} is not covered by the "
+            f"deny-write floor — DG's BLOCK would be vacuous"
+        )
+        result = self._run(ActionType.WRITE_HOST_FILE, "/etc/sudoers")
+        assert result.decision is DeterministicDecision.BLOCK
+        assert result.matched_gate == "write_host_file_floor"
+
+    def test_write_host_file_nested_deny_path_blocks(self):
+        # Path under a deny prefix (not the prefix itself).
+        result = self._run(
+            ActionType.WRITE_HOST_FILE,
+            "/etc/sudoers.d/00-malicious",
+        )
+        assert result.decision is DeterministicDecision.BLOCK
+        assert result.matched_gate == "write_host_file_floor"
+
+    def test_delete_host_file_deny_floor_blocks(self):
+        result = self._run(
+            ActionType.DELETE_HOST_FILE,
+            "/etc/sudoers",
+        )
+        assert result.decision is DeterministicDecision.BLOCK
+        assert result.matched_gate == "delete_host_file_floor"
+
+    def test_write_host_file_outside_floor_falls_through(self):
+        # Under tmp — never on the floor list.  Still goes UNDECIDED
+        # because host-file writes are critical (no deterministic ALLOW
+        # outside the floor).
+        result = self._run(
+            ActionType.WRITE_HOST_FILE,
+            "/tmp/intentframe-host-test.txt",
+        )
+        assert result.decision is DeterministicDecision.UNDECIDED
+
+    def test_delete_host_file_outside_floor_falls_through(self):
+        result = self._run(
+            ActionType.DELETE_HOST_FILE,
+            "/tmp/intentframe-host-test.txt",
+        )
+        assert result.decision is DeterministicDecision.UNDECIDED
+
+    def test_read_host_file_never_blocked_by_floor(self):
+        # The floor is a *write* floor.  Reads under deny prefixes are
+        # an exposure risk but not the same destructive hazard; they
+        # fall through to AE/AIGuardian for scope review.
+        result = self.dg.decide(
+            _intent(ActionType.READ_HOST_FILE, "/etc/sudoers"),
+            _user(READ_HOST_FILE=ActionPermission(safe=False)),
+        )
+        assert result.decision is DeterministicDecision.UNDECIDED
+
+    def test_host_file_passive_read_fast_path(self):
+        """Host-file reads marked safe take the passive-read ALLOW
+        just like virtual-path reads — the _PRE_AE_SAFE_READS set
+        already includes READ_HOST_FILE / LIST_HOST_DIRECTORY."""
+        for action in (ActionType.READ_HOST_FILE, ActionType.LIST_HOST_DIRECTORY):
+            result = self.dg.decide(
+                _intent(action, "~/Documents/foo.txt"),
+                _user(**{action.value: ActionPermission(safe=True)}),
+            )
+            assert result.decision is DeterministicDecision.ALLOW
+            assert result.matched_gate == "passive_read"
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # Non-passive, non-run-command actions → UNDECIDED
 # ═══════════════════════════════════════════════════════════════════════
 

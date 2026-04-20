@@ -24,6 +24,7 @@ class ActionCategory(Enum):
     """
 
     FILE = "FILE"
+    HOST_FILE = "HOST_FILE"
     TERMINAL = "TERMINAL"
     EMAIL = "EMAIL"
     CALENDAR = "CALENDAR"
@@ -53,6 +54,14 @@ class ActionType(Enum):
     WRITE_FILE = "WRITE_FILE"
     APPEND_ROW = "APPEND_ROW"
     DELETE_FILE = "DELETE_FILE"
+
+    # ── HOST_FILE ─────────────────────────────────────────────────
+    # Real-path operations parallel to FILE actions. Uses host OS paths
+    # (e.g. ~/Documents/...) rather than the virtual filesystem.
+    READ_HOST_FILE = "READ_HOST_FILE"
+    WRITE_HOST_FILE = "WRITE_HOST_FILE"
+    DELETE_HOST_FILE = "DELETE_HOST_FILE"
+    LIST_HOST_DIRECTORY = "LIST_HOST_DIRECTORY"
 
     # ── TERMINAL ──────────────────────────────────────────────────
     RUN_COMMAND = "RUN_COMMAND"
@@ -170,6 +179,11 @@ ACTION_CATEGORIES: dict[ActionType, ActionCategory] = {
     ActionType.WRITE_FILE: ActionCategory.FILE,
     ActionType.APPEND_ROW: ActionCategory.FILE,
     ActionType.DELETE_FILE: ActionCategory.FILE,
+    # HOST_FILE
+    ActionType.READ_HOST_FILE: ActionCategory.HOST_FILE,
+    ActionType.WRITE_HOST_FILE: ActionCategory.HOST_FILE,
+    ActionType.DELETE_HOST_FILE: ActionCategory.HOST_FILE,
+    ActionType.LIST_HOST_DIRECTORY: ActionCategory.HOST_FILE,
     # TERMINAL
     ActionType.RUN_COMMAND: ActionCategory.TERMINAL,
     # EMAIL
@@ -260,6 +274,7 @@ class DomainType(str, Enum):
 ACTION_DOMAINS: dict[ActionType, DomainType] = {
     ActionType.PAY_INVOICE: DomainType.FINANCE,
     ActionType.DELETE_FILE: DomainType.DELETION,
+    ActionType.DELETE_HOST_FILE: DomainType.DELETION,
     ActionType.DELETE_EVENT: DomainType.DELETION,
     ActionType.DELETE_REMINDER: DomainType.DELETION,
     ActionType.DELETE_CONTACT: DomainType.DELETION,

@@ -1,14 +1,21 @@
-"""Non-negotiable deny-write floor for file-tool actions.
+"""Non-negotiable deny-write floor + shared real-path canonicalization.
 
 Analogue of ``executor.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE`` for
-WRITE_FILE / DELETE_FILE / APPEND_ROW.  The sandbox's deny list only
-protects ``RUN_COMMAND`` (via the Seatbelt profile at
-``executor/sandbox/platforms/macos.py``); file-tool actions go through
-``executor/platforms/macos/virtual_filesystem.py`` and bypass the
-kernel-level floor entirely.  This module gives the VFS a symmetric
-floor so ``WRITE_FILE`` to a launchd plist / shell rc file /
-``~/.ssh/*`` / sudoers file is rejected deterministically regardless of
-how broad the agent's ``allowed_paths`` policy is.
+mutating file-tool actions (WRITE_FILE / DELETE_FILE / APPEND_ROW, plus
+WRITE_HOST_FILE / DELETE_HOST_FILE for the host-file family).  The
+sandbox's deny list only protects ``RUN_COMMAND`` (via the Seatbelt
+profile at ``executor/sandbox/platforms/macos.py``); file-tool actions
+go through the VFS / host-file adapters and bypass the kernel-level
+floor entirely.  This module gives both families a symmetric floor so
+writes/deletes to a launchd plist / shell rc file / ``~/.ssh/*`` /
+sudoers file are rejected deterministically regardless of how broad the
+agent's ``allowed_paths`` / ``allowed_host_paths`` policy is.
+
+In addition to the floor list, this module exposes
+:func:`canonicalize_real_path` — the single canonicalization primitive
+the Deterministic Guardian, ``HostFileChecker``, and ``HostFilesAdapter``
+all share so their deny-prefix comparisons always speak the same
+canonical form.
 
 Design choices:
 
@@ -52,6 +59,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 # Identity-aware HOME resolution lives in executor.sandbox.venv today.
 # Importing it does NOT edit sandbox code — it's a read-only dependency
@@ -65,6 +73,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "DENY_WRITE_PREFIXES",
+    "canonicalize_real_path",
     "match_deny_prefix",
 ]
 
@@ -154,6 +163,48 @@ Every entry is an absolute path with ``~`` resolved against the owning
 user's HOME.  Compare against a canonicalized real path via
 :func:`match_deny_prefix`.
 """
+
+
+def canonicalize_real_path(raw: str) -> str:
+    """Return the canonical real-path string form of *raw*.
+
+    Single canonicalization primitive shared between:
+
+    - :class:`intentframe_components.guardian.deterministic.DeterministicGuardian`
+      (host-file floor gates)
+    - :class:`intentframe_components.guardian.checkers.host_file.HostFileChecker`
+      (per-action allowlist match)
+    - :class:`executor.platforms.macos.adapters.host_files.HostFilesAdapter`
+      (pre-I/O enforcement)
+
+    All three must agree on the canonical string form before calling
+    :func:`match_deny_prefix`, otherwise a symlink escape could match
+    one canonicalization but not another.
+
+    Semantics mirror
+    :func:`executor.platforms.macos.virtual_filesystem._canonical_real_path`
+    (re-implemented here rather than imported so ``resource_registry``
+    stays free of ``executor`` deps):
+
+    - ``~`` is expanded via :func:`os.path.expanduser`.
+    - ``Path.resolve(strict=False)`` resolves existing symlink prefixes
+      (e.g. ``/tmp`` → ``/private/tmp`` on macOS).
+    - For nonexistent leaves (typical ``WRITE_HOST_FILE`` target), we
+      fall back to resolving the parent and re-joining the literal leaf
+      name so "about to be created" paths still canonicalize correctly.
+
+    The empty string is returned unchanged so callers can distinguish
+    "no target" from a canonical empty path.
+    """
+    if not raw:
+        return raw
+    expanded = os.path.expanduser(raw)
+    p = Path(expanded)
+    try:
+        return str(p.resolve(strict=False))
+    except OSError:
+        parent = p.parent.resolve(strict=False)
+        return str(parent / p.name)
 
 
 def match_deny_prefix(real_path: str) -> str | None:
