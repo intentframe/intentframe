@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # ── Default policy seed data ─────────────────────────────────────────────────
 
 SAFE_ACTIONS = [
-    "READ_FILE", "LIST_DIRECTORY",
     "READ_HOST_FILE", "LIST_HOST_DIRECTORY",
     "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
     "GET_CLIPBOARD", "SET_CLIPBOARD",
@@ -26,14 +25,13 @@ SAFE_ACTIONS = [
     "LIST_NOTES", "READ_NOTE",
     "READ_MESSAGES",
     "SEARCH_CONTACTS", "GET_CONTACT",
-    "SEARCH_WEB", "GET_PAGE_CONTENT",
+    "GET_PAGE_CONTENT",
     "SEARCH_EMAIL", "READ_EMAIL", "GET_EMAIL", "DOWNLOAD_ATTACHMENT",
     "HTTP_GET",
     "GET_SYSTEM_INFO", "GET_BRIGHTNESS", "GET_VOLUME", "GET_MUTE", "GET_DARK_MODE",
 ]
 
 UNSAFE_ACTIONS = [
-    "WRITE_FILE", "APPEND_ROW", "DELETE_FILE",
     "WRITE_HOST_FILE", "DELETE_HOST_FILE",
     "RUN_COMMAND",
     "SEND_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL",
@@ -80,7 +78,6 @@ def _resolve_user_id() -> str:
 
 def _build_default_policy() -> dict:
     allowed_actions: dict[str, dict] = {}
-    home_constraint = {"allowed_paths": ["/home/*"]}
     # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py):
     # ``host_path_constraint.allowed_host_paths`` MUST mirror
     # ``jarvis_pa/executor.yaml::host_files.allowed_write_paths`` (and
@@ -111,9 +108,7 @@ def _build_default_policy() -> dict:
     }
 
     for action in SAFE_ACTIONS:
-        if action in ("READ_FILE", "LIST_DIRECTORY"):
-            constraint = home_constraint
-        elif action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
+        if action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
             constraint = host_constraint
         else:
             constraint = None
@@ -124,8 +119,6 @@ def _build_default_policy() -> dict:
             constraint = email_constraint
         elif action == "SEND_MESSAGE":
             constraint = message_constraint
-        elif action in ("WRITE_FILE", "DELETE_FILE"):
-            constraint = home_constraint
         elif action in ("WRITE_HOST_FILE", "DELETE_HOST_FILE"):
             constraint = host_constraint
         elif action == "RUN_COMMAND":

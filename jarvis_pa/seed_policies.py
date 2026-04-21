@@ -19,10 +19,7 @@ POLICY_REGISTRY_SOCKET = "~/.intentframe/run/policy-registry.sock"
 RESOURCE_REGISTRY_SOCKET = "~/.intentframe/run/resource-registry.sock"
 
 SAFE_ACTIONS = [
-    # File reads (virtual paths)
-    "READ_FILE",
-    "LIST_DIRECTORY",
-    # Host file reads (real paths — parallel to READ_FILE / LIST_DIRECTORY)
+    # Host file reads
     "READ_HOST_FILE",
     "LIST_HOST_DIRECTORY",
     # User IO
@@ -52,7 +49,6 @@ SAFE_ACTIONS = [
     "SEARCH_CONTACTS",
     "GET_CONTACT",
     # Browser (reads)
-    "SEARCH_WEB",
     "GET_PAGE_CONTENT",
     # Email (reads)
     "SEARCH_EMAIL",
@@ -70,11 +66,7 @@ SAFE_ACTIONS = [
 ]
 
 UNSAFE_ACTIONS = [
-    # File writes (virtual paths)
-    "WRITE_FILE",
-    "APPEND_ROW",
-    "DELETE_FILE",
-    # Host file writes (real paths — parallel to WRITE_FILE / DELETE_FILE)
+    # Host file writes
     "WRITE_HOST_FILE",
     "DELETE_HOST_FILE",
     # Terminal
@@ -120,8 +112,6 @@ UNSAFE_ACTIONS = [
 
 def _build_policy() -> dict:
     allowed_actions: dict[str, dict] = {}
-
-    home_path_constraint = {"allowed_paths": ["/home/*"]}
     # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py):
     # ``host_path_constraint.allowed_host_paths`` MUST mirror
     # ``jarvis_pa/executor.yaml::host_files.allowed_write_paths`` (and
@@ -133,15 +123,12 @@ def _build_policy() -> dict:
     # guardian will disagree at the path boundary and users see
     # inconsistent deny reasons.  HostFileConstraints rejects
     # trailing-slash shorthand (``dir/``) at load time, so use
-    # explicit subtree globs only.  Disjoint field name
-    # (``allowed_host_paths``) vs ``home_path_constraint.allowed_paths``
-    # drives the Union-dispatch disambiguation — keep them distinct.
+    # explicit subtree globs only. The disjoint field name
+    # ``allowed_host_paths`` drives the Union-dispatch disambiguation.
     host_path_constraint = {"allowed_host_paths": ["~/*"]}
 
     for action in SAFE_ACTIONS:
-        if action in ("READ_FILE", "LIST_DIRECTORY"):
-            constraint = home_path_constraint
-        elif action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
+        if action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
             constraint = host_path_constraint
         else:
             constraint = None
@@ -175,8 +162,6 @@ def _build_policy() -> dict:
             constraint = email_constraint
         elif action == "SEND_MESSAGE":
             constraint = message_constraint
-        elif action in ("WRITE_FILE", "DELETE_FILE"):
-            constraint = home_path_constraint
         elif action in ("WRITE_HOST_FILE", "DELETE_HOST_FILE"):
             constraint = host_path_constraint
         elif action == "RUN_COMMAND":

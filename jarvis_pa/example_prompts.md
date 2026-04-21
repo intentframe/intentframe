@@ -120,9 +120,9 @@ Search for "travel", open the top result, and forward it to test@example.com wit
 
 ```
 List files in my home directory
-Read the file at /home/Desktop/notes.txt
-Write "hello world" to /home/Desktop/test.txt
-Delete /home/Desktop/test.txt
+Read the file at ~/Desktop/notes.txt
+Write "hello world" to ~/Desktop/test.txt
+Delete ~/Desktop/test.txt
 ```
 
 ## Terminal — Safe Commands

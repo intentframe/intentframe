@@ -14,6 +14,7 @@ The LLM sees these as plain callable functions.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from agents import RunContextWrapper, WebSearchTool, function_tool
@@ -30,30 +31,8 @@ from jarvis.types import AgentContext
 # IntentFrame.data, which the executor client forwards as adapter params.
 # ---------------------------------------------------------------------------
 
-class _FileAction(BaseModel):
-    action: str
-    target: str
-    reason: str
-    offset: int | None = None
-    limit: int | None = None
-
-class _WriteAction(BaseModel):
-    action: str = "WRITE_FILE"
-    target: str
-    content: str
-    reason: str
-
-class _DeleteAction(BaseModel):
-    action: str = "DELETE_FILE"
-    target: str
-    reason: str
-    target_path: str       # required by DeletionIntentData domain schema
-    irreversible: bool = True  # required by DeletionIntentData domain schema
-
-# ── Host-file actions (real paths, no VFS) ───────────────────────────
-# Mirror _FileAction / _WriteAction / _DeleteAction but bind to the
-# HOST_FILE action family.  ``target`` carries a real host path
-# (``~/Documents/foo.txt``) rather than a virtual one (``/home/foo.txt``).
+# ── Host-file actions ─────────────────────────────────────────────────
+# ``target`` carries a real host path like ``~/Documents/foo.txt``.
 
 class _ReadHostFileAction(BaseModel):
     action: str = "READ_HOST_FILE"
@@ -269,7 +248,7 @@ class _SystemAction(BaseModel):
 
 MAX_STDOUT_CHARS = 8192    # ~2k tokens — fine for listings, diffs, logs
 MAX_STDERR_CHARS = 2048    # errors are almost always short
-MAX_CONTENT_CHARS = 8192   # read_file already paginates; this is a backstop
+MAX_CONTENT_CHARS = 8192   # paginated file reads still get a backstop cap
 MAX_ERROR_CHARS = 2048     # for result.error when distinct from stderr
 
 _TRUNCATE_LIMITS: dict[str, int] = {
@@ -367,48 +346,8 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
 
 
 # ---------------------------------------------------------------------------
-# File / Directory tools
+# Host file / directory tools
 # ---------------------------------------------------------------------------
-
-@function_tool
-async def read_file(ctx: RunContextWrapper[AgentContext], path: str, reason: str, offset: int = 0, limit: int = 500) -> str:
-    """Read the contents of a file. Supports text files and PDFs.
-    Returns up to `limit` lines starting at `offset` (0-based).
-    Response includes total_lines and truncated flag — call again
-    with a higher offset to read more."""
-    return await _submit(ctx, _FileAction(
-        action="READ_FILE", target=path, reason=reason,
-        offset=offset, limit=limit,
-    ))
-
-
-@function_tool
-async def write_file(ctx: RunContextWrapper[AgentContext], path: str, content: str, reason: str) -> str:
-    """Write content to a file (create or overwrite)."""
-    return await _submit(ctx, _WriteAction(target=path, content=content, reason=reason))
-
-
-@function_tool
-async def list_directory(ctx: RunContextWrapper[AgentContext], path: str, reason: str) -> str:
-    """List files and subdirectories at the given path."""
-    return await _submit(ctx, _FileAction(action="LIST_DIRECTORY", target=path, reason=reason))
-
-
-@function_tool
-async def delete_file(ctx: RunContextWrapper[AgentContext], path: str, reason: str) -> str:
-    """Delete a file or empty directory."""
-    return await _submit(ctx, _DeleteAction(target=path, reason=reason, target_path=path))
-
-
-# ---------------------------------------------------------------------------
-# Host file / directory tools (real paths, no VFS)
-# ---------------------------------------------------------------------------
-#
-# These mirror read_file / write_file / list_directory / delete_file but
-# accept real host paths (e.g. ``~/Documents/foo.txt``) rather than
-# virtual paths (``/home/foo.txt``).  Agents MUST NOT mix the two
-# vocabularies — ``/home/...`` through host tools will not resolve, and
-# ``~/...`` through virtual tools will not pass the VFS resolver.
 
 @function_tool
 async def read_host_file(
@@ -418,12 +357,10 @@ async def read_host_file(
     offset: int = 0,
     limit: int = 500,
 ) -> str:
-    """Read a file on the host filesystem using a real path (e.g. ``~/Documents/foo.txt``).
-
-    For virtual-filesystem reads use ``read_file`` instead.  Returns up
-    to ``limit`` lines starting at ``offset`` (0-based); response
-    includes ``total_lines`` and ``truncated`` — call again with a
-    higher offset to read more."""
+    """Read the contents of a file. Supports text files and PDFs.
+    Returns up to `limit` lines starting at `offset` (0-based).
+    Response includes total_lines and truncated flag — call again
+    with a higher offset to read more."""
     return await _submit(ctx, _ReadHostFileAction(
         target=path, reason=reason, offset=offset, limit=limit,
     ))
@@ -436,9 +373,7 @@ async def write_host_file(
     content: str,
     reason: str,
 ) -> str:
-    """Write content to a file on the host filesystem using a real path
-    (e.g. ``~/Documents/foo.txt``).  Creates parents as needed, overwrites
-    existing files.  For virtual-filesystem writes use ``write_file``."""
+    """Write content to a file (create or overwrite)."""
     return await _submit(ctx, _WriteHostFileAction(
         target=path, content=content, reason=reason,
     ))
@@ -450,9 +385,7 @@ async def list_host_directory(
     path: str,
     reason: str,
 ) -> str:
-    """List files and subdirectories at a real host path (e.g. ``~/Documents/``).
-
-    For virtual-filesystem listings use ``list_directory``."""
+    """List files and subdirectories at the given path."""
     return await _submit(ctx, _ListHostDirectoryAction(
         target=path, reason=reason,
     ))
@@ -464,9 +397,7 @@ async def delete_host_file(
     path: str,
     reason: str,
 ) -> str:
-    """Delete a file on the host filesystem using a real path
-    (e.g. ``~/Documents/foo.txt``).  For virtual-filesystem deletes use
-    ``delete_file``."""
+    """Delete a file or empty directory."""
     return await _submit(ctx, _DeleteHostFileAction(
         target=path, reason=reason, target_path=path,
     ))
@@ -478,10 +409,7 @@ async def delete_host_file(
 
 @function_tool
 async def run_command(ctx: RunContextWrapper[AgentContext], command: str, reason: str) -> str:
-    """Execute a shell command and return its output.
-
-    Commands run in a real OS shell. Do not assume the paths used for file
-    tools will work inside the shell — discover and use real host paths instead."""
+    """Execute a shell command and return its output."""
     return await _submit(ctx, _CommandAction(command=command, reason=reason))
 
 
@@ -762,11 +690,6 @@ async def open_url(ctx: RunContextWrapper[AgentContext], url: str, reason: str) 
     return await _submit(ctx, _BrowserAction(action="OPEN_URL", url=url, reason=reason))
 
 
-@function_tool
-async def search_web(ctx: RunContextWrapper[AgentContext], query: str, reason: str) -> str:
-    """Perform a web search and return results."""
-    return await _submit(ctx, _BrowserAction(action="SEARCH_WEB", query=query, reason=reason))
-
 
 @function_tool
 async def get_page_content(ctx: RunContextWrapper[AgentContext], url: str, reason: str) -> str:
@@ -897,20 +820,53 @@ async def memory_search(ctx: RunContextWrapper[AgentContext], query: str) -> str
         return f"Memory search error: {exc}"
 
 
-@function_tool
-async def memory_get(ctx: RunContextWrapper[AgentContext], path: str, start_line: int, end_line: int) -> str:
-    """Read specific lines from a memory file."""
-    result = await ctx.context.actor.submit({
-        "action": "READ_FILE",
-        "target": path,
-        "reason": f"Reading memory file lines {start_line}-{end_line}",
-    })
-    if not result.success:
-        return f"Error reading {path}: {result.error}"
-    content = str(result.data.get("content", result.data) if isinstance(result.data, dict) else result.data)
+def _read_memory_lines(
+    workspace_root: Path,
+    path: str,
+    start_line: int,
+    end_line: int,
+) -> str:
+    """Read a 1-indexed, inclusive line range from a memory file.
+
+    ``workspace_root`` MUST be an absolute, resolved path; callers are
+    responsible for ``.expanduser().resolve()`` so this helper's
+    traversal guard is deterministic.
+
+    All failures return a human-readable ``"Error reading ..."`` string
+    rather than raising — memory tooling is on the LLM hot path and the
+    model should see the reason verbatim.  Kept as a plain function
+    (not an ``@function_tool``) so unit tests can exercise path
+    boundaries, symlink escapes, and line-slice edges without going
+    through the agents SDK.
+    """
+    target = (workspace_root / path).resolve()
+
+    try:
+        target.relative_to(workspace_root)
+    except ValueError:
+        return f"Error reading {path}: path escapes Jarvis memory workspace"
+
+    if not target.exists():
+        return f"Error reading {path}: file does not exist"
+    if not target.is_file():
+        return f"Error reading {path}: not a file"
+
+    try:
+        content = target.read_text(encoding="utf-8")
+    except Exception as exc:
+        return f"Error reading {path}: {exc}"
+
     lines = content.splitlines()
     selected = lines[max(0, start_line - 1):end_line]
     return "\n".join(selected)
+
+
+@function_tool
+async def memory_get(ctx: RunContextWrapper[AgentContext], path: str, start_line: int, end_line: int) -> str:
+    """Read specific lines from a memory file."""
+    workspace_root = (ctx.context.config.workspace_dir / "workspace").expanduser().resolve()
+    return _read_memory_lines(workspace_root, path, start_line, end_line)
+    
 
 
 @function_tool
@@ -968,10 +924,6 @@ async def spawn_agent(ctx: RunContextWrapper[AgentContext], task: str, model: st
 # ---------------------------------------------------------------------------
 
 ALL_TOOLS: list[Any] = [
-    read_file,
-    write_file,
-    list_directory,
-    delete_file,
     read_host_file,
     write_host_file,
     list_host_directory,
