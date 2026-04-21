@@ -238,6 +238,74 @@ class TestInputValidation:
         assert "directory" in r.error.lower()
 
 
+class TestContentDecoding:
+    """Parity with LocalVirtualFileSystem.read_file:
+
+    - PDFs decode via pymupdf text extraction rather than raw bytes.
+    - Known binary MIME types are refused with a readable reason.
+    - Plain text is decoded as UTF-8 explicitly so a non-utf-8 byte
+      sequence surfaces as "cannot read binary file" rather than the
+      default-locale decoder's traceback.
+    """
+
+    def test_utf8_text_round_trips(self, sandbox):
+        adapter, root = sandbox
+        target = root / "utf8.txt"
+        target.write_bytes("héllo — world\n".encode("utf-8"))
+        r = _run(adapter, ActionType.READ_HOST_FILE, {"path": str(target)})
+        assert r.success, r.error
+        assert "héllo" in r.data["content"]
+
+    def test_non_utf8_bytes_rejected_as_binary(self, sandbox):
+        adapter, root = sandbox
+        target = root / "latin1.txt"
+        # 0xff is invalid as a leading UTF-8 byte; triggers UnicodeDecodeError.
+        target.write_bytes(b"\xff\xfe\x00plain")
+        r = _run(adapter, ActionType.READ_HOST_FILE, {"path": str(target)})
+        assert not r.success
+        assert "binary" in r.error.lower()
+
+    def test_binary_mime_rejected_before_decode(self, sandbox):
+        adapter, root = sandbox
+        # .png is in _BINARY_UNSUPPORTED; refuse by MIME without reading.
+        target = root / "pixel.png"
+        target.write_bytes(b"\x89PNG\r\n\x1a\n")
+        r = _run(adapter, ActionType.READ_HOST_FILE, {"path": str(target)})
+        assert not r.success
+        assert "binary" in r.error.lower()
+        assert "image/png" in r.error
+
+    def test_pdf_text_extraction(self, sandbox):
+        pymupdf = pytest.importorskip("pymupdf")
+        adapter, root = sandbox
+        target = root / "sample.pdf"
+        # Build a tiny single-page PDF with known text so the assertion
+        # is independent of external fixtures / network state.
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "Hello from pymupdf")
+        doc.save(str(target))
+        doc.close()
+
+        r = _run(adapter, ActionType.READ_HOST_FILE, {"path": str(target)})
+        assert r.success, r.error
+        assert "Hello from pymupdf" in r.data["content"]
+
+    def test_pagination_still_applies_to_decoded_content(self, sandbox):
+        # The MIME-aware decode path must not bypass offset/limit paging.
+        adapter, root = sandbox
+        target = root / "many.txt"
+        target.write_text("\n".join(f"l{i}" for i in range(20)) + "\n")
+        r = _run(adapter, ActionType.READ_HOST_FILE, {
+            "path": str(target), "offset": 5, "limit": 3,
+        })
+        assert r.success, r.error
+        assert r.data["offset"] == 5
+        assert r.data["limit"] == 3
+        assert r.data["total_lines"] == 20
+        assert r.data["content"].splitlines() == ["l5", "l6", "l7"]
+
+
 class TestManifest:
     def test_supported_actions_match_category(self, sandbox):
         adapter, _ = sandbox
