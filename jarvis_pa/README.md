@@ -27,7 +27,7 @@ IntentFrame is a dependency, not an identity. Jarvis stores nothing in IntentFra
 jarvis/
 ├── main.py              Entry point, terminal REPL, slash commands
 ├── agent.py             LLM agent core (OpenAI Agents SDK)
-├── tools.py             40+ tool definitions (thin actor.submit wrappers)
+├── tools.py             55+ tool definitions (actor.submit wrappers + memory tools)
 ├── prompt.py            System prompt builder (Jinja2 templates)
 ├── config.py            All configuration (model, paths, thresholds)
 ├── session.py           JSONL conversation persistence + compaction
@@ -87,8 +87,15 @@ Runtime data lives at `~/.jarvis/`:
 (`read_host_file`, `write_host_file`, `list_host_directory`,
 `delete_host_file`) so paths the user sees on disk (`~/Documents/...`)
 are the same ones the LLM reasons about. IntentFrame also supports a
-workspace/VFS file family; a background on when each fits lives in
+virtual-filesystem family for agents that need path isolation; a
+background on when each fits lives in
 [`../docs/vfs-vs-host-tools.md`](../docs/vfs-vs-host-tools.md).
+
+**Web search** — handled by OpenAI's hosted `WebSearchTool` (Responses API),
+not an IntentFrame actor action. This means web searches bypass the
+guardian pipeline and don't appear in the intent audit trail. Fetching
+the full content of a specific URL (`get_page_content`) *does* go
+through the actor.
 
 ## Setup
 
@@ -157,6 +164,25 @@ jarvis-server --tcp
 See [`jarvis/server/README.md`](jarvis/server/README.md) for endpoints, request/response schemas, error handling, and the concurrency gate design.
 
 ## Testing
+
+### Unit tests
+
+Fast, hermetic tests that need no running server, no API key, and no IntentFrame gateway.
+Run from the workspace root:
+
+```bash
+uv run pytest tests/test_jarvis_memory_get.py    # memory_get path-confinement and line-slice logic
+uv run pytest tests/test_host_files_adapter.py   # host-file adapter (PDF, binary, UTF-8, pagination)
+```
+
+`tests/test_onboarding_jarvis_policy.py` is a standalone script (not a pytest module) that
+drives `AIOnboardingEngine` against a simulated Jarvis policy across all four filesystem-family
+modes.  It requires `OPENAI_API_KEY`:
+
+```bash
+OPENAI_API_KEY=sk-... python tests/test_onboarding_jarvis_policy.py --fs-mode host
+OPENAI_API_KEY=sk-... python tests/test_onboarding_jarvis_policy.py --fs-mode both
+```
 
 ### Server gate integration tests
 
