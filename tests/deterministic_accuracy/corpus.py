@@ -414,7 +414,11 @@ _OBFUSCATION: list[Case] = [
     Case(
         command="p''ip install requests",
         category="obfuscation",
-        note="empty-quote split head \u2014 classifier typically misses",
+        note=(
+            "empty-quote split head \u2014 shlex.split collapses the empty "
+            "quotes, normalize() produces 'pip install requests', "
+            "classifier emits capability:package_install:pip normally"
+        ),
         expected={
             "permissive": UNDECIDED,
             "developer": UNDECIDED,
@@ -422,10 +426,12 @@ _OBFUSCATION: list[Case] = [
             "locked_down": BLOCK,
             "no_run_command": BLOCK,
         },
-        xfail={
-            "data_analyst": "classifier doesn't normalize quoted-head splits; no package_install cap",
-            "locked_down": "same classifier miss; caps empty \u2192 allow_capabilities gate skipped",
-        },
+        # No xfail: empirically verified the classifier handles this.
+        # A previous xfail here was a guess that the classifier missed
+        # quoted-head splits \u2014 probe of `shlex.split("p''ip install")`
+        # \u2192 ['pip', 'install'] and the matching regex fires on the
+        # normalized form.  Pinned as a passing case so a future
+        # classifier change that breaks this normalization is caught.
     ),
     Case(
         command="/usr/bin/pip install requests",
