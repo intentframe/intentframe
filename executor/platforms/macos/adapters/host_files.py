@@ -28,6 +28,7 @@ still cannot escape the executor-level ceiling.
 from __future__ import annotations
 
 import asyncio
+import mimetypes
 import os
 from pathlib import Path
 
@@ -36,6 +37,50 @@ from executor.adapters.base import CapabilityAdapter
 from executor.config.schema import HostFilesConfig
 from executor.models import AdapterManifest, ExecutionResult
 from resource_registry.floor import canonicalize_real_path, match_deny_prefix
+
+# MIME types we refuse up-front rather than surfacing cryptic decode
+# errors.  Mirrors LocalVirtualFileSystem._BINARY_UNSUPPORTED so the
+# two file-reading surfaces agree on what "binary" means; kept in
+# lockstep intentionally — adding a type here without the peer leaves
+# one family able to read what the other rejects.
+_BINARY_UNSUPPORTED = frozenset({
+    "image/jpeg", "image/png", "image/gif", "image/webp", "image/tiff",
+    "application/zip", "application/x-tar", "application/gzip",
+    "application/octet-stream",
+    "audio/mpeg", "video/mp4",
+})
+
+
+def _read_pdf_text(real_path: Path) -> str:
+    """Extract text from a PDF via pymupdf.
+
+    Returns the concatenated page text (pages joined by a blank line)
+    or a human-readable placeholder when the PDF has no extractable
+    text layer (scanned/image-only PDFs).  Raises ``RuntimeError`` on
+    missing optional dep or extraction failure — callers convert into
+    their native error surface.
+    """
+    try:
+        import pymupdf
+    except ImportError as exc:
+        raise RuntimeError(
+            "PDF support not available (pymupdf not installed)"
+        ) from exc
+
+    try:
+        doc = pymupdf.open(str(real_path))
+        pages: list[str] = []
+        for page in doc:
+            text = page.get_text().strip()
+            if text:
+                pages.append(text)
+        doc.close()
+    except Exception as exc:
+        raise RuntimeError(f"failed to extract PDF text: {exc}") from exc
+
+    if not pages:
+        return "(PDF contains no extractable text — may be scanned/image-only)"
+    return "\n\n".join(pages)
 
 
 class HostFilesAdapter(CapabilityAdapter):
@@ -162,7 +207,40 @@ class HostFilesAdapter(CapabilityAdapter):
                 success=False,
                 error=f"host_files: path is a directory, use LIST_HOST_DIRECTORY: {canonical}",
             )
-        content = p.read_text()
+
+        # MIME-driven decoding matches LocalVirtualFileSystem.read_file:
+        # PDFs go through pymupdf text extraction, known binary types
+        # are refused with a clear reason, and plain text is decoded as
+        # UTF-8 so a stray latin-1 byte doesn't surface as the default
+        # locale-decoder's cryptic traceback.
+        mime, _ = mimetypes.guess_type(canonical)
+
+        if mime == "application/pdf":
+            try:
+                content = _read_pdf_text(p)
+            except RuntimeError as exc:
+                return ExecutionResult(
+                    success=False, error=f"host_files: {exc}: {canonical}"
+                )
+        elif mime in _BINARY_UNSUPPORTED:
+            return ExecutionResult(
+                success=False,
+                error=f"host_files: cannot read binary file ({mime}): {canonical}",
+            )
+        else:
+            try:
+                content = p.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                return ExecutionResult(
+                    success=False,
+                    error=f"host_files: cannot read binary file: {canonical}",
+                )
+            except Exception as exc:
+                return ExecutionResult(
+                    success=False,
+                    error=f"host_files: failed to read {canonical}: {exc}",
+                )
+
         lines = content.splitlines(keepends=True)
         total_lines = len(lines)
         offset = params.get("offset", 0)
@@ -214,7 +292,11 @@ class HostFilesAdapter(CapabilityAdapter):
             )
         p = Path(canonical)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content)
+        # Explicit UTF-8 matches LocalVirtualFileSystem.write_file and
+        # makes the round-trip with _read's utf-8 decode deterministic
+        # across locales (the platform default on macOS is utf-8 but
+        # pinning it here prevents surprises if that ever changes).
+        p.write_text(content, encoding="utf-8")
         return ExecutionResult(
             success=True,
             data={"path": canonical, "bytes_written": len(content)},
