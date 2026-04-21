@@ -27,6 +27,12 @@ The two must **never** share a constraint field name. The disjoint field names (
 
 Trailing-slash shorthand for host paths (`~/Documents/`) is rejected at config load time. Use `dir/*` for subtree scope, exact paths otherwise.
 
+For runtime enforcement, supporting both vocabularies is fine. For
+LLM-facing product design, it usually is **not**. In real agent
+profiles, prefer exposing either the VFS family or the host-file family,
+not both. The dedicated design note is
+`docs/vfs-vs-host-tools.md`.
+
 ---
 
 ## The wiring fan-out (checklist for a new action family)
@@ -67,7 +73,10 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 
 ### 6. Agent + onboarding (LLM-visible surface)
 
-- `jarvis_pa/jarvis/tools.py` — add `function_tool` wrappers with docstrings that name the vocabulary and discourage mixing with other tools.
+- `jarvis_pa/jarvis/tools.py` — add `function_tool` wrappers whose
+  docstrings are self-contained for the granted family. Avoid
+  cross-referencing sibling file families unless you are intentionally
+  building a comparison/test profile.
 - `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` — add the new action types so they appear in `AgentCapabilities` at handshake.
 - `intentframe_components/onboarding/engine.py` — if the family needs its own guardrail block in the prompt, add a section here.
 
@@ -184,5 +193,8 @@ The goal is for this doc to become the one place where the cross-cutting fan-out
 ## Related documents
 
 - `TODO/shell-mode-host-file-tools-for-jarvis.md` — concrete walkthrough of a real action-family rollout (HOST_FILE).
+- `docs/vfs-vs-host-tools.md` — when to use VFS vs host file tools, and
+  why a real product profile should usually expose only one family to a
+  given LLM.
 - `executor/plan.md` — executor architecture + adapter pattern + security invariants.
 - `docs/executor-root-mode.md` — how root relates to the containment story (unrelated to wiring, but useful context).

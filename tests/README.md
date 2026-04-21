@@ -131,6 +131,21 @@ out of scope for this test suite:
 - **Actor SDK** (client-side, not a security boundary)
 - **Onboarding Engine** (handshake guardrail generation)
 
+For manual onboarding experiments, use the standalone script:
+
+```bash
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode vfs
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode host
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode none
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode both
+```
+
+That harness does **not** start the full gateway/runtime stack. It builds
+Jarvis capabilities plus the gateway bootstrap policy in-process and
+runs only `AIOnboardingEngine.onboard()`. See
+[`docs/vfs-vs-host-tools.md`](../docs/vfs-vs-host-tools.md) for why the
+filesystem family split matters when reading those outputs.
+
 ## Running
 
 ```bash

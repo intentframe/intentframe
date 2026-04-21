@@ -83,6 +83,13 @@ Runtime data lives at `~/.jarvis/`:
 
 **API Server** — A FastAPI server that wraps Jarvis over HTTP (UDS or TCP) so any local client — Telegram bot, dashboard, CLI — can talk to it. Enforces single-client concurrency with a gate. See [`jarvis/server/README.md`](jarvis/server/README.md) for full docs.
 
+**Filesystem tool families** — IntentFrame supports both workspace/VFS
+file tools and host file tools, but Jarvis-style product profiles should
+usually expose only one family to a given LLM tool list. Keeping both in
+the same prompt surface is useful for testing, but it adds path-model
+confusion in real deployments. See
+[`../docs/vfs-vs-host-tools.md`](../docs/vfs-vs-host-tools.md).
+
 ## Setup
 
 From the workspace root:

@@ -121,6 +121,14 @@ There is currently no file-based or CLI-based way to customise policies without 
 
 A full policy-editing surface — via a web app, the CLI, or a macOS app — is planned for a future release.
 
+IntentFrame also supports two filesystem tool families: workspace/VFS
+tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools
+(`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce
+either family, but real product profiles should usually expose only one
+family to a given LLM tool list. See
+[`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design
+guidance, tradeoffs, and test harness modes.
+
 ---
 
 ## Requirements
