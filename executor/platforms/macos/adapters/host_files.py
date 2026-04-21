@@ -67,16 +67,20 @@ def _read_pdf_text(real_path: Path) -> str:
             "PDF support not available (pymupdf not installed)"
         ) from exc
 
+    pages: list[str] = []
     try:
         doc = pymupdf.open(str(real_path))
-        pages: list[str] = []
+    except Exception as exc:
+        raise RuntimeError(f"failed to extract PDF text: {exc}") from exc
+    try:
         for page in doc:
             text = page.get_text().strip()
             if text:
                 pages.append(text)
-        doc.close()
     except Exception as exc:
         raise RuntimeError(f"failed to extract PDF text: {exc}") from exc
+    finally:
+        doc.close()
 
     if not pages:
         return "(PDF contains no extractable text — may be scanned/image-only)"

@@ -1,25 +1,32 @@
-"""Isolated onboarding run: Jarvis-seeded policy -> AIOnboardingEngine.
+"""Isolated onboarding simulation for a Jarvis-shaped agent.
 
-Exercises :class:`AIOnboardingEngine.onboard` with the *exact* policy
-``intentframe_gateway.bootstrap`` seeds for Jarvis and the *exact*
-``AgentCapabilities`` Jarvis declares during handshake -- without
-running the gateway, executor, or any UDS proxies.
+Drives :class:`AIOnboardingEngine.onboard` with a **simulated** Jarvis
+policy and capability set, entirely self-contained in this file.  No
+imports from ``intentframe_gateway.bootstrap``, ``jarvis_pa``,
+``jarvis.agent`` or any other production seed — that is intentional.
 
-Filesystem family toggle (``--fs-mode``) filters **both**
-``AgentCapabilities.action_types`` and the policy ``allowed_actions``
-in lockstep so you can test onboarding for:
+The point of the script is to exercise onboarding across all four
+filesystem-family configurations regardless of what Jarvis (or any
+other agent) actually ships in production:
 
-- VFS file actions only
-- host-file actions only
-- both (default, matches production bootstrap)
-- neither family (all other Jarvis actions unchanged)
+- ``vfs``   — VFS file actions only (legacy virtual-path family)
+- ``host``  — host-file actions only (real ``~/...`` paths)
+- ``both``  — both families declared simultaneously
+- ``none``  — neither family declared
 
-Not a pytest module on purpose -- runs as a plain script so you can
-print the full generated ``RuntimeContext`` without pytest capture
-interfering.
+The simulated policy is the **union** of both families plus the usual
+non-filesystem Jarvis actions (email, calendar, reminders, notes,
+messages, contacts, clipboard, notifications, browser, system
+controls, HTTP).  ``--fs-mode`` filters this superset in lockstep
+across ``AgentCapabilities.action_types`` and ``UserPolicy.allowed_actions``.
 
-Requires ``OPENAI_API_KEY`` in the environment (onboarding calls the
-OpenAI Agents SDK).
+The simulated policy still goes through ``UserPolicy.model_validate``
+so any drift in the registry's Pydantic models fails here.
+
+Not a pytest module on purpose — runs as a plain script so the full
+generated ``RuntimeContext`` prints without pytest output capture.
+
+Requires ``OPENAI_API_KEY`` (onboarding calls the OpenAI Agents SDK).
 
 Run:
 
@@ -40,11 +47,8 @@ from typing import Literal
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_JARVIS_PA = _REPO_ROOT / "jarvis_pa"
-for extra in (_REPO_ROOT, _JARVIS_PA):
-    extra_str = str(extra)
-    if extra_str not in sys.path:
-        sys.path.insert(0, extra_str)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 
 from intentframe_core.types import (  # noqa: E402
@@ -54,10 +58,11 @@ from intentframe_core.types import (  # noqa: E402
     UserContext,
 )
 from intentframe_components.onboarding.engine import AIOnboardingEngine  # noqa: E402
-from intentframe_gateway.bootstrap import _build_default_policy  # noqa: E402
 from policy_registry.models import UserPolicy  # noqa: E402
 
 FsMode = Literal["both", "vfs", "host", "none"]
+
+# ── Simulated filesystem families ────────────────────────────────────────────
 
 VFS_FILE_ACTIONS: frozenset[str] = frozenset({
     "READ_FILE",
@@ -75,6 +80,84 @@ HOST_FILE_ACTIONS: frozenset[str] = frozenset({
 
 FS_FILE_ACTIONS: frozenset[str] = VFS_FILE_ACTIONS | HOST_FILE_ACTIONS
 
+_VFS_WRITE_ACTIONS: frozenset[str] = frozenset({"WRITE_FILE", "DELETE_FILE"})
+_HOST_WRITE_ACTIONS: frozenset[str] = frozenset({"WRITE_HOST_FILE", "DELETE_HOST_FILE"})
+
+# ── Simulated non-filesystem actions (superset, independent of prod) ─────────
+
+_SAFE_NON_FS_ACTIONS: tuple[str, ...] = (
+    "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
+    "GET_CLIPBOARD", "SET_CLIPBOARD",
+    "SEARCH_SPOTLIGHT", "SHOW_NOTIFICATION",
+    "LIST_CALENDARS", "LIST_EVENTS", "SEARCH_EVENTS",
+    "LIST_REMINDER_LISTS", "LIST_REMINDERS",
+    "LIST_NOTES", "READ_NOTE",
+    "READ_MESSAGES",
+    "SEARCH_CONTACTS", "GET_CONTACT",
+    "SEARCH_WEB", "GET_PAGE_CONTENT",
+    "SEARCH_EMAIL", "READ_EMAIL", "GET_EMAIL", "DOWNLOAD_ATTACHMENT",
+    "HTTP_GET",
+    "GET_SYSTEM_INFO", "GET_BRIGHTNESS", "GET_VOLUME", "GET_MUTE", "GET_DARK_MODE",
+)
+
+_UNSAFE_NON_FS_ACTIONS: tuple[str, ...] = (
+    "RUN_COMMAND",
+    "SEND_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL",
+    "MARK_READ_EMAIL", "MOVE_EMAIL", "DELETE_EMAIL",
+    "CREATE_EVENT", "UPDATE_EVENT", "DELETE_EVENT",
+    "CREATE_REMINDER", "UPDATE_REMINDER", "COMPLETE_REMINDER", "DELETE_REMINDER",
+    "CREATE_NOTE", "DELETE_NOTE",
+    "ADD_CONTACT", "UPDATE_CONTACT", "DELETE_CONTACT",
+    "SEND_MESSAGE",
+    "OPEN_URL",
+    "HTTP_POST", "HTTP_PUT", "HTTP_DELETE",
+    "SET_VOLUME", "SET_BRIGHTNESS", "TOGGLE_MUTE", "TOGGLE_DARK_MODE",
+)
+
+_SIMULATED_CAPABILITY_LIST: tuple[str, ...] = (
+    "file_ops", "commands", "email", "calendar", "reminders",
+    "notes", "messages", "browser", "clipboard", "spotlight",
+    "notifications", "system_control",
+)
+
+_SIMULATED_INTENT_LIMITS: list[dict] = [
+    {
+        "limit_id": "max-spend-per-txn",
+        "domain": "spending",
+        "description": "Maximum $500 per transaction",
+        "raw": "Don't spend more than $500 on a single thing without asking me",
+        "threshold": 500.0,
+        "effect": "block",
+        "scope": "per_action",
+    },
+    {
+        "limit_id": "confirm-before-delete",
+        "domain": "deletion",
+        "description": "Always confirm before deleting",
+        "raw": "Ask me before deleting anything I can't get back",
+        "effect": "require_confirmation",
+        "scope": "per_action",
+    },
+]
+
+# Disjoint constraint field names drive Pydantic Union dispatch in the
+# registry — keep these as-is.
+_VFS_CONSTRAINT = {"allowed_paths": ["/home/*"]}
+_HOST_CONSTRAINT = {"allowed_host_paths": ["~/*"]}
+_EMAIL_CONSTRAINT = {
+    "allowed_recipients": [],
+    "recipient_sources": [{"source": "contacts_all", "filter": "", "enabled": True}],
+}
+_MESSAGE_CONSTRAINT = {
+    "allowed_contacts": [],
+    "contact_sources": [{"source": "contacts_all", "filter": "", "enabled": True}],
+}
+_TERMINAL_CONSTRAINT = {
+    "blocked_patterns": [
+        "sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777",
+    ],
+}
+
 
 def _excluded_fs_actions(fs_mode: FsMode) -> frozenset[str]:
     if fs_mode == "both":
@@ -88,9 +171,67 @@ def _excluded_fs_actions(fs_mode: FsMode) -> frozenset[str]:
     raise ValueError(f"unknown fs_mode: {fs_mode!r}")
 
 
+def _fs_action_entry(action: str) -> dict:
+    """Return ``{"safe": ..., "constraints": ...}`` for a filesystem action."""
+    if action in _VFS_WRITE_ACTIONS:
+        return {"safe": False, "constraints": _VFS_CONSTRAINT}
+    if action in VFS_FILE_ACTIONS:  # read/list
+        return {"safe": True, "constraints": _VFS_CONSTRAINT}
+    if action in _HOST_WRITE_ACTIONS:
+        return {"safe": False, "constraints": _HOST_CONSTRAINT}
+    if action in HOST_FILE_ACTIONS:  # read/list
+        return {"safe": True, "constraints": _HOST_CONSTRAINT}
+    raise ValueError(f"not a filesystem action: {action!r}")
+
+
+def _non_fs_action_entry(action: str, *, safe: bool) -> dict:
+    if action in ("SEND_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL"):
+        constraint: dict | None = _EMAIL_CONSTRAINT
+    elif action == "SEND_MESSAGE":
+        constraint = _MESSAGE_CONSTRAINT
+    elif action == "RUN_COMMAND":
+        constraint = _TERMINAL_CONSTRAINT
+    else:
+        constraint = None
+    return {"safe": safe, "constraints": constraint}
+
+
+def _simulated_policy_dict(fs_mode: FsMode, *, user_id: str) -> dict:
+    """Build a simulated Jarvis policy dict covering the requested fs family.
+
+    This is the *only* source of truth for the policy in this script;
+    nothing is imported from production bootstrap.
+    """
+    excluded = _excluded_fs_actions(fs_mode)
+    allowed_actions: dict[str, dict] = {}
+
+    for action in sorted(FS_FILE_ACTIONS):
+        if action in excluded:
+            continue
+        allowed_actions[action] = _fs_action_entry(action)
+
+    for action in _SAFE_NON_FS_ACTIONS:
+        allowed_actions[action] = _non_fs_action_entry(action, safe=True)
+    for action in _UNSAFE_NON_FS_ACTIONS:
+        allowed_actions[action] = _non_fs_action_entry(action, safe=False)
+
+    return {
+        "user_id": user_id,
+        "allowed_actions": allowed_actions,
+        "intent_limits": _SIMULATED_INTENT_LIMITS,
+        "metadata": {
+            "profile": "jarvis-simulated",
+            "note": "Self-contained simulation (not loaded from gateway bootstrap)",
+        },
+    }
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run AI onboarding against Jarvis bootstrap policy (no gateway).",
+        description=(
+            "Run AI onboarding against a simulated Jarvis-shaped policy "
+            "(no gateway, no production seed)."
+        ),
     )
     parser.add_argument(
         "--fs-mode",
@@ -101,79 +242,38 @@ def _parse_args() -> argparse.Namespace:
             "policy: both (default), vfs only, host only, or neither."
         ),
     )
+    parser.add_argument(
+        "--user-id",
+        default="jarvis_sim",
+        help="User ID to use in the simulated policy (default: jarvis_sim).",
+    )
     return parser.parse_args()
 
 
-def _build_jarvis_capabilities(fs_mode: FsMode) -> AgentCapabilities:
-    """Mirror of the capabilities block in ``jarvis_pa/jarvis/agent.py``.
-
-    Imported lazily so the script still runs even if ``jarvis_pa`` is
-    not installed as a package in the current environment -- we fall
-    back to a hardcoded copy if the import fails.
-    """
-    try:
-        from jarvis.agent import _ACTION_TYPES, _CAPABILITY_LIST  # type: ignore
-    except Exception:
-        _CAPABILITY_LIST = [
-            "file_ops", "commands", "email", "calendar", "reminders",
-            "notes", "messages", "browser", "clipboard", "spotlight",
-            "notifications", "system_control",
-        ]
-        _ACTION_TYPES = [
-            "READ_FILE", "WRITE_FILE", "LIST_DIRECTORY", "DELETE_FILE",
-            "READ_HOST_FILE", "WRITE_HOST_FILE", "LIST_HOST_DIRECTORY", "DELETE_HOST_FILE",
-            "RUN_COMMAND",
-            "SEND_EMAIL", "READ_EMAIL", "SEARCH_EMAIL",
-            "GET_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL", "MARK_READ_EMAIL",
-            "MOVE_EMAIL", "DELETE_EMAIL", "DOWNLOAD_ATTACHMENT",
-            "CREATE_EVENT", "LIST_EVENTS", "LIST_CALENDARS", "UPDATE_EVENT",
-            "DELETE_EVENT", "SEARCH_EVENTS",
-            "CREATE_REMINDER", "LIST_REMINDERS", "LIST_REMINDER_LISTS",
-            "COMPLETE_REMINDER", "UPDATE_REMINDER", "DELETE_REMINDER",
-            "CREATE_NOTE", "LIST_NOTES", "READ_NOTE", "DELETE_NOTE",
-            "SEND_MESSAGE", "READ_MESSAGES",
-            "SEARCH_CONTACTS", "GET_CONTACT", "ADD_CONTACT",
-            "UPDATE_CONTACT", "DELETE_CONTACT",
-            "OPEN_URL", "SEARCH_WEB", "GET_PAGE_CONTENT",
-            "GET_CLIPBOARD", "SET_CLIPBOARD",
-            "SEARCH_SPOTLIGHT", "SHOW_NOTIFICATION", "ASK_USER",
-            "GET_SYSTEM_INFO", "SET_VOLUME", "SET_BRIGHTNESS", "TOGGLE_DARK_MODE",
-        ]
-
+def _build_simulated_capabilities(fs_mode: FsMode) -> AgentCapabilities:
     excluded = _excluded_fs_actions(fs_mode)
-    action_types = [a for a in _ACTION_TYPES if a not in excluded]
 
-    cap_list = list(_CAPABILITY_LIST)
+    fs_actions = [a for a in sorted(FS_FILE_ACTIONS) if a not in excluded]
+    non_fs_actions = list(_SAFE_NON_FS_ACTIONS) + list(_UNSAFE_NON_FS_ACTIONS)
+    action_types = fs_actions + non_fs_actions
+
+    cap_list = list(_SIMULATED_CAPABILITY_LIST)
     if fs_mode == "none" and "file_ops" in cap_list:
         cap_list.remove("file_ops")
 
     return AgentCapabilities(
         agent_type="PersonalAssistant",
-        description="Jarvis - macOS personal assistant",
+        description="Jarvis - macOS personal assistant (simulated)",
         capabilities=cap_list,
         action_types=action_types,
         version="0.1.0",
-        author="jarvis",
+        author="jarvis-sim",
     )
 
 
-def _build_jarvis_user_context(fs_mode: FsMode) -> UserContext:
-    """Build a ``UserContext`` from the gateway bootstrap policy dict.
-
-    Applies ``fs_mode`` by removing the same filesystem action keys from
-    ``allowed_actions`` as :func:`_build_jarvis_capabilities` removes from
-    ``action_types``.
-
-    Goes through ``UserPolicy.model_validate`` so the raw seed dict is
-    validated by the same Pydantic models the policy registry uses in
-    production -- any drift in constraint schemas will fail here.
-    """
-    policy_dict = _build_default_policy()
-    excluded = _excluded_fs_actions(fs_mode)
-    raw_actions = policy_dict["allowed_actions"]
-    policy_dict["allowed_actions"] = {
-        action: perm for action, perm in raw_actions.items() if action not in excluded
-    }
+def _build_simulated_user_context(fs_mode: FsMode, user_id: str) -> UserContext:
+    """Validate the simulated policy dict through the real Pydantic model."""
+    policy_dict = _simulated_policy_dict(fs_mode, user_id=user_id)
     policy = UserPolicy.model_validate(policy_dict)
     return UserContext(
         user_id=policy.user_id,
@@ -211,8 +311,8 @@ def _print_runtime_context(ctx: RuntimeContext) -> None:
 async def _run(
     fs_mode: FsMode,
     user_context: UserContext,
+    capabilities: AgentCapabilities,
 ) -> RuntimeContext:
-    capabilities = _build_jarvis_capabilities(fs_mode)
     execution_context = ExecutionContext()
 
     caps_fs = sorted(set(capabilities.action_types) & FS_FILE_ACTIONS)
@@ -277,10 +377,10 @@ def main() -> int:
         )
         return 2
 
-    user_context = _build_jarvis_user_context(fs_mode)
-    capabilities = _build_jarvis_capabilities(fs_mode)
+    user_context = _build_simulated_user_context(fs_mode, args.user_id)
+    capabilities = _build_simulated_capabilities(fs_mode)
     try:
-        ctx = asyncio.run(_run(fs_mode, user_context))
+        ctx = asyncio.run(_run(fs_mode, user_context, capabilities))
     except Exception as exc:
         print(f"\nonboarding run failed: {exc!r}")
         return 1
