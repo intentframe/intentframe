@@ -865,8 +865,9 @@ def _read_memory_lines(
 async def memory_get(ctx: RunContextWrapper[AgentContext], path: str, start_line: int, end_line: int) -> str:
     """Read specific lines from a memory file."""
     workspace_root = (ctx.context.config.workspace_dir / "workspace").expanduser().resolve()
-    return _read_memory_lines(workspace_root, path, start_line, end_line)
-    
+    result = _read_memory_lines(workspace_root, path, start_line, end_line)
+    logger.debug(f"memory_get({path!r}, {start_line}, {end_line}) → {len(result.splitlines())} lines")
+    return result
 
 
 @function_tool
