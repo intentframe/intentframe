@@ -362,9 +362,7 @@ class AIGuardian(Guardian):
         if self.verbose:
             print(f"    │  AI judging: {action} (prompt={prompt_id})...")
 
-        log_prompt_dump(
-            "guardian", prompt, prompt_id=prompt_id, verbose=self.verbose,
-        )
+        log_prompt_dump("guardian", prompt, prompt_id=prompt_id)
         result = await Runner.run(agent, prompt)
 
         return self._convert_to_result(intent, analysis, result.final_output)

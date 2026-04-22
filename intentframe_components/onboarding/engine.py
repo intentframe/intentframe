@@ -220,7 +220,7 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
         if self.verbose:
             print(f"\n    [ONBOARDING] AI analyzing agent '{capabilities.agent_type}'...")
 
-        log_prompt_dump("onboarding", prompt, verbose=self.verbose)
+        log_prompt_dump("onboarding", prompt)
         result = await Runner.run(self._agent, prompt)
         ai_output: AIOnboardingOutput = result.final_output
 

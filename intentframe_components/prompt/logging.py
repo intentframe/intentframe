@@ -53,3 +53,4 @@ def log_prompt_dump(
 
     if verbose:
         print(line)
+
