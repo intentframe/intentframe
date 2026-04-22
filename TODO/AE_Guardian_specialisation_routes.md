@@ -219,7 +219,7 @@ and covered by tests.
 | File | What it pins |
 |---|---|
 | `tests/test_prompt_strategy.py` | AE routing matrix (RUN_COMMAND × capability sub-tags, critical non-command actions, non-critical actions), Guardian routing matrix, precedence (mutation > probe > generic), fail-closed when `command_intel` is missing on RUN_COMMAND, drift guard `CRITICAL_ACTIONS ∩ _PASSIVE_READ_ACTIONS == ∅`. |
-| `tests/test_prompt_library.py` | Shape (all ids present, non-empty, read-only mapping), standard-body keyword invariants, critical-overlay invariants (6 tests `xfail(strict=False)` as living placeholders for the initial rollout), aliasing of probe / mutation lanes. |
+| `tests/test_prompt_library.py` | Shape (all ids present, non-empty, read-only mapping), standard-body keyword invariants, full-body fork invariants for `critical_run_command` and `critical_write_file`, aliasing of probe / mutation lanes (`xfail` placeholders for future per-lane forks). |
 | `tests/test_audit_prompt_id_reset.py` | Regression: deterministic-ALLOW and deterministic-BLOCK audit entries must not carry `ae_prompt_id` / `guardian_prompt_id` from a preceding AI-path request. |
 
 ### Routing wired end-to-end

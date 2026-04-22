@@ -27,7 +27,8 @@ from command_shield.verdict import Signal
 
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
-from intentframe_server.pipeline import IntentFrameRuntime, _build_file_intel
+from intentframe_server.pipeline import IntentFrameRuntime
+from intentframe_server.file_intel import build_file_intel
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -239,9 +240,10 @@ write_file_intent = IntentFrame(
     agent_type="personal_assistant",
     task_description="Maintain the user's weekly expense sync script",
 )
-write_file_intel = _build_file_intel(
+write_file_intel = build_file_intel(
     write_file_intent.data["content"],
     write_file_intent.target,
+    write_file_intent.action.value,
 )
 write_file_analysis = AnalysisReport(
     stated_intent="Write a Python expense-sync helper to the user's scripts directory",

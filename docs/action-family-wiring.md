@@ -69,7 +69,7 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 - `intentframe_components/analysis/engine.py::_PASSIVE_READ_ACTIONS` — add read-only actions here so they skip full AE analysis.
 - `intentframe_components/routing/criticality.py::CRITICAL_ACTIONS` — add high-risk actions (deletes, privileged writes) so they take the critical AIGuardian lane.
 - `intentframe_components/prompt/strategy.py` — route write/delete actions to the right prompt template (`critical_write_file`, `standard`, etc.).
-- `intentframe_server/pipeline.py::_build_file_intel` — if the family has a payload (write content), extend the condition that attaches File Shield intel.
+- `intentframe_server/file_intel.py::build_file_intel` — if the family has a payload (write content), extend the `_HOST_PATH_ACTIONS` set and the action-value condition in `pipeline.py` that invokes `build_file_intel`.
 
 ### 6. Agent + onboarding (LLM-visible surface)
 
@@ -160,7 +160,7 @@ When you see one of these, jump straight to the file named.
 | Write-file action skipped the critical lane | Missing from `critical_write_file` route | `intentframe_components/prompt/strategy.py` |
 | Read action ran a full AE call it didn't need | Missing from `_PASSIVE_READ_ACTIONS` | `intentframe_components/analysis/engine.py` |
 | Delete action didn't require confirmation | Missing from `CRITICAL_ACTIONS` | `intentframe_components/routing/criticality.py` |
-| New write action didn't get File Shield intel | `_build_file_intel` condition too narrow | `intentframe_server/pipeline.py` |
+| New write action didn't get File Shield intel | `build_file_intel` / `_HOST_PATH_ACTIONS` condition too narrow | `intentframe_server/file_intel.py` |
 | `/etc/foo` blocked but `/private/etc/foo` allowed (macOS) | Canonicalizer / DENY list asymmetry | `resource_registry/floor.py` + relevant checker |
 | Mirror test green but runtime broken | Test pinning the wrong file | `tests/test_jarvis_host_scope_mirror.py` |
 | LLM keeps picking `RUN_COMMAND` over the structured tool | Tool docstring not discouraging shell alternatives | `jarvis_pa/jarvis/tools.py` |
