@@ -40,6 +40,7 @@ from intentframe_components.prompt.library import (
     ANALYSIS_PROMPT_IDS,
     ANALYSIS_PROMPTS,
 )
+from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
 from intentframe_components.prompt.strategy import (
     DefaultPromptStrategy,
@@ -446,6 +447,9 @@ class AIAnalysisEngine(AnalysisEngine):
         if self.verbose:
             print(f"    │  AI analyzing: {intent.action.value} (prompt={prompt_id})...")
 
+        log_prompt_dump(
+            "analysis", prompt, prompt_id=prompt_id, verbose=self.verbose,
+        )
         result = await Runner.run(agent, prompt)
 
         return self._convert_to_report(

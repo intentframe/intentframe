@@ -25,6 +25,7 @@ from agents import Agent, ModelSettings, Runner
 
 from intentframe_core.types import AgentCapabilities, ExecutionContext, RuntimeContext, UserContext
 from intentframe_components.onboarding.base import OnboardingEngine
+from intentframe_components.prompt.logging import log_prompt_dump
 from policy_registry.constraints.email import EmailConstraints
 from policy_registry.constraints.file import FileConstraints
 from policy_registry.constraints.host_file import HostFileConstraints
@@ -219,6 +220,7 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
         if self.verbose:
             print(f"\n    [ONBOARDING] AI analyzing agent '{capabilities.agent_type}'...")
 
+        log_prompt_dump("onboarding", prompt, verbose=self.verbose)
         result = await Runner.run(self._agent, prompt)
         ai_output: AIOnboardingOutput = result.final_output
 
