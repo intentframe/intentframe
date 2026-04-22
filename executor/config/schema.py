@@ -14,7 +14,7 @@ hierarchy's sake.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -279,6 +279,19 @@ class SandboxConfig(BaseModel):
             "missing or lacks bin/python3. Recommended: True (fail loud at "
             "startup rather than silent wrong-Python at first RUN_COMMAND). "
             "Set False for minimal dev setups that want system python3."
+        ),
+    )
+    escalate: Literal["none", "sudo"] = Field(
+        default="none",
+        description=(
+            "Per-command privilege escalation for RUN_COMMAND. 'none' runs "
+            "sandbox-exec under the executor's own UID. 'sudo' prepends "
+            "'sudo -n' so the kernel sandbox subprocess runs as root -- "
+            "requires the machine to be provisioned by "
+            "intentframe_setup_root_demo.sh (writes a NOPASSWD sudoers "
+            "entry for sandbox-exec and a marker file). Takes effect only "
+            "when the gateway reports INTENTFRAME_ESCALATION_ARMED=1; "
+            "otherwise falls back to unprivileged execution."
         ),
     )
 

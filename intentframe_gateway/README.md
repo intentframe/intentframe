@@ -58,12 +58,13 @@ The gateway is the **root process**.  It starts everything in dependency order:
 | 2 | Check mandatory credentials | OpenAI API key required; partial startup mode if missing |
 | 3 | Start EDI (fire-and-forget) | Email sync daemon, only if email accounts configured |
 | 4 | Build combined env | Merge non-sensitive config YAML + vault secrets; see [Env injection](#env-injection-three-layers-one-dict) |
-| 5 | Start supervisor | Spawns 4 infra services (policy-registry, resource-registry, executor, intentframe-core) |
-| 6 | Start platform server (macOS) | Via `open .app` for TCC permissions; non-fatal if unavailable |
-| 7 | Bootstrap | Seed policies and workspace (idempotent) |
-| 8 | Start Jarvis | AI agent, needs runtime env (OpenAI key) |
-| 9 | Start Telegram | Only if bot token exists in vault and Jarvis is healthy |
-| 10 | Open store and event stream | SQLite preferences + unified health/event polling |
+| 5 | Detect root-demo escalation | Read `~/.intentframe/state/root-demo.json` + check `/etc/sudoers.d/intentframe-run`; inject `INTENTFRAME_ESCALATION_ARMED=0\|1` into supervisor env |
+| 6 | Start supervisor | Spawns 4 infra services (policy-registry, resource-registry, executor, intentframe-core); inherits `INTENTFRAME_ESCALATION_ARMED` |
+| 7 | Start platform server (macOS) | Via `open .app` for TCC permissions; non-fatal if unavailable |
+| 8 | Bootstrap | Seed policies and workspace (idempotent) |
+| 9 | Start Jarvis | AI agent, needs runtime env (OpenAI key) |
+| 10 | Start Telegram | Only if bot token exists in vault and Jarvis is healthy |
+| 11 | Open store and event stream | SQLite preferences + unified health/event polling |
 
 ### Env injection (three layers, one dict)
 
@@ -185,6 +186,9 @@ uvicorn intentframe_gateway.server:app --uds /tmp/gateway.sock --log-level info
 | `INTENTFRAME_LOG_DIR` | `~/.intentframe/logs` | Directory containing `{service}.log` files |
 | `INTENTFRAME_FRONTEND_MODE` | unset | Set to `1` for JSON progress on stdout (native frontend) |
 | `PLATFORM_SERVER_APP` | auto-detected | Path to `macos-appkit-server.app` bundle |
+| `INTENTFRAME_PROFILE` | `user` | Set to `root` to activate the Jarvis root demo profile (controls bootstrap and `EXECUTOR_CONFIG` default). Normally set by the CLI via `--profile root`. |
+| `EXECUTOR_CONFIG` | `jarvis_pa/executor.yaml` | Path to the executor YAML config file. Overridden to `jarvis_pa/executor_root.yaml` when `INTENTFRAME_PROFILE=root` and the operator has not set it explicitly. |
+| `INTENTFRAME_ESCALATION_ARMED` | (set by gateway) | Injected by the gateway into the supervisor/executor env at startup. `1` if root-demo is installed and armed (`/etc/sudoers.d/intentframe-run` + `~/.intentframe/state/root-demo.json` both present), `0` otherwise. The executor's `MacOSSandboxEngine` reads this to decide whether to prepend `sudo -n` to `sandbox-exec`. Never set this manually. |
 
 ## Module Structure
 
@@ -197,6 +201,10 @@ intentframe_gateway/
 ├── config.py              # GatewayConfig (Pydantic): socket paths, backends
 ├── config_loader.py       # System config YAML loader (~/.intentframe/gateway.yaml)
 ├── credential_gate.py     # Mandatory/optional credential checks + secret env builder
+├── escalation.py          # Root-demo capability detection: reads root-demo.json marker
+│                          #   + sudoers file; produces EscalationState used by server.py
+│                          #   (to inject INTENTFRAME_ESCALATION_ARMED) and routes/system.py
+│                          #   (to populate root_demo block in /system/health)
 ├── process_manager.py     # Manages vault, jarvis, edi, telegram, platform-server
 ├── bootstrap.py           # Idempotent policy/workspace seeding
 ├── store.py               # AppStore: async SQLite for app preferences
@@ -210,6 +218,7 @@ intentframe_gateway/
     ├── platform.py         # /platform/*  — read-only proxy to platform.sock (health, permissions)
     ├── edi.py              # /edi/*       — EDI email account management + status
     ├── system.py           # /system/*    — health, services, lifecycle, logs, shutdown
+    │                       #               includes root_demo block in /system/health response
     ├── config_routes.py    # /config/*    — app preferences CRUD
     └── events_routes.py    # /events      — unified WS + SSE event stream
 
@@ -277,7 +286,7 @@ intentframe_cli/
 ### System (`/system/*`)
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/system/health` | Aggregated health (all services, parallel) |
+| GET | `/system/health` | Aggregated health (all services, parallel). Response includes a `root_demo` block: `{profile, escalation_armed, sudoers_path, escalated_binary, installed_at, installer_user, marker_path, reason, executor_running_as_root}` — the CLI uses this to render the escalation banner. |
 | GET | `/system/services` | Per-service status (socket, PID, health) |
 | POST | `/system/{service}/start` | Start a managed service |
 | POST | `/system/{service}/stop` | Stop a managed service |

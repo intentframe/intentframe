@@ -29,6 +29,7 @@ from fastapi import FastAPI
 from intentframe_gateway.bootstrap import Bootstrapper
 from intentframe_gateway.config import GatewayConfig, load_gateway_config
 from intentframe_gateway.credential_gate import CredentialGate
+from intentframe_gateway.escalation import detect_escalation_state
 from intentframe_gateway.process_manager import ProcessManager
 from intentframe_gateway.proxy import UDSProxy
 
@@ -53,6 +54,24 @@ async def _start_supervisor(
     """Spawn the supervisor as a child process."""
     child_env = {**os.environ, "PYTHONUNBUFFERED": "1", **runtime_env}
     child_env["EXECUTOR_CONFIG"] = os.environ.get("EXECUTOR_CONFIG") or "jarvis_pa/executor.yaml"
+
+    # Detect root-demo escalation capability and stamp it into the
+    # supervisor/executor env.  Both sides use this single env var as
+    # the machine-level source of truth:
+    #   * executor /health.running_as_root reflects it.
+    #   * MacOSSandboxEngine.wrap() gates ``sudo -n`` on it.
+    # Missing marker or revoked sudoers -> env="0" and every command
+    # runs unprivileged, regardless of which executor YAML is loaded.
+    escalation = detect_escalation_state()
+    child_env["INTENTFRAME_ESCALATION_ARMED"] = "1" if escalation.armed else "0"
+    if escalation.armed:
+        logger.info(
+            "root-demo escalation: armed (sudoers=%s, binary=%s)",
+            escalation.sudoers_path,
+            escalation.escalated_binary or "<unknown>",
+        )
+    else:
+        logger.info("root-demo escalation: disarmed (%s)", escalation.reason)
 
     log_path = config.log_dir / "supervisor.log"
     config.log_dir.mkdir(parents=True, exist_ok=True)

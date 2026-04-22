@@ -40,10 +40,35 @@ from intentframe_cli.lifecycle import (
     wait_for_gateway,
 )
 from intentframe_cli.repl import run_normal_mode, run_setup_mode
-from intentframe_cli.ui import console, error
+from intentframe_cli.ui import console, error, root_demo_installed
 
 _PROFILE_CHOICES = ("user", "root")
 _ROOT_EXECUTOR_CONFIG = "jarvis_pa/executor_root.yaml"
+
+
+def _warn_if_root_demo_missing(profile: str | None) -> None:
+    """Yellow warning when ``--profile root`` is requested on a machine
+    that hasn't run ``intentframe_setup_root_demo.sh`` yet.
+
+    The gateway will still start, the executor will still come up, and
+    policy will still match the root profile shape.  What *won't*
+    happen is the ``sudo -n sandbox-exec`` wrap -- RUN_COMMAND will
+    run unprivileged, which is almost certainly not what the operator
+    wanted when they passed ``--profile root``.  Warn loudly but do
+    not block.
+    """
+    if profile != "root":
+        return
+    if root_demo_installed():
+        return
+    console.print(
+        "[yellow]--profile root requested but root-demo is not "
+        "installed on this machine.  RUN_COMMAND will execute "
+        "unprivileged.[/]"
+    )
+    console.print(
+        "[dim]Install with:  sudo bash intentframe_setup_root_demo.sh[/]"
+    )
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -87,6 +112,7 @@ async def _async_main(profile: str | None = None) -> None:
 
     if not is_running():
         _apply_profile_env(profile)
+        _warn_if_root_demo_missing(profile)
         label = f" ({profile} profile)" if profile else ""
         console.print(f"[bold cyan]Starting IntentFrame gateway{label}...[/]")
         proc = start_gateway()

@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
+from typing import Literal
 
 from executor.config.schema import SandboxConfig
 
@@ -44,6 +45,11 @@ class ExecutionPlan:
     deny_access_paths: tuple[str, ...]
     working_directory: str | None = None
     executor_venv_path: str | None = None
+    # Per-command privilege-escalation intent propagated from
+    # ``SandboxConfig.escalate``.  The engine combines it with the
+    # runtime ``INTENTFRAME_ESCALATION_ARMED`` env (machine capability)
+    # to decide whether to prepend ``sudo -n`` to the argv.
+    sandbox_escalate: Literal["none", "sudo"] = "none"
 
 
 class SandboxPlanner:
@@ -112,6 +118,7 @@ class SandboxPlanner:
             deny_access_paths=self._deny_access,
             working_directory=working_directory,
             executor_venv_path=self._executor_venv_path,
+            sandbox_escalate=self._config.escalate,
         )
 
     # ------------------------------------------------------------------

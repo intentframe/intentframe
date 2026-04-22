@@ -17,6 +17,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from intentframe_gateway.escalation import detect_escalation_state
+
 router = APIRouter(prefix="/system", tags=["system"])
 
 logger = logging.getLogger(__name__)
@@ -154,10 +156,23 @@ async def aggregated_health(request: Request):
     if unhealthy:
         logger.debug("Aggregated /system/health: degraded: %s", ", ".join(unhealthy))
 
+    # Root-demo + profile block for CLI surfacing.  Computed on every
+    # call because the installer/uninstaller can run while the gateway
+    # is up; the marker/sudoers state is cheap to re-stat.
+    escalation = detect_escalation_state()
+    profile = os.environ.get("INTENTFRAME_PROFILE", "user")
+    executor_running_as_root = (os.geteuid() == 0) or escalation.armed
+    root_demo = {
+        "profile": profile,
+        **escalation.as_health_payload(),
+        "executor_running_as_root": executor_running_as_root,
+    }
+
     return {
         "status": "healthy" if all_healthy else "degraded",
         "partial_startup": getattr(request.app.state, "partial_startup", False),
         "services": services,
+        "root_demo": root_demo,
     }
 
 

@@ -106,6 +106,13 @@ sandbox:
     - file_read_write
     - network_outbound
     - unrestricted
+  # Per-command root escalation.  ``sudo`` asks the sandbox engine to prepend
+  # ``sudo -n`` to the sandbox-exec argv so the kernel-sandboxed subprocess
+  # briefly runs as UID 0.  Only takes effect when the gateway advertises
+  # INTENTFRAME_ESCALATION_ARMED=1 (set iff intentframe_setup_root_demo.sh
+  # has installed /etc/sudoers.d/intentframe-run).  Disarmed machines
+  # silently run unprivileged, so this file is safe to ship.
+  escalate: sudo
 
 storage:
   database_path: null

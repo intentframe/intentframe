@@ -232,6 +232,7 @@ class MacOSSandboxEngine(SandboxEngine):
 
     def __init__(self) -> None:
         self._sandbox_exec = shutil.which("sandbox-exec")
+        self._sudo = shutil.which("sudo")
 
     def available(self) -> bool:
         return self._sandbox_exec is not None
@@ -253,12 +254,68 @@ class MacOSSandboxEngine(SandboxEngine):
             env_overrides["VIRTUAL_ENV"] = venv
             env_overrides["PYTHONNOUSERSITE"] = "1"
 
+        argv: list[str] = [
+            self._sandbox_exec,
+            "-p", profile,
+            "/bin/sh", "-c", command,
+        ]
+
+        # Per-command root escalation.  Both signals must agree:
+        #   1. Machine capability  -- INTENTFRAME_ESCALATION_ARMED=1
+        #                             (gateway-injected; reflects
+        #                             /etc/sudoers.d/intentframe-run).
+        #   2. Session intent      -- plan.sandbox_escalate == "sudo"
+        #                             (propagated from executor.yaml::
+        #                             sandbox.escalate).
+        # When both are true the whole sandbox-exec invocation runs via
+        # ``sudo -n`` so the kernel sandbox itself runs under UID 0.  If
+        # sudoers has been revoked mid-session, ``sudo -n`` will exit
+        # non-zero with ``sudo: a password is required`` and the normal
+        # subprocess error path surfaces that to the caller -- we
+        # deliberately do NOT silently retry without sudo, since the
+        # operator asked for root and should hear about the capability
+        # being gone.
+        #
+        # ``--preserve-env`` matters: macOS sudo defaults to env_reset,
+        # which strips PATH/VIRTUAL_ENV/PYTHONNOUSERSITE/TMPDIR.  Without
+        # an explicit preserve-list the sandboxed ``/bin/sh`` child would
+        # lose the venv-prefixed PATH we just built in ``env_overrides``
+        # and fall back to system python3.  The sudoers fragment written
+        # by intentframe_setup_root_demo.sh includes the ``SETENV:`` tag
+        # precisely to authorize this preservation.
+        env_armed = os.environ.get("INTENTFRAME_ESCALATION_ARMED") == "1"
+        escalate = plan.sandbox_escalate == "sudo"
+        if escalate and env_armed:
+            if not self._sudo:
+                raise RuntimeError(
+                    "sandbox.escalate=sudo requested and "
+                    "INTENTFRAME_ESCALATION_ARMED=1, but 'sudo' was not "
+                    "found on PATH at engine init. Reinstall root-demo "
+                    "or set sandbox.escalate=none."
+                )
+            preserved = "PATH,VIRTUAL_ENV,PYTHONNOUSERSITE,TMPDIR"
+            argv = [
+                self._sudo,
+                "-n",
+                f"--preserve-env={preserved}",
+                *argv,
+            ]
+            logger.debug(
+                "sandbox escalation armed -- wrapping sandbox-exec with "
+                "sudo -n --preserve-env=%s",
+                preserved,
+            )
+        elif escalate and not env_armed:
+            logger.warning(
+                "sandbox.escalate=sudo requested but "
+                "INTENTFRAME_ESCALATION_ARMED is not set -- running "
+                "unprivileged. Install root-demo with "
+                "'sudo bash intentframe_setup_root_demo.sh' to enable "
+                "root RUN_COMMAND.",
+            )
+
         return SandboxedCommand(
-            argv=[
-                self._sandbox_exec,
-                "-p", profile,
-                "/bin/sh", "-c", command,
-            ],
+            argv=argv,
             env_overrides=env_overrides,
         )
 

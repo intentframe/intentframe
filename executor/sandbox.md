@@ -89,6 +89,24 @@ sandbox:
     - network_outbound
   # executor_venv_path: null           # auto-resolve to ~/.intentframe-venvs/executor
   # executor_venv_required: true       # fail-closed at startup if missing
+  # escalate: none                     # "sudo" only for root demo profile
+```
+
+The root demo profile (`jarvis_pa/executor_root.yaml`) sets `escalate: sudo`:
+
+```yaml
+sandbox:
+  enabled: true
+  working_directory: /
+  allowed_write_paths:
+    - /
+  allowed_templates:
+    - pure_compute
+    - file_read_only
+    - file_read_write
+    - network_outbound
+    - unrestricted
+  escalate: sudo
 ```
 
 ### Fields
@@ -101,6 +119,7 @@ sandbox:
 | `allowed_write_paths` | Paths where sandboxed commands can write. Expanded + canonicalized at runtime. Defaults to `["~/"]`. |
 | `executor_venv_path` | Absolute path to the executor's dedicated Python venv. `None` = auto-resolve to `<owner_home>/.intentframe-venvs/executor`. Owner is `SUDO_USER` if set, else the running uid's HOME; bare root with no `SUDO_USER` resolves to `None`. Provisioned by `intentframe_setup.sh` via `uv venv --seed`. Must not sit under any `NON_NEGOTIABLE_DENY_ACCESS` entry (e.g. `~/.intentframe/`); the planner rejects such paths at startup because the sandbox would deny reads on `bin/python3`, breaking exec. |
 | `executor_venv_required` | Default `True`. When `True`, executor startup fails if the venv is missing or lacks `bin/python3`. Set `False` to fall back silently to system `python3`. |
+| `escalate` | `"none"` (default) or `"sudo"`. When `"sudo"`, the macOS engine prepends `sudo -n --preserve-env=PATH,VIRTUAL_ENV,PYTHONNOUSERSITE,TMPDIR` to the `sandbox-exec` argv so the kernel sandbox subprocess runs as root. Only takes effect when the gateway also sets `INTENTFRAME_ESCALATION_ARMED=1` (set iff `intentframe_setup_root_demo.sh` has installed the narrow sudoers entry). See `docs/executor-root-mode.md` for the full operator flow. |
 
 ### Executor venv exposure
 
@@ -298,8 +317,10 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 - It does not teach the agent about sandbox templates. The agent has no visibility into sandbox internals.
 - It does not modify `IntentFrame`, `RuntimeContext`, `ExecutionRequest`, or any pipeline types.
 - It does not touch policy registry, resource registry, or Guardian.
-- It does not handle `sudo`. `sudo` is blocked by command_shield before the sandbox is involved.
+- It does not allow agent-authored `sudo`. `sudo` in a command string is blocked by `command_shield` before it ever reaches the sandbox.
 - It does not use VFS mounts. Write paths come from `SandboxConfig`, not `MountPointResolver`.
+
+The `escalate: sudo` path is the one narrow exception to the "no sudo" rule — the sandbox engine itself prepends `sudo -n` to the `sandbox-exec` argv during the root demo mode, as an internal implementation detail invisible to the agent. This is only armed when both the executor config opts in (`sandbox.escalate: sudo`) and the gateway has confirmed the machine-level capability is present (`INTENTFRAME_ESCALATION_ARMED=1`).
 
 ---
 
@@ -328,6 +349,14 @@ Tests in `tests/test_sandbox.py` covering:
 | `TestUnrestrictedEnforcement` | **Real `sandbox-exec` calls**: unrestricted template with deny overrides still holding |
 | `TestTerminalAdapterSandbox` | Adapter wiring: disabled, unavailable, wrapped, bare compat |
 | `TestEndToEnd` | Full pipeline: plan → wrap → subprocess for echo, cat, cp, network ceiling |
+| `TestExecutorVenvResolver` | Venv path resolution from config, `SUDO_USER`, and uid HOME |
+| `TestExecutorVenvValidator` | Venv validation: missing, unusable, valid |
+| `TestExecutionPlanVenvThreading` | Planner threads venv path through `ExecutionPlan` |
+| `TestMacOSEngineVenvOverrides` | Engine sets `VIRTUAL_ENV`, venv `PATH` prefix, `PYTHONNOUSERSITE` |
+| `TestSeatbeltVenvEnforcement` | **Real `sandbox-exec`**: `which python3` resolves to venv; env vars set |
+| `TestPlannerRejectsVenvUnderDenyAccess` | Planner logs error and returns `None` when venv is under deny-access path |
+| `TestSeatbeltProductionDenyBehavior` | **Real `sandbox-exec`**: deny-access blocks venv exec; sibling path execs cleanly |
+| `TestMacOSEngineEscalationWrap` | `sudo -n` wrapping only when both `INTENTFRAME_ESCALATION_ARMED=1` and `sandbox_escalate="sudo"`; `--preserve-env` preserves venv env vars; `env_overrides` still populated |
 
 The enforcement tests run actual commands through `sandbox-exec` and verify the kernel blocks or allows operations.
 

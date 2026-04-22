@@ -113,10 +113,22 @@ class RollbackRequest(BaseModel):
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     euid = os.geteuid()
+    # ``running_as_root`` reflects machine-level root capability for
+    # RUN_COMMAND, not the executor process's own privilege.  Two paths
+    # to ``True``:
+    #   1. The executor actually runs as UID 0 (rare -- only if the
+    #      whole stack was launched with sudo).
+    #   2. The gateway advertised ``INTENTFRAME_ESCALATION_ARMED=1`` in
+    #      our env at spawn time, meaning ``/etc/sudoers.d/intentframe-run``
+    #      is installed and the sandbox engine is allowed to wrap
+    #      sandbox-exec with ``sudo -n``.
+    # No runtime probe, no YAML coupling -- the YAML only decides
+    # whether each individual command opts into the escalation.
+    env_armed = os.environ.get("INTENTFRAME_ESCALATION_ARMED") == "1"
     return HealthResponse(
         uid=os.getuid(),
         euid=euid,
-        running_as_root=(euid == 0),
+        running_as_root=(euid == 0) or env_armed,
         pid=os.getpid(),
     )
 

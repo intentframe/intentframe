@@ -1,149 +1,244 @@
 # Executor Root Mode
 
-Status: **demo-only note**. Root is not a recommended deployment mode and this document is not a product roadmap.
+Status: **demo-only operator note**. This is intentionally narrow and is not the recommended default for local use.
 
-This document records the narrow intent behind executor root access in IntentFrame: a security/marketing demo that shows the Guardian still constrains the agent even when the executor has maximum local privilege. For normal usage on macOS, root is unnecessary and usually worse.
+IntentFrame now supports a **Jarvis root demo profile** on macOS where only the executor's `RUN_COMMAND` sandbox subprocess is allowed to escalate to root. The rest of the stack still runs as the normal user.
 
----
-
-## Current state
-
-Only one executor change is intentionally kept:
-
-- The executor's `/health` endpoint reports `uid`, `euid`, `running_as_root`, and `pid`.
-
-That lets us prove at runtime whether the executor is running as root without adding any new control plane, setup flow, or privilege-specific lifecycle code.
-
-What does **not** exist:
-
-- No supervisor-managed root mode
-- No sudoers installer
-- No `--root` setup path
-- No socket permission fixup
-- No launchd integration
-- No CLI privilege/status plumbing
+This exists for one reason: to demonstrate that IntentFrame's policy pipeline and deterministic gates still constrain an agent even when command execution has maximum local POSIX privilege available.
 
 ---
 
-## Why root exists here at all
+## What shipped
 
-Root is only relevant for the demo story.
+The current model is **not** "run the whole stack with `sudo`".
 
-The point is not that a personal Mac agent needs root for normal work. It usually does not. The point is that IntentFrame can demonstrate a stronger containment claim:
+Instead, IntentFrame ships a small privilege-separation path:
 
-- even if the executor is running as root
-- even if the executor has the highest local POSIX privilege
-- the Guardian and deterministic gates still remain the real safety boundary
+1. The CLI can start the gateway with `--profile root`.
+2. The root profile uses `jarvis_pa/executor_root.yaml`.
+3. That YAML sets `sandbox.escalate: sudo`.
+4. A one-time installer writes a narrow sudoers entry for `sandbox-exec` and a user-space marker file.
+5. On gateway startup, the gateway detects whether that root-demo capability is armed and exports `INTENTFRAME_ESCALATION_ARMED=0|1` to the supervisor / executor.
+6. The executor only prepends `sudo -n` when **both** of these are true:
+   - the machine capability is armed (`INTENTFRAME_ESCALATION_ARMED=1`)
+   - the loaded executor config explicitly asks for it (`sandbox.escalate: sudo`)
 
-That makes the demo more visceral. It is a proof-of-containment story, not a recommended operating model.
+So the root decision is split cleanly into:
 
----
-
-## Why root is not the real capability unlock on macOS
-
-On macOS, `uid 0` is not the top meaningful boundary for most user-facing agent tasks.
-
-- TCC sits above root for Mail, Messages, Photos, Contacts, Calendar, Screen Recording, Accessibility, Camera, Mic, and similar protected surfaces.
-- SIP protects system locations that root still cannot freely modify from a live running system.
-- A user-level agent with the right TCC grants can already do most of the valuable personal-assistant work.
-
-So for day-to-day use, running as root mostly increases blast radius without unlocking much additional capability.
-
-The honest framing is:
-
-- user-level is the right default
-- root is mostly negative-value operationally
-- root is still useful as a demo stress test and marketing signal
+- **machine capability**: can this Mac do root-demo right now?
+- **session intent**: does this executor profile want to use that capability?
 
 ---
 
-## Demo operating model
+## Why this shape exists
 
-For the demo, the simplest approach is to run the whole backend stack as root instead of building selective-root orchestration:
+The original idea of launching the whole IntentFrame stack as root was rejected because Unix privilege is process-wide:
+
+- if the gateway runs as root, every child it starts inherits that privilege unless deliberately separated
+- root-owned runtime files and logs then leak into normal development flow
+- switching back and forth requires file ownership cleanup and creates unnecessary operational friction
+
+The actual goal was narrower: let **`RUN_COMMAND`** execute under root for the demo, without making the whole product behave like a root-owned application.
+
+This shipped model preserves that boundary.
+
+---
+
+## Why root is still mostly a demo story
+
+On macOS, `uid 0` is not the highest practical boundary for many user-facing integrations:
+
+- TCC still gates Mail, Messages, Photos, Contacts, Calendar, Screen Recording, Accessibility, Camera, and Mic
+- SIP still protects important system locations
+- many useful assistant workflows already work fine from a user-level process with the right TCC grants
+
+So root is not the normal product value proposition. It is mainly useful as:
+
+- a containment stress test
+- a security demo
+- a marketing proof point
+
+---
+
+## Operator flow
+
+### 1. Install the root-demo capability once
 
 ```bash
-sudo uv run intentframe start
+sudo bash intentframe_setup_root_demo.sh
 ```
 
-That keeps the story simple:
+That installer writes two artifacts:
 
-- supervisor, gateway, and executor all come up under the same privilege level
-- there is no cross-UID lifecycle complexity to solve
-- there is no need for sudoers plumbing
-- there is no need for launchd plumbing
+- `/etc/sudoers.d/intentframe-run`
+- `~/.intentframe/state/root-demo.json`
 
-If we want to show that the executor is running as root, the existing `/health` endpoint is enough.
+The sudoers entry is intentionally narrow:
 
-Example:
+```text
+<user> ALL=(root) NOPASSWD: SETENV: /usr/bin/sandbox-exec
+```
+
+`SETENV:` is required because the executor preserves a small allow-list of env vars across `sudo`:
+
+- `PATH`
+- `VIRTUAL_ENV`
+- `PYTHONNOUSERSITE`
+- `TMPDIR`
+
+Without that preserve-list, macOS sudo's default `env_reset` behavior would strip the executor venv wiring and the sandboxed shell would silently fall back to system `python3`.
+
+### 2. Launch the CLI with the root profile
 
 ```bash
-curl --unix-socket ~/.intentframe/run/executor.sock http://x/health
+intentframe-gateway-cli --profile root
 ```
 
-The response includes `uid`, `euid`, `running_as_root`, and `pid`.
+The CLI translates that into:
+
+- `INTENTFRAME_PROFILE=root`
+- `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` (only if the operator did not already set `EXECUTOR_CONFIG`)
+
+### 3. Observe root-demo status in the CLI
+
+The gateway's `/system/health` response now includes a `root_demo` block. The CLI renders that as a banner such as:
+
+```text
+Profile: root   Escalation: ARMED   Executor running_as_root: yes
+```
+
+If `--profile root` is requested but the installer has not been run yet, the CLI warns before startup and shows the install command.
+
+When you quit the CLI, it also reminds you that root-demo is still installed and prints the uninstall command, because the sudoers entry survives gateway shutdown.
+
+### 4. Uninstall when done
+
+```bash
+sudo bash intentframe_uninstall_root_demo.sh
+```
+
+That removes both the sudoers fragment and the marker file. The next gateway launch will advertise `INTENTFRAME_ESCALATION_ARMED=0`.
 
 ---
 
-## Client connectivity in the demo
+## Runtime truth model
 
-Tests and the demo dashboard do not need to run as root just because backend services are running as root.
+Three different values matter here:
 
-Uvicorn sets Unix domain socket permissions to `0o666` when binding, so local clients can still connect over the socket regardless of UID. This means the demo can run the backend as root while clients remain unprivileged.
+### `sandbox.escalate`
 
-This also means socket permissions are not the interesting security boundary here. The meaningful boundary remains IntentFrame's internal policy and execution gates.
+This lives in executor config and captures **intent**.
 
----
+- `"none"`: run sandboxed commands under the executor's own UID
+- `"sudo"`: ask the macOS sandbox engine to prepend `sudo -n`
 
-## What we explicitly are not doing
+This value alone does **not** prove root capability.
 
-During exploration, a more complex path was considered and then rejected for this demo:
+### `INTENTFRAME_ESCALATION_ARMED`
 
-- supervisor spawning only the executor via `sudo -n`
-- installing scoped sudoers entries
-- launchd-managed executor lifecycle
-- root-specific shutdown protocols
-- root-specific socket ownership/perms logic
-- productizing executor root mode as a supported feature
+This is the gateway-injected environment variable and captures **machine capability**.
 
-Those ideas add complexity to startup, shutdown, configuration, and docs without improving the actual demo outcome we care about.
+It is set from shared detection logic in `intentframe_gateway/escalation.py`, which checks:
 
----
+- whether the marker file exists and parses
+- whether the referenced sudoers file still exists
 
-## Pipeline startup probe
+The executor uses this env var as its single runtime source of truth for "is root-demo actually armed on this machine right now?"
 
-The IntentFrame Core server (`intentframe_server/server.py`) probes the executor's `/health` endpoint once at startup and stores the result as a frozen `ExecutionContext`:
+### `running_as_root`
 
-```
-Supervisor starts executor → executor healthy
-Supervisor starts intentframe-core
-  → _create_runtime()
-    → ExecutorHTTPClient.health() → { running_as_root, uid, euid }
-    → ExecutionContext(frozen, immutable)
-    → IntentFrameRuntime stores it as _execution_context
-```
+The executor's `/health` endpoint reports:
 
-This means:
+- `uid`
+- `euid`
+- `running_as_root`
+- `pid`
 
-- The pipeline self-discovers executor privilege level. No environment variable or config flag needed.
-- If the executor is unreachable at startup, intentframe-core fails to start (fail-closed).
-- `ExecutionContext` is threaded to `AnalysisEngine.analyze()`, `Guardian.validate()`, and `OnboardingEngine.onboard()`. All three layers inject an "Execution Privilege" trusted section into their AI prompts when `executor_running_as_root` is true, so the AI accounts for elevated blast radius, applies heightened scrutiny, and generates root-aware guardrails.
-- The agent never sees `ExecutionContext` directly. It learns the consequences via `RuntimeContext` guardrails (e.g. "commands run as root, do not use sudo").
+`running_as_root` is true when either:
 
-For tests, `ExecutionContext` is constructed explicitly rather than probed:
+- the executor process really is running as UID 0
+- `INTENTFRAME_ESCALATION_ARMED=1`
 
-```python
-execution_context = ExecutionContext(executor_running_as_root=True, executor_uid=0, executor_euid=0)
-runtime = IntentFrameRuntime(..., execution_context=execution_context)
-```
+That means the health field communicates **effective root capability for `RUN_COMMAND`**, not just the process's own UID.
+
+This was deliberate: the health signal should describe what the machine can do, while the YAML decides whether a given session chooses to use it.
 
 ---
 
-## Technical notes we want to preserve
+## Command execution path
 
-Even though we are not shipping a full root-mode feature, two findings from the investigation are worth keeping:
+When `RUN_COMMAND` is sandboxed on macOS:
 
-1. **Uvicorn already handles Unix socket permissions broadly enough for local connectivity.**
-   No `_fix_socket_perms_if_root` logic is needed for this demo path.
+1. `SandboxPlanner` builds an `ExecutionPlan`.
+2. The plan carries `sandbox_escalate`.
+3. `MacOSSandboxEngine.wrap()` builds the `sandbox-exec` argv.
+4. If `sandbox_escalate == "sudo"` and `INTENTFRAME_ESCALATION_ARMED == "1"`, the engine wraps with:
 
-2. **The executor already has the right place to expose privilege state.**
-   Reporting `uid` / `euid` / `running_as_root` from `/health` is sufficient to verify the demo state cleanly.
+```bash
+sudo -n --preserve-env=PATH,VIRTUAL_ENV,PYTHONNOUSERSITE,TMPDIR sandbox-exec ...
+```
+
+5. If the machine is disarmed, the command runs unprivileged.
+6. If sudoers is revoked mid-session, `sudo -n` fails and that error is surfaced rather than silently retrying unprivileged.
+
+This keeps failures honest: when the operator asked for root, the operator should hear if root is no longer available.
+
+---
+
+## Security boundary and caveats
+
+The sudoers line is intentionally narrow, but it is **not** itself the hardening layer.
+
+A hostile local user could still try to invoke `sandbox-exec` directly with a permissive profile. The actual protection in the intended demo threat model is:
+
+- upstream Guardian / Analysis Engine review
+- `command_shield` catastrophic-command blocking
+- internal argv construction inside the executor
+
+In other words:
+
+- this is safe enough for the demo threat model
+- it is not designed to defend against a fully hostile local shell user
+
+That distinction is important and should not be blurred in product messaging.
+
+---
+
+## What did not ship
+
+The following still do **not** exist:
+
+- a general-purpose supported "run IntentFrame as root" product mode
+- launchd-specific root orchestration
+- root-specific socket ownership hacks
+- a broad `sudoers` grant like `NOPASSWD: ALL`
+- agent-authored `sudo` as an allowed command path
+
+The design stayed intentionally small: one installer, one marker, one gateway detection helper, one executor config bit, one CLI surface.
+
+---
+
+## Pipeline / prompt implications
+
+The IntentFrame runtime still treats executor privilege as a real risk signal.
+
+At startup, the pipeline probes executor health and freezes that into `ExecutionContext`. When `executor_running_as_root` is true, the analysis / policy layers can inject higher-scrutiny privilege-aware guardrails into their prompts and runtime reasoning.
+
+For tests, `ExecutionContext` can still be constructed directly rather than probed.
+
+---
+
+## Files to know
+
+- `jarvis_pa/executor_root.yaml` — root demo executor profile
+- `executor/config/schema.py` — `sandbox.escalate`
+- `executor/sandbox/planner.py` — threads `sandbox_escalate` into `ExecutionPlan`
+- `executor/sandbox/platforms/macos.py` — conditional `sudo -n --preserve-env=... sandbox-exec` wrap
+- `executor/server.py` — `/health.running_as_root`
+- `intentframe_gateway/escalation.py` — shared root-demo detection logic
+- `intentframe_gateway/server.py` — injects `INTENTFRAME_ESCALATION_ARMED`
+- `intentframe_gateway/routes/system.py` — exposes `root_demo` in `/system/health`
+- `intentframe_cli/main.py` — `--profile root` pre-flight warning
+- `intentframe_cli/ui.py` — profile banner and uninstall hint
+- `intentframe_setup_root_demo.sh` — installer
+- `intentframe_uninstall_root_demo.sh` — uninstaller

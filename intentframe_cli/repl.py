@@ -37,6 +37,8 @@ from intentframe_cli.ui import (
     print_credential_checklist,
     print_help,
     print_missing_optional,
+    print_profile_banner,
+    print_root_demo_uninstall_hint,
     print_service_status,
     print_setup_greeting,
     print_setup_help,
@@ -72,6 +74,11 @@ async def _shutdown(client: GatewayClient) -> None:
         console.print("[green]Gateway stopped.[/]")
     else:
         console.print("[yellow]Gateway force-killed after timeout.[/]")
+    # If the machine has root-demo armed, remind the operator on their
+    # way out.  The sudoers entry and marker survive the gateway exit,
+    # so the next launch will pick up ``INTENTFRAME_ESCALATION_ARMED=1``
+    # silently.  This keeps dev/demo state transparent.
+    print_root_demo_uninstall_hint()
 
 
 # ── Setup mode ───────────────────────────────────────────────────────────────
@@ -80,6 +87,7 @@ async def _shutdown(client: GatewayClient) -> None:
 async def run_setup_mode(client: GatewayClient, health_data: dict) -> bool:
     """Restricted REPL for partial startup. Returns True if user quit."""
     print_service_status(health_data)
+    print_profile_banner(health_data)
     try:
         cred_data = await client.credential_status()
         print_credential_checklist(cred_data.get("credentials", []))
@@ -134,6 +142,7 @@ async def run_setup_mode(client: GatewayClient, health_data: dict) -> bool:
                 h = await client.health()
                 if h.get("partial_startup", False):
                     print_service_status(h)
+                    print_profile_banner(h)
                     console.print(
                         "[yellow]  System still in partial startup.[/]\n"
                     )
@@ -150,6 +159,7 @@ async def run_setup_mode(client: GatewayClient, health_data: dict) -> bool:
 async def run_normal_mode(client: GatewayClient, health_data: dict) -> None:
     """Full REPL after successful startup."""
     print_service_status(health_data)
+    print_profile_banner(health_data)
     try:
         cred_data = await client.credential_status()
         print_missing_optional(cred_data.get("credentials", []))

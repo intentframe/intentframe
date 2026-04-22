@@ -61,6 +61,12 @@ On first launch, the gateway CLI starts the gateway stack. If the OpenAI API key
 has not been stored yet, the system enters setup mode and tells you exactly how
 to add it to the credential vault. After that, restart the CLI and continue.
 
+For the demo-only root command-execution profile on macOS, see
+[`docs/executor-root-mode.md`](docs/executor-root-mode.md). That flow uses
+`intentframe-gateway-cli --profile root` plus a one-time
+`intentframe_setup_root_demo.sh` installer; it is intentionally separate from
+normal setup and is not the default operating mode.
+
 ### Re-running Setup
 
 `intentframe_setup.sh` is safe to rerun after dependency changes or after

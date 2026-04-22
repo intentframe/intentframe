@@ -2086,3 +2086,86 @@ class TestSeatbeltProductionDenyBehavior:
             assert _DEFAULT_VENV_RELATIVE != deny_rel, (
                 f"default venv path equals deny-access path {deny!r}"
             )
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+class TestMacOSEngineEscalationWrap:
+    """Unit tests for the ``sudo -n`` wrapping logic in
+    :class:`MacOSSandboxEngine.wrap` — verifies that both signals
+    (``INTENTFRAME_ESCALATION_ARMED`` *and* ``plan.sandbox_escalate``)
+    are required, and that ``--preserve-env`` is set so the executor
+    venv env vars survive ``sudo`` (which otherwise strips them via
+    ``env_reset`` on macOS).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _engine(self):
+        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        self.engine = MacOSSandboxEngine()
+        if not self.engine.available():
+            pytest.skip("sandbox-exec not available")
+
+    def _plan(self, escalate: str = "none") -> ExecutionPlan:
+        return ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            sandbox_escalate=escalate,
+        )
+
+    def test_no_escalation_when_plan_says_none(self, monkeypatch) -> None:
+        monkeypatch.setenv("INTENTFRAME_ESCALATION_ARMED", "1")
+        wrapped = self.engine.wrap("echo hi", self._plan(escalate="none"))
+        assert wrapped.argv[0].endswith("sandbox-exec"), (
+            f"expected sandbox-exec first; got {wrapped.argv[:3]}"
+        )
+        assert "sudo" not in wrapped.argv[0]
+
+    def test_no_escalation_when_env_not_armed(self, monkeypatch) -> None:
+        monkeypatch.delenv("INTENTFRAME_ESCALATION_ARMED", raising=False)
+        wrapped = self.engine.wrap("echo hi", self._plan(escalate="sudo"))
+        assert wrapped.argv[0].endswith("sandbox-exec")
+        assert not any("sudo" in a and a.endswith("sudo") for a in wrapped.argv[:1])
+
+    def test_no_escalation_when_env_armed_is_zero(self, monkeypatch) -> None:
+        monkeypatch.setenv("INTENTFRAME_ESCALATION_ARMED", "0")
+        wrapped = self.engine.wrap("echo hi", self._plan(escalate="sudo"))
+        assert wrapped.argv[0].endswith("sandbox-exec")
+
+    def test_escalation_when_both_signals_agree(self, monkeypatch) -> None:
+        monkeypatch.setenv("INTENTFRAME_ESCALATION_ARMED", "1")
+        wrapped = self.engine.wrap("echo hi", self._plan(escalate="sudo"))
+        # Full shape: [sudo, -n, --preserve-env=..., sandbox-exec, -p, <profile>, /bin/sh, -c, cmd]
+        assert wrapped.argv[0].endswith("/sudo"), (
+            f"expected sudo first; got {wrapped.argv[:5]}"
+        )
+        assert wrapped.argv[1] == "-n"
+        assert wrapped.argv[2].startswith("--preserve-env=")
+        preserved = wrapped.argv[2].split("=", 1)[1].split(",")
+        # These are the ones sudo's default env_reset would strip on
+        # macOS and that the executor venv setup relies on.
+        for key in ("PATH", "VIRTUAL_ENV", "PYTHONNOUSERSITE", "TMPDIR"):
+            assert key in preserved, (
+                f"{key} must be in --preserve-env list; got {preserved}"
+            )
+        assert wrapped.argv[3].endswith("sandbox-exec")
+
+    def test_escalation_passthrough_preserves_env_overrides(
+        self, monkeypatch, tmp_path,
+    ) -> None:
+        """env_overrides are still populated so the subprocess env
+        carries the values; --preserve-env then tells sudo to keep
+        them. Without both, the venv PATH would be lost."""
+        monkeypatch.setenv("INTENTFRAME_ESCALATION_ARMED", "1")
+        venv = _fake_venv(str(tmp_path / "v"))
+        plan = ExecutionPlan(
+            template=SandboxTemplate.PURE_COMPUTE,
+            allowed_read_paths=(), allowed_write_paths=(),
+            deny_write_paths=(), deny_access_paths=(),
+            executor_venv_path=venv,
+            sandbox_escalate="sudo",
+        )
+        wrapped = self.engine.wrap("echo hi", plan)
+        assert wrapped.env_overrides.get("VIRTUAL_ENV") == venv
+        assert wrapped.env_overrides.get("PYTHONNOUSERSITE") == "1"
+        assert wrapped.env_overrides["PATH"].startswith(f"{venv}/bin:")
