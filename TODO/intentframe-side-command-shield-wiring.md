@@ -364,9 +364,9 @@ Rough aggregate: **70–85% of total intent traffic** avoids an AE LLM call. For
 | 3 | Extend `TerminalChecker` to evaluate capabilities (Gap 3) | Low — pure addition to checker logic | **Done** |
 | 4 | Wire capability deny-check to per-agent policy (e.g. Jarvis) for immediate wins | Low — just populate the new fields in user policy | **Done** (policy files shipped) |
 | 5 | Extract and run deterministic Guardian pre-pass before AE (Gap 4) — includes the read-only ALLOW short-circuit above | Medium — pipeline reorder, needs careful testing of UNDECIDED boundary | **Done** |
-| 6 | Author per-lane overlay bodies for `critical_network_probe` / `critical_network_mutation` / `critical_generic` (AE) + `critical` (Guardian) | Medium — prompt edits need red-team coverage | **Plumbing done** (commit `e705d57`, prompt-specialisation & criticality-routing refactor); **overlay bodies deferred** — see `TODO/AE_Guardian_specialisation_routes.md` |
+| 6 | Author per-lane bodies for `critical_network_probe` / `critical_network_mutation` sub-lanes | Medium — prompt edits need red-team coverage | **Plumbing done** (commit `e705d57`); `critical_run_command` and `critical_write_file` full-body forks shipped; probe / mutation aliased to `critical_run_command` pending per-lane forks — see `TODO/AE_Guardian_specialisation_routes.md` |
 
-All structural work is shipped. The only remaining work is authoring the critical-lane overlay bodies (step 6) — a pure content edit in `intentframe_components/prompt/library/{analysis,guardian}.py`, guarded by the `xfail`-marked placeholder tests in `tests/test_prompt_library.py`.
+All structural work is shipped. The remaining content work is authoring full-body forks for `critical_network_probe` and `critical_network_mutation` — a pure library-file edit in `intentframe_components/prompt/library/analysis.py` and deletion of the aliasing assertions in `tests/test_prompt_library.py::TestInitialRolloutAliasing`.
 
 ---
 

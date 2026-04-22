@@ -271,15 +271,15 @@ and are the final stance.
 
   The earlier plan of a passive-write `ALLOW` fast-path (keyed on extension + text payload + FileIntel "non-code" signal) **was reverted before shipping**.  Rationale: agent-provided extensions and `command_shield`'s payload classification are heuristics, not trustworthy evidence under an adversarial agent.  Any `ALLOW` fast-path built on them widens the attack surface for false-negative classification bugs.  Mutating writes that are not on the sensitive-path deny list always pay the LLM round-trip; the only deterministic shortcuts DG offers for mutating actions are hard BLOCKs.
 
-- **`critical_write_file` AE lane, flat routing.**  `intentframe_components/prompt/library/analysis.py` defines a `critical_write_file` prompt id, and `DefaultPromptStrategy.select_ae_prompt_id` routes every `WRITE_FILE` onto it unconditionally.  The overlay body is currently aliased to `_STANDARD` (empty `_CRITICAL_WRITE_FILE_OVERLAY`), which means the LLM sees the same system prompt it saw pre-Phase-7a; only the per-request `WRITE_FILE — PAYLOAD SIGNALS` block is new.  Tests in `tests/test_prompt_strategy.py::TestWriteFileAERouting` (the active assertions) and `tests/test_prompt_library.py::TestAECriticalWriteFileOverlay` (overlay-contract placeholders).
+- **`critical_write_file` AE lane, flat routing.**  `intentframe_components/prompt/library/analysis.py` defines a `critical_write_file` prompt id with its own full-body fork (`_CRITICAL_WRITE_FILE`), and `DefaultPromptStrategy.select_ae_prompt_id` routes every `WRITE_FILE` onto it unconditionally.  Tests in `tests/test_prompt_strategy.py::TestWriteFileAERouting` and `tests/test_prompt_library.py::TestAECriticalWriteFileBody`.
 
-  The original plan of splitting `critical_write_file_code` (positively-classified code payload) vs `critical_write_file` (opaque / destination-sensitive) was **deferred, not rejected**.  Reason: while the overlay body is still empty, the two lanes would alias the same string — there is nothing to differentiate.  The future split is kept alive as `@pytest.mark.xfail(strict=False, ...)` tests in `test_prompt_strategy.py` (code payload → `critical_write_file_code`; passive doc payload on benign destination → `standard`) which flip to green once per-lane overlay bodies are authored.
+  The original plan of splitting `critical_write_file_code` (positively-classified code payload) vs `critical_write_file` (opaque / destination-sensitive) was **deferred, not rejected**.  When authored, `critical_write_file_code` will be a full-body fork of `_CRITICAL_WRITE_FILE` — not an additive overlay.  The future split is kept alive as `@pytest.mark.xfail(strict=False, ...)` tests in `test_prompt_strategy.py`.
 
 - **Heuristics package scope reduced.**  `intentframe_components/heuristics/file_payload.py` now exports only `SENSITIVE_WRITE_PATH_FRAGMENTS` + `is_sensitive_write_path` (consumed by DG alone).  The earlier `is_code_file_payload` / `is_critical_file_payload` / `CODE_LANGUAGES` / `PASSIVE_WRITE_EXTENSIONS` predicates were removed — no caller consumed them after DG stopped short-circuiting on payload shape and the strategy stopped routing on payload shape.
 
 - **Retraction.**  The stale "Phase 7a shipped" claim in `TODO/root-demo-policy-driven-sandbox.md` has been rewritten to match this narrower shape.
 
-**Net effect on the LLM surface:** byte-identical to pre-Phase-7a for every action type *except* that `WRITE_FILE` AE prompts now include the `WRITE_FILE — PAYLOAD SIGNALS` trusted-context block.  Guardian prompts are unchanged.  Routing is flat for WRITE_FILE; payload- and destination-aware lanes exist only as xfailed placeholder tests waiting on overlay bodies.
+**Net effect on the LLM surface:** `WRITE_FILE` AE prompts now use the `critical_write_file` full-body fork (`_CRITICAL_WRITE_FILE`) plus the `WRITE_FILE — PAYLOAD SIGNALS` trusted-context block.  Guardian prompts are unchanged.  Routing is flat for WRITE_FILE; payload-aware sub-lanes (`critical_write_file_code`) exist only as xfailed placeholder tests in `test_prompt_strategy.py`.
 
 ---
 
@@ -318,7 +318,7 @@ After this, `allowed_paths: ["/*"]` + unrestricted sandbox becomes a coherently-
 
 ### Optional — "Escalate AE only" defense-in-depth
 
-> **Status:** partially landed, deferred for content split.  The `critical_write_file` lane and the `file_intel` → AE trusted-context plumbing are in; the payload-aware vs destination-aware routing *inside* that lane was reverted in favour of flat routing until overlay bodies exist.  See the "Phase 7a — Revised Scope" block above.  The text below is kept as the design reference for the eventual two-lane (`critical_write_file_code` + `critical_write_file`) split.
+> **Status:** partially landed, deferred for content split.  The `critical_write_file` full-body fork and the `file_intel` → AE trusted-context plumbing are in; the payload-aware sub-lane (`critical_write_file_code`) is deferred.  See the "Phase 7a — Revised Scope" block above.  The text below is kept as the design reference for the eventual two-lane split.
 
 Once the floor is symmetric, the remaining risk is prompt-injection-driven writes that land in the allowed zone but create execution surfaces the user didn't consciously authorize (e.g. a PDF convinces Jarvis to drop `~/.config/zsh/helper.zsh` into an auto-load directory that isn't on the floor list, or writes a passive-looking `.py` into a `sys.path`-adjacent location).
 
@@ -400,13 +400,12 @@ Historical plan; current state is tracked in "Phase 7a — Revised Scope" above.
 - ~~ship sandbox-floor parity for WRITE_FILE / DELETE_FILE~~ ✅ shipped.
 - ~~share the deny list between `executor/sandbox/templates.py` and the VFS~~ ✅ shipped via `resource_registry/floor.py`.
 - ~~passive-write fast-path in `DeterministicGuardian`~~ reverted by design — see "Optional — passive-file fast-path for WRITE_FILE".
-- author a real `_CRITICAL_WRITE_FILE_OVERLAY` body (payload context framing, execution-surface reminders, `understand`/`decide` invariant).  Currently empty; overlay-contract tests in `tests/test_prompt_library.py::TestAECriticalWriteFileOverlay` are xfailed waiting for it.
+- `critical_write_file` full-body fork (`_CRITICAL_WRITE_FILE`) is shipped.  Content covers destination-payload cross-check, payload-signals consumption, and consumer-awareness.
 - fix `SandboxConfig.working_directory` to use the same identity-aware expansion as the executor venv (currently `os.path.expanduser` in `terminal.py` resolves against whatever HOME the executor process has — wrong under bare root).
 
 ### Mid-term
 
-- split the WRITE_FILE AE lane into `critical_write_file_code` (positively-classified code payload) vs `critical_write_file` (opaque / destination-sensitive / non-code) once two distinct overlay bodies are authored.  The routing hooks already exist as xfailed tests in `tests/test_prompt_strategy.py::TestWriteFileAERouting`; flipping them green requires the new prompt id in the library plus a `file_intel`-driven branch in `DefaultPromptStrategy.select_ae_prompt_id`.
-- author a real Guardian `critical` overlay body — same pattern as AE but aimed at enforcement, not analysis.  Placeholder tests in `tests/test_prompt_library.py::TestGuardianCriticalOverlay` are xfailed.
+- split the WRITE_FILE AE lane into `critical_write_file_code` (positively-classified code payload) vs `critical_write_file` (opaque / destination-sensitive / non-code).  `critical_write_file_code` will be a full-body fork of `_CRITICAL_WRITE_FILE`.  Routing hooks exist as xfailed tests in `tests/test_prompt_strategy.py::TestWriteFileAERouting`; flipping them green requires the new prompt id in the library plus a `file_intel`-driven branch in `DefaultPromptStrategy.select_ae_prompt_id`.
 - if a second consumer of `FileIntel` besides AE emerges (e.g. a future `FileChecker` that gates on payload size / language), feed the same intel into Guardian through the deterministic constraint-check path — the Guardian LLM prompt continues to read only the `AnalysisReport`, never raw deterministic intel, to preserve the "AE understands, Guardian decides" invariant.
 - `command_shield.inspect_code(...)` should flag absolute-interpreter invocations (`/usr/bin/python3 …`) and absolute-shebang scripts as signals, since those bypass the executor-venv PATH steering.
 

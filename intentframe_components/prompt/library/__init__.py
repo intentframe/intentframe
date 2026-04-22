@@ -1,43 +1,44 @@
 """
 Prompt library — versioned bodies of the AE and Guardian system prompts.
 
-The prompt-specialisation & criticality-routing refactor establishes the
-library with two prompt ids for Guardian and four prompt ids for the
-Analysis Engine:
+Analysis Engine prompt ids
+--------------------------
+``standard``                — general-purpose analysis body
+``critical_run_command``    — full-body fork for shell commands
+                              (decomposition, compound reversibility,
+                              structural-signals consumption)
+``critical_network_probe``  — aliased to ``critical_run_command``
+                              (initial rollout; per-lane fork later)
+``critical_network_mutation`` — aliased to ``critical_run_command``
+                              (initial rollout; per-lane fork later)
+``critical_write_file``     — full-body fork for file writes
+                              (destination-payload cross-check,
+                              payload-signals consumption,
+                              consumer-awareness)
+``critical_generic``        — equals ``standard`` by design; covers
+                              PAY_INVOICE, DELETE_*, SEND_EMAIL,
+                              HTTP_POST whose rubric is already well-
+                              served by the standard body
 
-Analysis Engine
-    ``standard``                    — byte-identical to the pre-specialisation baseline
-    ``critical_generic``            — **initial rollout**: aliased to ``standard``
-                                      (overlay body is currently empty —
-                                      see initial-rollout content policy below)
-    ``critical_network_probe``      — aliased to ``critical_generic``
-    ``critical_network_mutation``   — aliased to ``critical_generic``
+Guardian prompt ids
+-------------------
+``standard``                — enforcement body (ALLOW/BLOCK decisions)
+``critical``                — equals ``standard`` by design; Guardian's
+                              standard body is already enforcement-heavy
+                              and a separate critical body would risk
+                              instruction drift without adding value
 
-Guardian
-    ``standard``                    — byte-identical to the pre-specialisation baseline
-    ``critical``                    — **initial rollout**: aliased to ``standard``
-                                      (overlay body is currently empty —
-                                      see initial-rollout content policy below)
-
-Initial-rollout content policy — plumbing lands, bodies are deferred
----------------------------------------------------------------------
+Content policy — full-body forks, not additive overlays
+--------------------------------------------------------
 The routing infrastructure for every critical lane is fully wired:
 ``DefaultPromptStrategy`` selects the lane, the engines hold one
 :class:`Agent` per prompt id, ``last_prompt_id`` flows into the audit
 log, unknown ids fail-closed to ``standard`` with a warning.
 
-However the **text content** of every critical lane is intentionally
-equal to ``standard`` in this initial rollout — the ``_CRITICAL_OVERLAY``
-constants in ``analysis.py`` and ``guardian.py`` are ``""``.  This means
-production LLM behaviour is byte-identical to the pre-specialisation
-baseline for every action type while the routing seam is ready for a
-later PR to author bespoke overlays without touching any engine /
-pipeline / strategy / audit code.
-
-Six tests in ``tests/test_prompt_library.py`` are marked
-``@pytest.mark.xfail(strict=False, ...)`` as living placeholders for
-that work — when the overlays are authored they will xpass and can
-then have the marker removed.
+Specialisation is done by writing a complete standalone body (a fork),
+not by appending to ``standard``.  See ``analysis.py`` for the
+``_CRITICAL_RUN_COMMAND`` and ``_CRITICAL_WRITE_FILE`` bodies as
+reference.
 
 Contract
 --------

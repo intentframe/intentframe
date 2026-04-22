@@ -189,7 +189,7 @@ The pipeline's intelligence is concentrated where the bombs are, not spread thin
 
 - **Current (V1/MVP):** Single AE + single Guardian. Proved the architecture works. Validated by milestones and 24 attack tests.
 - **Shipped (commit `e705d57`) — Option A plumbing (prompt specialisation & criticality routing):** See "What shipped" below.
-- **Next (OSS release):** Author the `_CRITICAL_OVERLAY` bodies for AE (`critical_generic` + sub-lanes) and Guardian (`critical`).  Zero code change — only edit `intentframe_components/prompt/library/{analysis,guardian}.py` and remove the `xfail` markers in `tests/test_prompt_library.py`.
+- **Next (OSS release):** Author full-body forks for probe / mutation sub-lanes (`critical_network_probe`, `critical_network_mutation`) based on `_CRITICAL_RUN_COMMAND`.  Update the aliasing assertions in `tests/test_prompt_library.py::TestInitialRolloutAliasing` to reflect the new bodies.
 - **Future:** Option B (separate-engine-instances architecture) when the critical path needs fine-tuned models or different infrastructure.
 
 ---
@@ -208,8 +208,8 @@ and covered by tests.
 | Module | Purpose |
 |---|---|
 | `intentframe_components/routing/criticality.py` | `CRITICAL_ACTIONS` frozenset + `is_critical()` helper — single source of truth for which action types ride the critical lane. |
-| `intentframe_components/prompt/library/analysis.py` | AE prompt bodies: `standard`, `critical_generic`, `critical_network_probe`, `critical_network_mutation`. `_CRITICAL_OVERLAY = ""` in initial rollout. |
-| `intentframe_components/prompt/library/guardian.py` | Guardian prompt bodies: `standard`, `critical`. `_CRITICAL_OVERLAY = ""` in initial rollout. |
+| `intentframe_components/prompt/library/analysis.py` | AE prompt bodies: `standard`, `critical_generic` (= standard), `critical_run_command` (full fork), `critical_write_file` (full fork), `critical_network_probe` / `critical_network_mutation` (aliased to `critical_run_command`). |
+| `intentframe_components/prompt/library/guardian.py` | Guardian prompt bodies: `standard`, `critical` (= standard). No overlay pattern — specialisation uses full-body forks. |
 | `intentframe_components/prompt/strategy.py` | `PromptStrategy` Protocol + `DefaultPromptStrategy` — deterministic selection of AE / Guardian prompt ids from `intent.action` and `command_intel.capabilities`. |
 | `AIAnalysisEngine`, `AIGuardian` | Now accept `prompt_strategy` at construction, hold one `Agent` per prompt id, and expose `last_prompt_id` for audit. |
 | `intentframe_server/pipeline.py` | Records `ae_prompt_id` / `guardian_prompt_id` in the audit entry when the AI path ran; resets the engine-side `last_prompt_id` at the start of every request so deterministic / fast-path outcomes never inherit stale values. |
@@ -238,8 +238,8 @@ Guardian:
 
 ### What is deliberately deferred
 
-- **Overlay text.** `_CRITICAL_OVERLAY` is `""` in both libraries.  The commented-out drafts in `analysis.py` and `guardian.py` capture the initial design discussion — keep, rewrite, or replace when authoring.
-- **Probe / mutation sub-lane specialisation.** `critical_network_probe` and `critical_network_mutation` alias `critical_generic` in the initial rollout.  Per-lane overlay bodies will replace them without any engine / strategy / test change beyond the library file and `tests/test_prompt_library.py::TestInitialRolloutAliasing` (whose docstring says to delete those assertions when the alias ends).
+- **Probe / mutation sub-lane specialisation.** `critical_network_probe` and `critical_network_mutation` alias `critical_run_command` in the initial rollout.  Per-lane full-body forks will replace them without any engine / strategy / test change beyond the library file and `tests/test_prompt_library.py::TestInitialRolloutAliasing` (whose docstring says to delete those assertions when the alias ends).  No overlay pattern — new bodies are standalone forks.
+- **`critical_generic` and Guardian `critical` bodies.** Both deliberately equal their respective `standard` bodies.  `critical_generic` covers PAY_INVOICE, DELETE_*, SEND_EMAIL, HTTP_POST — typed, structured actions whose rubric is already well-served by the standard body.  Guardian's standard body is already enforcement-heavy.  If deeper specialisation is later justified, author a full-body fork (not an overlay).
 - **Model tiering.** Every lane currently uses the same model.  The seams (one `Agent` per id, lane name in `Agent.name`) are ready for per-lane model configuration when wanted.
 
 ### Guardrails against regression

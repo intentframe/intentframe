@@ -12,14 +12,15 @@ deliberately kept outside both engines so:
 - Third parties can ship their own :class:`PromptStrategy` by
   satisfying the Protocol, without touching the engines.
 
-Routing model (initial rollout — overlay bodies empty, routing live)
----------------------------------------------------------------------
+Routing model
+-------------
 Analysis Engine ids, in precedence order (strictest wins):
 
     critical_network_mutation   (RUN_COMMAND + capability:network_probe:{http_mutate, http_download, port_scan, file_transfer})
     critical_network_probe      (RUN_COMMAND + capability:network_probe:{icmp, trace, dns, whois, http_get})
+    critical_run_command        (RUN_COMMAND default — no recognised network caps, or no command_intel)
     critical_write_file         (action == WRITE_FILE — every write)
-    critical_generic            (action ∈ CRITICAL_ACTIONS)
+    critical_generic            (action ∈ CRITICAL_ACTIONS, not RUN_COMMAND or WRITE_FILE)
     standard                    (everything else)
 
 Guardian ids:
@@ -30,9 +31,11 @@ Guardian ids:
 Fail-closed
 -----------
 If ``command_intel`` is ``None`` for a RUN_COMMAND, we route to
-``critical_generic``, not ``standard``.  A missing ``CommandIntel`` on
-a RUN_COMMAND indicates a plumbing bug somewhere upstream; the safe
-default is the stricter overlay.
+``critical_run_command``, not ``standard``.  A missing ``CommandIntel``
+on a RUN_COMMAND indicates a plumbing bug somewhere upstream; the safe
+default is the command-specific body (teaches decomposition, compound
+reversibility, structural-signal consumption) rather than the generic
+standard body.
 
 Role of ``file_intel``
 ----------------------
@@ -42,9 +45,8 @@ forward into their prompts (payload language, binary / oversized flags,
 code-intel findings).  The default strategy does **not** consult it to
 pick a prompt id — every WRITE_FILE lands in ``critical_write_file``
 regardless of payload shape.  Content-aware lanes (e.g. a future
-``critical_write_file_code``) are deferred until per-lane overlay
-bodies are authored; until then, payload-aware routing would just
-switch between aliases of the same body and buy nothing.
+``critical_write_file_code``) are deferred; when authored they will be
+full-body forks of ``_CRITICAL_WRITE_FILE``, not additive overlays.
 """
 
 from __future__ import annotations
@@ -176,6 +178,7 @@ class DefaultPromptStrategy:
     _AE_PRECEDENCE: tuple[str, ...] = (
         "critical_network_mutation",
         "critical_network_probe",
+        "critical_run_command",
         "critical_write_file",
         "critical_generic",
         "standard",
@@ -197,7 +200,7 @@ class DefaultPromptStrategy:
         # ``file_intel`` is accepted on the Protocol so engines can pass
         # it through; the default strategy does not route on it.  WRITE_FILE
         # lands in ``critical_write_file`` unconditionally — payload-aware
-        # sub-lanes are deferred until per-lane overlay bodies exist.
+        # sub-lanes are deferred to a later PR.
         del file_intel
 
         action_value = intent.action.value
@@ -210,10 +213,12 @@ class DefaultPromptStrategy:
             if _has_network_probe(caps):
                 return "critical_network_probe"
             # RUN_COMMAND without known network sub-tags (or with no
-            # command_intel at all) falls through to the generic
-            # critical prompt.  This is the fail-closed default for
-            # a missing-intel plumbing bug.
-            return "critical_generic"
+            # command_intel at all) falls through to the command-
+            # specific base body.  This is the fail-closed default for
+            # a missing-intel plumbing bug — the command-specific body
+            # is stricter than _STANDARD (teaches decomposition,
+            # compound reversibility, structural-signal consumption).
+            return "critical_run_command"
 
         if action_value in {
             ActionType.WRITE_FILE.value,

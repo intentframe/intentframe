@@ -22,8 +22,8 @@ handed to the AE as context inside the payload but does not affect
 prompt-id selection.
 Content-aware WRITE_FILE sub-lanes (e.g. a future
 ``critical_write_file_code`` for positively-classified code payloads)
-are deferred until per-lane overlay bodies are authored — until then,
-splitting would just route between aliases of the same body.  The
+are deferred — when added they will be full-body forks of the existing
+``critical_write_file`` body, not additive overlays.  The
 destination-sensitive side is handled earlier, deterministically, by
 :class:`DeterministicGuardian` which BLOCKs writes that land on
 sensitive system locations (see

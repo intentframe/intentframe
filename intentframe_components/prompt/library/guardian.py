@@ -9,23 +9,20 @@ command-shape reasoning, so an extra lane would dilute focus.
 
 Every prompt id must produce :class:`AIGuardianOutput`.
 
-Initial-rollout content policy — ``critical`` aliases ``standard``
-------------------------------------------------------------------
-Symmetric with the AE library: ``_CRITICAL_OVERLAY = ""`` so the
-``critical`` body is byte-identical to ``standard`` in this initial
-rollout.  The routing plumbing is live (``DefaultPromptStrategy``
+Content policy — ``critical`` equals ``standard``
+-------------------------------------------------
+``_CRITICAL`` is byte-identical to ``_STANDARD`` by deliberate design:
+Guardian's standard body is already enforcement-heavy (BLOCK on
+HIGH/CRITICAL risk, scope mismatch, hidden behaviours, limit
+violations).  A critical-specific overlay would be redundant and would
+risk drift between what the standard body teaches and what the
+overlay appends.  The routing plumbing is live (``DefaultPromptStrategy``
 selects ``critical`` for actions in :data:`CRITICAL_ACTIONS`, the
 Guardian engine holds one :class:`Agent` per id, ``last_prompt_id``
-feeds the audit log), but the text change is deferred to a later PR
-so the prompt-specialisation refactor ships zero production
-LLM-behaviour change.
-
-To author a critical body later:
-    1. Replace the ``_CRITICAL_OVERLAY = ""`` assignment with the
-       desired overlay string (the commented-out block above is the
-       draft from the initial design discussion — keep or rewrite).
-    2. Remove the ``@pytest.mark.xfail`` markers on the overlay-
-       content tests in ``tests/test_prompt_library.py``.
+feeds the audit log) so per-action-class bodies can be added later
+as full forks — the same pattern used by the AE's
+``critical_run_command`` and ``critical_write_file`` bodies — without
+touching any engine / strategy / audit code.
 """
 
 from __future__ import annotations
@@ -107,53 +104,7 @@ Intent Limits:
 Be brief and cite the specific concern that caused your decision."""
 
 
-# ────────────────────────────────────────────────────────────────
-# CRITICAL_OVERLAY — appended to STANDARD for the critical lane
-# ────────────────────────────────────────────────────────────────
-# Mirror of the AE critical overlay: one-direction, additive, keeps
-# the same output schema.  "Stricter" for Guardian means: on balance,
-# prefer BLOCK over ALLOW when the evidence is ambiguous for a
-# critical-class action.  Guardian is the sole ALLOW/BLOCK authority,
-# so this is where that bias belongs.
-
-# _CRITICAL_OVERLAY = """
-
-# — — — CRITICAL-ACTION OVERLAY — — —
-
-# This decision concerns an action class with elevated blast radius
-# (arbitrary code execution, irreversible deletion, external
-# communication, financial impact, or outbound network). The cost of
-# a wrong ALLOW is asymmetric: a false BLOCK costs one retry; a false
-# ALLOW can be uncatchable.
-
-# Apply the following without weakening anything above:
-
-# 1. When the Analysis Report surfaces hidden behaviours, scope
-#    mismatch, or HIGH/CRITICAL risk factors for a critical action,
-#    BLOCK unless the policy explicitly sanctions the exact behaviour
-#    observed. Do not reason your way past a surfaced concern with
-#    charitable assumptions about agent intent.
-
-# 2. Cite the specific concern that drove the decision. For BLOCK
-#    outputs, name the risk factor, the hidden behaviour, or the
-#    policy clause. For ALLOW outputs on a critical action, state
-#    which policy explicitly permits the behaviour observed.
-
-# 3. Treat ambiguous intent limits as violated, not as inapplicable.
-#    If a limit plausibly applies to the effective semantic domains
-#    for this action, evaluate it. If you cannot tell whether a limit
-#    is violated because the payload is ambiguous, default to BLOCK
-#    and cite the limit_id.
-
-# 4. Do not override deterministic gates. If a constraint or domain
-#    module would have blocked this action, that signal is
-#    authoritative. The AI path is here to add, not to retract.
-# """
-
-_CRITICAL_OVERLAY = ""
-
-
-_CRITICAL = _STANDARD + _CRITICAL_OVERLAY
+_CRITICAL = _STANDARD
 
 
 GUARDIAN_PROMPTS: Mapping[str, str] = MappingProxyType({

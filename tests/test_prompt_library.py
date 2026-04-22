@@ -9,31 +9,17 @@ invariants that the engines and tests depend on:
   - The ``standard`` bodies still contain the keyword fragments that
     ``tests/test_prompt_hardening.py`` and
     ``tests/test_transitive_injection.py`` rely on.
-  - The ``critical_generic`` body is a strict superset of ``standard``
-    (the overlay is additive, never a replacement).
-  - The ``critical_generic`` overlay preserves the "understand, not
-    decide" invariant (still says Guardian is the decider) and does
-    not introduce an allow/block verdict into the AE prompt.
+  - ``critical_generic`` equals ``standard`` by deliberate design.
+  - ``critical_run_command`` and ``critical_write_file`` are full-body
+    forks that contain command- / write-shaped framing, are factual-
+    analysis prompts, and do not direct the AE to allow or block.
   - ``critical_network_probe`` and ``critical_network_mutation`` are
-    aliased to ``critical_generic`` in the initial rollout (byte-identical).
-    Per-lane overlay bodies will replace them later; when they do, the
-    "alias" test should be deleted rather than mechanically updated.
-  - Guardian's ``critical`` body is a strict superset of ``standard``
-    with symmetric critical-overlay properties.
+    aliased to ``critical_run_command`` in the initial rollout
+    (byte-identical).  When per-lane full-body forks replace them, the
+    aliasing assertions should be deleted rather than mechanically updated.
+  - Guardian's ``critical`` body equals ``standard`` by deliberate design.
   - ``_base_instructions()`` on both engines still returns the
     ``standard`` body — the back-compat promise.
-
-Placeholder tests for overlay content (initial rollout)
--------------------------------------------------------
-The six tests that assert on critical-overlay *content* (length
-strictly greater than standard, "CRITICAL-ACTION OVERLAY" marker,
-"understand/decide" / "enforce/analyse" framing) are marked
-``@pytest.mark.xfail(strict=False, ...)`` because ``_CRITICAL_OVERLAY``
-is intentionally ``""`` in the initial rollout — the routing plumbing
-ships now, the overlay bodies ship later.  ``strict=False`` means: when
-the overlays are authored and the tests start passing, pytest will
-report them as XPASS rather than failing the suite, giving the author
-a clear signal to remove the markers.
 """
 
 from __future__ import annotations
@@ -51,21 +37,6 @@ from intentframe_components.prompt.library import (
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Placeholder marker — remove from each test below when the
-# corresponding overlay body is authored (see library/__init__.py).
-# ═══════════════════════════════════════════════════════════════════════
-
-_OVERLAY_PLACEHOLDER = pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "_CRITICAL_OVERLAY is intentionally empty in the initial rollout; "
-        "routing / audit plumbing ships now, overlay bodies deferred to a "
-        "later PR.  Remove this marker when the overlay is authored."
-    ),
-)
-
-
-# ═══════════════════════════════════════════════════════════════════════
 # Shape invariants
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -73,6 +44,7 @@ class TestLibraryShape:
     def test_ae_has_expected_prompt_ids(self):
         assert ANALYSIS_PROMPT_IDS == frozenset({
             "standard",
+            "critical_run_command",
             "critical_generic",
             "critical_network_probe",
             "critical_network_mutation",
@@ -141,111 +113,23 @@ class TestGuardianStandardBody:
 # Critical-overlay invariants (additive, one-direction)
 # ═══════════════════════════════════════════════════════════════════════
 
-class TestAECriticalOverlay:
-    def test_critical_generic_starts_with_standard_body(self):
-        # Additive: critical_generic must contain the entire standard
-        # body verbatim as a prefix.  No rewrites of inherited rules.
-        # Passes trivially while overlay is empty (critical_generic ==
-        # standard).  Remains the correct invariant once the overlay is authored.
-        assert ANALYSIS_PROMPTS["critical_generic"].startswith(
-            ANALYSIS_PROMPTS["standard"],
-        )
+class TestAECriticalGenericBody:
+    """Pin the ``critical_generic`` body contract.
 
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_generic_is_strictly_longer_than_standard(self):
-        assert len(ANALYSIS_PROMPTS["critical_generic"]) > len(
-            ANALYSIS_PROMPTS["standard"],
-        )
-
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_overlay_mentions_critical_action_framing(self):
-        overlay = ANALYSIS_PROMPTS["critical_generic"][len(ANALYSIS_PROMPTS["standard"]):]
-        assert "CRITICAL-ACTION OVERLAY" in overlay
-
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_overlay_preserves_understand_not_decide(self):
-        # The core invariant from concepts/core/layers/03-analysis-engine.md:
-        # AE never makes an ALLOW/BLOCK decision.  The overlay must
-        # reaffirm this, not undermine it.
-        overlay = ANALYSIS_PROMPTS["critical_generic"][len(ANALYSIS_PROMPTS["standard"]):]
-        lowered = overlay.lower()
-        assert "understand" in lowered
-        assert "decide" in lowered
-        # Guardian remains the authority.
-        assert "Guardian" in overlay
-
-    def test_critical_overlay_does_not_instruct_ae_to_allow_or_block(self):
-        # The AE prompt must not contain imperatives that direct the
-        # AE itself to ALLOW or BLOCK.  "ALLOW/BLOCK" may appear as
-        # context ("Guardian decides ALLOW/BLOCK") but never as an
-        # instruction aimed at the AE.
-        overlay = ANALYSIS_PROMPTS["critical_generic"][len(ANALYSIS_PROMPTS["standard"]):]
-        forbidden = [
-            "you must ALLOW",
-            "you must BLOCK",
-            "you allow",
-            "you block",
-            "You ALLOW",
-            "You BLOCK",
-        ]
-        for phrase in forbidden:
-            assert phrase not in overlay, f"AE overlay contains directive {phrase!r}"
-
-
-class TestAECriticalWriteFileOverlay:
-    """Symmetric overlay invariants for the ``critical_write_file`` lane.
-
-    Mirrors :class:`TestAECriticalOverlay` for ``critical_generic``.  The
-    xfailed tests document the future body contract: once a real
-    WRITE_FILE-specific overlay is authored (payload context framing,
-    executability reminders, etc.), these tests start passing and the
-    markers come off.
+    ``critical_generic`` is deliberately equal to ``standard`` — it covers
+    PAY_INVOICE, DELETE_*, SEND_EMAIL, HTTP_POST whose rubric is already
+    well-served by the standard body and whose examples are exactly these
+    typed, structured actions.  These tests document that intentionally.
     """
 
-    def test_critical_write_file_starts_with_standard_body(self):
-        # Additive: critical_write_file must contain the entire standard
-        # body verbatim as a prefix.  Passes trivially while the overlay
-        # is empty (critical_write_file == standard).
-        assert ANALYSIS_PROMPTS["critical_write_file"].startswith(
-            ANALYSIS_PROMPTS["standard"],
-        )
+    def test_critical_generic_equals_standard_body(self):
+        # Deliberate design: critical_generic IS standard.
+        # If this ever becomes a full-body fork, replace this assertion
+        # with content-specific markers (like TestAECriticalRunCommandBody).
+        assert ANALYSIS_PROMPTS["critical_generic"] == ANALYSIS_PROMPTS["standard"]
 
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_write_file_is_strictly_longer_than_standard(self):
-        assert len(ANALYSIS_PROMPTS["critical_write_file"]) > len(
-            ANALYSIS_PROMPTS["standard"],
-        )
-
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_write_file_overlay_mentions_write_framing(self):
-        # Pin some identifiable WRITE_FILE framing in the overlay so
-        # authoring accidents (e.g. pasting the RUN_COMMAND overlay
-        # into this lane) are caught.  The exact phrase is not
-        # specified — any of the common markers is acceptable.
-        overlay = ANALYSIS_PROMPTS["critical_write_file"][
-            len(ANALYSIS_PROMPTS["standard"]):
-        ]
-        markers = ("WRITE_FILE", "write_file", "file write")
-        assert any(m in overlay for m in markers), (
-            f"overlay must mention a WRITE_FILE marker; got: {overlay[:120]!r}"
-        )
-
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_write_file_overlay_preserves_understand_not_decide(self):
-        # Same invariant as the generic overlay: AE understands, Guardian
-        # decides.  The overlay must reaffirm this, not undermine it.
-        overlay = ANALYSIS_PROMPTS["critical_write_file"][
-            len(ANALYSIS_PROMPTS["standard"]):
-        ]
-        lowered = overlay.lower()
-        assert "understand" in lowered
-        assert "decide" in lowered
-        assert "Guardian" in overlay
-
-    def test_critical_write_file_overlay_does_not_instruct_ae_to_allow_or_block(self):
-        overlay = ANALYSIS_PROMPTS["critical_write_file"][
-            len(ANALYSIS_PROMPTS["standard"]):
-        ]
+    def test_critical_generic_does_not_instruct_ae_to_allow_or_block(self):
+        body = ANALYSIS_PROMPTS["critical_generic"]
         forbidden = [
             "you must ALLOW",
             "you must BLOCK",
@@ -255,61 +139,133 @@ class TestAECriticalWriteFileOverlay:
             "You BLOCK",
         ]
         for phrase in forbidden:
-            assert phrase not in overlay, f"AE overlay contains directive {phrase!r}"
+            assert phrase not in body, f"critical_generic body contains directive {phrase!r}"
 
 
-class TestGuardianCriticalOverlay:
-    def test_critical_starts_with_standard_body(self):
-        # Passes trivially while overlay is empty (critical == standard).
-        assert GUARDIAN_PROMPTS["critical"].startswith(GUARDIAN_PROMPTS["standard"])
+class TestAECriticalWriteFileBody:
+    """Pin WRITE_FILE-specific markers in the ``critical_write_file`` body.
 
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_is_strictly_longer_than_standard(self):
-        assert len(GUARDIAN_PROMPTS["critical"]) > len(GUARDIAN_PROMPTS["standard"])
+    The body is a fork of ``_STANDARD`` (not an overlay): it re-teaches
+    the full analysis rubric with write-specific framing (destination-
+    payload cross-check, payload-signals consumption, consumer
+    awareness).  These assertions catch accidents — e.g. reverting the
+    key to point at ``_STANDARD``, or pasting a Guardian body into this
+    lane.
+    """
 
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_overlay_mentions_critical_action_framing(self):
-        overlay = GUARDIAN_PROMPTS["critical"][len(GUARDIAN_PROMPTS["standard"]):]
-        assert "CRITICAL-ACTION OVERLAY" in overlay
+    def test_body_contains_write_framing(self):
+        body = ANALYSIS_PROMPTS["critical_write_file"]
+        markers = (
+            "WRITE_FILE",
+            "file-write",
+            "destination",
+            "payload",
+        )
+        assert any(m in body for m in markers), (
+            f"critical_write_file body must mention write-shaped framing; "
+            f"got: {body[:120]!r}"
+        )
 
-    @_OVERLAY_PLACEHOLDER
-    def test_critical_overlay_preserves_enforce_not_analyse(self):
-        overlay = GUARDIAN_PROMPTS["critical"][len(GUARDIAN_PROMPTS["standard"]):]
-        lowered = overlay.lower()
-        assert "enforce" in lowered
-        assert "analyse" in lowered or "analyze" in lowered
-        # Analysis Engine remains the factual source.
-        assert "Analysis Engine" in overlay
+    def test_body_is_factual_analysis(self):
+        # Same invariant as the standard body — AE understands, does not decide.
+        assert "factual analysis" in ANALYSIS_PROMPTS["critical_write_file"]
+
+    def test_body_does_not_instruct_ae_to_allow_or_block(self):
+        body = ANALYSIS_PROMPTS["critical_write_file"]
+        forbidden = [
+            "you must ALLOW",
+            "you must BLOCK",
+            "you allow",
+            "you block",
+            "You ALLOW",
+            "You BLOCK",
+        ]
+        for phrase in forbidden:
+            assert phrase not in body, (
+                f"critical_write_file body contains directive {phrase!r}"
+            )
+
+
+class TestAECriticalRunCommandBody:
+    """Pin RUN_COMMAND-specific markers in the ``critical_run_command`` body.
+
+    The body is a fork of ``_STANDARD`` (not an overlay): it re-teaches
+    the full analysis rubric with command-specific framing.  These
+    assertions catch accidents — e.g. reverting the key to point at
+    ``_STANDARD``, or pasting a Guardian body into this lane.
+    """
+
+    def test_body_contains_command_framing(self):
+        body = ANALYSIS_PROMPTS["critical_run_command"]
+        # Any of these structural markers is fine — we're pinning the
+        # command-shaped framing, not the exact text.
+        markers = (
+            "TERMINAL COMMAND",
+            "shell command",
+            "decompose",
+            "compound",
+        )
+        assert any(m in body for m in markers), (
+            f"critical_run_command body must mention command-shaped framing; "
+            f"got: {body[:120]!r}"
+        )
+
+    def test_body_is_factual_analysis(self):
+        # Same invariant as the standard body — AE understands, does not decide.
+        assert "factual analysis" in ANALYSIS_PROMPTS["critical_run_command"]
+
+    def test_body_does_not_instruct_ae_to_allow_or_block(self):
+        body = ANALYSIS_PROMPTS["critical_run_command"]
+        forbidden = [
+            "you must ALLOW",
+            "you must BLOCK",
+            "you allow",
+            "you block",
+            "You ALLOW",
+            "You BLOCK",
+        ]
+        for phrase in forbidden:
+            assert phrase not in body, (
+                f"critical_run_command body contains directive {phrase!r}"
+            )
+
+
+class TestGuardianCriticalBody:
+    """Pin the Guardian ``critical`` body contract.
+
+    ``critical`` is deliberately equal to ``standard`` — Guardian's
+    standard body is already enforcement-heavy (BLOCK on HIGH/CRITICAL
+    risk, scope mismatch, hidden behaviours, limit violations) and a
+    separate critical body would risk instruction drift without adding
+    value.  These tests document that intentionally.
+    """
+
+    def test_critical_equals_standard_body(self):
+        # Deliberate design: critical IS standard.
+        # If this ever becomes a full-body fork, replace this assertion
+        # with content-specific markers.
+        assert GUARDIAN_PROMPTS["critical"] == GUARDIAN_PROMPTS["standard"]
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Initial-rollout aliasing (delete this class when per-lane overlay
-# bodies are authored for probe / mutation lanes)
+# Initial-rollout aliasing (delete this class when per-lane full-body
+# forks are authored for probe / mutation lanes)
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestInitialRolloutAliasing:
-    """Probe / mutation lanes are aliased to critical_generic on initial rollout.
+    """Probe / mutation lanes are aliased to critical_run_command on initial rollout.
 
-    These tests document that intentionally.  When per-lane overlay bodies
+    These tests document that intentionally.  When per-lane full-body forks
     replace either lane, delete the corresponding assertion here rather than
     mechanically updating it — the whole point is that the alias is temporary.
     """
 
-    def test_probe_lane_aliased_to_critical_generic(self):
+    def test_probe_lane_aliased_to_critical_run_command(self):
         assert ANALYSIS_PROMPTS["critical_network_probe"] == ANALYSIS_PROMPTS[
-            "critical_generic"
+            "critical_run_command"
         ]
 
-    def test_mutation_lane_aliased_to_critical_generic(self):
+    def test_mutation_lane_aliased_to_critical_run_command(self):
         assert ANALYSIS_PROMPTS["critical_network_mutation"] == ANALYSIS_PROMPTS[
-            "critical_generic"
-        ]
-
-    def test_write_file_lane_aliased_to_standard_body(self):
-        # ``critical_write_file`` aliases the standard body directly on
-        # initial rollout (``_CRITICAL_WRITE_FILE_OVERLAY = ""``).  When
-        # a real WRITE_FILE overlay is authored, delete this assertion
-        # and rely on :class:`TestAECriticalWriteFileOverlay` instead.
-        assert ANALYSIS_PROMPTS["critical_write_file"] == ANALYSIS_PROMPTS[
-            "standard"
+            "critical_run_command"
         ]

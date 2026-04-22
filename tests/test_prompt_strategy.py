@@ -139,24 +139,24 @@ class TestAERouting:
             _intent(action, "~/Documents/"), None,
         ) == "standard"
 
-    def test_run_command_with_no_intel_routes_to_critical_generic(self):
+    def test_run_command_with_no_intel_routes_to_critical_run_command(self):
         # Fail-closed: a missing CommandIntel on RUN_COMMAND means
         # upstream plumbing is broken; the safer default is the
-        # critical overlay, not the standard prompt.
+        # command-specific body, not the standard prompt.
         assert STRATEGY.select_ae_prompt_id(
             _intent(ActionType.RUN_COMMAND, "ls -la"), None,
-        ) == "critical_generic"
+        ) == "critical_run_command"
 
-    def test_run_command_with_empty_caps_routes_to_critical_generic(self):
+    def test_run_command_with_empty_caps_routes_to_critical_run_command(self):
         assert STRATEGY.select_ae_prompt_id(
             _intent(ActionType.RUN_COMMAND, "do thing"), _intel(),
-        ) == "critical_generic"
+        ) == "critical_run_command"
 
-    def test_run_command_with_unrelated_caps_routes_to_critical_generic(self):
+    def test_run_command_with_unrelated_caps_routes_to_critical_run_command(self):
         assert STRATEGY.select_ae_prompt_id(
             _intent(ActionType.RUN_COMMAND, "do thing"),
             _intel("capability:filesystem_write"),
-        ) == "critical_generic"
+        ) == "critical_run_command"
 
     # ── network_probe sub-routing ───────────────────────────────────
 
@@ -199,10 +199,11 @@ class TestAERouting:
     def test_unrelated_capability_not_matching_subtag_falls_through(self):
         # A network_probe:* tag we don't recognise (newer classifier,
         # older strategy) must not silently route to probe lane.
+        # Falls through to the command-specific base body.
         caps = _intel("capability:network_probe:experimental_new_thing")
         assert STRATEGY.select_ae_prompt_id(
             _intent(ActionType.RUN_COMMAND, "cmd"), caps,
-        ) == "critical_generic"
+        ) == "critical_run_command"
 
 
 # ═══════════════════════════════════════════════════════════════════════
