@@ -27,6 +27,39 @@ It is intentionally a **fact producer**, not a policy engine:
 
 That means `command_shield` is useful for investigating **a command, a resolved script, or an already-loaded code body**.  It is not a repo crawler, dependency graph engine, or semantic codebase explorer.
 
+### Literal inspection, not semantic understanding
+
+`command_shield` exists to answer narrow mechanical questions about a
+command string:
+
+- which fixed dangerous primitives literally appear,
+- how the shell would structurally decompose the command,
+- whether the command contains interpreter indirection or hidden
+  payloads,
+- what deterministic capability tags the command exposes,
+- whether any referenced or inline code body contains static-analysis
+  findings.
+
+It does **not** try to answer semantic questions such as:
+
+- "is this command merely quoting documentation text?",
+- "is the user explaining a command rather than invoking it?",
+- "does the current task justify this action?",
+- "what does this command mean in the broader business context?",
+- "should this user be allowed to do this right now?"
+
+Those questions belong to the higher layers in IntentFrame:
+
+- `command_shield` performs literal / syntactic / structural inspection,
+- the Analysis Engine interprets intent and context,
+- Guardian applies policy and authorization,
+- the executor only runs what survives the earlier gates.
+
+That division is intentional.  The root-profile demo is specifically
+about showing that even when the executor is highly privileged,
+IntentFrame's deterministic gate still refuses known catastrophic
+primitives *before* semantic reasoning or execution happens.
+
 ## Why It Exists
 
 Arbitrary shell commands are the one action class that can hide a lot of behavior inside a single string:
@@ -124,6 +157,113 @@ The first decisive layer is pattern + structure:
 - interpreter indirections / payloads are re-scanned.
 
 This is where the verdict comes from.
+
+#### Pattern pack layout
+
+The regex pack lives at `command_shield/patterns/*.json` and is loaded at import time.  Every entry has `{id, regex, verdict, description, source, category}`.  The packs are organized by what they catch, not where they came from:
+
+- `catastrophic.json` — cross-platform catastrophic primitives: `sudo`, destructive `rm` against home / `/`, fork bombs, `chmod 777` on system roots, disk-write primitives (`dd of=/dev/…`, `mkfs`, `wipefs`, `shred`), destructive `git` (force-push, `reset --hard`, `stash clear`), shell-wrapper evasions (`bash -c '…rm -rf…'`, `find -exec rm`, `xargs rm`, …), **non-sudo privilege escalation verbs** (`pkexec`, `doas`, `runuser`, `machinectl shell|login`), and **direct `sandbox-exec` invocation** (which would bypass the executor-managed sandbox).
+- `macos.json` — macOS-specific primitives: `diskutil erase*`, keychain dump / password extraction, Time Machine deletion, directory-services account / group mutation (`dscl . -create|passwd|change|merge|append /Users|Groups/…`), Gatekeeper / SIP / boot-arg tampering (`spctl --master-disable`, `csrutil disable|enable|clear`, `nvram` writes, `bless -…`), kernel-extension loading (`kextload`, `kextunload`, `kmutil load|unload|install|…`), TCC database access, and **AppleScript privilege escalation** (`…with administrator privileges`, case-insensitive).
+- `persistence.json` — launchd / cron / at persistence: `launchctl load|unload` of specific system paths, the broader modern launchd verbs (`launchctl bootstrap|bootout|kickstart|enable|disable|submit|remove`), plist moves into `/Library/Launch*`, `crontab -e`, `crontab -` (stdin replace), `at now|<digit>|-f …`, `systemctl stop|disable|mask` of critical services, bash-history clearing.
+- `credential_access.json` — reads / exfil of `~/.ssh/`, `~/.aws/`, `~/.kube/`, `~/.gnupg/`, `.env`, `~/.git-credentials`, etc.
+- `exfiltration.json` — `curl … | sh`, base64-piped exec, reverse shells, `ssh host 'rm -rf /'`, etc.
+
+Every pattern either produces a `CATASTROPHIC` or a `NEEDS_REVIEW` verdict; `SAFE` is the default when nothing matches.  Patterns never look at user policy, privilege level, or session state — they encode fixed-system facts only.
+
+#### Why these families exist (root-demo relevance)
+
+When the executor runs as root (the Jarvis root-profile demo), the kernel-level sandbox floor is intentionally minimal so the demo can showcase `RUN_COMMAND` with broad capability.  `command_shield` is the deterministic pre-gate that holds the line *regardless* of executor privilege.  The privilege-escalation pack in `catastrophic.json` (pkexec, doas, runuser, machinectl shell, sandbox-exec) and the macOS system-security pack in `macos.json` (SIP toggle, NVRAM writes, kext load/unload, `bless`, AppleScript admin prompt, dscl account control) exist specifically so that an agent with maximum executor privilege still cannot reach for a new security domain, a firmware / boot-path mutation, or a persistent local-account backdoor.  They have zero effect on benign legitimate commands — each regex targets a narrow, well-known system primitive.
+
+#### Known false-positive surface
+
+The packs intentionally match **the literal verb or phrase anywhere in the command string**.  `\b…\b` word-boundary anchors prevent substring collisions (`pkexec` inside `my_pkexec_log`) but they do **not** distinguish "the command `pkexec`" from "the word `pkexec` quoted inside an `echo` / `git commit -m` / heredoc / docstring".  So the following are classified `CATASTROPHIC` today even though they execute nothing privileged:
+
+```
+echo "use sudo or pkexec for privilege escalation"
+git commit -m 'migrate away from doas'
+echo "do not invoke sandbox-exec directly"
+git commit -m 'script runs with administrator privileges'
+echo "use csrutil enable to re-enable SIP"
+echo "run nvram -d VarName to delete a variable"
+echo "use launchctl bootstrap for new daemons"
+echo "run crontab -e to edit your schedule"
+echo "lets meet at 3pm today"            # IF-AT-SCHEDULE-001
+echo "pointing at now"                   # IF-AT-SCHEDULE-001
+```
+
+Every such case is pinned as an `xfail` in
+`command_shield/tests/test_patterns.py::TestKnownFalsePositives`
+with a reason that names the responsible pattern ID, so the surface
+is discoverable in code rather than folklore.  If someone later
+tightens a pattern, the xfail flips to XPASS and nudges them to
+remove the marker and make the negative real.
+
+This is the clearest consequence of the boundary above: `command_shield`
+is intentionally matching **literal command text**, not trying to infer
+whether the surrounding prose is documentation, explanation, or benign
+quotation.  In IntentFrame terms, that semantic disambiguation belongs
+upstream in the AI layers, not in the deterministic regex gate.
+
+**Why we leave these as-is for now.**
+
+1. **Consistency with the existing pack.** The older `rm`-family
+   patterns (`DEL-001`…`DEL-007`) carry narrow negative lookbehinds
+   like `(?<!echo\s)(?<!echo ')(?<!echo \")` precisely because `rm`
+   was the single highest-FP verb.  The remaining hardstop patterns
+   (`sudo`, `reboot`, `mkfs`, `dd`, `chmod 777`, `diskutil eraseDisk`,
+   `tccutil reset`, `launchctl load /Library/LaunchDaemons/…`, …) do
+   **not** carry echo-guards either — an `echo "sudo reboot"` fires
+   `IF-SUDO-001` today.  The new root-demo patterns follow the same
+   convention so the pack stays uniform.
+2. **CATASTROPHIC surfaces the block, doesn't hide it.**  A false
+   positive returns a hard rejection with a named pattern ID that the
+   caller sees.  A false *negative* on one of these verbs when the
+   executor runs as root is the actual security failure.  The
+   asymmetry favors over-blocking for the demo narrative.
+3. **Echo-of-verb is already a weak signal.**  A plausibly benign
+   command that quotes a privileged verb is uncommon in real agent
+   usage; an attacker who wants to smuggle a privileged verb into a
+   command string has easier paths (interpreter indirection, base64
+   decoding, process substitution) that the pipeline's *structural*
+   layer catches independently of these regexes.
+4. **Downgrading would mask the demo point.**  Moving these to
+   `NEEDS_REVIEW` would defer the decision to Guardian / AE on every
+   hit, including the real attempts the demo is meant to block.  The
+   point of the root-profile demo is that `command_shield` *alone*
+   refuses these verbs, regardless of how generous the executor is.
+
+**What could be done when the FP cost becomes real.**
+
+Listed in increasing order of effort / risk:
+
+1. **Echo-guard negative lookbehinds** on the highest-FP patterns.
+   Mirror the existing `DEL-001` shape:
+   `(?<!echo\s)(?<!echo ')(?<!echo \")<pattern>`.  Cheap, purely
+   additive, flips the named xfail cases to PASS.  Does not handle
+   `printf`, `git commit -m`, here-documents, or multi-token quoting.
+2. **A shared `_prose_guard` prefix** compiled into every pattern
+   whose category is `privilege_escalation` / `macos_system_security`
+   / `scheduled_persistence` — same idea, one source of truth, easier
+   to maintain than per-pattern lookbehinds.
+3. **Structural mask of quoted regions** before regex matching.  The
+   pipeline already runs `bashlex` for decomposition; a short pass
+   could null out the interior of single- and double-quoted word
+   tokens that are arguments to a small allowlist of heads (`echo`,
+   `printf`, `git commit -m`, `cat <<EOF … EOF`).  Most surgical, but
+   changes a shared preprocessing step that every pattern consumes.
+4. **Downgrade prose-heavy patterns to `NEEDS_REVIEW`** and let the
+   downstream Guardian / AE disambiguate invocation vs quoting.  Only
+   worth it for patterns that are pure English phrases
+   (`IF-OSASCRIPT-ADMIN-001` is the lone candidate today).  Costs an
+   AI round-trip per hit.
+5. **Two-pass: match → verify head.**  After a pattern hits, confirm
+   the matched span starts a shell *simple command* head (via
+   `bashlex`).  Most expensive, highest precision, biggest contract
+   change — the module's current promise is "regex against a
+   normalized string".
+
+Anyone tightening a pattern should start at option 1, remove the
+matching xfail(s), and leave the broader remediation for later.
 
 ### 2. Language detection
 

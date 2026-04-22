@@ -4,6 +4,14 @@ Every *.json pattern file under command_shield/patterns/ contributes
 to the catastrophic / needs-review verdict.  These tests pin each
 family to at least one positive example so that future edits to
 regex packs cannot silently lose coverage.
+
+Important boundary: these tests mostly exercise literal / syntactic
+pattern coverage, not semantic interpretation.  When a pattern matches
+quoted prose like ``echo "use pkexec"`` that is treated as a known
+false-positive surface of the deterministic gate, not as evidence that
+the test suite expects command_shield to understand documentation
+intent.  Those cases are pinned explicitly via ``xfail`` below so the
+trade-off stays visible.
 """
 
 from __future__ import annotations
@@ -76,6 +84,59 @@ class TestCatastrophicPatterns:
         assert inspect_command("echo 'data' > /dev/sda").is_catastrophic
 
 
+class TestPrivilegeEscalationPrimitives:
+    """Non-sudo privilege-escalation verbs beyond IF-SUDO-001.
+
+    These patterns guarantee that when the gateway is running as root
+    (the Jarvis root-profile demo) the agent cannot reach for alternate
+    escalation primitives to jump to a different identity or into
+    another security domain.
+    """
+
+    @pytest.mark.parametrize("cmd", [
+        "pkexec /usr/bin/id",
+        "pkexec --user root whoami",
+        "ls && pkexec reboot",
+    ])
+    def test_pkexec(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "doas -u root id",
+        "doas sh -c 'whoami'",
+    ])
+    def test_doas(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "runuser -u root -- id",
+        "runuser -l nobody -c 'whoami'",
+    ])
+    def test_runuser(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "machinectl shell root@.host",
+        "machinectl login my-container",
+    ])
+    def test_machinectl_shell(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    def test_machinectl_list_is_not_catastrophic(self) -> None:
+        # machinectl list / status are introspection-only and must not
+        # trigger this pattern on their own.
+        assert not inspect_command("machinectl list").is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "sandbox-exec -p '(version 1)(allow default)' ls",
+        "/usr/bin/sandbox-exec -f profile.sb bash",
+    ])
+    def test_sandbox_exec(self, cmd: str) -> None:
+        # Direct sandbox-exec invocation bypasses IntentFrame's executor-
+        # managed sandbox; the agent must never reach it.
+        assert inspect_command(cmd).is_catastrophic
+
+
 class TestMacOSPatterns:
     @pytest.mark.parametrize("cmd", [
         "diskutil eraseDisk JHFS+ NewDisk disk2",
@@ -125,6 +186,79 @@ class TestMacOSPatterns:
     def test_tccutil_reset(self) -> None:
         assert inspect_command("tccutil reset All").is_catastrophic
 
+    @pytest.mark.parametrize("cmd", [
+        "osascript -e 'do shell script \"whoami\" with administrator privileges'",
+        "osascript -e 'do shell script \"id\" with Administrator Privileges'",
+        "osascript -e 'do shell script \"id\" WITH ADMINISTRATOR PRIVILEGES'",
+    ])
+    def test_osascript_admin_privileges(self, cmd: str) -> None:
+        # AppleScript `with administrator privileges` triggers macOS's
+        # own password prompt; must be CATASTROPHIC regardless of case.
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "csrutil enable",
+        "csrutil enable --without kext",
+        "csrutil clear",
+    ])
+    def test_csrutil_mutations_beyond_disable(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    def test_csrutil_status_is_not_catastrophic(self) -> None:
+        assert not inspect_command("csrutil status").is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "nvram SystemAudioVolume=%80",
+        "nvram boot-args='-v'",
+        "nvram -d SystemAudioVolume",
+        "nvram -c",
+        "nvram -f /tmp/vars.txt",
+    ])
+    def test_nvram_write(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    def test_nvram_read_is_not_catastrophic(self) -> None:
+        # `nvram -p` prints current values; it is read-only.
+        assert not inspect_command("nvram -p").is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "bless --folder /Volumes/Macintosh\\ HD/System/Library/CoreServices --bootefi",
+        "bless --mount / --setBoot",
+    ])
+    def test_bless(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "kextload /tmp/evil.kext",
+        "kextunload -b com.apple.driver.AppleHID",
+    ])
+    def test_kextload(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "kmutil load -p /tmp/evil.kext",
+        "kmutil unload -b com.apple.driver.AppleHID",
+        "kmutil install --volume-root /",
+    ])
+    def test_kmutil(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "dscl . -create /Users/backdoor",
+        "dscl . -passwd /Users/prince newpass",
+        "dscl . -change /Users/prince UserShell /bin/bash /bin/sh",
+        "dscl . -merge /Users/prince AuthenticationAuthority 'foo'",
+        "dscl . -append /Groups/wheel GroupMembership backdoor",
+    ])
+    def test_dscl_account_mutations(self, cmd: str) -> None:
+        # Beyond the existing narrow `dscl . -delete /Users/` and admin-
+        # group patterns, any create/passwd/change/merge/append on a
+        # user or group record is a local-account-control primitive.
+        assert inspect_command(cmd).is_catastrophic
+
+    def test_dscl_read_is_not_catastrophic(self) -> None:
+        assert not inspect_command("dscl . -read /Users/prince").is_catastrophic
+
 
 class TestPersistencePatterns:
     def test_launchctl_load_daemon(self) -> None:
@@ -146,6 +280,59 @@ class TestPersistencePatterns:
         assert inspect_command(
             "mv evil.plist /Library/LaunchAgents/com.evil.plist"
         ).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "launchctl bootstrap system /Library/LaunchDaemons/com.evil.plist",
+        "launchctl bootout gui/501/com.apple.Spotlight",
+        "launchctl kickstart -k system/com.apple.sshd",
+        "launchctl enable system/com.evil",
+        "launchctl disable system/com.apple.Spotlight",
+        "launchctl submit -l bad -p /tmp/payload.sh",
+        "launchctl remove com.evil",
+    ])
+    def test_launchctl_administrative_verbs(self, cmd: str) -> None:
+        # The pre-existing MAC-PERSIST-001/002 patterns only catch
+        # `launchctl load /Library/LaunchDaemons/...` and `launchctl
+        # unload ... com.apple.`.  Modern launchd verbs below are the
+        # actual persistence / lateral-movement primitives.
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "crontab -e",
+        "crontab -E",
+    ])
+    def test_crontab_edit(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "crontab -",
+        "crontab - < /tmp/new.tab",
+    ])
+    def test_crontab_stdin(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    def test_crontab_list_is_not_catastrophic(self) -> None:
+        assert not inspect_command("crontab -l").is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "at now + 1 minute",
+        "at 03:00",
+        "at -f /tmp/job.sh tomorrow",
+    ])
+    def test_at_schedule(self, cmd: str) -> None:
+        assert inspect_command(cmd).is_catastrophic
+
+    @pytest.mark.parametrize("cmd", [
+        "cat /tmp/foo",
+        "what is going on",
+        "echo 'meeting tomorrow'",
+    ])
+    def test_at_no_false_positive_on_substrings(self, cmd: str) -> None:
+        # `cat`, `what`, `tomorrow` all contain the letters "at".  The
+        # word-boundary anchor in IF-AT-SCHEDULE-001 must prevent any
+        # of these from being classified as catastrophic on account of
+        # the `at`-scheduling rule.
+        assert not inspect_command(cmd).is_catastrophic
 
 
 class TestExfiltrationPatterns:
@@ -379,6 +566,180 @@ class TestPatternDataIntegrity:
                     f"Invalid verdict in {json_path.name}: "
                     f"{entry.get('id')}"
                 )
+
+
+# ── Known false-positive surface (pinned via xfail) ─────────────────
+#
+# The privilege-escalation / macOS-admin / persistence patterns added
+# for the root-profile demo all use `\b…\b` word-boundary anchors.
+# That prevents substring matches (`pkexec` inside `my_pkexec_log`) but
+# it does NOT distinguish "the command `pkexec`" from "the word
+# `pkexec` quoted inside an `echo` / `git commit -m` / docstring".
+# This is deliberate: command_shield is a literal / structural command
+# inspector, not a semantic classifier for "is this prose or an actual
+# invocation?".  That semantic disambiguation belongs to the AI layers.
+#
+# Every case below is a *real* false positive today: the listed benign
+# string is classified CATASTROPHIC because the verb appears verbatim
+# inside a quoted argument.  We intentionally leave the patterns as-is
+# (see command_shield/README.md → "Known false-positive surface") and
+# pin each FP with `xfail(strict=False)` so that:
+#
+#   1. the FP surface is discoverable in the test file, not folklore;
+#   2. if someone later tightens a pattern (e.g. adds an echo-guard
+#      lookbehind à la `DEL-001`), the xfail flips to XPASS and
+#      prompts them to remove the marker and make the negative real.
+#
+# Do NOT fix these by loosening the verdict — either tighten the regex
+# or accept the FP as the cost of deterministic coverage.
+
+
+class TestKnownFalsePositives:
+    """Pinned false positives for the deterministic regex gate.
+
+    These are not "tests that should pass once command_shield learns
+    semantics".  They document the current contract boundary:
+    command_shield matches literal command text and shell structure, and
+    intentionally does not try to infer whether a quoted dangerous verb
+    is documentation, explanation, or invocation.  If this boundary is
+    ever changed, the corresponding xfail should flip to XPASS and be
+    removed together with a README update.
+    """
+
+    @pytest.mark.parametrize("cmd", [
+        pytest.param(
+            'echo "use sudo or pkexec for privilege escalation"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-PKEXEC-001: bare word matches inside echo/quoted prose",
+            ),
+        ),
+        pytest.param(
+            "git commit -m 'migrate away from doas'",
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-DOAS-001: bare word matches inside commit message",
+            ),
+        ),
+        pytest.param(
+            'echo "service loads via runuser at boot"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-RUNUSER-001: bare word matches inside echo/quoted prose",
+            ),
+        ),
+        pytest.param(
+            'echo "enter machinectl shell for the container"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-MACHINECTL-SHELL-001: verb+subverb matches inside echo",
+            ),
+        ),
+        pytest.param(
+            'echo "do not invoke sandbox-exec directly"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-SANDBOX-EXEC-001: bare word matches inside echo/quoted prose",
+            ),
+        ),
+        pytest.param(
+            "git commit -m 'script runs with administrator privileges'",
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason=(
+                    "IF-OSASCRIPT-ADMIN-001: pure English phrase; any doc / "
+                    "commit message containing it fires"
+                ),
+            ),
+        ),
+        pytest.param(
+            'echo "use csrutil enable to re-enable SIP"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-CSRUTIL-ANY-001: verb+subverb matches inside echo",
+            ),
+        ),
+        pytest.param(
+            'echo "run nvram -d VarName to delete a variable"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-NVRAM-WRITE-001: flag form matches inside echo/help text",
+            ),
+        ),
+        pytest.param(
+            'echo "run bless --info to check boot volume"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-BLESS-001: `bless -…` matches inside echo/help text",
+            ),
+        ),
+        pytest.param(
+            'echo "deprecated: use kextload instead"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-KEXT-LOAD-001: bare word matches inside echo/quoted prose",
+            ),
+        ),
+        pytest.param(
+            'echo "use kmutil load to stage a kext"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-KMUTIL-001: verb+subverb matches inside echo",
+            ),
+        ),
+        pytest.param(
+            "git commit -m 'example: dscl . -create /Users/foo'",
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-DSCL-ACCOUNT-001: full invocation fragment in commit message",
+            ),
+        ),
+        pytest.param(
+            'echo "use launchctl bootstrap for new daemons"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-LAUNCHCTL-ADMIN-001: verb+subverb matches inside echo",
+            ),
+        ),
+        pytest.param(
+            'echo "run crontab -e to edit your schedule"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-CRONTAB-EDIT-001: `crontab -e` matches inside echo/help text",
+            ),
+        ),
+        pytest.param(
+            'echo "pipe a new file into crontab - to replace it"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-CRONTAB-STDIN-001: `crontab -` matches inside echo/help text",
+            ),
+        ),
+        pytest.param(
+            'echo "lets meet at 3pm today"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason=(
+                    "IF-AT-SCHEDULE-001: English `at <digit>` in prose fires "
+                    "the scheduled-job rule"
+                ),
+            ),
+        ),
+        pytest.param(
+            'echo "pointing at now"',
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="IF-AT-SCHEDULE-001: English `at now` in prose fires",
+            ),
+        ),
+    ])
+    def test_prose_false_positive(self, cmd: str) -> None:
+        # Invariant we *want*: echoing / committing text that mentions
+        # one of the new privileged verbs must not be CATASTROPHIC.
+        # Today every case below violates that invariant — see the
+        # xfail reason.  Remove the xfail once the corresponding
+        # pattern grows an echo-guard (or an equivalent mitigation).
+        assert not inspect_command(cmd).is_catastrophic
 
 
 # ── match_patterns direct API ───────────────────────────────────────
