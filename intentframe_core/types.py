@@ -36,6 +36,52 @@ FILE_INTEL_SIGNAL_IDS_MAX_ITEMS = 16
 FILE_INTEL_SIGNAL_ID_MAX_LEN = 96
 FILE_INTEL_FINDING_IDS_MAX_ITEMS = 32
 FILE_INTEL_FINDING_ID_MAX_LEN = 96
+# Bounds for destination-side signals added to FileIntel.  The path
+# cap matches the conservative limit used elsewhere in the core types
+# for user-controlled path strings; the extension cap mirrors the
+# language cap since extensions are short by convention.
+FILE_INTEL_PATH_MAX_LEN = 512
+FILE_INTEL_EXTENSION_MAX_LEN = 32
+
+
+# Destination classification categories for ``FileIntel.path_category``.
+# The vocabulary is intentionally small; add new entries here and in
+# the classifier together.
+FILE_PATH_CATEGORY = Literal[
+    "system_config",
+    "shell_init",
+    "launch_agent",
+    "credential_store",
+    "persistence_hook",
+    "user_document",
+    "dev_workspace",
+    "cache_or_tmp",
+    "unknown",
+]
+
+# What a ``stat()`` found at the destination.  ``"symlink"`` here is
+# set by the classifier when the destination itself is a dangling
+# symlink; for a symlink that resolves successfully, ``destination_kind``
+# reports what the symlink resolves TO (file / directory / other) and
+# ``is_symlink`` separately flags the indirection.
+FILE_DESTINATION_KIND = Literal[
+    "file",
+    "directory",
+    "symlink",
+    "missing",
+    "other",
+]
+
+# What the immediate parent directory of the destination looks like.
+# ``"missing"`` means the write would implicitly create a directory
+# tree (scope expansion signal).  ``"file"`` means the parent is a
+# regular file — the write cannot succeed (inconsistency signal).
+FILE_PARENT_KIND = Literal[
+    "directory",
+    "missing",
+    "file",
+    "other",
+]
 
 
 class CommandIntel(BaseModel):
@@ -102,28 +148,40 @@ class CommandIntel(BaseModel):
 
 
 class FileIntel(BaseModel):
-    """Bounded summary of deterministic payload facts for WRITE_FILE.
+    """Bounded summary of deterministic facts for WRITE_FILE.
 
     Sibling of :class:`CommandIntel`: where CommandIntel carries
     ``command_shield.inspect_command`` output for RUN_COMMAND, FileIntel
     carries ``command_shield.inspect_code`` output for WRITE_FILE
-    content.  Populated only for WRITE_FILE intents — ``None`` for every
-    other action.
+    content AND a bounded summary of the destination (existence, kind,
+    symlink indirection, parent, floor-deny status, semantic category).
+    Populated only for WRITE_FILE / WRITE_HOST_FILE intents — ``None``
+    for every other action.
 
-    Consumers:
-      - :class:`DeterministicGuardian` — the passive-write fast-path
-        requires ``not is_binary and not is_oversized and not
-        has_code_intel_findings`` before ALLOWing on a safe-looking
-        extension.  This catches prompt-injection tricks like writing a
-        file named ``notes.md`` whose body sniffs as Python.
-      - :class:`AnalysisEngine` — routing to the ``critical_write_file``
-        AE lane uses ``language`` and ``has_code_intel_findings`` as
-        payload-side triggers (with destination heuristics handled by
-        path-based helpers, not this type).
+    The type is partitioned into five groups:
 
-    Bounds are enforced at construction via the same ``_clip_tuple``
-    pattern CommandIntel uses; an overflowing upstream cannot swell the
-    pipeline payload.
+    * **Payload signals** (``language``, ``is_binary``, ``is_oversized``,
+      ``size_bytes``, ``has_code_intel_findings``,
+      ``code_intel_finding_ids``, ``signal_ids``) — what is being
+      written.
+    * **Destination state** (``destination_exists``, ``destination_kind``,
+      ``is_symlink``, ``symlink_target_real_path``) — what is at the
+      target right now.
+    * **Parent state** (``parent_kind``) — whether the write would
+      implicitly create a directory tree or collide with a non-directory
+      parent.
+    * **Path semantics** (``path_category``, ``hits_floor_deny_prefix``)
+      — target-derived classification and floor-match status.
+    * **Relational** (``extension``) — target-derived facts.
+
+    Bounds are enforced at construction via the same ``_clip_tuple`` /
+    ``_clip_string`` pattern CommandIntel uses; an overflowing upstream
+    cannot swell the pipeline payload.
+
+    Tri-state on ``destination_exists``: ``True`` = destination present,
+    ``False`` = definitely absent, ``None`` = could not determine
+    (virtual target the pipeline cannot resolve, permission error on
+    parent, etc.).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -136,14 +194,14 @@ class FileIntel(BaseModel):
 
     is_binary: bool = False
     """True when ``command_shield`` flagged the payload as binary.
-    Redundant with ``language == "binary"`` but exposed as a first-class
-    flag so downstream consumers don't have to magic-string match."""
+    Redundant with ``language == "binary"`` but carried as a dedicated
+    boolean field."""
 
     is_oversized: bool = False
     """True when payload length exceeded ``ShieldConfig.max_code_length``.
-    An oversized payload is NOT analysed — ``code_intel_finding_ids``
-    and deep signals will be empty in that case, so consumers must check
-    this flag before drawing conclusions from absence of findings."""
+    Oversized payloads are not deeply analyzed, so finding / signal
+    details may be absent even when the content would otherwise have
+    produced them."""
 
     size_bytes: int = 0
     """Length of the content string in bytes (UTF-8).  Bounded at
@@ -153,9 +211,7 @@ class FileIntel(BaseModel):
     has_code_intel_findings: bool = False
     """True iff ``CodeReport.code_intel.findings`` is non-empty after
     language-aware analysis.  ``False`` both for "analyzed and clean"
-    AND for "not analyzed" (binary / oversized / out-of-scope language)
-    — consumers that care about the distinction must also check
-    ``is_binary`` / ``is_oversized`` / ``language``."""
+    AND for "not analyzed" (binary / oversized / out-of-scope language)."""
 
     code_intel_finding_ids: tuple[str, ...] = Field(default_factory=tuple)
     """Finding-id strings from ``CodeReport.code_intel.findings``.
@@ -169,6 +225,63 @@ class FileIntel(BaseModel):
     ``FILE_INTEL_SIGNAL_IDS_MAX_ITEMS``.  Intentionally does NOT carry
     severity or evidence — those live on the original ``CodeReport``
     the pipeline keeps thread-local."""
+
+    # ── Destination state ─────────────────────────────────────
+    destination_exists: Optional[bool] = None
+    """Whether a deterministic check found the destination present.
+
+    Tri-state: ``True`` = exists, ``False`` = does not exist,
+    ``None`` = could not determine (unresolvable virtual target,
+    permission error on parent, or the pipeline has no resolver
+    available for this action family)."""
+
+    destination_kind: Optional[FILE_DESTINATION_KIND] = None
+    """What the destination resolves to, when the check succeeded.
+
+    Derived from ``os.stat`` (which follows symlinks), so a symlink
+    pointing to a regular file reports ``"file"`` here.
+    ``"symlink"`` is reserved for the dangling-symlink case (lstat
+    sees a symlink; stat raises).  ``None`` when
+    ``destination_exists`` is ``None`` or ``False``."""
+
+    is_symlink: bool = False
+    """True when ``os.lstat`` at the target reports a symlink, whether
+    or not the symlink resolves."""
+
+    symlink_target_real_path: Optional[str] = None
+    """Canonical real path the symlink points to, when
+    ``is_symlink=True`` and the symlink resolves.  ``None`` for
+    non-symlink targets AND for dangling symlinks (distinguish via
+    ``destination_exists``).  Bounded by ``FILE_INTEL_PATH_MAX_LEN``."""
+
+    # ── Parent state ──────────────────────────────────────────
+    parent_kind: Optional[FILE_PARENT_KIND] = None
+    """Kind of the destination's immediate parent directory.
+
+    ``"directory"`` is the normal case; ``"missing"`` means the write
+    would require a missing parent path; ``"file"`` means the parent is
+    a regular file; ``"other"`` covers FIFO / device / etc.
+    ``None`` when parent resolution was not attempted."""
+
+    # ── Path semantics ────────────────────────────────────────
+    path_category: Optional[FILE_PATH_CATEGORY] = None
+    """Semantic classification of the destination path — independent
+    of whether anything exists there today.  Populated by
+    ``intentframe_components.heuristics.file_payload.classify_path_category``."""
+
+    hits_floor_deny_prefix: bool = False
+    """True when the canonicalized real path matches the floor at
+    ``resource_registry.floor.DENY_WRITE_PREFIXES``.  For ``WRITE_FILE``
+    (virtual) and ``WRITE_HOST_FILE`` alike, this is a pure prefix-match
+    result against the canonicalized path string."""
+
+    # ── Relational ────────────────────────────────────────────
+    extension: Optional[str] = None
+    """Normalized lowercase file extension (``".py"``, ``".sh"``,
+    ``".plist"``, ...) derived from the write target via
+    ``Path(target).suffix.lower()``.  ``None`` when the target is
+    empty, absent, or has no suffix.  Bounded by
+    ``FILE_INTEL_EXTENSION_MAX_LEN``."""
 
     @classmethod
     def _clip_tuple(
@@ -217,6 +330,14 @@ class FileIntel(BaseModel):
             except (TypeError, ValueError):
                 n = 0
             data["size_bytes"] = max(0, n)
+        if "symlink_target_real_path" in data:
+            data["symlink_target_real_path"] = self._clip_string(
+                data["symlink_target_real_path"], FILE_INTEL_PATH_MAX_LEN
+            )
+        if "extension" in data:
+            data["extension"] = self._clip_string(
+                data["extension"], FILE_INTEL_EXTENSION_MAX_LEN
+            )
         super().__init__(**data)
 
 

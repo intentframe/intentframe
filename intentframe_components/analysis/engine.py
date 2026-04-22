@@ -526,19 +526,27 @@ class AIAnalysisEngine(AnalysisEngine):
                 context_lines.append(line)
 
         if file_intel is not None:
-            # Inject payload-side facts as TRUSTED context.  Mirror of the
-            # terminal-command signals block, but scoped to WRITE_FILE
-            # payloads.  The AE routes to ``critical_write_file`` when the
-            # payload looks code-like; once there, the prompt body needs
-            # the structured facts so reasoning stays grounded in
-            # deterministic output rather than re-sniffing the raw bytes.
+            # Inject deterministic facts as TRUSTED context, partitioned
+            # into three labeled subsections the ``_CRITICAL_WRITE_FILE``
+            # prompt body can cite by name.  The block is scoped to
+            # WRITE_FILE / WRITE_HOST_FILE payloads; once an intent
+            # routes to ``critical_write_file``, the rubric relies on
+            # these subsections so reasoning stays grounded in
+            # deterministic output rather than the LLM re-sniffing the
+            # raw bytes or guessing at destination state.
+            #
+            # Ordering and field shape here are part of the contract the
+            # prompt body references — do NOT reorder or rename without
+            # updating ``_CRITICAL_WRITE_FILE`` in lockstep.
+
+            # ── Subsection 1: payload signals ─────────────────────
             context_lines.append(
                 "\nWRITE_FILE — PAYLOAD SIGNALS:\n"
-                "Before this intent reached you, deterministic code inspection "
-                "(language sniff, binary guard, AST / regex analyzers) produced "
-                "the facts below.  Factor them into your hidden-behavior and "
-                "risk analysis — especially language/extension mismatches, "
-                "findings on code payloads, and oversized / binary content:"
+                "Deterministic code inspection of the write PAYLOAD "
+                "(language sniff, binary guard, AST / regex analyzers) "
+                "produced the facts below.  Factor them into your "
+                "hidden-behavior and risk analysis — especially findings "
+                "on code payloads and oversized / binary content:"
             )
             context_lines.append(
                 f"  - language={file_intel.language or 'unknown'} "
@@ -553,6 +561,61 @@ class AIAnalysisEngine(AnalysisEngine):
             if file_intel.has_code_intel_findings:
                 ids = ", ".join(file_intel.code_intel_finding_ids) or "(unnamed)"
                 context_lines.append(f"  - code-intel findings: {ids}")
+
+            # ── Subsection 2: destination signals ─────────────────
+            # Describes what is at the target RIGHT NOW.  The
+            # ``destination_exists`` field is tri-state — True / False /
+            # unknown — and the rubric uses all three distinctly to
+            # classify creation vs overwrite vs unknown.  The renderer
+            # emits ``unknown`` explicitly (not ``None``) so the LLM
+            # reads a human word, not a Python-ish sentinel.
+            context_lines.append(
+                "\nWRITE_FILE — DESTINATION SIGNALS:\n"
+                "Deterministic probe of the TARGET path.  "
+                "``destination_exists`` is tri-state: ``true`` = present, "
+                "``false`` = absent, ``unknown`` = could not check.  Apply "
+                "the reversibility / deletion rules accordingly:"
+            )
+            exists_str = (
+                "unknown"
+                if file_intel.destination_exists is None
+                else str(file_intel.destination_exists).lower()
+            )
+            kind_str = file_intel.destination_kind or "unknown"
+            context_lines.append(
+                f"  - destination_exists={exists_str} "
+                f"destination_kind={kind_str}"
+            )
+            symlink_target = (
+                file_intel.symlink_target_real_path
+                if file_intel.symlink_target_real_path
+                else "n/a"
+            )
+            context_lines.append(
+                f"  - is_symlink={str(file_intel.is_symlink).lower()} "
+                f"symlink_target_real_path={symlink_target}"
+            )
+            parent_str = file_intel.parent_kind or "unknown"
+            context_lines.append(f"  - parent_kind={parent_str}")
+
+            # ── Subsection 3: path semantics ──────────────────────
+            # What the destination MEANS, independent of whether
+            # anything exists there today.  ``path_category`` is always
+            # populated (falls back to ``unknown``); ``hits_floor_deny_prefix``
+            # tells the rubric the write would be refused at the floor
+            # regardless of policy breadth.
+            context_lines.append(
+                "\nWRITE_FILE — PATH SEMANTICS:\n"
+                "Deterministic classification of the target PATH, "
+                "independent of what is at the destination today:"
+            )
+            context_lines.append(
+                f"  - path_category={file_intel.path_category or 'unknown'} "
+                f"hits_floor_deny_prefix="
+                f"{str(file_intel.hits_floor_deny_prefix).lower()}"
+            )
+            ext_str = file_intel.extension or "none"
+            context_lines.append(f"  - extension={ext_str}")
 
         trusted_sections["Context"] = "\n".join(context_lines)
 
