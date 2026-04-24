@@ -99,6 +99,31 @@ The CLI translates that into:
 - `INTENTFRAME_PROFILE=root`
 - `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` (only if the operator did not already set `EXECUTOR_CONFIG`)
 
+### 2a. (Alternative) Launch supervisor directly and seed manually
+
+If you are running the supervisor outside of the CLI wrapper — e.g.
+during development or when driving the gateway from a script — set the
+same two env vars yourself:
+
+```bash
+INTENTFRAME_PROFILE=root \
+EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
+python -m supervisor.main start
+```
+
+The gateway's `Bootstrapper.reconcile` runs at startup and seeds the
+root-profile policy + `/ → /` workspace automatically.  If you want to
+seed by hand (for example, against a registry that was started without
+the gateway bootstrap), use the mirror script:
+
+```bash
+INTENTFRAME_PROFILE=root python jarvis_pa/seed_policies.py
+```
+
+The script honors the same `INTENTFRAME_PROFILE` and `JARVIS_USER_ID`
+env vars as bootstrap and is idempotent (GET-first, skip if present),
+so running it after an auto-seeded gateway is a no-op.
+
 ### 3. Observe root-demo status in the CLI
 
 The gateway's `/system/health` response now includes a `root_demo` block. The CLI renders that as a banner such as:
@@ -242,3 +267,5 @@ For tests, `ExecutionContext` can still be constructed directly rather than prob
 - `intentframe_cli/ui.py` — profile banner and uninstall hint
 - `intentframe_setup_root_demo.sh` — installer
 - `intentframe_uninstall_root_demo.sh` — uninstaller
+- `intentframe_gateway/bootstrap.py` — runtime policy/workspace seeder (profile-aware)
+- `jarvis_pa/seed_policies.py` — hand-runnable mirror of bootstrap for manual seeding

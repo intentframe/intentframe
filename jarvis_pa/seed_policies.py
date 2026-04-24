@@ -7,16 +7,68 @@ This creates:
     1. A user policy (allowed actions, intent limits)
     2. A workspace in the Resource Registry (virtual path mounts)
 
+Profiles
+--------
+Seeds different policy / workspace shapes depending on the
+``INTENTFRAME_PROFILE`` environment variable (mirrors
+``intentframe_gateway/bootstrap.py``):
+
+* ``user`` (default) — home-scoped host-file access (``~/*``), virtual
+  workspace rooted at ``/home/``.  Mirrors ``jarvis_pa/executor.yaml``.
+* ``root`` — full-filesystem host-file access (``/*``), virtual workspace
+  rooted at ``/``.  Mirrors ``jarvis_pa/executor_root.yaml``.
+
+Idempotent: checks for an existing policy before POSTing so reruns are
+safe (workspace seed is idempotent on the registry's 409 response).
+
 For development/testing only — tighten in production.
 """
 
 from __future__ import annotations
 
-import httpx
+import logging
+import os
 import sys
+
+import httpx
+
+logger = logging.getLogger(__name__)
 
 POLICY_REGISTRY_SOCKET = "~/.intentframe/run/policy-registry.sock"
 RESOURCE_REGISTRY_SOCKET = "~/.intentframe/run/resource-registry.sock"
+
+_VALID_PROFILES = ("user", "root")
+
+
+def _resolve_profile() -> str:
+    """Active profile from ``INTENTFRAME_PROFILE`` (default: ``user``).
+
+    Unknown values fall back to ``user`` so a typo never silently
+    relaxes policy.
+    """
+    raw = (os.environ.get("INTENTFRAME_PROFILE") or "user").strip().lower()
+    if raw not in _VALID_PROFILES:
+        logger.warning(
+            "Unknown INTENTFRAME_PROFILE=%r — falling back to 'user'", raw
+        )
+        return "user"
+    return raw
+
+
+def _resolve_user_id() -> str:
+    """Base user id from ``JARVIS_USER_ID`` env (ignores profile suffix)."""
+    return os.environ.get("JARVIS_USER_ID", "jarvis_default")
+
+
+def _profile_user_id(profile: str) -> str:
+    """User id scoped to a profile.
+
+    Root uses a ``_root`` suffix so the two profiles' policies and
+    workspaces coexist in the registry without colliding.
+    """
+    base = _resolve_user_id()
+    return f"{base}_root" if profile == "root" else base
+
 
 SAFE_ACTIONS = [
     # Host file reads
@@ -110,22 +162,48 @@ UNSAFE_ACTIONS = [
 ]
 
 
-def _build_policy() -> dict:
+INTENT_LIMITS = [
+    {
+        "limit_id": "max-spend-per-txn",
+        "domain": "spending",
+        "description": "Maximum $500 per transaction",
+        "raw": "Don't spend more than $500 on a single thing without asking me",
+        "threshold": 500.0,
+        "effect": "block",
+        "scope": "per_action",
+    },
+    {
+        "limit_id": "confirm-before-delete",
+        "domain": "deletion",
+        "description": "Always confirm before deleting",
+        "raw": "Ask me before deleting anything I can't get back",
+        "effect": "require_confirmation",
+        "scope": "per_action",
+    },
+]
+
+
+def _build_policy(profile: str = "user") -> dict:
     allowed_actions: dict[str, dict] = {}
-    # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py):
-    # ``host_path_constraint.allowed_host_paths`` MUST mirror
-    # ``jarvis_pa/executor.yaml::host_files.allowed_write_paths`` (and
-    # by extension the read paths, which today are the same).  The
-    # executor YAML is the source of truth; this policy is the
-    # per-action allowlist that rides alongside.  If executor.yaml
-    # ever narrows to e.g. ``[~/Documents/*, ~/Downloads/*]``, update
-    # the list below in lockstep — otherwise the adapter and the
-    # guardian will disagree at the path boundary and users see
-    # inconsistent deny reasons.  HostFileConstraints rejects
-    # trailing-slash shorthand (``dir/``) at load time, so use
-    # explicit subtree globs only. The disjoint field name
-    # ``allowed_host_paths`` drives the Union-dispatch disambiguation.
-    host_path_constraint = {"allowed_host_paths": ["~/*"]}
+    # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py for
+    # the user profile; the root profile mirrors
+    # ``jarvis_pa/executor_root.yaml::host_files.allowed_write_paths``):
+    # ``host_path_constraint.allowed_host_paths`` MUST mirror the matching
+    # executor YAML's ``host_files.allowed_write_paths`` (and by extension
+    # the read paths, which today are the same).  The executor YAML is
+    # the source of truth; this policy is the per-action allowlist that
+    # rides alongside.  If an executor.yaml narrows to e.g.
+    # ``[~/Documents/*, ~/Downloads/*]``, update the matching profile
+    # branch below in lockstep — otherwise the adapter and the guardian
+    # will disagree at the path boundary and users see inconsistent deny
+    # reasons.  HostFileConstraints rejects trailing-slash shorthand
+    # (``dir/``) at load time, so use explicit subtree globs only. The
+    # disjoint field name ``allowed_host_paths`` drives the Union-dispatch
+    # disambiguation.
+    if profile == "root":
+        host_path_constraint = {"allowed_host_paths": ["/*"]}
+    else:
+        host_path_constraint = {"allowed_host_paths": ["~/*"]}
 
     for action in SAFE_ACTIONS:
         if action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
@@ -174,32 +252,14 @@ def _build_policy() -> dict:
             "constraints": constraint,
         }
 
-    intent_limits = [
-        {
-            "limit_id": "max-spend-per-txn",
-            "domain": "spending",
-            "description": "Maximum $500 per transaction",
-            "raw": "Don't spend more than $500 on a single thing without asking me",
-            "threshold": 500.0,
-            "effect": "block",
-            "scope": "per_action",
-        },
-        {
-            "limit_id": "confirm-before-delete",
-            "domain": "deletion",
-            "description": "Always confirm before deleting",
-            "raw": "Ask me before deleting anything I can't get back",
-            "effect": "require_confirmation",
-            "scope": "per_action",
-        },
-    ]
+    profile_label = "jarvis-root" if profile == "root" else "jarvis-dev"
 
     return {
-        "user_id": "jarvis_default",
+        "user_id": _profile_user_id(profile),
         "allowed_actions": allowed_actions,
-        "intent_limits": intent_limits,
+        "intent_limits": INTENT_LIMITS,
         "metadata": {
-            "profile": "jarvis-dev",
+            "profile": profile_label,
             "note": "Auto-seeded by seed_policies.py",
         },
     }
@@ -209,24 +269,38 @@ WORKSPACE_MOUNTS = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
 
+# Root-profile workspace: the virtual root coincides with the real root
+# so the agent's path model matches the operator's.  Mirrors
+# ``jarvis_pa/executor_root.yaml::filesystem.mounts``.
+ROOT_WORKSPACE_MOUNTS = [
+    {"virtual_path": "/", "real_path": "/", "writable": True},
+]
 
-def _seed_workspace(socket_path: str) -> None:
+
+def _profile_workspace_mounts(profile: str) -> list[dict]:
+    return ROOT_WORKSPACE_MOUNTS if profile == "root" else WORKSPACE_MOUNTS
+
+
+def _seed_workspace(socket_path: str, profile: str = "user") -> None:
     """Register Jarvis's workspace in the Resource Registry."""
+    workspace_id = _profile_user_id(profile)
+    mounts = _profile_workspace_mounts(profile)
+    profile_label = "root" if profile == "root" else "consumer"
     transport = httpx.HTTPTransport(uds=socket_path)
     with httpx.Client(transport=transport, base_url="http://resource-registry") as client:
         payload = {
-            "workspace_id": "jarvis_default",
-            "mounts": WORKSPACE_MOUNTS,
-            "metadata": {"agent": "jarvis", "profile": "consumer"},
+            "workspace_id": workspace_id,
+            "mounts": mounts,
+            "metadata": {"agent": "jarvis", "profile": profile_label},
         }
         resp = client.post("/workspaces", json=payload)
         if resp.status_code == 409:
-            print("Workspace already exists — skipping")
+            print(f"Workspace {workspace_id} already exists (profile={profile}) — skipping")
             return
         resp.raise_for_status()
-        print(f"Workspace seeded: {resp.json().get('workspace_id')}")
-        print(f"  Mounts: {len(WORKSPACE_MOUNTS)}")
-        for m in WORKSPACE_MOUNTS:
+        print(f"Workspace seeded: {resp.json().get('workspace_id')} (profile={profile})")
+        print(f"  Mounts: {len(mounts)}")
+        for m in mounts:
             rw = "read/write" if m.get("writable") else "read"
             print(f"    - {m['virtual_path']} → {m['real_path']} ({rw})")
 
@@ -242,25 +316,33 @@ def main() -> None:
         print("Start the supervisor first: python -m supervisor.main start")
         sys.exit(1)
 
-    # 1. Seed policies
-    policy = _build_policy()
+    profile = _resolve_profile()
+    print(f"Active profile: {profile}")
+
+    # 1. Seed policies (idempotent — GET first, POST only if absent)
+    policy = _build_policy(profile)
+    user_id = policy["user_id"]
 
     transport = httpx.HTTPTransport(uds=str(policy_sock))
     with httpx.Client(transport=transport, base_url="http://policy-registry") as client:
-        resp = client.post("/policies", json=policy)
-        resp.raise_for_status()
-        print(f"Policy seeded: {resp.json()}")
+        existing = client.get(f"/policies/{user_id}")
+        if existing.status_code == 200:
+            print(f"Policy {user_id} already exists (profile={profile}) — skipping")
+        else:
+            resp = client.post("/policies", json=policy)
+            resp.raise_for_status()
+            print(f"Policy seeded: {resp.json()}")
 
-        total = len(SAFE_ACTIONS) + len(UNSAFE_ACTIONS)
-        limits = len(policy.get("intent_limits", []))
-        print(f"  Allowed actions: {total} ({len(SAFE_ACTIONS)} safe, {len(UNSAFE_ACTIONS)} AI-validated)")
-        print(f"  Intent limits:   {limits}")
-        for lim in policy.get("intent_limits", []):
-            print(f"    - [{lim['domain']}] {lim['description']} → {lim['effect']}")
+            total = len(SAFE_ACTIONS) + len(UNSAFE_ACTIONS)
+            limits = len(policy.get("intent_limits", []))
+            print(f"  Allowed actions: {total} ({len(SAFE_ACTIONS)} safe, {len(UNSAFE_ACTIONS)} AI-validated)")
+            print(f"  Intent limits:   {limits}")
+            for lim in policy.get("intent_limits", []):
+                print(f"    - [{lim['domain']}] {lim['description']} → {lim['effect']}")
 
     # 2. Seed workspace
     if resource_sock.exists():
-        _seed_workspace(str(resource_sock))
+        _seed_workspace(str(resource_sock), profile)
     else:
         print(f"Warning: Resource registry socket not found at {resource_sock} — workspace not seeded")
 

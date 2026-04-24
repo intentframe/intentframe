@@ -20,9 +20,12 @@ only if the policy later grows finer-grained sub-allowlists (out of
 scope for this plan).
 
 Note: ``jarvis_pa/seed_policies.py`` is a hand-runnable mirror of this
-same policy (kept in lockstep intentionally).  This test pins the
-*runtime* path — the gateway bootstrap — so drift there cannot slip
-past CI.
+same policy across both profiles (``user`` and ``root``), kept in
+lockstep with bootstrap intentionally.  This test pins the *runtime*
+path — the gateway bootstrap against ``jarvis_pa/executor.yaml`` (user
+profile) — so drift there cannot slip past CI.  Bootstrap-vs-seeder
+parity (including the root profile) is covered by the ``Mirror check``
+snippet in ``docs/action-family-wiring.md``.
 """
 
 from __future__ import annotations

@@ -83,7 +83,7 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 ### 7. Policy seed (the runtime truth)
 
 - `intentframe_gateway/bootstrap.py` — the **runtime** policy seeder. Add the actions to `SAFE_ACTIONS` / `UNSAFE_ACTIONS`. Wire the new constraint into `_build_default_policy()` with the correct disjoint field name. This is the file the gateway actually runs on startup.
-- `jarvis_pa/seed_policies.py` — the manual mirror script. Keep it byte-for-byte equivalent to `bootstrap.py` (see "Drift hotspots" below).
+- `jarvis_pa/seed_policies.py` — the manual mirror script. Keep it equivalent to `bootstrap.py` across **both profiles** (`user` and `root`): SAFE/UNSAFE sets, per-action constraints, intent limits, and workspace mounts must match. The script reads `INTENTFRAME_PROFILE` and `JARVIS_USER_ID` from env just like bootstrap, and is idempotent (GET-first, skip if present). See "Drift hotspots" below.
 
 ### 8. Tests
 
@@ -122,18 +122,23 @@ A good rule: whenever you add or rename a list that enumerates action types, ask
   ```
   Compare to "Allowed Actions: N" in the handshake banner. They must match.
 
-- **Mirror check.** `bootstrap.py` vs `seed_policies.py`:
+- **Mirror check.** `bootstrap.py` vs `seed_policies.py` (covers both
+  profiles and the shared constants):
   ```bash
   python -c "
   from intentframe_gateway import bootstrap as b
   from jarvis_pa import seed_policies as s
   assert set(b.SAFE_ACTIONS) == set(s.SAFE_ACTIONS)
   assert set(b.UNSAFE_ACTIONS) == set(s.UNSAFE_ACTIONS)
-  bp = b._build_default_policy()['allowed_actions']
-  sp = s._build_policy()['allowed_actions']
-  assert set(bp) == set(sp)
-  for k in bp:
-      assert bp[k]['constraints'] == sp[k]['constraints'], k
+  assert b.INTENT_LIMITS == s.INTENT_LIMITS
+  assert b.WORKSPACE_MOUNTS == s.WORKSPACE_MOUNTS
+  assert b.ROOT_WORKSPACE_MOUNTS == s.ROOT_WORKSPACE_MOUNTS
+  for profile in ('user', 'root'):
+      bp = b._build_policy(profile)['allowed_actions']
+      sp = s._build_policy(profile)['allowed_actions']
+      assert set(bp) == set(sp), profile
+      for k in bp:
+          assert bp[k]['constraints'] == sp[k]['constraints'], (profile, k)
   print('mirror OK')
   "
   ```
