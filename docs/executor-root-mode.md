@@ -99,22 +99,45 @@ The CLI translates that into:
 - `INTENTFRAME_PROFILE=root`
 - `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` (only if the operator did not already set `EXECUTOR_CONFIG`)
 
-### 2a. (Alternative) Launch supervisor directly and seed manually
+### 2a. (Alternative) Launch supervisor directly (faster dev loop)
 
-If you are running the supervisor outside of the CLI wrapper — e.g.
-during development or when driving the gateway from a script — set the
-same two env vars yourself:
+If you are running the supervisor **without** `intentframe-gateway-cli`,
+you must supply the same **three** pieces the gateway would otherwise
+set: profile, executor YAML, and machine capability for root-demo.
+
+**Faster dev loop** (no gateway process, no credential-vault checks, no
+CLI/gateway teardown cycle). This is only appropriate when
+`sudo bash intentframe_setup_root_demo.sh` has already been run
+successfully on this machine — otherwise `sandbox.escalate: sudo` in
+`executor_root.yaml` will not have a working `sudo -n` path.
 
 ```bash
 INTENTFRAME_PROFILE=root \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
+INTENTFRAME_ESCALATION_ARMED=1 \
 python -m supervisor.main start
 ```
 
-The gateway's `Bootstrapper.reconcile` runs at startup and seeds the
-root-profile policy + `/ → /` workspace automatically.  If you want to
-seed by hand (for example, against a registry that was started without
-the gateway bootstrap), use the mirror script:
+The gateway normally injects `INTENTFRAME_ESCALATION_ARMED=0|1` on **each
+launch** after re-reading `~/.intentframe/state/root-demo.json` and
+`/etc/sudoers.d/intentframe-run` (`intentframe_gateway/escalation.py`).
+A bare supervisor has no such step: nothing sets this variable unless
+you do, so the executor will not enable `sudo -n` wrapping unless
+`INTENTFRAME_ESCALATION_ARMED=1` is present when the executor starts.
+
+**Footgun (manual `INTENTFRAME_ESCALATION_ARMED=1`)**: if you **uninstall**
+root-demo (sudoers + marker removed) but leave `INTENTFRAME_ESCALATION_ARMED=1`
+in your shell profile or a script, `sudo -n` can fail at runtime with a
+cryptic *“a password is required”*-style error — the var still claims
+the machine is armed, but the sudoers entry is gone. Prefer letting the
+gateway set capability, or re-export `0` / unset the variable after
+uninstall, or launch in a clean shell. The gateway-driven path avoids
+this because it re-detects on every launch.
+
+`Bootstrapper.reconcile` (policy + workspace seeding) runs with the
+**gateway**; it does not run for supervisor-only. If you need the same
+registry state the gateway would create (e.g. other profiles or
+services), use:
 
 ```bash
 INTENTFRAME_PROFILE=root python jarvis_pa/seed_policies.py
@@ -122,7 +145,10 @@ INTENTFRAME_PROFILE=root python jarvis_pa/seed_policies.py
 
 The script honors the same `INTENTFRAME_PROFILE` and `JARVIS_USER_ID`
 env vars as bootstrap and is idempotent (GET-first, skip if present),
-so running it after an auto-seeded gateway is a no-op.
+so running it after an auto-seeded gateway is a no-op. The
+`demo/tests/root_demo/` Python harnesses seed their own test policy
+and workspace in-process, so they can run against a supervisor started
+as above without an extra `seed_policies` step.
 
 ### 3. Observe root-demo status in the CLI
 

@@ -22,8 +22,11 @@
 # shell rc files, etc.) — those gates still apply under every template,
 # including ``unrestricted``.
 #
-# Usage:
-#   EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml python -m supervisor.main start
+# Usage (supervisor only — see docs/executor-root-mode.md section 2a):
+#   INTENTFRAME_PROFILE=root \
+#   EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
+#   INTENTFRAME_ESCALATION_ARMED=1 \
+#   python -m supervisor.main start
 # ═══════════════════════════════════════════════════════════════════════════════
 
 transport:
