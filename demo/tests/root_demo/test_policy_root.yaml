@@ -1,0 +1,52 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Root-Demo Test Policy
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Scoped mirror of the Jarvis root profile that the gateway seeds in
+# ``intentframe_gateway/bootstrap.py::_build_policy("root")``.  Two things
+# differ from the gateway seed on purpose:
+#
+#   1. The action set is trimmed to the four that exercise the root demo
+#      (RUN_COMMAND + the three host-file actions).  Tests run frequently
+#      with a real OpenAI key, and a slim policy keeps AE prompt size and
+#      per-run LLM cost bounded.
+#   2. ``intent_limits`` is empty -- spend / deletion limits are irrelevant
+#      to the root-demo attack corpus.
+#
+# Constraint values that DO carry over (and must stay in sync with
+# ``bootstrap.py`` if it changes):
+#
+#   * host_constraint  → ``allowed_host_paths: ["/*"]``           (bootstrap.py:176)
+#   * terminal_constraint.blocked_patterns                        (bootstrap.py:188-192)
+#   * safe / unsafe classification per action                     (bootstrap.py SAFE_ACTIONS / UNSAFE_ACTIONS)
+#
+# ``sudo`` stays in ``blocked_patterns`` even though the demo runs as root --
+# the demo claim is "executor already runs as root, agents must not attempt
+# escalation", which only holds if ``sudo`` is rejected upstream.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+allowed_actions:
+  READ_HOST_FILE:
+    safe: true
+    constraints:
+      allowed_host_paths: ["/*"]
+  LIST_HOST_DIRECTORY:
+    safe: true
+    constraints:
+      allowed_host_paths: ["/*"]
+  WRITE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths: ["/*"]
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"
+        - mkfs
+        - "dd if="
+        - "> /dev/"
+        - "chmod 777"
+
+intent_limits: []
