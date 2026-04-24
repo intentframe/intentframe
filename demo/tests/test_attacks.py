@@ -3,7 +3,13 @@ IntentFrame attack test runner — full supervisor pipeline.
 
 Submits scripted malicious intents through the Actor SDK and verifies that
 Analysis + Guardian correctly block them.  Agent-agnostic: the stub agent
-is just a ``for`` loop calling ``actor.submit()``.
+is just a loop calling ``actor.submit()``.
+
+Session shape:
+  One test run = one policy seed, one workspace seed, one Actor handshake.
+  Per-attack state (expense tracker + invoice sandbox) is reset between
+  attacks; audit is cleared before each attack and captured after so
+  per-attack reporting stays attributable.
 
 Prerequisites:
   - Start supervisor from repo root with the attack executor profile::
@@ -20,7 +26,9 @@ Each attack tests a different prompt injection technique (see ATTACKS dict).
 
 from __future__ import annotations
 
+import asyncio
 import sys
+import time
 from pathlib import Path
 
 _project_root = Path(__file__).resolve().parents[2]
@@ -31,7 +39,21 @@ for p in (_project_root, _tests_dir):
 
 from typing import Any, Dict, List
 
-from invoice_attack_pipeline import ATTACK_USER_ID, DEMO_DATA, run_attack_pipeline
+from policy_registry.client import PolicyRegistryClient
+from resource_registry.client import ResourceRegistryClient
+from intentframe_server.client import IntentFrameClient
+
+from invoice_attack_pipeline import (
+    ATTACK_USER_ID,
+    DEFAULT_INTENTFRAME_SOCKET,
+    DEMO_DATA,
+    ensure_attack_user_policy,
+    populate_attack_sandbox,
+    register_attack_workspace,
+    reset_expense_tracker,
+    snapshot_audit,
+)
+from stub_pipeline_agent import StubPipelineAgent, load_attack_submissions
 
 # ============================================================
 # Attack configurations
@@ -83,12 +105,7 @@ ATTACKS: Dict[int, Dict[str, Any]] = {
 }
 
 
-def run_attack(attack_num: int, *, verbose: bool = True) -> Dict[str, Any]:
-    if attack_num not in ATTACKS:
-        return {"error": f"Unknown attack number: {attack_num}"}
-
-    attack = ATTACKS[attack_num]
-
+def _print_attack_header(attack_num: int, attack: Dict[str, Any]) -> None:
     print("\n" + "=" * 79)
     print(f"  ATTACK {attack_num}: {attack['name']}")
     print("=" * 79)
@@ -97,24 +114,6 @@ def run_attack(attack_num: int, *, verbose: bool = True) -> Dict[str, Any]:
     print(f"  Invoice Amount: ${attack['amount']:,}")
     print(f"  User: {ATTACK_USER_ID}")
     print("=" * 79)
-
-    pipe = run_attack_pipeline(
-        attack_num=attack_num,
-        attack_folder=attack["folder"],
-        verbose=verbose,
-    )
-
-    return {
-        "attack_num": attack_num,
-        "attack_name": attack["name"],
-        "status": "completed",
-        "duration": pipe["duration_sec"],
-        "blocked_count": pipe["blocked_count"],
-        "allowed_count": pipe["allowed_count"],
-        "blocked_invoices": pipe["blocked_append_rows"],
-        "audit_log": pipe["audit_log"],
-        "result": pipe["agent_result"],
-    }
 
 
 def print_attack_summary(results: List[Dict[str, Any]]) -> None:
@@ -150,6 +149,74 @@ def print_attack_summary(results: List[Dict[str, Any]]) -> None:
     print("╚═══════════════════════════════════════════════════════════════════════════════╝")
 
 
+async def run(attack_nums: List[int]) -> None:
+    policy_client = PolicyRegistryClient()
+    resource_client = ResourceRegistryClient()
+    server_client = IntentFrameClient(socket_path=DEFAULT_INTENTFRAME_SOCKET)
+
+    try:
+        ensure_attack_user_policy(policy_client)
+        register_attack_workspace(resource_client)
+
+        agent = StubPipelineAgent()
+        await agent.open(ATTACK_USER_ID, DEFAULT_INTENTFRAME_SOCKET)
+        try:
+            session_t0 = time.monotonic()
+            results: List[Dict[str, Any]] = []
+
+            for n in attack_nums:
+                attack = ATTACKS[n]
+                _print_attack_header(n, attack)
+
+                try:
+                    reset_expense_tracker()
+                    populate_attack_sandbox(attack["folder"])
+                    server_client.clear_audit_log()
+
+                    submissions = load_attack_submissions(n)
+
+                    t0 = time.monotonic()
+                    submit_results = [await agent.submit(req) for req in submissions]
+                    duration = time.monotonic() - t0
+
+                    audit = snapshot_audit(server_client)
+                    results.append({
+                        "attack_num": n,
+                        "attack_name": attack["name"],
+                        "status": "completed",
+                        "duration": duration,
+                        "blocked_count": audit["blocked_count"],
+                        "allowed_count": audit["allowed_count"],
+                        "blocked_invoices": audit["blocked_append_rows"],
+                        "audit_log": audit["audit_log"],
+                        "result": {
+                            "submits": len(submissions),
+                            "results": [
+                                {"success": r.success, "error": (r.error or "")[:300]}
+                                for r in submit_results
+                            ],
+                        },
+                    })
+                except Exception as e:
+                    print(f"\n  ❌ Attack {n} failed with error: {e}")
+                    results.append({
+                        "attack_num": n,
+                        "attack_name": attack.get("name", "Unknown"),
+                        "error": str(e),
+                    })
+
+            session_duration = time.monotonic() - session_t0
+        finally:
+            await agent.close()
+
+        print_attack_summary(results)
+        print(f"\n  Session duration: {session_duration:.2f}s")
+    finally:
+        policy_client.close()
+        resource_client.close()
+        server_client.close()
+
+
 def main() -> None:
     if not DEMO_DATA.is_dir():
         print(f"\n⚠️  Demo data not found at {DEMO_DATA}")
@@ -159,28 +226,19 @@ def main() -> None:
     if not attack_nums:
         attack_nums = list(ATTACKS.keys())
 
+    unknown = [n for n in attack_nums if n not in ATTACKS]
+    if unknown:
+        print(f"Unknown attack number(s): {unknown}")
+        return
+
     print("\n" + "=" * 79)
     print("  IntentFrame ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)")
     print("  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start")
     print("=" * 79)
-    print(f"  Running attacks: {attack_nums}")
+    print(f"  Running attacks: {attack_nums} (single Actor session)")
     print("=" * 79)
 
-    results: List[Dict[str, Any]] = []
-    for attack_num in attack_nums:
-        try:
-            results.append(run_attack(attack_num))
-        except Exception as e:
-            print(f"\n  ❌ Attack {attack_num} failed with error: {e}")
-            results.append(
-                {
-                    "attack_num": attack_num,
-                    "attack_name": ATTACKS.get(attack_num, {}).get("name", "Unknown"),
-                    "error": str(e),
-                }
-            )
-
-    print_attack_summary(results)
+    asyncio.run(run(attack_nums))
 
 
 if __name__ == "__main__":
