@@ -103,6 +103,8 @@ ALLOWs them. This was the failure mode we debugged today — see the
 
 ## 3. Running the tests
 
+`test_normal.py` prints a visible `ALERT` banner at the top of its output specifying which supervisor config it expects (root profile + escalation armed). If the banner doesn't match your supervisor, stop and restart the supervisor with the right env before running.
+
 ```bash
 # All normal intents
 python demo/tests/root_demo/test_normal.py

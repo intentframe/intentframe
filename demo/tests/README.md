@@ -39,6 +39,8 @@ class StubPipelineAgent:
 
 Attack JSON files (like `attack_15_stealth_amount_mismatch.json`) are fully-formed intents, not prompts fed to a model. This makes the tests **agent-agnostic** — they validate IntentFrame's boundary regardless of what agent or model sits behind it.
 
+**Single-session behavior.** Each test file invocation opens the Actor once and runs all selected attacks through the same session. You'll see exactly one `[STUB] Handshake OK` line at the top of the run regardless of how many attacks you pass — one onboarding LLM call per file, not per attack. Between attacks the harness resets per-attack state (invoice sandbox, expense tracker, audit log) so per-attack reporting stays attributable. The shared stub exposes `open()` / `submit()` / `close()` async primitives in [`stub_pipeline_agent.py`](stub_pipeline_agent.py); the test file drives the loop directly.
+
 ### Shared policy
 
 All suites share a single policy YAML (`demo/config/test_policy.yaml`) loaded via `policy_loader.py`. Each suite provides its own `user_id`; the policy definition lives in one place so changes propagate everywhere.
@@ -72,11 +74,22 @@ intent_limits:
 
 ### Prerequisites
 
-Start the supervisor with the attack executor profile (from repo root):
+Each suite expects a specific supervisor executor config. Start the supervisor **from repo root** with the matching config before running the suite:
+
+| Test file(s) | Required supervisor command |
+|---|---|
+| `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start` |
+| `root_demo/test_normal.py` | `intentframe-gateway-cli --profile root` (or direct-supervisor equivalent — see [`root_demo/README.md`](root_demo/README.md)) |
 
 ```bash
+# For the 24 attack suites:
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+
+# For the root-demo suite (after one-time `sudo bash intentframe_setup_root_demo.sh`):
+intentframe-gateway-cli --profile root
 ```
+
+**Mixing configs is the most common footgun.** Running the 24 attack tests while the supervisor is under `executor_root.yaml` (or vice versa) causes VFS mount mismatches — Guardian decisions stay correct, but adapter-level `READ_FILE` surfaces as `"temporarily unavailable"` errors. Each test now prints a visible `ALERT` banner at the top of its output specifying which config the supervisor should be running with; if the banner doesn't match your supervisor, stop the supervisor and restart with the right `EXECUTOR_CONFIG`.
 
 ### Test suites
 

@@ -215,6 +215,20 @@ def register_redteam_workspace(resource_client: ResourceRegistryClient) -> None:
 # ============================================================
 
 
+def _print_executor_alert() -> None:
+    print()
+    print("#" * 79)
+    print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ATTACK EXECUTOR CONFIG")
+    print("#")
+    print("#  REQUIRED:")
+    print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
+    print("#    python -m supervisor.main start")
+    print("#")
+    print("#  WRONG CONFIG -> VFS MOUNT MISMATCH -> \"TEMPORARILY UNAVAILABLE\" ON READS")
+    print("#  (GUARDIAN DECISIONS STAY CORRECT; ADAPTER-LEVEL READS FAIL)")
+    print("#" * 79)
+
+
 def _print_attack_header(attack_num: int, attack: Dict[str, Any]) -> None:
     print("\n" + "=" * 79)
     print(f"  RED TEAM ATTACK {attack_num}: {attack['name']}")
@@ -370,6 +384,8 @@ def main() -> None:
     if not attack_nums:
         print("No valid attack numbers provided")
         return
+
+    _print_executor_alert()
 
     print("\n" + "=" * 79)
     print("  IntentFrame RED TEAM TEST SUITE (Actor → Analysis → Guardian)")

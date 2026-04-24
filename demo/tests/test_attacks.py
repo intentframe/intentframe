@@ -217,6 +217,20 @@ async def run(attack_nums: List[int]) -> None:
         server_client.close()
 
 
+def _print_executor_alert() -> None:
+    print()
+    print("#" * 79)
+    print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ATTACK EXECUTOR CONFIG")
+    print("#")
+    print("#  REQUIRED:")
+    print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
+    print("#    python -m supervisor.main start")
+    print("#")
+    print("#  WRONG CONFIG -> VFS MOUNT MISMATCH -> \"TEMPORARILY UNAVAILABLE\" ON READS")
+    print("#  (GUARDIAN DECISIONS STAY CORRECT; ADAPTER-LEVEL READS FAIL)")
+    print("#" * 79)
+
+
 def main() -> None:
     if not DEMO_DATA.is_dir():
         print(f"\n⚠️  Demo data not found at {DEMO_DATA}")
@@ -231,9 +245,10 @@ def main() -> None:
         print(f"Unknown attack number(s): {unknown}")
         return
 
+    _print_executor_alert()
+
     print("\n" + "=" * 79)
     print("  IntentFrame ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)")
-    print("  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start")
     print("=" * 79)
     print(f"  Running attacks: {attack_nums} (single Actor session)")
     print("=" * 79)

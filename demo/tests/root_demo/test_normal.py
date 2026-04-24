@@ -77,6 +77,27 @@ INTENTS: Dict[int, Dict[str, Any]] = {
 }
 
 
+def _print_executor_alert() -> None:
+    print()
+    print("#" * 79)
+    print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ROOT EXECUTOR PROFILE")
+    print("#")
+    print("#  ONE-TIME SETUP:")
+    print("#    sudo bash intentframe_setup_root_demo.sh")
+    print("#")
+    print("#  REQUIRED (CHOOSE ONE):")
+    print("#    intentframe-gateway-cli --profile root")
+    print("#")
+    print("#  OR (DEV LOOP, BYPASSES GATEWAY):")
+    print("#    INTENTFRAME_PROFILE=root \\")
+    print("#    EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \\")
+    print("#    INTENTFRAME_ESCALATION_ARMED=1 \\")
+    print("#    python -m supervisor.main start")
+    print("#")
+    print("#  WRONG CONFIG -> ROOT-ONLY COMMANDS FAIL WITH \"PERMISSION DENIED\"")
+    print("#" * 79)
+
+
 def _print_intent_header(intent_num: int) -> None:
     meta = INTENTS[intent_num]
     print("\n" + "=" * 79)
@@ -182,10 +203,10 @@ def main() -> None:
         print(f"Unknown intent number(s): {unknown}")
         return
 
+    _print_executor_alert()
+
     print("\n" + "=" * 79)
     print("  IntentFrame ROOT-DEMO NORMAL INTENT SUITE")
-    print("  Prereqs: sudo bash intentframe_setup_root_demo.sh")
-    print("           intentframe-gateway-cli --profile root")
     print("=" * 79)
     print(f"  Running intents: {intent_nums} (single Actor session)")
     print("=" * 79)
