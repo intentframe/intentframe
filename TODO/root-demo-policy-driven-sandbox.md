@@ -70,7 +70,8 @@ Normal mode remains unchanged.
 
 Root demo mode gets its own seeded profile with:
 
-- broader file path permissions (`/*` instead of `/home/*`)
+- a root workspace shape (`/` instead of `/home/*`) for prompt/runtime context
+- `RUN_COMMAND` as the root-demo action surface
 - a broad sandbox policy for `RUN_COMMAND`
 - prompt metadata that says commands already run as root
 
@@ -82,7 +83,7 @@ For the demo, the agent's workspace root should be `/`.
 
 That means:
 
-- file tools can reference system paths directly
+- root operations are expressed as shell commands against system paths
 - onboarding can honestly tell the agent its workspace root is `/`
 - the demo feels like real root access instead of "root with a fake home-only shell"
 
@@ -136,6 +137,10 @@ We only need a coherent root-demo profile where:
 
 That keeps the demo aligned without overengineering the terminal model.
 
+Shipped clarification: the root-demo harness is `RUN_COMMAND`-only. Root
+operations in this demo are shell operations; host-file, virtual-file, mail,
+calendar, and other adapters are not part of the root surface.
+
 ---
 
 ## Implementation Shape
@@ -144,7 +149,7 @@ That keeps the demo aligned without overengineering the terminal model.
 
 Add a root-demo seed profile that differs from the current bootstrap defaults in two ways:
 
-1. file path scope becomes `/*`
+1. the test-harness policy grants only `RUN_COMMAND`
 2. sandbox policy for `RUN_COMMAND` becomes broad/minimal
 
 The normal bootstrap seed remains unchanged.
@@ -153,14 +158,9 @@ The normal bootstrap seed remains unchanged.
 
 Seed a root-demo workspace mount of `/ -> /` (or the broadest acceptable equivalent).
 
-This keeps:
-
-- file tools
-- runtime `virtual_paths`
-- agent prompt
-- executor view
-
-all aligned to the same root workspace model.
+This keeps runtime `virtual_paths`, the agent prompt, and the executor view
+aligned to the same root workspace model. It does not imply that structured
+file tools are part of the root-demo action surface.
 
 ### Handshake / onboarding / prompt
 
@@ -225,14 +225,16 @@ Those are separate problems.
 The root demo is correct when all of these are true:
 
 1. The agent is told its workspace root is `/` and that commands already run as root.
-2. `READ_FILE`, `WRITE_FILE`, and `LIST_DIRECTORY` can operate on system paths through the root-demo profile.
-3. `RUN_COMMAND` can successfully do things like:
+2. The root-demo test harness grants only `RUN_COMMAND`; root operations are represented as terminal commands.
+3. Every suite performs a hard `RUN_COMMAND whoami` preflight through the same Actor → IntentFrame → executor path and aborts non-zero unless it returns `root`.
+4. `RUN_COMMAND` can successfully do things like:
    - `pwd`
    - `cd / && ls -la`
    - `cat /etc/hosts`
-4. The agent does not need `sudo`, and `sudo` remains blocked.
-5. Dangerous commands are still blocked by the prevention pipeline.
-6. Normal mode still uses the current stricter policy/workspace profile.
+5. The agent does not need `sudo`, and `sudo` remains blocked.
+6. Dangerous commands are still blocked by the prevention pipeline.
+7. Normal mode still uses the current stricter policy/workspace profile.
+8. Test harness exit status is meaningful: `0` only when preflight and all selected intents pass, `1` for preflight/verdict failures, `2` for invalid or unknown intent arguments.
 
 ---
 
@@ -264,7 +266,7 @@ Before giving the executor a root handle on a real Mac with any persistent state
 
 ☑ Per-lane full-body forks authored for critical_network_mutation and critical_network_probe (currently aliased to critical_run_command). Today RUN_COMMAND sub-lanes share the same body.
 
-✅ Root demo profile (Jarvis root profile) — shipped as `jarvis_pa/executor_root.yaml` (executor config) + the `INTENTFRAME_PROFILE=root` / `--profile root` gateway/CLI flag.  Privilege-separation model: only `sandbox-exec` subprocess runs as root via `sudo -n`, not the whole stack.  Machine capability gated by `intentframe_setup_root_demo.sh` which installs a narrow `NOPASSWD: SETENV: /usr/bin/sandbox-exec` sudoers entry and a user-space marker.  Gateway detects armed/disarmed at startup and injects `INTENTFRAME_ESCALATION_ARMED=0|1`; executor uses that env var as single source of truth.  CLI shows escalation banner and post-quit uninstall reminder.  See `docs/executor-root-mode.md` for the full operator flow.  **Note:** the "separate UserContext / policy profile" described in the original checklist item was not needed — the existing policy bootstrap covers the root profile shape via `INTENTFRAME_PROFILE=root`; the executor YAML + escalation mechanism handles the privilege side.
+✅ Root demo profile (Jarvis root profile) — shipped as `jarvis_pa/executor_root.yaml` (executor config) + the `INTENTFRAME_PROFILE=root` / `--profile root` gateway/CLI flag.  Privilege-separation model: only `sandbox-exec` subprocess runs as root via `sudo -n`, not the whole stack.  Machine capability gated by `intentframe_setup_root_demo.sh` which installs a narrow `NOPASSWD: SETENV: /usr/bin/sandbox-exec` sudoers entry and a user-space marker.  Gateway detects armed/disarmed at startup and injects `INTENTFRAME_ESCALATION_ARMED=0|1`; executor uses that env var as single source of truth.  CLI shows escalation banner and post-quit uninstall reminder.  The root-demo Python harness is RUN_COMMAND-only, starts with a hard `whoami == root` preflight, and exits non-zero on preflight/verdict failures.  See `docs/executor-root-mode.md` and `demo/tests/root_demo/README.md` for the full operator flow.  **Note:** the "separate UserContext / policy profile" described in the original checklist item was not needed — the existing policy bootstrap covers the root profile shape via `INTENTFRAME_PROFILE=root`; the executor YAML + escalation mechanism handles the privilege side.
 
 ☐ Red-team corpus run against the root profile specifically — the existing 24-attack test set was built before Bundles A–C and doesn't exercise capability edges, composition fast-path, or WRITE_FILE payload. At least a dozen new attacks: persistence (LaunchAgent plist, crontab, shell rc, .pth), privilege (sudoers, sshd_config, PAM), egress (reverse shell via curl | sh, nc -e, bash -i >& /dev/tcp), interpreter indirection, and TCC-circumvention paths.
 

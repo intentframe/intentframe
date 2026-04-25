@@ -152,6 +152,36 @@ so running it after an auto-seeded gateway is a no-op. The
 and workspace in-process, so they can run against a supervisor started
 as above without an extra `seed_policies` step.
 
+### 2b. Verify with the root-demo test harness
+
+The Python harnesses under `demo/tests/root_demo/` are black-box pipeline
+tests: each fixture submits an intent, receives an `ExecutionResult`, and
+asserts the observed decision matches the fixture's `expected_decision`.
+They do not assert which internal gate made the decision.
+
+Every suite now starts with a hard preflight before evaluating fixtures:
+
+```text
+RUN_COMMAND whoami
+```
+
+That preflight goes through the same Actor → IntentFrame → executor path as
+the fixtures and must return `root`. If it does not, the suite exits non-zero
+instead of letting root-only commands fail later with misleading permission
+errors.
+
+```bash
+python demo/tests/root_demo/test_normal.py
+python demo/tests/root_demo/test_general.py
+python demo/tests/root_demo/test_attacks.py
+```
+
+Exit status is part of the contract:
+
+- `0`: preflight passed and every selected intent matched `expected_decision`
+- `1`: preflight failed or at least one selected intent failed
+- `2`: invalid CLI argument or unknown intent number
+
 ### 3. Observe root-demo status in the CLI
 
 The gateway's `/system/health` response now includes a `root_demo` block. The CLI renders that as a banner such as:
@@ -293,6 +323,8 @@ For tests, `ExecutionContext` can still be constructed directly rather than prob
 - `intentframe_gateway/routes/system.py` — exposes `root_demo` in `/system/health`
 - `intentframe_cli/main.py` — `--profile root` pre-flight warning
 - `intentframe_cli/ui.py` — profile banner and uninstall hint
+- `demo/tests/root_demo/root_test_runner.py` — black-box root-demo suite runner, root preflight, and exit-code contract
+- `demo/tests/root_demo/README.md` — fixture categories and local test workflow
 - `intentframe_setup_root_demo.sh` — installer
 - `intentframe_uninstall_root_demo.sh` — uninstaller
 - `intentframe_gateway/bootstrap.py` — runtime policy/workspace seeder (profile-aware)

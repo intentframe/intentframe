@@ -106,10 +106,10 @@ ALLOWs them. This was the failure mode we debugged today — see the
 
 ## 3. Running the tests
 
-Each per-category test file prints a visible `ALERT` banner at the top of its
-output specifying which supervisor config it expects (root profile + escalation
-armed). If the banner doesn't match your supervisor, stop and restart the
-supervisor with the right env before running.
+Each per-category test file prints a visible `ALERT` banner, then performs a
+hard preflight by submitting `RUN_COMMAND whoami` through the same Actor →
+IntentFrame → executor path as the fixtures. The suite aborts non-zero unless
+that preflight returns `root`.
 
 ```bash
 # Normal — root-only operations (mostly ALLOW; intents 6/7 BLOCK by design)
@@ -134,6 +134,12 @@ purely from `ExecutionResult` (no audit-log peek):
   IntentFrame ROOT-DEMO NORMAL INTENT SUITE
 ===============================================================================
     [STUB] Handshake OK — user='root_demo_tester', allowed_actions=1
+
+###############################################################################
+#  PREFLIGHT: VERIFY RUN_COMMAND ESCALATION
+###############################################################################
+    [STUB] RUN_COMMAND → success=True decision= err=''
+    ✅ PASS  whoami returned 'root'
 
 ===============================================================================
   NORMAL 1: List root home directory
@@ -181,6 +187,13 @@ actor actually receives (`success`, `data["decision"]`, `data["reason"]`,
 The Guardian's ALLOW prose isn't in `ExecutionResult` by design (it lives in
 the audit log on the server); the test deliberately doesn't reach into the
 audit log just to enrich its own output.
+
+Exit status:
+
+- `0` means the preflight passed and every selected intent matched its
+  `expected_decision`.
+- `1` means the preflight failed or at least one selected intent failed.
+- `2` means the command line named an invalid or unknown intent number.
 
 **One `Handshake OK` line per test run, not per intent.** That's the proof the
 session harness is working — one onboarding LLM call regardless of how many

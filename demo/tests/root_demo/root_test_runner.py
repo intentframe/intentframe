@@ -129,14 +129,19 @@ class RootIntentSuite:
     # ── Public entry point ───────────────────────────────────────────
 
     def main(self) -> None:
-        intent_nums = [int(a) for a in sys.argv[1:] if a.isdigit()]
+        invalid_args = [a for a in sys.argv[1:] if not a.isdigit()]
+        if invalid_args:
+            print(f"Invalid intent argument(s): {invalid_args}")
+            sys.exit(2)
+
+        intent_nums = [int(a) for a in sys.argv[1:]]
         if not intent_nums:
             intent_nums = list(self.intents.keys())
 
         unknown = [n for n in intent_nums if n not in self.intents]
         if unknown:
             print(f"Unknown intent number(s): {unknown}")
-            return
+            sys.exit(2)
 
         _print_executor_alert()
 
@@ -146,7 +151,9 @@ class RootIntentSuite:
         print(f"  Running intents: {intent_nums} (single Actor session)")
         print("=" * 79)
 
-        asyncio.run(self._run(intent_nums))
+        passed = asyncio.run(self._run(intent_nums))
+        if not passed:
+            sys.exit(1)
 
     # ── Per-intent header / verdict ──────────────────────────────────
 
@@ -216,6 +223,41 @@ class RootIntentSuite:
         print(f"#  ACTION GROUP: {action}   —   intents {nums}")
         print("#" * 79)
 
+    async def _run_root_preflight(
+        self,
+        agent: StubPipelineRootAgent,
+        server_client: IntentFrameClient,
+    ) -> bool:
+        print()
+        print("#" * 79)
+        print("#  PREFLIGHT: VERIFY RUN_COMMAND ESCALATION")
+        print("#" * 79)
+        server_client.clear_audit_log()
+        result = await agent.submit(
+            {
+                "action": "RUN_COMMAND",
+                "data": {"command": "whoami"},
+                "reason": (
+                    "Preflight check: verify root-demo RUN_COMMAND execution "
+                    "is actually running as UID 0 before evaluating fixtures."
+                ),
+            }
+        )
+
+        data = result.data if isinstance(result.data, dict) else {}
+        output = str(data.get("content") or data.get("stdout") or "").strip()
+        if result.success and output == "root":
+            print("    ✅ PASS  whoami returned 'root'")
+            return True
+
+        print("    ❌ FAIL  root-demo escalation is not active")
+        if output:
+            print(f"        whoami output: {output!r}")
+        if result.error:
+            print(f"        error: {result.error}")
+        print("        Start the supervisor with the root executor profile before rerunning.")
+        return False
+
     # ── Summary ──────────────────────────────────────────────────────
 
     def _print_summary(self, per_intent: List[Dict[str, Any]]) -> None:
@@ -245,7 +287,7 @@ class RootIntentSuite:
 
     # ── Async run loop ───────────────────────────────────────────────
 
-    async def _run(self, intent_nums: List[int]) -> None:
+    async def _run(self, intent_nums: List[int]) -> bool:
         policy_client = PolicyRegistryClient()
         resource_client = ResourceRegistryClient()
         server_client = IntentFrameClient(socket_path=DEFAULT_INTENTFRAME_SOCKET)
@@ -257,8 +299,12 @@ class RootIntentSuite:
             agent = StubPipelineRootAgent()
             await agent.open(ROOT_USER_ID, DEFAULT_INTENTFRAME_SOCKET)
             try:
+                if not await self._run_root_preflight(agent, server_client):
+                    return False
+
                 t0 = time.monotonic()
                 per_intent: List[Dict[str, Any]] = []
+                all_passed = True
                 for action, nums in self._group_by_action(intent_nums):
                     self._print_group_banner(action, nums)
                     for n in nums:
@@ -281,6 +327,8 @@ class RootIntentSuite:
                             ],
                         }
                         per_intent.append(entry)
+                        passed, _, _ = self._evaluate(entry)
+                        all_passed = all_passed and passed
                         self._print_intent_verdict(entry)
                 duration = time.monotonic() - t0
             finally:
@@ -288,6 +336,7 @@ class RootIntentSuite:
 
             self._print_summary(per_intent)
             print(f"\n  Session duration: {duration:.2f}s")
+            return all_passed
         finally:
             policy_client.close()
             resource_client.close()
