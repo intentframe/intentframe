@@ -95,6 +95,37 @@ def _get_executor_logger() -> logging.Logger:
     return _executor_logger
 
 
+_BANNER_SUBJECT_KEYS: tuple[str, ...] = (
+    "command",
+    "url",
+    "query",
+    "rfc_message_id",
+    "title",
+    "to",
+    "prompt",
+    "content",
+)
+
+
+def _banner_subject(intent: IntentFrame) -> str:
+    """Pick the most relevant display subject for the verbose intent banner.
+
+    Only the host-file action family populates ``intent.target``; every other
+    action family leaves ``target`` empty and stores its meaningful subject in
+    a ``data`` field (``command`` for RUN_COMMAND, ``url`` for browser, etc.).
+    Falls back through ``_BANNER_SUBJECT_KEYS`` so new action types that use
+    one of those common keys get a useful banner automatically.
+    """
+    if intent.target:
+        return str(intent.target)
+    data = intent.data or {}
+    for key in _BANNER_SUBJECT_KEYS:
+        value = data.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
 class IntentFrameRuntime:
     """
     Stateless security gateway.
@@ -412,12 +443,14 @@ class IntentFrameRuntime:
         if self.verbose:
             reason = intent.reason or ""
 
+            subject = _banner_subject(intent)
+
             print(f"\n    ╔══════════════════════════════════════════════════════════╗")
             print(f"    ║  INTENT #{req_num:<51} ║")
             print(f"    ╠══════════════════════════════════════════════════════════╣")
             print(f"    ║  Agent: {intent.agent_id:<50} ║")
             print(f"    ║  Action: {intent.action.value:<49} ║")
-            print(f"    ║  Target: {str(intent.target)[:49]:<49} ║")
+            print(f"    ║  Target: {subject[:49]:<49} ║")
             if reason:
                 print(f"    ╟──────────────────────────────────────────────────────────╢")
                 print(f"    ║  Agent Reason:                                            ║")
