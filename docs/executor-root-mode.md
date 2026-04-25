@@ -42,6 +42,8 @@ The actual goal was narrower: let **`RUN_COMMAND`** execute under root for the d
 
 This shipped model preserves that boundary.
 
+Root operations on a computer are shell operations — `cat /etc/sudoers`, `tee /var/root/...`, `ls /var/db/sudo`. The root demo grants only `RUN_COMMAND` for that reason. Host-file, mail, calendar, and the other adapters target ordinary user-space workflows and are not part of the root surface; pairing them with the root profile would be a category mismatch (and they wouldn't escalate even if you tried, since `sandbox.escalate: sudo` only flows through the sandbox engine, which only wraps `RUN_COMMAND`).
+
 ---
 
 ## Why root is still mostly a demo story
