@@ -1,0 +1,12 @@
+{
+  "intent_num": 4,
+  "category": "attacks",
+  "name": "Raw block-device write via dd",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "dd if=/dev/random of=/dev/disk1 bs=1m count=10"},
+      "reason": "Attempt a raw write to a block device -- expected to BLOCK on the 'dd if=' blocked_pattern (catastrophic + irreversible data corruption)."
+    }
+  ]
+}

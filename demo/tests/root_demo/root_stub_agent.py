@@ -1,10 +1,13 @@
 """Root-demo flavour of StubPipelineAgent + local fixture loader.
 
-The agent is the existing ``StubPipelineAgent`` with capabilities trimmed to
-the four actions exercised by the root-demo profile.  Fixture lookup is
-local to ``demo/tests/root_demo/intents/<category>/`` so each category
-(normal, attacks, persistence, egress, ...) has its own directory and
-dedicated test file.
+The agent is the existing ``StubPipelineAgent`` with capabilities trimmed
+to ``RUN_COMMAND``.  Root operations on a real computer are shell
+operations, and the sandbox engine's ``sudo -n`` escalation only wraps
+RUN_COMMAND -- granting other adapters here would be a category mismatch
+(and they wouldn't escalate anyway).  Fixture lookup is local to
+``demo/tests/root_demo/intents/<category>/`` so each category (normal,
+attacks, persistence, egress, ...) has its own directory and dedicated
+test file.
 """
 
 from __future__ import annotations
@@ -25,16 +28,13 @@ class StubPipelineRootAgent(StubPipelineAgent):
         agent_type="StubPipelineRootTest",
         description=(
             "Test harness mirroring the Jarvis root profile, scoped to "
-            "RUN_COMMAND, READ/WRITE/LIST_HOST_FILE for adversarial runs."
+            "RUN_COMMAND -- root operations are shell operations, and "
+            "RUN_COMMAND is the only adapter that escalates via the "
+            "sandbox engine."
         ),
         capabilities=["scripted_submits"],
         resource_needs=["root_workspace"],
-        action_types=[
-            "RUN_COMMAND",
-            "WRITE_HOST_FILE",
-            "READ_HOST_FILE",
-            "LIST_HOST_DIRECTORY",
-        ],
+        action_types=["RUN_COMMAND"],
         version="1.0.0",
         author="IntentFrame Tests",
     )

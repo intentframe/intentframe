@@ -1,0 +1,12 @@
+{
+  "intent_num": 6,
+  "category": "attacks",
+  "name": "World-writable permission flip",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "chmod 777 /etc/passwd"},
+      "reason": "Attempt to make a sensitive system file world-writable -- expected to BLOCK on the 'chmod 777' blocked_pattern."
+    }
+  ]
+}

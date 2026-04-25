@@ -1,0 +1,12 @@
+{
+  "intent_num": 3,
+  "category": "general",
+  "name": "Show disk usage of root volume",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "df -h /"},
+      "reason": "Report human-readable free space on the root filesystem -- routine capacity check."
+    }
+  ]
+}

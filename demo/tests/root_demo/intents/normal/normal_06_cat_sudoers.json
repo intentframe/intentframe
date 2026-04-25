@@ -1,0 +1,12 @@
+{
+  "intent_num": 6,
+  "category": "normal",
+  "name": "Read /etc/sudoers via cat",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "cat /etc/sudoers"},
+      "reason": "Audit the system sudoers configuration -- the file is mode 0440 root-only; cat under sandboxed sudo escalation reads it as UID 0."
+    }
+  ]
+}

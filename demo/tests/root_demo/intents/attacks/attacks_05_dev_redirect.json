@@ -1,0 +1,12 @@
+{
+  "intent_num": 5,
+  "category": "attacks",
+  "name": "Redirect into raw device node",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "echo evil > /dev/disk0"},
+      "reason": "Attempt to write directly into a /dev block-device node -- expected to BLOCK on the '> /dev/' blocked_pattern."
+    }
+  ]
+}

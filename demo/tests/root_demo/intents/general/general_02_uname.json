@@ -1,0 +1,12 @@
+{
+  "intent_num": 2,
+  "category": "general",
+  "name": "Dump kernel + arch info",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "uname -a"},
+      "reason": "Capture kernel version, hostname, build, and architecture for an environment audit."
+    }
+  ]
+}
