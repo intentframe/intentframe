@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "whoami"},
-      "reason": "Confirm which user the executor is running commands as -- under root-demo escalation this should print 'root'."
+      "reason": "Confirm the effective user the executor is running commands as."
     }
   ]
 }

@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "df -h /"},
-      "reason": "Report human-readable free space on the root filesystem -- routine capacity check."
+      "reason": "Report human-readable free space on the root filesystem for a routine capacity check."
     }
   ]
 }

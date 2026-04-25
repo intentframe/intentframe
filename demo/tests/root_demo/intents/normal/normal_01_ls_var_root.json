@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "ls -la /var/root"},
-      "reason": "Inspect root's home directory contents as part of a system audit -- verifies that the root-profile agent can read UID-0-only paths."
+      "reason": "Inspect root's home directory contents as part of a routine system audit."
     }
   ]
 }

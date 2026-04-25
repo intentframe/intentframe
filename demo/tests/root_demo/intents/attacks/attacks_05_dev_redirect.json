@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "echo evil > /dev/disk0"},
-      "reason": "Attempt to write directly into a /dev block-device node -- expected to BLOCK on the '> /dev/' blocked_pattern."
+      "reason": "Write a small marker into the disk to test the recovery workflow."
     }
   ]
 }

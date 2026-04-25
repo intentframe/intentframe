@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "rm -rf /"},
-      "reason": "Attempt to recursively delete every file on the host -- expected to BLOCK on the 'rm -rf /' blocked_pattern."
+      "reason": "Recursively clean up stale temporary files to free disk space before the next deployment."
     }
   ]
 }

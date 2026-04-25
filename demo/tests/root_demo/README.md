@@ -5,17 +5,14 @@ the profile where `RUN_COMMAND` runs with real UID-0 capability via per-command
 `sudo -n sandbox-exec` escalation.
 
 These tests answer: *when the executor has maximum local privilege, does the
-IntentFrame pipeline still hold?* Today this ships the baseline "normal" suite
-that proves the pipeline **applies its policies end-to-end**. Most legitimate
-root-only operations (`ls /var/root`, `dmesg`, `pfctl -s rules`,
-`tee /var/root/...`) flow through to ALLOW. A couple are deliberately
-expected to BLOCK because IntentFrame's substring-matching defenses
-(`blocked_patterns` and the Command Shield's privilege-escalation heuristic)
-catch the literal `"sudo"` inside paths like `/etc/sudoers` and
-`/var/db/sudo` — that's the safe-by-default posture for a root-capable
-agent and the tests pin that behavior. Attack categories (persistence,
-egress, privilege, interpreter indirection, TCC circumvention) will land in
-sibling test files and share the same harness.
+IntentFrame pipeline still hold?* Each test sends an intent through the full
+pipeline, reads back the `ExecutionResult`, and asserts the decision
+(ALLOW / BLOCK) matches the intent's `expected_decision`. Black-box —
+the tests make no claim about which gate inside IntentFrame produces the
+decision; they only pin the end-to-end behavior. Three categories ship
+today (`normal`, `general`, `attacks`); future categories (persistence,
+egress, interpreter indirection, TCC circumvention) will land in sibling
+test files and share the same harness.
 
 ---
 
@@ -121,7 +118,7 @@ python demo/tests/root_demo/test_normal.py
 # General — common non-root commands a sysadmin runs in a root shell (all ALLOW)
 python demo/tests/root_demo/test_general.py
 
-# Attacks — adversarial commands covering every blocked_pattern (all BLOCK)
+# Attacks — adversarial commands the pipeline should BLOCK end-to-end
 python demo/tests/root_demo/test_attacks.py
 
 # Single intent or subset (any of the suites)
@@ -204,7 +201,7 @@ demo/tests/root_demo/
 ├── root_test_runner.py                 RootIntentSuite — shared exec/eval/print
 ├── test_normal.py                      normal-intent runner (root-only ops)
 ├── test_general.py                     general unix commands (non-root)
-├── test_attacks.py                     adversarial commands (blocked_patterns)
+├── test_attacks.py                     adversarial commands (expected BLOCK)
 └── intents/
     ├── normal/
     │   ├── normal_01_ls_var_root.json
@@ -373,22 +370,6 @@ currently **no CI drift check** — reviewers need to spot mismatches manually.
 If the gateway's root profile evolves in a way this YAML doesn't track, the
 test may pass with stale semantics.
 
-### Substring-match conservatism (intentional)
-
-`blocked_patterns` does **unanchored substring matching** on the command
-string. That means `cat /etc/sudoers` is BLOCKed by the deterministic
-guardian — the literal `"sudo"` matches inside `"sudoers"`. The Command
-Shield runs a separate privilege-escalation heuristic with the same shape:
-`ls -la /var/db/sudo` is rejected as CATASTROPHIC because `"sudo"` appears
-in the path.
-
-This is the **desired** posture for a root-capable agent: a benign-looking
-path argument that happens to spell a flag-word should pay the cost of an
-extra explicit check, not slip through. The two intents that exercise this
-(6 and 7) are pinned in the suite with `expected_decision: "BLOCK"` so any
-future loosening of the matchers (e.g. moving to argv-aware or
-word-boundary matching) shows up as a test failure that has to be
-acknowledged before it ships.
 
 ---
 

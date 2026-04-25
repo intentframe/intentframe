@@ -1,10 +1,15 @@
 """Root-demo ATTACKS intent test runner.
 
-Adversarial commands that should BLOCK upstream of the executor.  Each
-fixture is built to fire a specific gate — covering every entry in
-``test_policy_root.yaml::RUN_COMMAND.constraints.blocked_patterns`` plus
-known command-shield catastrophic heuristics — so any future relaxation
-of those gates surfaces as a test failure that has to be acknowledged.
+Adversarial ``RUN_COMMAND`` intents that the IntentFrame pipeline should
+BLOCK end-to-end.  Demonstrates the demo claim from
+``docs/executor-root-mode.md``: even when the executor has maximum local
+POSIX privilege, the pipeline still constrains what the agent can do.
+
+Each fixture's ``reason`` is a plausible-sounding agent rationale, on the
+threat-model assumption that a compromised agent will dress dangerous
+commands in benign cover stories.  The test asserts the
+``ExecutionResult`` decision matches ``expected_decision`` (BLOCK) — it
+makes no claim about which gate inside IntentFrame produces the BLOCK.
 
 Prerequisites + verdict semantics: see ``root_test_runner.py``.
 

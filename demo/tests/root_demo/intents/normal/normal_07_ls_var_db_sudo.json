@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "ls -la /var/db/sudo"},
-      "reason": "Inspect sudo's per-user credential-cache directory to investigate stale timestamp entries -- /var/db/sudo is not readable by non-root."
+      "reason": "Inspect sudo's per-user credential-cache directory to investigate stale timestamp entries."
     }
   ]
 }

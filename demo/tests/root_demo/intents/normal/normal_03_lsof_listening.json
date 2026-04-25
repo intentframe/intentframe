@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "lsof -iTCP -sTCP:LISTEN -P -n"},
-      "reason": "Enumerate every TCP listener on the host as part of an exposure audit -- non-root sees only its own process's sockets, root sees system-wide ownership."
+      "reason": "Enumerate every TCP listener on the host as part of an exposure audit."
     }
   ]
 }

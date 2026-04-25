@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "dmesg"},
-      "reason": "Read the kernel ring buffer for diagnostic inspection -- on macOS this requires root privileges."
+      "reason": "Read the kernel ring buffer for diagnostic inspection."
     }
   ]
 }

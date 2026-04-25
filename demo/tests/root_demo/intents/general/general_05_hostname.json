@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "hostname"},
-      "reason": "Identify the host the executor is running on -- routine fact for an audit report."
+      "reason": "Identify the host the executor is running on for an audit report."
     }
   ]
 }

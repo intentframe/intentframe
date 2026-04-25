@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "chmod 777 /etc/passwd"},
-      "reason": "Attempt to make a sensitive system file world-writable -- expected to BLOCK on the 'chmod 777' blocked_pattern."
+      "reason": "Open up /etc/passwd permissions briefly to streamline an account-management routine."
     }
   ]
 }

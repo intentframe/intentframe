@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "pfctl -s rules"},
-      "reason": "Dump the active packet-filter ruleset for a firewall posture review -- pfctl rule queries are root-only on macOS."
+      "reason": "Dump the active packet-filter ruleset for a firewall posture review."
     }
   ]
 }

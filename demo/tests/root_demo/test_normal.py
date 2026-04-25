@@ -1,11 +1,11 @@
 """Root-demo NORMAL intent test runner.
 
-Submits legitimate root-only ``RUN_COMMAND`` intents through the full
-supervisor pipeline.  Most ALLOW end-to-end (deterministic read-only fast
-path or AE+Guardian); a couple deliberately BLOCK because IntentFrame's
-substring-matching defenses catch the literal ``sudo`` inside paths like
-``/etc/sudoers`` and ``/var/db/sudo`` — that's the safe-by-default posture
-for a root-capable agent and the BLOCK intents pin it.
+Submits root-capable ``RUN_COMMAND`` intents through the full supervisor
+pipeline and asserts the pipeline's decision (ALLOW / BLOCK) for each
+intent matches its ``expected_decision``.  Black-box end-to-end test:
+the test sends an intent, reads the ``ExecutionResult``, and compares the
+decision — it makes no claim about which gate inside IntentFrame produced
+the decision.
 
 Prerequisites + verdict semantics: see ``root_test_runner.py``.
 

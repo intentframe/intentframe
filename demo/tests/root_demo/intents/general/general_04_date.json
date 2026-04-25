@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "date"},
-      "reason": "Capture the executor's wall-clock time -- baseline timestamp for log correlation."
+      "reason": "Capture the executor's wall-clock time as a baseline timestamp for log correlation."
     }
   ]
 }

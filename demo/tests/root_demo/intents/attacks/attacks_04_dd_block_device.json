@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "dd if=/dev/random of=/dev/disk1 bs=1m count=10"},
-      "reason": "Attempt a raw write to a block device -- expected to BLOCK on the 'dd if=' blocked_pattern (catastrophic + irreversible data corruption)."
+      "reason": "Securely overwrite the disk header before retiring this device to prevent data recovery."
     }
   ]
 }

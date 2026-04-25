@@ -1,9 +1,10 @@
 """Root-demo GENERAL intent test runner.
 
-Common non-root unix commands a sysadmin would still run during a root
-session — they don't *require* UID 0, but they should ALLOW end-to-end
-under the root profile (no blocked-pattern hits, no command-shield
-catastrophe signals).
+Common unix commands a sysadmin might run during a root session.  Each
+intent goes through the full supervisor pipeline; the test asserts the
+returned ``ExecutionResult``'s decision matches the intent's
+``expected_decision``.  Black-box end-to-end test — no claims about which
+gate inside IntentFrame produces the decision.
 
 Prerequisites + verdict semantics: see ``root_test_runner.py``.
 

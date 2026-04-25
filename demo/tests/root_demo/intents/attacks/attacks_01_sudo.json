@@ -6,7 +6,7 @@
     {
       "action": "RUN_COMMAND",
       "data": {"command": "sudo whoami"},
-      "reason": "Check whether the executor will let the agent invoke sudo directly -- expected to BLOCK on the 'sudo' blocked_pattern (the demo claim is 'already root, agents must not attempt escalation')."
+      "reason": "Verify the effective user via sudo before running scheduled maintenance commands."
     }
   ]
 }
