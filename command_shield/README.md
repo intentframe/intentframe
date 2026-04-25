@@ -544,6 +544,79 @@ Examples of shell findings:
 
 These findings are structured, severity-bearing facts.  They still do not make policy decisions.
 
+## Detected Script File Validation
+
+This section explains how `command_shield` deals with script files — written for anyone who wants to understand the behaviour without reading the implementation.
+
+### The default: nothing is ever read from disk
+
+By default, `command_shield` **never opens a file**.  Even if a command like `python foo.py` clearly references a script on disk, the shield only notes "there is a path here" and stops.  No file is read, no disk is touched.
+
+This is intentional.  The shield's primary job is inspecting what you *wrote in the command string*, not what is *stored on disk*.  Filesystem access is an explicit opt-in — something the caller chooses to enable, not something the shield assumes is safe.
+
+### When does file reading happen?
+
+Only when you enable it.  Two things must be true **at the same time**:
+
+1. You set `auto_resolve_local=True` in a `ShieldConfig`.
+2. You pass a `ResolveSession` that tells the shield which directory to work from and what it is allowed to read.
+
+Without both, no file is ever opened.  If you set `auto_resolve_local=True` but forget the session, the report will contain a `resolved:no-session` signal and `script_resolved` stays `False`.  The feature simply does nothing rather than guessing.
+
+### What is a ResolveSession?
+
+Think of `ResolveSession` as a permission slip you hand to the shield.  It has three fields:
+
+- **`cwd`** — "treat relative paths as relative to this directory".  So `foo.py` in the command becomes `/your/cwd/foo.py` on disk.
+- **`allow_roots`** — "only read files inside these folders".  If you set `allow_roots=("/srv/work",)`, a path like `/etc/passwd` will be refused immediately with `resolved:outside-allow-roots`, before any read attempt.  Leave it empty to allow any path under `cwd`.
+- **`follow_symlinks`** — "whether symlinks are okay".  Default is `False`: any symlink anywhere in the resolved path causes the read to fail with `resolved:symlink`.  Turn it on only if you fully trust the environment.
+
+The session is never inferred from the running process — the caller always supplies it explicitly.  This means the shield's behaviour around files is fully predictable from the call site.
+
+### What happens once a file is located?
+
+The shield runs through a layered set of checks before touching the code inside.  Every check that fails produces a `resolved:*` signal and stops further processing of that file:
+
+1. **Null byte in path** → refused immediately (`resolved:unsafe-path`).
+2. **Outside allow roots** → refused (`resolved:outside-allow-roots`).
+3. **File does not exist / stat error** → `resolved:stat-failed`.
+4. **Is a symlink** → refused by default (`resolved:symlink`); allowed only if `follow_symlinks=True`.
+5. **Not a regular file** → directories, devices, and sockets are all refused (`resolved:not-regular-file`).
+6. **File is too large** → files over `max_resolved_bytes` (default **1 MB / 1,000,000 bytes**) are read only up to that limit.  The analysis continues on the prefix but you also get a `resolved:truncated` signal so you know the result covers only part of the file.
+7. **Looks like a binary** → magic-byte / NUL-density check.  If the content looks like a compiled binary or other non-text format, code analysis is skipped entirely (`resolved:binary`).
+8. **Language detection** → sniffed from file extension, then shebang line, then content heuristics.  If the sniffed language conflicts with what the command implied — e.g. `python mystery` where the file has `#!/bin/bash` — you get `resolved:language-mismatch` alongside the actual findings.
+9. **Decoded text is too long** → code text longer than `max_code_length` (default **50,000 characters**) skips AST / regex analysis and emits `CODE_TOO_LARGE`.
+10. **Static analysis** → Python files go through an AST walk; shell files go through regex heuristics.  Findings like `DANGEROUS_IMPORT_subprocess`, `SHELL_EVAL`, `NETWORK_SERVER_BIND`, etc. are emitted as structured facts.
+
+All of these are signals — facts reported to the caller.  None of them change the `SAFE / NEEDS_REVIEW / CATASTROPHIC` verdict.
+
+### Does any of this block the command?
+
+No.  All `resolved:*` and size signals are **advisory**.  They flow downstream to the Analysis Engine and Guardian, which make the actual allow / block decision.  The only things that can produce `CATASTROPHIC` or `NEEDS_REVIEW` are the pattern and structural passes, which run on the *command string itself* before any file is ever touched.
+
+### How deep does it go into nested commands?
+
+Controlled by `resolve_max_depth` (default **2**).
+
+- Depth 1: only the outermost command's edges are followed.
+- Depth 2: one level of nested interpreter indirection is also resolved — so `bash -c "python inner.py"` will also read and inspect `inner.py`.
+- Beyond the limit: edges are recorded but not walked, and the pipeline moves on silently.
+
+### Quick reference
+
+| Question | Answer |
+|---|---|
+| Does `command_shield` read files by default? | No. Never. |
+| What enables file reading? | `auto_resolve_local=True` + a `ResolveSession` |
+| What if I set the flag but forget the session? | `resolved:no-session` signal, nothing is read |
+| Max file size read from disk? | 1 MB (default `max_resolved_bytes`) |
+| What happens to files larger than that? | Truncated to 1 MB prefix + `resolved:truncated` signal |
+| Max code length analysed? | 50,000 chars (default `max_code_length`) |
+| Are symlinks followed? | No by default; opt in with `follow_symlinks=True` |
+| Can it read files outside a directory root? | No, if `allow_roots` is set |
+| Do file findings block the command? | No — signals only, never verdict-bearing |
+| How deep does nested-interpreter resolution go? | 2 levels by default (`resolve_max_depth`) |
+
 ## Public API
 
 `command_shield` intentionally exposes a small surface.
