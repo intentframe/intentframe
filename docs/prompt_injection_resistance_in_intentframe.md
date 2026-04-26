@@ -112,5 +112,3 @@ In `skeptical_security_questions.md` and `stub_agent_crash_test_rationale.md`, w
 > Caveat: attacks 7–14 (encoding/delimiter/role/unicode/tool-confusion) are blocked by the $5k deterministic cap in the test policy, so they validate *containment under injection*, not *AI resistance under injection*. The latter is what attacks 2/6/15/17 and the transitive live suite specifically measure.
 
 That way the claim is both true and un-ambush-able.
-
-Want me to draft the exact insert text for those two docs (I can show it here, Ask mode only)?
