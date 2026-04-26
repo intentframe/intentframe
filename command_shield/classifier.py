@@ -190,16 +190,70 @@ _PACKAGE_INSTALL_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bcomposer\s+(?:install|require)\b"), "composer"),
 )
 
-# Refined rules: one per interpreter.  Excludes inline `-c` / `-e` /
-# `--eval` forms (those are classified as inline code by the language
-# detector, not as script-file execution).
+# Refined rules: one per interpreter.
+#
+# File-form rules require an explicit script file (or `-jar` / `run`
+# verb) as proof the command is execution-shaped rather than help/
+# version/REPL.  Inline-form rules (`-e`, `-r`, `--eval`) are
+# enumerated for every interpreter EXCEPT python/shell, which the
+# python+shell-only profile is meant to allow.  Adding a python
+# inline tag here would force every `_safe_for_read_only` consumer
+# to deal with `python -c` showing up as a script_execution
+# capability — out of scope for this change.
 _SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bpython3?\s+[^|;&]*\.py\b"), "python"),
-    (re.compile(r"\bnode\s+[^|;&]*\.(?:js|mjs|cjs)\b"), "node"),
+    (re.compile(r"\bnode\s+[^|;&]*\.(?:js|mjs|cjs|ts)\b"), "node"),
     (re.compile(r"\bruby\s+[^|;&]*\.rb\b"), "ruby"),
     (re.compile(r"\bperl\s+[^|;&]*\.pl\b"), "perl"),
     (re.compile(r"\b(?:bash|sh|zsh|ksh|dash)\s+[^|;&]*\.(?:sh|bash|zsh)\b"), "shell"),
     (re.compile(r"(?:^|[\s;&|])\./[\w.][\w./-]*"), "local_binary"),
+    # ── long-tail interpreters: file-form ───────────────────────────
+    # `java -jar foo.jar` / `java -cp ... Main` / `java Foo.class`.
+    # The `-jar` flag is the canonical run form; `Foo.class` direct
+    # exec is rare but covered by the second alternative.
+    (re.compile(r"\bjava\s+(?:[^|;&]*\s)?-jar\b"), "java"),
+    (re.compile(r"\bjava\s+[^|;&]*\.(?:class|jar)\b"), "java"),
+    # `go run main.go` — distinct from `go build` (compilation) and
+    # `go install` (package_install).
+    (re.compile(r"\bgo\s+run\b"), "go"),
+    # `dotnet foo.dll` — the .NET host running a managed assembly.
+    (re.compile(r"\bdotnet\s+[^|;&]*\.dll\b"), "dotnet"),
+    # `php foo.php` — file-mode interpretation.
+    (re.compile(r"\bphp\s+[^|;&]*\.php\b"), "php"),
+    # `lua foo.lua`.
+    (re.compile(r"\blua\s+[^|;&]*\.lua\b"), "lua"),
+    # `Rscript foo.R` / `.r`.
+    (re.compile(r"\bRscript\s+[^|;&]*\.[Rr]\b"), "r"),
+    # `julia foo.jl`.
+    (re.compile(r"\bjulia\s+[^|;&]*\.jl\b"), "julia"),
+    # `swift run` (package mode) or `swift script.swift`.
+    (re.compile(r"\bswift\s+(?:run\b|[^|;&]*\.swift\b)"), "swift"),
+    # Deno / Bun share a single suffix; both are JS/TS runtimes whose
+    # `run`/`test` verbs execute a script.
+    (re.compile(r"\b(?:deno|bun)\s+(?:run|test)\b"), "deno_bun"),
+    # ── long-tail interpreters: inline-eval form ─────────────────────
+    # These mirror file-form rules above.  Each catches an inline
+    # body so policies that deny `script_execution:<lang>` reject
+    # both `node app.js` and `node -e '...'`.
+    (re.compile(r"\bnode\s+(?:-e|--eval)\b"), "node"),
+    (re.compile(r"\bruby\s+-e\b"), "ruby"),
+    (re.compile(r"\bperl\s+-e\b"), "perl"),
+    (re.compile(r"\bphp\s+-r\b"), "php"),
+    # `awk 'BEGIN{...}'` / `awk -f script.awk` — both shapes are
+    # AWK-language execution.  The classifier's haystack is the
+    # shlex-normalised command (quotes already stripped), so we
+    # cannot anchor on `'`.  Instead we accept any awk invocation
+    # that has a non-flag positional argument; `awk --version` /
+    # `awk -h` (no positional) stay untagged.  `gawk` / `mawk` get
+    # the same suffix so policy can deny the family with one tag.
+    (
+        re.compile(
+            r"\b(?:awk|gawk|mawk)\b"
+            r"(?:\s+-[a-zA-Z][^\s]*)*"
+            r"\s+(?!--?(?:help|version|h|V)\b)\S",
+        ),
+        "awk",
+    ),
 )
 
 
