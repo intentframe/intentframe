@@ -127,7 +127,14 @@ PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:script_execution:julia",
     "capability:script_execution:swift",
     "capability:script_execution:deno_bun",
-    "capability:script_execution:awk",
+    # NOTE: ``awk`` is intentionally NOT denied — it is a POSIX shell
+    # utility (IEEE Std 1003.1), part of the canonical Unix toolchain
+    # every model is heavily trained on, and structurally in the same
+    # bucket as ``sed`` / ``cut`` / ``tr`` / ``grep`` which are allowed.
+    # The policy stance is: block non-python, non-shell *language
+    # runtimes*; keep all POSIX shell utilities.  The classifier still
+    # emits ``capability:script_execution:awk`` for telemetry so this
+    # decision stays one edit away.
     # Direct execution of compiled local binaries (``./foo``,
     # ``./bin/tool``).  Source compilation is below.
     "capability:script_execution:local_binary",

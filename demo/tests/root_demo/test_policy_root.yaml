@@ -65,7 +65,9 @@ allowed_actions:
         - "capability:script_execution:julia"
         - "capability:script_execution:swift"
         - "capability:script_execution:deno_bun"
-        - "capability:script_execution:awk"
+        # awk is NOT denied: POSIX shell utility (IEEE Std 1003.1), same
+        # risk class as sed/cut/grep which are allowed.  Stance: block
+        # non-python/non-shell language runtimes; keep POSIX utilities.
         - "capability:script_execution:local_binary"
         # Build / link toolchains.
         - "capability:compilation"

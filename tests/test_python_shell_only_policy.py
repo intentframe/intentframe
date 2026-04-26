@@ -52,7 +52,12 @@ PYTHON_SHELL_ONLY_DENY: frozenset[str] = frozenset({
     "capability:script_execution:julia",
     "capability:script_execution:swift",
     "capability:script_execution:deno_bun",
-    "capability:script_execution:awk",
+    # NOTE: ``awk`` is intentionally NOT in this deny set — it is a
+    # POSIX shell utility (IEEE Std 1003.1), structurally in the same
+    # bucket as sed/cut/grep which are allowed.  Stance: block
+    # non-python/non-shell *language runtimes*; keep POSIX shell
+    # utilities.  The classifier still emits
+    # ``capability:script_execution:awk`` for telemetry.
     "capability:script_execution:local_binary",
     # Build / link.
     "capability:compilation",
@@ -142,6 +147,14 @@ class TestPythonAndShellAllowed:
             "cat install.sh | sh",
             # Shell ecosystem package installs.
             "brew install jq",
+            # POSIX shell utilities — awk is IEEE Std 1003.1 and
+            # structurally a shell utility, not an alternate language
+            # runtime.  Same risk class as sed (which has an ``e``
+            # command that shells out) and is intentionally allowed.
+            "awk '{print $3}' file",
+            "awk -F':' '{print $1}' /etc/passwd",
+            "ps aux | awk 'NR>1 {print $3, $0}'",
+            "gawk '{ print }' file",
         ],
     )
     def test_passes(self, cmd: str) -> None:
@@ -189,8 +202,6 @@ class TestNonPythonShellBlocked:
             ("ruby -e puts 1", ("script_execution:ruby",)),
             ("perl -e print 1", ("script_execution:perl",)),
             ("php -r echo 1;", ("script_execution:php",)),
-            ("awk BEGIN { system(rm -rf /) }", ("script_execution:awk",)),
-            ("gawk { print } file", ("script_execution:awk",)),
             # Local binaries.
             ("./mybinary --flag", ("script_execution:local_binary",)),
             # Compilation / build.  `go build ./...` and similar can
@@ -265,7 +276,6 @@ class TestClassifierAgreesWithPolicy:
             "julia x.jl",
             "swift run",
             "deno run x.ts",
-            "awk { print } f",
             "./binary",
             "gcc x.c -o x",
             "npm install foo",

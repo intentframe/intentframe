@@ -213,7 +213,10 @@ PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:script_execution:julia",
     "capability:script_execution:swift",
     "capability:script_execution:deno_bun",
-    "capability:script_execution:awk",
+    # NOTE: ``awk`` is intentionally NOT denied — POSIX shell utility,
+    # same risk class as sed/cut/grep which are allowed.  Policy stance
+    # is: block non-python, non-shell *language runtimes*; keep POSIX
+    # shell utilities.  Classifier still tags it for telemetry.
     "capability:script_execution:local_binary",
     "capability:compilation",
     "capability:stdin_exec:node",

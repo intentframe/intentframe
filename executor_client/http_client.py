@@ -45,10 +45,26 @@ _DEMO_HMAC_KEY = "intentframe_demo_secret_key_do_not_use_in_production"
 # ── Result reshaping: adapter result dict → IntentFrame result dict ────────
 # Only needed when the adapter's output key doesn't match what the caller
 # expects.  Actions not listed here pass through unchanged.
+#
+# RUN_COMMAND: the terminal adapter returns {stdout, stderr, return_code,
+# command}.  We keep the historical ``{"content": stdout}`` shape (that
+# the LLM and demo harnesses already read) and add ``stderr`` next to
+# it — success or failure.  That single extra field is enough to make
+# silent failures visible (e.g. ``ps aux --sort=-%cpu | head`` on macOS
+# where ps errors to stderr, head exits 0, pipeline rc=0) without
+# reshaping the payload into a structured terminal-session-looking
+# dict, which was priming the LLM to summarise ("output above") instead
+# of quoting the actual bytes back to the user.  ``return_code`` and
+# ``command`` are intentionally not forwarded: the tool call arguments
+# already carry ``command``, and stderr presence is a more reliable
+# "something went wrong" signal than rc given pipe semantics.
 _RESULT_MAP: dict[str, Any] = {
     "LIST_DIRECTORY": lambda d: {"files": d.get("entries", d.get("files", []))},
     "READ_FILE":      lambda d: {"content": d.get("content", "")},
-    "RUN_COMMAND":    lambda d: {"content": d.get("stdout", "")},
+    "RUN_COMMAND":    lambda d: {
+        "content": d.get("stdout", ""),
+        "stderr": d.get("stderr", ""),
+    },
     "APPEND_ROW":     lambda d: {"appended": True},
     "ASK_USER":       lambda d: {"response": d.get("response")},
     "SHOW_OPTIONS":   lambda d: {"response": d.get("response")},

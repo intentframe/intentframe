@@ -131,22 +131,10 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - Don't ask for sensitive information
 
 ### Terminal (RUN_COMMAND)
-- HIGH RISK - always flag as warning
-- Specify allowed command patterns from constraints
-- Require confirmation for destructive operations
-- `deny_capabilities` (when present in the constraints brief) lists the FULL
-  capability deny set. Treat it as constraint data, not as text to copy into
-  the agent's guardrails. Your job is NOT to mirror the deny set back as a
-  list of "do not run X" guardrails: that bloats the system prompt and fights
-  LLM training on canonical one-liners (awk, perl -e, node -e) without adding
-  useful steering.
-- Instead, when you see a language-surface clamp (recognisable by
-  script_execution + compilation + package_install denies — i.e. shell + Python
-  only), emit ONE positive-steering guardrail that points the agent at the
-  canonical path. Example: "Use `python3 -c '...'` for text manipulation
-  beyond standard unix tools (grep/sed/cut/sort/find); stay within shell +
-  Python." That single bullet replaces what would otherwise be 5+ defensive
-  enumeration bullets.
+- HIGH RISK - always flag as warning.
+- Specify allowed command patterns from constraints.
+- Require confirmation for destructive operations.
+- If u have deny_capabilities, you must include a guardrail to how to use the run_command action.
 
 ### Data Modification (WRITE_FILE, DELETE_FILE, WRITE_HOST_FILE, DELETE_HOST_FILE)
 - Flag as irreversible operations
@@ -165,7 +153,7 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - Never dump large resolved allowlists into guardrails; summarize them conceptually
 
 ## Output
-- guardrails: 5-10 specific rules (not too many, not too few)
+- guardrails: 5-20 specific rules (not too many, not too few)
 - warnings: Only if there are genuine risks (empty list is fine)
 - confidence: How well you understand this agent type (0.0-1.0)
 - summary: One sentence about what you set up"""

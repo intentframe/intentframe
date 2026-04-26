@@ -230,3 +230,78 @@ class TestSummarizeConstraintsIntegration:
             "RUN_COMMAND", constraints
         )
         assert summary == "terminal command constraints are configured"
+
+
+# ── meta-prompt contract ─────────────────────────────────────────────
+
+
+class TestBuildInstructionsMetaPromptContract:
+    """The meta-prompt in `_build_instructions` is the OUTPUT half of
+    the onboarding contract: it directs the meta-LLM to translate the
+    lossless deny brief into ONE concrete, actionable guardrail rather
+    than a vague "avoid denied capabilities" pointer.
+
+    We observed the meta-LLM quietly regressing to produce bullets
+    like "avoid script execution from denied capabilities" when the
+    instruction was soft.  Those pointers give the agent zero
+    actionable information and defeat the whole purpose of the deny
+    brief.  These tests pin the contract so the instruction stays
+    imperative and carries the verbatim surface (POSIX tool names
+    + `python3` + the concrete denied runtimes) that the agent needs.
+    """
+
+    def _instructions(self) -> str:
+        # Avoid constructing the real OpenAI Agent (needs API key) —
+        # we only care about the static instructions string, which
+        # does not depend on any instance state in ``__init__``.
+        return AIOnboardingEngine._build_instructions(
+            AIOnboardingEngine.__new__(AIOnboardingEngine)
+        )
+
+    def test_instructions_forbid_vague_pointer_bullets(self) -> None:
+        """'avoid denied capabilities' / 'avoid script execution from
+        the deny list' are exactly the kind of vague bullets the
+        meta-LLM defaults to.  The instructions must explicitly
+        forbid them so the LLM is pushed into writing actionable
+        steering instead.
+        """
+        text = self._instructions()
+        assert "vague" in text.lower() or "no actionable" in text.lower() or (
+            "actionable information" in text.lower()
+        ), (
+            "meta-prompt must explicitly mark 'avoid denied capabilities'-"
+            "style pointer bullets as forbidden"
+        )
+
+    def test_instructions_mandate_posix_plus_python_guardrail(self) -> None:
+        """When the deny brief clamps multiple script-execution
+        runtimes, the meta-LLM MUST emit a guardrail that names the
+        canonical surface.  Pin the concrete tokens so a refactor
+        that drops one of them fails loudly.
+        """
+        text = self._instructions()
+        assert "MUST" in text, (
+            "meta-prompt must be imperative, not advisory, about the "
+            "python+shell guardrail"
+        )
+        for tool in ("grep", "sed", "awk", "cut", "sort", "find", "python3"):
+            assert tool in text, (
+                f"meta-prompt must name {tool!r} as part of the supported "
+                "surface so the LLM carries it verbatim into the guardrail"
+            )
+        for runtime in ("node", "ruby", "perl", "php", "java", "go"):
+            assert runtime in text, (
+                f"meta-prompt must name {runtime!r} as a runtime the "
+                "agent should avoid in favour of Python"
+            )
+
+    def test_instructions_reference_script_execution_trigger(self) -> None:
+        """The instruction needs a concrete trigger — "when
+        `script_execution:<lang>` denies are present" — so the LLM
+        knows exactly when to emit the guardrail rather than guessing.
+        """
+        text = self._instructions()
+        assert "script_execution" in text, (
+            "meta-prompt must tie the python+shell guardrail to the "
+            "`script_execution:<lang>` family so the trigger is concrete"
+        )
