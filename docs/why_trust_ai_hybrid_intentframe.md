@@ -242,15 +242,3 @@ The precise statement is: *deterministic gates block any action that structurall
 - No one — deterministic or AI — can unilaterally override a BLOCK into an ALLOW.
 
 So the AI does have **block authority** in its bounded role. What it lacks is **allow-override authority** over a deterministic block. That's actually a stronger story than "AI can only influence" — it's a classic **conjunctive** (AND-gated) control: ALLOW requires *all* layers to agree, BLOCK requires only one. That's how real-world security gates work too (defense in depth, least privilege).
-
-## Recommended micro-edits
-
-If you want me to fold both nuances into the doc (Agent mode is on, so I can), the surgical changes would be:
-
-- In the Q2 answer, change the closing clause to something like:  
-  *"Even if the AI layer is bypassed, deterministic gates still block any action that structurally violates policy (denied actions, path constraints, spending caps). The AI layer is what catches structurally-valid semantic deception — e.g. a clean `reason` with a poisoned `data` field. Both layers cover different surfaces; neither alone is sufficient."*
-
-- In the Q4 answer, change *"it cannot override deterministic policy"* to something like:  
-  *"The control is conjunctive: an ALLOW requires both deterministic gates AND the AI layer to agree. Either can block unilaterally; neither can force-allow past the other. The AI layer has block authority, not allow-override authority."*
-
-Want me to make those edits to `docs/why_lllm_guarding_llm.md` now?
