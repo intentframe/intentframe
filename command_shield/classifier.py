@@ -200,6 +200,37 @@ _PACKAGE_INSTALL_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 # inline tag here would force every `_safe_for_read_only` consumer
 # to deal with `python -c` showing up as a script_execution
 # capability — out of scope for this change.
+# Stdin-piped execution into an interpreter, refined by interpreter family.
+# Mirror the per-interpreter shape of ``_SCRIPT_EXECUTION_RULES`` so policy
+# layers can deny ``capability:stdin_exec:node`` while still allowing
+# ``capability:stdin_exec:python`` (e.g. python+shell-only profiles).
+#
+# These rules are emitted IN ADDITION to the binary ``CAPABILITY_STDIN_EXEC``
+# tag below; ``_READ_ONLY_INCOMPATIBLE_CAPS`` keys off the binary tag, so
+# read-only fast-path semantics are preserved unchanged.  Suffixes mirror
+# ``_SCRIPT_EXECUTION_RULES`` (``shell`` collapses bash/sh/zsh/dash/ksh/ash
+# the same way).
+#
+# The lookahead ``(?=\s|$|\||;|&)`` after the optional ``-`` prevents
+# false matches against tokens that merely *start* with an interpreter
+# name (``| nodejs-utility``, ``| sharp``).  ``python3?|python2`` is
+# split into its own rule because the suffix is uniformly ``python``.
+_STDIN_EXEC_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\|\s*python(?:3|2)?(?:\s+-)?(?=\s|$|\||;|&)"), "python"),
+    (re.compile(r"\|\s*node(?:js)?(?:\s+-)?(?=\s|$|\||;|&)"), "node"),
+    (re.compile(r"\|\s*ruby(?:\s+-)?(?=\s|$|\||;|&)"), "ruby"),
+    (re.compile(r"\|\s*perl(?:\s+-)?(?=\s|$|\||;|&)"), "perl"),
+    # `php` reads from stdin in CLI mode (`cat foo.php | php`); the
+    # ``-r`` and ``-f -`` shapes are also covered structurally because
+    # the optional ``\s+-`` accepts ``php -``.
+    (re.compile(r"\|\s*php(?:\s+-)?(?=\s|$|\||;|&)"), "php"),
+    (
+        re.compile(r"\|\s*(?:bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)"),
+        "shell",
+    ),
+)
+
+
 _SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bpython3?\s+[^|;&]*\.py\b"), "python"),
     (re.compile(r"\bnode\s+[^|;&]*\.(?:js|mjs|cjs|ts)\b"), "node"),
@@ -281,6 +312,16 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         CAPABILITY_SCRIPT_EXECUTION,
         "Command executes a {suffix} script or local binary",
     ),
+    # Refined: stdin-piped exec (one rule per interpreter family).
+    # Emitted alongside the binary CAPABILITY_STDIN_EXEC below so
+    # ``_READ_ONLY_INCOMPATIBLE_CAPS`` (literal-string lookup) keeps
+    # working, while policy layers gain ``stdin_exec:<lang>`` granularity
+    # for the python+shell-only deny set.
+    *_expand_refined(
+        _STDIN_EXEC_RULES,
+        CAPABILITY_STDIN_EXEC,
+        "Command pipes input into a {suffix} interpreter (stdin exec)",
+    ),
     # Compilation / build — compilers and build drivers.
     (
         re.compile(
@@ -358,7 +399,7 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
     # unresolvable so policy layers may want to deny it outright.
     (
         re.compile(
-            r"\|\s*(?:python3?|python2|node|nodejs|ruby|perl|"
+            r"\|\s*(?:python3?|python2|node|nodejs|ruby|perl|php|"
             r"bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)"
         ),
         CAPABILITY_STDIN_EXEC,

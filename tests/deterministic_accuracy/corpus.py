@@ -58,6 +58,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -70,6 +71,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -82,6 +84,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -94,6 +97,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -106,6 +110,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -118,6 +123,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -130,6 +136,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -142,6 +149,7 @@ _READ_ONLY: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -161,6 +169,7 @@ _COMPOSITION: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -173,6 +182,7 @@ _COMPOSITION: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
         xfail={
@@ -189,6 +199,7 @@ _COMPOSITION: list[Case] = [
             "developer": "pipe emits edge signal \u2192 fast-path disqualified",
             "data_analyst": "pipe emits edge signal \u2192 fast-path disqualified",
             "locked_down": "pipe emits edge signal \u2192 fast-path disqualified",
+            "python_shell_only": "pipe emits edge signal \u2192 fast-path disqualified",
         },
     ),
     Case(
@@ -200,6 +211,7 @@ _COMPOSITION: list[Case] = [
             "developer": ALLOW,
             "data_analyst": ALLOW,
             "locked_down": ALLOW,
+            "python_shell_only": ALLOW,
             "no_run_command": BLOCK,
         },
     ),
@@ -219,6 +231,7 @@ _PACKAGE_INSTALL: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -231,18 +244,20 @@ _PACKAGE_INSTALL: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
     Case(
         command="npm install express",
         category="package_install",
-        note="node package install",
+        note="node package install — denied under python_shell_only via package_install:npm",
         expected={
             "permissive": UNDECIDED,
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
             "no_run_command": BLOCK,
         },
     ),
@@ -255,6 +270,7 @@ _PACKAGE_INSTALL: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -276,6 +292,7 @@ _NETWORK_BIND: list[Case] = [
             "developer": BLOCK,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -288,6 +305,7 @@ _NETWORK_BIND: list[Case] = [
             "developer": BLOCK,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -309,6 +327,7 @@ _MUTATING: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": UNDECIDED,
             "locked_down": UNDECIDED,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -321,6 +340,7 @@ _MUTATING: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": UNDECIDED,
             "locked_down": UNDECIDED,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -333,6 +353,7 @@ _MUTATING: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": UNDECIDED,
             "locked_down": UNDECIDED,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -352,6 +373,7 @@ _BLOCKED_PATTERN: list[Case] = [
             "developer": BLOCK,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
             "no_run_command": BLOCK,
         },
     ),
@@ -364,6 +386,7 @@ _BLOCKED_PATTERN: list[Case] = [
             "developer": BLOCK,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
             "no_run_command": BLOCK,
         },
     ),
@@ -386,6 +409,7 @@ _EDGE_AND_EXEC: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": UNDECIDED,
             "locked_down": UNDECIDED,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -398,6 +422,7 @@ _EDGE_AND_EXEC: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": UNDECIDED,
             "locked_down": UNDECIDED,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
     ),
@@ -424,6 +449,7 @@ _OBFUSCATION: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
         # No xfail: empirically verified the classifier handles this.
@@ -442,6 +468,7 @@ _OBFUSCATION: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
         # No xfail: trusted-path handling is supposed to recognize this.
@@ -456,11 +483,331 @@ _OBFUSCATION: list[Case] = [
             "developer": UNDECIDED,
             "data_analyst": BLOCK,
             "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
             "no_run_command": BLOCK,
         },
         xfail={
             "data_analyst": "dynamic head hides package_install; only edge signal fires (no BLOCK)",
             "locked_down": "same; edge signal does not drive BLOCK today",
+        },
+    ),
+]
+
+
+# ── python+shell-only deny set ─────────────────────────────────────
+# Pins ``intentframe_gateway.bootstrap.PYTHON_SHELL_ONLY_DENY_CAPABILITIES``
+# end-to-end through DG.  python_shell_only is the load-bearing column;
+# the other profiles are presence checks documenting the cross-profile
+# blast radius of each command:
+#   * locked_down BLOCKs everything that emits a non-read_only cap
+#   * data_analyst BLOCKs only on package_install:*
+#   * permissive/developer leave non-deny commands at UNDECIDED
+#
+# Two positive pins ("python script.py", "bash deploy.sh") guard
+# against a regression that adds script_execution:python or
+# script_execution:shell to the deny set \u2014 they would XPASS as BLOCK
+# and immediately surface in CI.
+_PYTHON_SHELL_ONLY: list[Case] = [
+    # ── Positive pins: python + shell must NOT be blocked ──
+    Case(
+        command="python script.py",
+        category="python_shell_only",
+        note="python script execution \u2014 python_shell_only must allow",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="bash deploy.sh",
+        category="python_shell_only",
+        note="shell script execution \u2014 python_shell_only must allow",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # ── File-form interpreters: capability:script_execution:<lang> ──
+    Case(
+        command="node app.js",
+        category="python_shell_only",
+        note="javascript file \u2014 capability:script_execution:node",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="ruby foo.rb",
+        category="python_shell_only",
+        note="ruby file \u2014 capability:script_execution:ruby",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="java -jar evil.jar",
+        category="python_shell_only",
+        note="jvm jar \u2014 capability:script_execution:java",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="go run main.go",
+        category="python_shell_only",
+        note="go run \u2014 capability:script_execution:go",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="php script.php",
+        category="python_shell_only",
+        note="php file \u2014 capability:script_execution:php",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="deno run x.ts",
+        category="python_shell_only",
+        note="deno \u2014 capability:script_execution:deno_bun",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # ── Inline-eval forms (load-bearing case for the new classifier rules) ──
+    Case(
+        command="node -e console.log(1)",
+        category="python_shell_only",
+        note="node inline eval \u2014 file-less script_execution:node",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="ruby -e puts 1",
+        category="python_shell_only",
+        note="ruby inline eval \u2014 capability:script_execution:ruby",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # ── Local binary execution ──
+    Case(
+        command="./mybinary --flag",
+        category="python_shell_only",
+        note="local binary \u2014 capability:script_execution:local_binary",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # ── Compilation toolchains: capability:compilation ──
+    Case(
+        command="gcc evil.c -o evil",
+        category="python_shell_only",
+        note="C compiler \u2014 capability:compilation",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="make all",
+        category="python_shell_only",
+        note="make \u2014 capability:compilation",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="cargo build --release",
+        category="python_shell_only",
+        note="rust build \u2014 capability:compilation",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # ── Non-python/shell ecosystem package installs ──
+    Case(
+        command="gem install bundler",
+        category="python_shell_only",
+        note="ruby gem \u2014 capability:package_install:gem",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": BLOCK,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="cargo install ripgrep",
+        category="python_shell_only",
+        note="rust install \u2014 capability:package_install:cargo",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": BLOCK,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="composer require foo/bar",
+        category="python_shell_only",
+        note="php composer \u2014 capability:package_install:composer",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": BLOCK,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # ── Stdin-piped exec into non-python/shell interpreters ────────────
+    # The classifier emits BOTH the binary ``capability:stdin_exec`` tag
+    # (for read-only fast-path disqualification) AND a per-interpreter
+    # ``capability:stdin_exec:<lang>`` suffix.  python_shell_only denies
+    # the suffix for non-python/shell interpreters; the python and shell
+    # variants are intentionally absent so legitimate uses
+    # (``echo 'print(1)' | python``) keep working.
+    Case(
+        command="cat app.js | node",
+        category="python_shell_only",
+        note="stdin pipe into node \u2014 capability:stdin_exec:node",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="echo data | ruby",
+        category="python_shell_only",
+        note="stdin pipe into ruby \u2014 capability:stdin_exec:ruby",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="cat foo.pl | perl",
+        category="python_shell_only",
+        note="stdin pipe into perl \u2014 capability:stdin_exec:perl",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="cat foo.php | php",
+        category="python_shell_only",
+        note="stdin pipe into php \u2014 capability:stdin_exec:php",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    # Positive pin: python/shell stdin pipes must NOT be blocked.
+    # If a future regression adds stdin_exec:python or stdin_exec:shell
+    # to the deny set, these flip to BLOCK and the test catches it.
+    Case(
+        command="echo 'print(1)' | python",
+        category="python_shell_only",
+        note="stdin pipe into python \u2014 must NOT block under python_shell_only",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": UNDECIDED,
+            "no_run_command": BLOCK,
         },
     ),
 ]
@@ -475,4 +822,5 @@ CORPUS: list[Case] = (
     + _BLOCKED_PATTERN
     + _EDGE_AND_EXEC
     + _OBFUSCATION
+    + _PYTHON_SHELL_ONLY
 )

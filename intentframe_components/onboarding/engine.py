@@ -158,6 +158,84 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - summary: One sentence about what you set up"""
 
     @staticmethod
+    def _summarize_deny_capabilities(deny_caps) -> str:
+        """Conceptual summary of ``deny_capabilities`` for guardrail prose.
+
+        The onboarding LLM consumes this string to author guardrails — so
+        the goal is to make the agent's *intent layer* aware of what will
+        be blocked at Gate 2 (DG), not to dump literal capability tags.
+        Enumerating denied interpreter / ecosystem names IS appropriate
+        here (unlike file paths or email recipients) because:
+
+        - the deny-set is public policy, not sensitive configuration,
+        - the agent benefits from knowing which interpreters to avoid
+          *before* attempting them (saves tokens, improves UX), and
+        - a short list of denied languages is far more legible than a
+          frozenset of capability strings.
+
+        Special-cased shape: when the deny-set covers ``script_execution``
+        AND ``compilation`` AND ``package_install``, we recognise it as
+        the python+shell-only clamp and emit the high-level statement
+        first so the LLM internalises the headline before details.
+        """
+        SCRIPT_PREFIX = "capability:script_execution:"
+        STDIN_PREFIX = "capability:stdin_exec:"
+        PKG_PREFIX = "capability:package_install:"
+        denied_script_langs = sorted(
+            tag[len(SCRIPT_PREFIX):] for tag in deny_caps
+            if tag.startswith(SCRIPT_PREFIX)
+        )
+        denied_stdin_langs = sorted(
+            tag[len(STDIN_PREFIX):] for tag in deny_caps
+            if tag.startswith(STDIN_PREFIX)
+        )
+        denied_pkg_managers = sorted(
+            tag[len(PKG_PREFIX):] for tag in deny_caps
+            if tag.startswith(PKG_PREFIX)
+        )
+        compilation_denied = "capability:compilation" in deny_caps
+        network_bind_denied = "capability:network_bind" in deny_caps
+
+        is_python_shell_clamp = (
+            denied_script_langs
+            and compilation_denied
+            and denied_pkg_managers
+        )
+        details: list[str] = []
+        if is_python_shell_clamp:
+            details.append(
+                "language clamp: RUN_COMMAND is restricted to a python + "
+                "shell surface; the agent must not attempt to invoke "
+                "other interpreters or build toolchains via run_command"
+            )
+        if denied_script_langs:
+            details.append(
+                f"non-python/shell interpreters denied: "
+                f"{', '.join(denied_script_langs)}"
+            )
+        if denied_stdin_langs:
+            details.append(
+                f"stdin-piped code execution denied for: "
+                f"{', '.join(denied_stdin_langs)} "
+                "(e.g. `cat foo.js | node`)"
+            )
+        if compilation_denied:
+            details.append(
+                "compilation / build toolchains denied (gcc, clang, make, "
+                "cargo build, go build, javac, …)"
+            )
+        if denied_pkg_managers:
+            details.append(
+                f"package installs denied for: "
+                f"{', '.join(denied_pkg_managers)}"
+            )
+        if network_bind_denied:
+            details.append("local network listeners denied")
+        if not details:
+            return f"{len(deny_caps)} capability families denied at guardian"
+        return "; ".join(details)
+
+    @staticmethod
     def _summarize_constraints(action: str, constraints: ConstraintTypes) -> str:
         """Keep onboarding prompts conceptual so guardrails stay short and usable."""
         if isinstance(constraints, EmailConstraints):
@@ -195,12 +273,18 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
         if isinstance(constraints, TerminalConstraints):
             blocked = ", ".join(repr(pattern) for pattern in constraints.blocked_patterns)
             allowed = ", ".join(repr(cmd) for cmd in constraints.allowed_commands)
-            if blocked and allowed:
-                return f"blocked patterns: [{blocked}]; allowed commands: [{allowed}]"
+            deny_caps = constraints.deny_capabilities or frozenset()
+            parts: list[str] = []
             if blocked:
-                return f"blocked patterns: [{blocked}]"
+                parts.append(f"blocked patterns: [{blocked}]")
             if allowed:
-                return f"allowed commands: [{allowed}]"
+                parts.append(f"allowed commands: [{allowed}]")
+            if deny_caps:
+                parts.append(
+                    AIOnboardingEngine._summarize_deny_capabilities(deny_caps)
+                )
+            if parts:
+                return "; ".join(parts)
             return "terminal command constraints are configured"
 
         return constraints.model_dump_json()

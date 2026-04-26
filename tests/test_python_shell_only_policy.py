@@ -56,6 +56,16 @@ PYTHON_SHELL_ONLY_DENY: frozenset[str] = frozenset({
     "capability:script_execution:local_binary",
     # Build / link.
     "capability:compilation",
+    # Stdin-piped exec into non-python/shell interpreters
+    # (``cat foo.js | node``, ``echo data | ruby``, …).  The
+    # classifier emits a per-interpreter suffix alongside the
+    # binary ``capability:stdin_exec`` tag, so the python and
+    # shell stdin-pipe shapes (``echo 'print(1)' | python``)
+    # are intentionally not in the deny set here.
+    "capability:stdin_exec:node",
+    "capability:stdin_exec:ruby",
+    "capability:stdin_exec:perl",
+    "capability:stdin_exec:php",
     # Package installs in non-python/shell ecosystems.  pip / brew /
     # apt / yum / dnf / pacman / apk are intentionally absent — those
     # are part of the python or shell ecosystem.
@@ -122,6 +132,14 @@ class TestPythonAndShellAllowed:
             "ls -la | head",
             "cat foo.txt | wc -l",
             "grep TODO src/ | head -20",
+            # Stdin-piped code into the python and shell ecosystems is
+            # explicitly preserved — pinning these guards against a
+            # regression that adds stdin_exec:python or
+            # stdin_exec:shell to the deny set.
+            "echo 'print(1)' | python",
+            "cat snippet.py | python3",
+            "echo 'echo hi' | bash",
+            "cat install.sh | sh",
             # Shell ecosystem package installs.
             "brew install jq",
         ],
@@ -185,6 +203,21 @@ class TestNonPythonShellBlocked:
             ("go build ./...", ("compilation", "script_execution:local_binary")),
             ("rustc main.rs", ("compilation",)),
             ("javac Foo.java", ("compilation",)),
+            # Stdin-piped exec into non-python/shell interpreters.
+            # The classifier emits both the binary ``stdin_exec`` tag
+            # and the per-interpreter ``stdin_exec:<lang>`` suffix; the
+            # policy denies on the suffix.  These shapes were the
+            # gap the user surfaced — heredocs and pipes routed into
+            # other interpreters previously slipped through with only
+            # the binary tag.
+            ("cat app.js | node", ("stdin_exec:node",)),
+            ("cat app.js | node -", ("stdin_exec:node",)),
+            ("echo 'console.log(1)' | node", ("stdin_exec:node",)),
+            ("cat <<EOF | node -", ("stdin_exec:node",)),
+            ("cat foo.rb | ruby", ("stdin_exec:ruby",)),
+            ("echo data | ruby", ("stdin_exec:ruby",)),
+            ("cat foo.pl | perl", ("stdin_exec:perl",)),
+            ("cat foo.php | php", ("stdin_exec:php",)),
             # Non-python/non-shell package installs.
             ("npm install lodash", ("package_install:npm",)),
             ("yarn add react", ("package_install:npm",)),
@@ -240,6 +273,10 @@ class TestClassifierAgreesWithPolicy:
             "cargo install foo",
             "go install foo",
             "composer install",
+            "cat app.js | node",
+            "cat app.rb | ruby",
+            "cat app.pl | perl",
+            "cat app.php | php",
         ],
     )
     def test_classifier_emits_tag_in_deny_set(self, cmd: str) -> None:

@@ -21,12 +21,23 @@
 # Constraint values that DO carry over (and must stay in sync with
 # ``bootstrap.py`` if it changes):
 #
-#   * terminal_constraint.blocked_patterns                        (bootstrap.py:188-192)
+#   * terminal_constraint.blocked_patterns                        (bootstrap.py SYSTEM patterns)
+#   * terminal_constraint.deny_capabilities                       (bootstrap.py PYTHON_SHELL_ONLY_DENY_CAPABILITIES)
 #   * safe / unsafe classification per action                     (bootstrap.py SAFE_ACTIONS / UNSAFE_ACTIONS)
 #
 # ``sudo`` stays in ``blocked_patterns`` even though the demo runs as root --
 # the demo claim is "executor already runs as root, agents must not attempt
 # escalation", which only holds if ``sudo`` is rejected upstream.
+#
+# ``deny_capabilities`` mirrors the language clamp every gateway profile
+# seeds in ``intentframe_gateway/bootstrap.py``: ``RUN_COMMAND`` is
+# constrained to a python + shell language surface regardless of whether
+# the executor runs as user or root.  Every other scripting interpreter,
+# build/link toolchain, and non-pip/non-shell package install is denied
+# at Gate 2 before any LLM runs.  Tag suffixes mirror what
+# ``command_shield.classifier._SCRIPT_EXECUTION_RULES`` emits; the
+# contract is pinned by
+# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 allowed_actions:
@@ -40,5 +51,37 @@ allowed_actions:
         - "dd if="
         - "> /dev/"
         - "chmod 777"
+      deny_capabilities:
+        # Script execution -- non-python/shell interpreters.
+        - "capability:script_execution:node"
+        - "capability:script_execution:ruby"
+        - "capability:script_execution:perl"
+        - "capability:script_execution:java"
+        - "capability:script_execution:go"
+        - "capability:script_execution:dotnet"
+        - "capability:script_execution:php"
+        - "capability:script_execution:lua"
+        - "capability:script_execution:r"
+        - "capability:script_execution:julia"
+        - "capability:script_execution:swift"
+        - "capability:script_execution:deno_bun"
+        - "capability:script_execution:awk"
+        - "capability:script_execution:local_binary"
+        # Build / link toolchains.
+        - "capability:compilation"
+        # Stdin-piped exec into non-python/shell interpreters
+        # (cat foo.js | node, echo data | ruby, etc.).  Pinned via
+        # ``capability:stdin_exec:<interpreter>`` so the python and
+        # shell ecosystems remain usable.
+        - "capability:stdin_exec:node"
+        - "capability:stdin_exec:ruby"
+        - "capability:stdin_exec:perl"
+        - "capability:stdin_exec:php"
+        # Non-python/shell ecosystem package installs.
+        - "capability:package_install:npm"
+        - "capability:package_install:gem"
+        - "capability:package_install:cargo"
+        - "capability:package_install:go"
+        - "capability:package_install:composer"
 
 intent_limits: []

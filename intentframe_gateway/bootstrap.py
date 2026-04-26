@@ -13,13 +13,19 @@ The gateway seeds different policy / workspace shapes depending on the
 * ``root`` — full-filesystem host-file access (``/*``), virtual workspace
   rooted at ``/``.  Mirrors ``jarvis_pa/executor_root.yaml``.
 
-The profile only changes three values (host constraint, workspace mount,
-policy user id + metadata label).  Everything else (SAFE/UNSAFE action
-sets, blocked command patterns, email/message constraints, intent limits,
-and the gateway's non-negotiable floor enforced by
+The profile only changes three values (host constraint, workspace
+mount, policy user id + metadata label).  Everything else (SAFE/UNSAFE
+action sets, terminal ``blocked_patterns``, terminal
+``deny_capabilities``, email/message constraints, intent limits, and
+the gateway's non-negotiable floor enforced by
 ``resource_registry/floor.py``) is intentionally identical across
 profiles — the root profile still blocks ``sudo`` because the demo
-claim is "already root, no need to escalate".
+claim is "already root, no need to escalate", and both profiles
+clamp ``RUN_COMMAND`` to a python + shell language surface via
+:data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES`.  The shared deny-set is
+the design stance: the language surface IntentFrame is willing to
+reason about does not depend on whether the executor happens to run
+as root.
 
 ``_build_default_policy`` is a stable alias for the user profile so the
 ``tests/test_jarvis_host_scope_mirror.py`` mirror invariant against
@@ -89,6 +95,67 @@ INTENT_LIMITS = [
     },
 ]
 
+# Capability tags denied by every profile's ``terminal_constraint``.
+# The set encodes a "python + shell only" language surface: every other
+# scripting interpreter, build/link toolchain, and non-pip/non-shell
+# package install is rejected at Gate 2 (DeterministicGuardian) before
+# any LLM cost.  This is profile-independent on purpose — the language
+# surface IntentFrame is willing to reason about does not change just
+# because the executor happens to run as root.  Tag suffixes mirror
+# what ``command_shield.classifier._SCRIPT_EXECUTION_RULES`` actually
+# emits; the contract is pinned by
+# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
+#
+# Mirror invariant: ``jarvis_pa/seed_policies.py`` defines the same
+# constant inline (the two seeders historically duplicate their seed
+# data — see ``SAFE_ACTIONS`` / ``UNSAFE_ACTIONS``).  Keep both copies
+# in sync; ``demo/tests/root_demo/test_policy_root.yaml`` mirrors the
+# values literally as well.
+PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    # Script execution — every non-python/shell interpreter the
+    # classifier knows about (file form + inline-eval form share a
+    # single tag per language).
+    "capability:script_execution:node",
+    "capability:script_execution:ruby",
+    "capability:script_execution:perl",
+    "capability:script_execution:java",
+    "capability:script_execution:go",
+    "capability:script_execution:dotnet",
+    "capability:script_execution:php",
+    "capability:script_execution:lua",
+    "capability:script_execution:r",
+    "capability:script_execution:julia",
+    "capability:script_execution:swift",
+    "capability:script_execution:deno_bun",
+    "capability:script_execution:awk",
+    # Direct execution of compiled local binaries (``./foo``,
+    # ``./bin/tool``).  Source compilation is below.
+    "capability:script_execution:local_binary",
+    # Build / link toolchains (gcc / clang / make / cargo build /
+    # go build / rustc / javac / …).
+    "capability:compilation",
+    # Stdin-piped exec into non-python/shell interpreters.
+    # ``cat foo.js | node`` was previously slipping through with only
+    # the binary ``capability:stdin_exec`` tag; the classifier now
+    # emits a per-interpreter suffix so the policy can deny
+    # ``stdin_exec:node`` while still allowing
+    # ``stdin_exec:python`` / ``stdin_exec:shell`` (legitimate uses
+    # like ``echo 'print(1)' | python``).
+    "capability:stdin_exec:node",
+    "capability:stdin_exec:ruby",
+    "capability:stdin_exec:perl",
+    "capability:stdin_exec:php",
+    # Non-python/non-shell ecosystem package installs.  pip / brew /
+    # apt / yum / dnf / pacman / apk / gem-via-bundler are intentionally
+    # absent — those count as part of the python or shell ecosystem.
+    "capability:package_install:npm",
+    "capability:package_install:gem",
+    "capability:package_install:cargo",
+    "capability:package_install:go",
+    "capability:package_install:composer",
+})
+
+
 WORKSPACE_MOUNTS = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
@@ -149,6 +216,7 @@ def _build_policy(profile: str = "user") -> dict:
       * ``metadata.profile`` — label for audit visibility.
 
     Everything else — SAFE/UNSAFE sets, terminal ``blocked_patterns``,
+    terminal ``deny_capabilities`` (python + shell language clamp),
     email/message constraints, intent limits — is intentionally shared.
     The root profile deliberately keeps ``sudo`` in ``blocked_patterns``
     because the demo stance is "executor already runs as root; agents
@@ -185,10 +253,16 @@ def _build_policy(profile: str = "user") -> dict:
         "allowed_contacts": [],
         "contact_sources": [{"source": "contacts_all", "filter": "", "enabled": True}],
     }
+    # Both profiles get the same RUN_COMMAND clamp: python + shell is
+    # the entire language surface IntentFrame is willing to deterministically
+    # reason about, regardless of executor privilege.  Sorted for stable
+    # JSON-payload ordering across reseeds — Pydantic coerces back to
+    # ``frozenset`` on the registry side.
     terminal_constraint = {
         "blocked_patterns": [
             "sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777",
         ],
+        "deny_capabilities": sorted(PYTHON_SHELL_ONLY_DENY_CAPABILITIES),
     }
 
     for action in SAFE_ACTIONS:

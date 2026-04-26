@@ -18,6 +18,14 @@ Seeds different policy / workspace shapes depending on the
 * ``root`` — full-filesystem host-file access (``/*``), virtual workspace
   rooted at ``/``.  Mirrors ``jarvis_pa/executor_root.yaml``.
 
+Both profiles seed ``terminal_constraint.deny_capabilities`` with
+:data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` so ``RUN_COMMAND`` is
+clamped to a python + shell language surface regardless of executor
+privilege.  The corresponding constant in
+``intentframe_gateway/bootstrap.py`` is the canonical source — the
+two seeders historically duplicate their seed data; keep both copies
+in sync.
+
 Idempotent: checks for an existing policy before POSTing so reruns are
 safe (workspace seed is idempotent on the registry's 409 response).
 
@@ -183,6 +191,43 @@ INTENT_LIMITS = [
 ]
 
 
+# Capability tags denied by every profile's ``terminal_constraint``.
+# Profile-independent on purpose: the language surface IntentFrame is
+# willing to reason about does not change just because the executor
+# happens to run as root.  Must match ``intentframe_gateway/bootstrap.py
+# ::PYTHON_SHELL_ONLY_DENY_CAPABILITIES`` exactly — both seeders are
+# run against the same registry and an asymmetric seed would silently
+# let whichever seeder ran second relax the other's policy.  The
+# contract between this set and the classifier is pinned by
+# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
+PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    "capability:script_execution:node",
+    "capability:script_execution:ruby",
+    "capability:script_execution:perl",
+    "capability:script_execution:java",
+    "capability:script_execution:go",
+    "capability:script_execution:dotnet",
+    "capability:script_execution:php",
+    "capability:script_execution:lua",
+    "capability:script_execution:r",
+    "capability:script_execution:julia",
+    "capability:script_execution:swift",
+    "capability:script_execution:deno_bun",
+    "capability:script_execution:awk",
+    "capability:script_execution:local_binary",
+    "capability:compilation",
+    "capability:stdin_exec:node",
+    "capability:stdin_exec:ruby",
+    "capability:stdin_exec:perl",
+    "capability:stdin_exec:php",
+    "capability:package_install:npm",
+    "capability:package_install:gem",
+    "capability:package_install:cargo",
+    "capability:package_install:go",
+    "capability:package_install:composer",
+})
+
+
 def _build_policy(profile: str = "user") -> dict:
     allowed_actions: dict[str, dict] = {}
     # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py for
@@ -233,6 +278,7 @@ def _build_policy(profile: str = "user") -> dict:
             "> /dev/",
             "chmod 777",
         ],
+        "deny_capabilities": sorted(PYTHON_SHELL_ONLY_DENY_CAPABILITIES),
     }
 
     for action in UNSAFE_ACTIONS:
