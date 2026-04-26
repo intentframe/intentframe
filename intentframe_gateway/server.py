@@ -267,10 +267,13 @@ async def lifespan(app: FastAPI):
         _emit({"type": "healthy", "service": "edi"})
 
     # ── Step 4: Build combined env (config YAML + vault secrets) ──
+    from intentframe_gateway.bootstrap import policy_user_id_for_current_profile
     from intentframe_gateway.config_loader import build_config_env
     config_env = build_config_env()
     runtime_env = await gate.build_runtime_env()
     combined_env = {**config_env, **runtime_env}
+    # Must match policy-registry id from Bootstrapper (e.g. jarvis_default_root)
+    combined_env["JARVIS_USER_ID"] = policy_user_id_for_current_profile()
 
     # ── Step 5: Start platform server (macOS only) ─────────────────
     # Must start before supervisor so the executor can reach it

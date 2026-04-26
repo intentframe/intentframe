@@ -14,11 +14,11 @@
 - {{ g }}
 {% endfor %}
 
+{% endif -%}
 ## Terminal (run_command)
 - Exact working directory and read/write access depend on runtime security configurations.
 - You operate in shell with standard Unix tools and Python. For column extraction, arithmetic, log filtering, or any text manipulation that goes beyond `grep`/`sed`/`cut`/`sort`/`find`, reach for `python3 -c '...'` rather than `awk`, `perl`, `node`, or another interpreter — it's the canonical path here.
 
-{% endif -%}
 {% include "tool_usage.j2" %}
 
 {% if skills_xml -%}

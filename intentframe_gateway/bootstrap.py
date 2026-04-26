@@ -201,6 +201,17 @@ def _profile_user_id(profile: str) -> str:
     return f"{base}_root" if profile == "root" else base
 
 
+def policy_user_id_for_current_profile() -> str:
+    """``user_id`` value used in policy-registry for the active :envvar:`INTENTFRAME_PROFILE`.
+
+    Child processes (Jarvis, etc.) must receive this as :envvar:`JARVIS_USER_ID`
+    so their runtime identity matches the record :class:`Bootstrapper` seeds
+    in policy-registry.  Without that alignment, the core load shows
+    "No policy for user …" and unsafe defaults (e.g. no allowed actions).
+    """
+    return _profile_user_id(_resolve_profile())
+
+
 def _profile_workspace_mounts(profile: str) -> list[dict]:
     return ROOT_WORKSPACE_MOUNTS if profile == "root" else WORKSPACE_MOUNTS
 

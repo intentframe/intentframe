@@ -28,6 +28,7 @@ _MANAGED_SERVICES = frozenset({"jarvis", "edi", "telegram"})
 
 async def _build_combined_env(request: Request) -> dict[str, str]:
     """Build the merged config-YAML + vault-secrets env dict for child processes."""
+    from intentframe_gateway.bootstrap import policy_user_id_for_current_profile
     from intentframe_gateway.config_loader import build_config_env
     config_env = build_config_env()
     vault_client = getattr(request.app.state, "vault_client", None)
@@ -37,7 +38,9 @@ async def _build_combined_env(request: Request) -> dict[str, str]:
         runtime_env = await gate.build_runtime_env()
     else:
         runtime_env = {}
-    return {**config_env, **runtime_env}
+    merged = {**config_env, **runtime_env}
+    merged["JARVIS_USER_ID"] = policy_user_id_for_current_profile()
+    return merged
 
 
 # ── Credential status ─────────────────────────────────────────────────────────
