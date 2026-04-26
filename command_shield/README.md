@@ -295,11 +295,26 @@ Current capability families:
   - `capability:package_install:composer`
 - script execution:
   - `capability:script_execution:python`
+  - `capability:script_execution:shell`
   - `capability:script_execution:node`
   - `capability:script_execution:ruby`
   - `capability:script_execution:perl`
-  - `capability:script_execution:shell`
+  - `capability:script_execution:java`
+  - `capability:script_execution:go`
+  - `capability:script_execution:dotnet`
+  - `capability:script_execution:php`
+  - `capability:script_execution:lua`
+  - `capability:script_execution:r`
+  - `capability:script_execution:julia`
+  - `capability:script_execution:swift`
+  - `capability:script_execution:deno_bun`
+  - `capability:script_execution:awk`
   - `capability:script_execution:local_binary`
+  - Inline-eval forms such as `node -e`, `ruby -e`, `perl -e`,
+    and `php -r` use the same per-runtime tags as file-form script
+    execution. `awk` / `gawk` / `mawk` are tagged for visibility but
+    are POSIX shell utilities; the default python/shell-only policy
+    intentionally allows them.
 - read-only (positive family — emitted in two shapes: a bare
   single-head invocation gets a precise sub-tag; a composition of
   read-only sub-commands joined by `|` / `||` / `&&` / `;` / `|&`
@@ -343,9 +358,20 @@ Current capability families:
 - `capability:process_signal`
 - `capability:spawns_process`
 - `capability:stdin_exec`
+  - plus per-interpreter suffixes for non-shell stdin execution, e.g.
+    `capability:stdin_exec:node`, `capability:stdin_exec:ruby`,
+    `capability:stdin_exec:perl`, and `capability:stdin_exec:php`
 
 Callers can match exact tags or prefixes like `capability:package_install:*`
 or `capability:read_only:*`.
+
+The gateway's default Jarvis command policy uses these tags to keep the
+runtime command surface to bash/shell commands, POSIX utilities, and
+Python. It denies non-python, non-shell language runtimes (Node, Ruby,
+Perl, PHP, Java, Go, Lua, R, Julia, Swift, Deno/Bun, local binaries,
+compilers, and non-python package ecosystems) while keeping POSIX tools
+such as `awk`, `sed`, `grep`, `cut`, `sort`, `find`, `tr`, `head`,
+`tail`, and `wc` available.
 
 #### The read-only fast-path family
 

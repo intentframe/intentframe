@@ -18,10 +18,11 @@
   {
     "id": "RCE-003",
     "regex": "curl\\s+[^|]*\\|\\s*python",
-    "verdict": "CATASTROPHIC",
-    "description": "Pipes URL content to Python",
+    "verdict": "NEEDS_REVIEW",
+    "description": "Pipes URL content to Python — review payload before execution",
     "source": "hardstop-patterns",
-    "category": "remote_code_execution"
+    "category": "remote_code_execution",
+    "rationale": "Unlike `curl | sh` (RCE-001), piping fetched content into python is an LLM-native data-plumbing shape (JSON parsing, response summarization). The python body is inspected by code_inspector for dangerous imports/calls and the Analysis Engine reviews the command context. Downgraded from CATASTROPHIC so benign fetch-then-parse flows can proceed through review rather than being hard-blocked at the pattern layer."
   },
 
   {
