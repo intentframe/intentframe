@@ -12,6 +12,36 @@ intentframe-gateway-cli
 
 If the gateway isn't running, the CLI starts it as a background process, waits for it to become healthy, then drops into the interactive REPL. If the gateway is already running, it connects immediately.
 
+### Root demo profile
+
+The CLI also supports a demo-only root profile:
+
+```bash
+intentframe-gateway-cli --profile root
+```
+
+This does **not** run the whole stack with `sudo`. Instead, it asks the gateway to use the Jarvis root profile and `jarvis_pa/executor_root.yaml`, whose sandbox config opts `RUN_COMMAND` into per-command `sudo -n sandbox-exec` wrapping.
+
+That root capability only becomes active after a one-time machine setup:
+
+```bash
+sudo bash intentframe_setup_root_demo.sh
+```
+
+When root-demo is installed, the CLI shows a profile banner from gateway health data:
+
+```text
+Profile: root   Escalation: ARMED   Executor running_as_root: yes
+```
+
+If `--profile root` is requested before installation, the CLI warns but still starts normally; commands simply run unprivileged.
+
+When you quit the CLI, it prints an uninstall reminder if root-demo is still installed:
+
+```bash
+sudo bash intentframe_uninstall_root_demo.sh
+```
+
 ## First run
 
 On first launch the credential vault won't have an OpenAI API key, so the gateway enters **partial startup** mode. The CLI detects this and shows a **credential checklist** covering everything IntentFrame needs:
@@ -122,6 +152,8 @@ User types "quit" (or Ctrl+C / EOF)
 ```
 
 The CLI intentionally exercises the same `POST /system/shutdown` API rather than sending a signal directly, so it tests the same shutdown code path as any real frontend.
+
+If the local machine still has root-demo installed (`~/.intentframe/state/root-demo.json` present), the CLI prints a reminder after `Gateway stopped.` so the operator does not forget that the sudoers entry persists across sessions.
 
 ## Entry point
 

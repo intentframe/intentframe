@@ -14,6 +14,7 @@ The LLM sees these as plain callable functions.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from agents import RunContextWrapper, WebSearchTool, function_tool
@@ -30,25 +31,38 @@ from jarvis.types import AgentContext
 # IntentFrame.data, which the executor client forwards as adapter params.
 # ---------------------------------------------------------------------------
 
-class _FileAction(BaseModel):
-    action: str
+# ── Host-file actions ─────────────────────────────────────────────────
+# ``target`` carries a real host path like ``~/Documents/foo.txt``.
+
+class _ReadHostFileAction(BaseModel):
+    action: str = "READ_HOST_FILE"
     target: str
     reason: str
     offset: int | None = None
     limit: int | None = None
 
-class _WriteAction(BaseModel):
-    action: str = "WRITE_FILE"
+class _WriteHostFileAction(BaseModel):
+    action: str = "WRITE_HOST_FILE"
     target: str
     content: str
     reason: str
 
-class _DeleteAction(BaseModel):
-    action: str = "DELETE_FILE"
+class _ListHostDirectoryAction(BaseModel):
+    action: str = "LIST_HOST_DIRECTORY"
     target: str
     reason: str
-    target_path: str       # required by DeletionIntentData domain schema
-    irreversible: bool = True  # required by DeletionIntentData domain schema
+
+class _DeleteHostFileAction(BaseModel):
+    action: str = "DELETE_HOST_FILE"
+    target: str
+    reason: str
+    # DELETE_HOST_FILE is registered in ACTION_DOMAINS as DELETION, so the
+    # DeletionIntentData schema must be satisfied exactly like _DeleteAction.
+    # Populating target_path explicitly (rather than falling back to
+    # intent.target) keeps DeletionModule.check's raw-string path match
+    # deterministic — see the docstring on DeletionConstraints.
+    target_path: str
+    irreversible: bool = True
 
 class _CommandAction(BaseModel):
     action: str = "RUN_COMMAND"
@@ -218,6 +232,95 @@ class _SystemAction(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Result rendering
+# ---------------------------------------------------------------------------
+#
+# The LLM must see the same structured shape on both success and failure;
+# otherwise it loses useful context (e.g. a `find` with rc=1 still has
+# thousands of lines of real answers in stdout). We forward the full data
+# dict in both cases but cap the known-big string fields so a multi-MB
+# blob from a noisy command can't torch the context window.
+#
+# Caps are per-field (not a single JSON cap) so the payload stays valid
+# JSON and small keys like return_code / command always make it through.
+# Truncation keeps head + tail: listings keep their first entries and
+# compile logs keep the real error line at the bottom.
+
+MAX_STDOUT_CHARS = 8192    # ~2k tokens — fine for listings, diffs, logs
+MAX_STDERR_CHARS = 2048    # errors are almost always short
+MAX_CONTENT_CHARS = 8192   # paginated file reads still get a backstop cap
+MAX_ERROR_CHARS = 2048     # for result.error when distinct from stderr
+
+_TRUNCATE_LIMITS: dict[str, int] = {
+    "stdout": MAX_STDOUT_CHARS,
+    "stderr": MAX_STDERR_CHARS,
+    "content": MAX_CONTENT_CHARS,
+}
+
+
+def _truncate(text: str, limit: int) -> tuple[str, bool]:
+    """Return ``(maybe_shortened, was_truncated)`` using a head+tail window.
+
+    Preserves the first and last portions of the text so both the start
+    of a listing and the trailing error/summary line survive. The marker
+    in the middle tells the LLM the gap is a truncation, not real data.
+    """
+    if len(text) <= limit:
+        return text, False
+    head = limit // 2
+    tail = limit - head
+    dropped = len(text) - limit
+    return f"{text[:head]}\n…[{dropped} chars truncated]…\n{text[-tail:]}", True
+
+
+def _render_result(result: Any) -> str:
+    """Serialise an ExecutionResult for the LLM.
+
+    Success and failure produce the same shape — a JSON object with
+    ``success`` plus the adapter's ``data`` fields (truncated where
+    relevant). On failure, ``error`` is added only when it carries
+    information beyond what ``stderr`` already contains, avoiding the
+    duplicate text that ``f"Error: {stderr}"`` used to emit.
+
+    Falls back to plain strings when ``data`` is not a dict (rare:
+    some adapters return a scalar or None).
+    """
+    if not isinstance(result.data, dict):
+        if result.success:
+            return str(result.data) if result.data is not None else "OK"
+        return f"Error: {result.error or 'unknown error'}"
+
+    rendered: dict[str, Any] = {"success": result.success}
+    for key, value in result.data.items():
+        limit = _TRUNCATE_LIMITS.get(key)
+        if limit is not None and isinstance(value, str):
+            shortened, was_truncated = _truncate(value, limit)
+            rendered[key] = shortened
+            if was_truncated:
+                rendered[f"{key}_truncated"] = True
+                rendered[f"{key}_total_chars"] = len(value)
+        else:
+            rendered[key] = value
+
+    if not result.success and result.error:
+        # For terminal failures result.error is literally stderr — don't
+        # double-send it. For other adapters (email, calendar, etc.) it's
+        # distinct information and must be surfaced.
+        #
+        # Compare against the ORIGINAL stderr, not the truncated form;
+        # otherwise a large stderr (cap-triggered) would never match
+        # result.error and we'd emit both fields with the same text.
+        original_stderr = result.data.get("stderr")
+        if original_stderr != result.error:
+            err_short, err_truncated = _truncate(result.error, MAX_ERROR_CHARS)
+            rendered["error"] = err_short
+            if err_truncated:
+                rendered["error_truncated"] = True
+
+    return json.dumps(rendered, default=str)
+
+
+# ---------------------------------------------------------------------------
 # Shared submit helper
 # ---------------------------------------------------------------------------
 
@@ -236,48 +339,68 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
     logger.debug(f"actor.submit: {action_type} — {str(subject)[:60]}")
     try:
         result = await ctx.context.actor.submit(payload)
-        if result.success:
-            if isinstance(result.data, dict):
-                return json.dumps(result.data, default=str)
-            return str(result.data)
-        return f"Error: {result.error}"
+        return _render_result(result)
     except Exception as exc:
         logger.warning(f"actor.submit failed for {action_type}: {exc}")
         return f"Error: {exc}"
 
 
 # ---------------------------------------------------------------------------
-# File / Directory tools
+# Host file / directory tools
 # ---------------------------------------------------------------------------
 
 @function_tool
-async def read_file(ctx: RunContextWrapper[AgentContext], path: str, reason: str, offset: int = 0, limit: int = 500) -> str:
+async def read_host_file(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    reason: str,
+    offset: int = 0,
+    limit: int = 500,
+) -> str:
     """Read the contents of a file. Supports text files and PDFs.
     Returns up to `limit` lines starting at `offset` (0-based).
     Response includes total_lines and truncated flag — call again
     with a higher offset to read more."""
-    return await _submit(ctx, _FileAction(
-        action="READ_FILE", target=path, reason=reason,
-        offset=offset, limit=limit,
+    return await _submit(ctx, _ReadHostFileAction(
+        target=path, reason=reason, offset=offset, limit=limit,
     ))
 
 
 @function_tool
-async def write_file(ctx: RunContextWrapper[AgentContext], path: str, content: str, reason: str) -> str:
+async def write_host_file(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    content: str,
+    reason: str,
+) -> str:
     """Write content to a file (create or overwrite)."""
-    return await _submit(ctx, _WriteAction(target=path, content=content, reason=reason))
+    return await _submit(ctx, _WriteHostFileAction(
+        target=path, content=content, reason=reason,
+    ))
 
 
 @function_tool
-async def list_directory(ctx: RunContextWrapper[AgentContext], path: str, reason: str) -> str:
+async def list_host_directory(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    reason: str,
+) -> str:
     """List files and subdirectories at the given path."""
-    return await _submit(ctx, _FileAction(action="LIST_DIRECTORY", target=path, reason=reason))
+    return await _submit(ctx, _ListHostDirectoryAction(
+        target=path, reason=reason,
+    ))
 
 
 @function_tool
-async def delete_file(ctx: RunContextWrapper[AgentContext], path: str, reason: str) -> str:
+async def delete_host_file(
+    ctx: RunContextWrapper[AgentContext],
+    path: str,
+    reason: str,
+) -> str:
     """Delete a file or empty directory."""
-    return await _submit(ctx, _DeleteAction(target=path, reason=reason, target_path=path))
+    return await _submit(ctx, _DeleteHostFileAction(
+        target=path, reason=reason, target_path=path,
+    ))
 
 
 # ---------------------------------------------------------------------------
@@ -567,11 +690,6 @@ async def open_url(ctx: RunContextWrapper[AgentContext], url: str, reason: str) 
     return await _submit(ctx, _BrowserAction(action="OPEN_URL", url=url, reason=reason))
 
 
-@function_tool
-async def search_web(ctx: RunContextWrapper[AgentContext], query: str, reason: str) -> str:
-    """Perform a web search and return results."""
-    return await _submit(ctx, _BrowserAction(action="SEARCH_WEB", query=query, reason=reason))
-
 
 @function_tool
 async def get_page_content(ctx: RunContextWrapper[AgentContext], url: str, reason: str) -> str:
@@ -702,20 +820,54 @@ async def memory_search(ctx: RunContextWrapper[AgentContext], query: str) -> str
         return f"Memory search error: {exc}"
 
 
-@function_tool
-async def memory_get(ctx: RunContextWrapper[AgentContext], path: str, start_line: int, end_line: int) -> str:
-    """Read specific lines from a memory file."""
-    result = await ctx.context.actor.submit({
-        "action": "READ_FILE",
-        "target": path,
-        "reason": f"Reading memory file lines {start_line}-{end_line}",
-    })
-    if not result.success:
-        return f"Error reading {path}: {result.error}"
-    content = str(result.data.get("content", result.data) if isinstance(result.data, dict) else result.data)
+def _read_memory_lines(
+    workspace_root: Path,
+    path: str,
+    start_line: int,
+    end_line: int,
+) -> str:
+    """Read a 1-indexed, inclusive line range from a memory file.
+
+    ``workspace_root`` MUST be an absolute, resolved path; callers are
+    responsible for ``.expanduser().resolve()`` so this helper's
+    traversal guard is deterministic.
+
+    All failures return a human-readable ``"Error reading ..."`` string
+    rather than raising — memory tooling is on the LLM hot path and the
+    model should see the reason verbatim.  Kept as a plain function
+    (not an ``@function_tool``) so unit tests can exercise path
+    boundaries, symlink escapes, and line-slice edges without going
+    through the agents SDK.
+    """
+    target = (workspace_root / path).resolve()
+
+    try:
+        target.relative_to(workspace_root)
+    except ValueError:
+        return f"Error reading {path}: path escapes Jarvis memory workspace"
+
+    if not target.exists():
+        return f"Error reading {path}: file does not exist"
+    if not target.is_file():
+        return f"Error reading {path}: not a file"
+
+    try:
+        content = target.read_text(encoding="utf-8")
+    except Exception as exc:
+        return f"Error reading {path}: {exc}"
+
     lines = content.splitlines()
     selected = lines[max(0, start_line - 1):end_line]
     return "\n".join(selected)
+
+
+@function_tool
+async def memory_get(ctx: RunContextWrapper[AgentContext], path: str, start_line: int, end_line: int) -> str:
+    """Read specific lines from a memory file."""
+    workspace_root = (ctx.context.config.workspace_dir / "workspace").expanduser().resolve()
+    result = _read_memory_lines(workspace_root, path, start_line, end_line)
+    logger.debug(f"memory_get({path!r}, {start_line}, {end_line}) → {len(result.splitlines())} lines")
+    return result
 
 
 @function_tool
@@ -773,10 +925,10 @@ async def spawn_agent(ctx: RunContextWrapper[AgentContext], task: str, model: st
 # ---------------------------------------------------------------------------
 
 ALL_TOOLS: list[Any] = [
-    read_file,
-    write_file,
-    list_directory,
-    delete_file,
+    read_host_file,
+    write_host_file,
+    list_host_directory,
+    delete_host_file,
     run_command,
     send_email,
     read_email,

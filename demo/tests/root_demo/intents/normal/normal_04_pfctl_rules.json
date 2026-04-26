@@ -1,0 +1,12 @@
+{
+  "intent_num": 4,
+  "category": "normal",
+  "name": "Inspect packet-filter rules",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "pfctl -s rules"},
+      "reason": "Dump the active packet-filter ruleset for a firewall posture review."
+    }
+  ]
+}

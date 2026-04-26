@@ -178,6 +178,85 @@ def test_deletion_module():
     check("No path restriction, block_irreversible=False → pass", ok5)
 
 
+def test_deletion_module_host_file():
+    """DELETE_HOST_FILE interactions with the shared DeletionConstraints.
+
+    ``UserPolicy.domain_constraints`` is keyed by ``DomainType``, so a
+    single ``DeletionConstraints`` instance is shared across every
+    ``DELETE_*`` action a user is granted.  ``DeletionModule`` matches
+    ``data["target_path"]`` with raw string / fnmatch — it is
+    *vocabulary-blind* (no normalize_virtual_path, no canonicalize_real_path).
+    The plan calls out that mixing virtual (``/home/*``) and real
+    (``~/Documents/*``) patterns is unsafe unless the namespaces are
+    disjoint by coincidence; the recommended configuration is
+    ``allowed_paths=None`` when ``DELETE_HOST_FILE`` is granted, so the
+    per-action ``HostFileConstraints`` + the DG ``delete_host_file_floor``
+    gate carry the path-vocabulary load.
+
+    These checks pin that the module behaves as the docstring describes
+    so future changes (e.g. splitting ``DomainType.DELETION`` by
+    category) intentionally break this test rather than silently change
+    the contract.
+    """
+    print("\n" + "=" * 60)
+    print("  1c. Deletion Module — DELETE_HOST_FILE interactions")
+    print("=" * 60)
+
+    module = DeletionModule()
+
+    # Recommended config: allowed_paths=None → per-action HostFileConstraints
+    # owns the path wall; module only enforces irreversible / confirmation.
+    constraints_none = DeletionConstraints(
+        allowed_paths=None,
+        block_irreversible=False,
+    )
+    intent = IntentFrame(
+        action=ActionType.DELETE_HOST_FILE,
+        target="~/Documents/notes.md",
+        data={"target_path": "~/Documents/notes.md", "irreversible": True},
+    )
+    ok, _ = module.check(intent, constraints_none)
+    check(
+        "DELETE_HOST_FILE with allowed_paths=None → module passes (defers to per-action)",
+        ok,
+    )
+
+    # block_irreversible still applies to DELETE_HOST_FILE — it's the one
+    # path-agnostic setting that remains meaningful across vocabularies.
+    constraints_block = DeletionConstraints(
+        allowed_paths=None,
+        block_irreversible=True,
+    )
+    ok_blocked, reason_blocked = module.check(intent, constraints_block)
+    check(
+        "DELETE_HOST_FILE with block_irreversible=True → BLOCK",
+        not ok_blocked,
+    )
+    check(
+        "  reason mentions irreversible",
+        "irreversible" in reason_blocked.lower(),
+    )
+
+    # Vocabulary warning in action: a virtual-path allowlist applied to a
+    # real-path target deterministically fails (no coincidence).  Pins
+    # the recommendation in the DeletionConstraints docstring — mixing
+    # vocabularies is a foot-gun, not a feature.
+    constraints_virtual = DeletionConstraints(
+        allowed_paths=["/home/*"],
+        block_irreversible=False,
+    )
+    intent_real = IntentFrame(
+        action=ActionType.DELETE_HOST_FILE,
+        target="~/Documents/notes.md",
+        data={"target_path": "~/Documents/notes.md", "irreversible": False},
+    )
+    ok_cross, _ = module.check(intent_real, constraints_virtual)
+    check(
+        "Virtual-path allowlist does NOT admit real-path DELETE_HOST_FILE target",
+        not ok_cross,
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 2. Actor Schema Validation (no server)
 # ═══════════════════════════════════════════════════════════════════
@@ -237,6 +316,33 @@ def test_actor_schema_validation():
     except ValueError as e:
         raised2 = True
     check("DELETE_FILE without target_path → ValueError", raised2)
+
+    # DELETE_HOST_FILE (real-path parallel) — same DeletionIntentData schema.
+    intent_host = actor._build_intent({
+        "action": "DELETE_HOST_FILE",
+        "target": "~/Documents/file.txt",
+        "reason": "cleanup",
+        "data": {"target_path": "~/Documents/file.txt"},
+    })
+    check(
+        "DELETE_HOST_FILE with target_path → builds OK",
+        intent_host is not None,
+    )
+
+    raised_host = False
+    try:
+        actor._build_intent({
+            "action": "DELETE_HOST_FILE",
+            "target": "~/Documents/file.txt",
+            "reason": "cleanup",
+            "data": {"filename": "file.txt"},
+        })
+    except ValueError:
+        raised_host = True
+    check(
+        "DELETE_HOST_FILE without target_path → ValueError",
+        raised_host,
+    )
 
     # Non-critical-domain action → no schema validation
     intent3 = actor._build_intent({
@@ -315,7 +421,15 @@ def test_taxonomy():
 
     check("PAY_INVOICE mapped to FINANCE", ACTION_DOMAINS.get(ActionType.PAY_INVOICE) == DomainType.FINANCE)
     check("DELETE_FILE mapped to DELETION", ACTION_DOMAINS.get(ActionType.DELETE_FILE) == DomainType.DELETION)
+    check(
+        "DELETE_HOST_FILE mapped to DELETION",
+        ACTION_DOMAINS.get(ActionType.DELETE_HOST_FILE) == DomainType.DELETION,
+    )
     check("READ_FILE not in ACTION_DOMAINS", ActionType.READ_FILE not in ACTION_DOMAINS)
+    check(
+        "READ_HOST_FILE not in ACTION_DOMAINS",
+        ActionType.READ_HOST_FILE not in ACTION_DOMAINS,
+    )
 
     check("FINANCE has a schema", DomainType.FINANCE in DOMAIN_SCHEMAS)
     check("DELETION has a schema", DomainType.DELETION in DOMAIN_SCHEMAS)
@@ -485,6 +599,7 @@ def main():
 
     test_finance_module()
     test_deletion_module()
+    test_deletion_module_host_file()
     test_actor_schema_validation()
     test_serialization_roundtrip()
     test_taxonomy()

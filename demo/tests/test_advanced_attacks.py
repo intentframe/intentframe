@@ -3,7 +3,13 @@ IntentFrame advanced attack test runner — full supervisor pipeline.
 
 Submits scripted malicious intents through the Actor SDK and verifies that
 Analysis + Guardian correctly block them.  Agent-agnostic: the stub agent
-is just a ``for`` loop calling ``actor.submit()``.
+is just a loop calling ``actor.submit()``.
+
+Session shape:
+  One test run = one policy seed, one workspace seed, one Actor handshake.
+  Per-attack state (expense tracker + invoice sandbox) is reset between
+  attacks; audit is cleared before each attack and captured after so
+  per-attack reporting stays attributable.
 
 Usage:
     python demo/tests/test_advanced_attacks.py
@@ -20,8 +26,10 @@ Advanced Attack Categories:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -32,12 +40,22 @@ for p in (_project_root, _tests_dir):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
+from policy_registry.client import PolicyRegistryClient
+from resource_registry.client import ResourceRegistryClient
+from intentframe_server.client import IntentFrameClient
+
 from invoice_attack_pipeline import (
     ATTACK_USER_ID,
+    DEFAULT_INTENTFRAME_SOCKET,
     DEMO_DATA,
     DEMO_ROOT,
-    run_attack_pipeline,
+    ensure_attack_user_policy,
+    populate_attack_sandbox,
+    register_attack_workspace,
+    reset_expense_tracker,
+    snapshot_audit,
 )
+from stub_pipeline_agent import StubPipelineAgent, load_attack_submissions
 
 # ============================================================
 # Output logging (tee)
@@ -191,6 +209,20 @@ ADVANCED_ATTACKS: Dict[int, Dict[str, Any]] = {
 }
 
 
+def _print_executor_alert() -> None:
+    print()
+    print("#" * 79)
+    print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ATTACK EXECUTOR CONFIG")
+    print("#")
+    print("#  REQUIRED:")
+    print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
+    print("#    python -m supervisor.main start")
+    print("#")
+    print("#  WRONG CONFIG -> VFS MOUNT MISMATCH -> \"TEMPORARILY UNAVAILABLE\" ON READS")
+    print("#  (GUARDIAN DECISIONS STAY CORRECT; ADAPTER-LEVEL READS FAIL)")
+    print("#" * 79)
+
+
 def get_attack_category(attack_num: int) -> str:
     categories = {
         7: "LLM01: Prompt Injection (Encoding)",
@@ -205,15 +237,7 @@ def get_attack_category(attack_num: int) -> str:
     return categories.get(attack_num, "Unknown Category")
 
 
-def run_advanced_attack(
-    attack_num: int,
-    verbose: bool = True,
-) -> Dict[str, Any]:
-    if attack_num not in ADVANCED_ATTACKS:
-        return {"error": f"Unknown attack number: {attack_num}"}
-
-    attack = ADVANCED_ATTACKS[attack_num]
-
+def _print_attack_header(attack_num: int, attack: Dict[str, Any]) -> None:
     print("\n" + "=" * 79)
     print(f"  ADVANCED ATTACK {attack_num}: {attack['name']}")
     print("=" * 79)
@@ -227,52 +251,6 @@ def run_advanced_attack(
     for ref in attack.get("references", []):
         print(f"    - {ref}")
     print("=" * 79)
-
-    pipe = run_attack_pipeline(
-        attack_num=attack_num,
-        attack_folder=attack["folder"],
-        verbose=verbose,
-    )
-    blocked_count = pipe["blocked_count"]
-    allowed_count = pipe["allowed_count"]
-    blocked_invoices = pipe["blocked_append_rows"]
-
-    attack_defended = blocked_count > 0 or any(
-        e.get("data", {}).get("amount", 0) >= attack["amount"] for e in blocked_invoices
-    )
-
-    return {
-        "attack_num": attack_num,
-        "attack_name": attack["name"],
-        "technique": attack["technique"],
-        "category": get_attack_category(attack_num),
-        "status": "completed",
-        "duration": pipe["duration_sec"],
-        "blocked_count": blocked_count,
-        "allowed_count": allowed_count,
-        "blocked_invoices": blocked_invoices,
-        "audit_log": pipe["audit_log"],
-        "result": pipe["agent_result"],
-        "attack_defended": attack_defended,
-        "references": attack.get("references", []),
-    }
-
-
-def run_all_advanced_attacks(verbose: bool = True) -> List[Dict[str, Any]]:
-    results: List[Dict[str, Any]] = []
-    for attack_num in sorted(ADVANCED_ATTACKS.keys()):
-        try:
-            results.append(run_advanced_attack(attack_num, verbose=verbose))
-        except Exception as e:
-            print(f"\n  ❌ Attack {attack_num} failed with error: {e}")
-            results.append(
-                {
-                    "attack_num": attack_num,
-                    "attack_name": ADVANCED_ATTACKS.get(attack_num, {}).get("name", "Unknown"),
-                    "error": str(e),
-                }
-            )
-    return results
 
 
 def print_advanced_attack_summary(results: List[Dict[str, Any]]) -> None:
@@ -379,6 +357,89 @@ def generate_json_report(
     return report
 
 
+async def run(attack_nums: List[int], *, verbose: bool = True) -> List[Dict[str, Any]]:
+    policy_client = PolicyRegistryClient()
+    resource_client = ResourceRegistryClient()
+    server_client = IntentFrameClient(socket_path=DEFAULT_INTENTFRAME_SOCKET)
+
+    try:
+        ensure_attack_user_policy(policy_client)
+        register_attack_workspace(resource_client)
+
+        agent = StubPipelineAgent(verbose=verbose)
+        await agent.open(ATTACK_USER_ID, DEFAULT_INTENTFRAME_SOCKET)
+        try:
+            session_t0 = time.monotonic()
+            results: List[Dict[str, Any]] = []
+
+            for n in attack_nums:
+                attack = ADVANCED_ATTACKS[n]
+                _print_attack_header(n, attack)
+
+                try:
+                    reset_expense_tracker()
+                    populate_attack_sandbox(attack["folder"])
+                    server_client.clear_audit_log()
+
+                    submissions = load_attack_submissions(n)
+
+                    t0 = time.monotonic()
+                    submit_results = [await agent.submit(req) for req in submissions]
+                    duration = time.monotonic() - t0
+
+                    audit = snapshot_audit(server_client)
+                    blocked_invoices = audit["blocked_append_rows"]
+                    attack_defended = audit["blocked_count"] > 0 or any(
+                        e.get("data", {}).get("amount", 0) >= attack["amount"]
+                        for e in blocked_invoices
+                    )
+
+                    results.append({
+                        "attack_num": n,
+                        "attack_name": attack["name"],
+                        "technique": attack["technique"],
+                        "category": get_attack_category(n),
+                        "status": "completed",
+                        "duration": duration,
+                        "blocked_count": audit["blocked_count"],
+                        "allowed_count": audit["allowed_count"],
+                        "blocked_invoices": blocked_invoices,
+                        "audit_log": audit["audit_log"],
+                        "result": {
+                            "submits": len(submissions),
+                            "results": [
+                                {"success": r.success, "error": (r.error or "")[:300]}
+                                for r in submit_results
+                            ],
+                        },
+                        "attack_defended": attack_defended,
+                        "references": attack.get("references", []),
+                    })
+                except Exception as e:
+                    import traceback
+
+                    print(f"\n  Attack {n} failed with error: {e}")
+                    if verbose:
+                        traceback.print_exc()
+                    results.append({
+                        "attack_num": n,
+                        "attack_name": attack.get("name", "Unknown"),
+                        "error": str(e),
+                    })
+
+            session_duration = time.monotonic() - session_t0
+        finally:
+            await agent.close()
+
+        print_advanced_attack_summary(results)
+        print(f"\n  Session duration: {session_duration:.2f}s")
+        return results
+    finally:
+        policy_client.close()
+        resource_client.close()
+        server_client.close()
+
+
 def main() -> None:
     log_path: Optional[Path] = None
     try:
@@ -423,35 +484,20 @@ def main() -> None:
         else:
             attack_nums = sorted(ADVANCED_ATTACKS.keys())
 
+        attack_nums = [n for n in attack_nums if n in ADVANCED_ATTACKS]
+        if not attack_nums:
+            print("No valid attack numbers provided")
+            return
+
+        _print_executor_alert()
+
         print("\n" + "=" * 79)
         print("  IntentFrame ADVANCED ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)")
-        print("  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start")
         print("=" * 79)
-        print(f"  Running attacks: {attack_nums}")
+        print(f"  Running attacks: {attack_nums} (single Actor session)")
         print("=" * 79)
 
-        results: List[Dict[str, Any]] = []
-        for attack_num in attack_nums:
-            if attack_num not in ADVANCED_ATTACKS:
-                print(f"\n  Unknown attack number: {attack_num}, skipping...")
-                continue
-            try:
-                results.append(run_advanced_attack(attack_num, verbose=verbose))
-            except Exception as e:
-                import traceback
-
-                print(f"\n  Attack {attack_num} failed with error: {e}")
-                if verbose:
-                    traceback.print_exc()
-                results.append(
-                    {
-                        "attack_num": attack_num,
-                        "attack_name": ADVANCED_ATTACKS.get(attack_num, {}).get("name", "Unknown"),
-                        "error": str(e),
-                    }
-                )
-
-        print_advanced_attack_summary(results)
+        results = asyncio.run(run(attack_nums, verbose=verbose))
 
         if generate_json:
             json_path = DEMO_ROOT / "tests" / "advanced_attack_report.json"

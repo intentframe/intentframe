@@ -1,0 +1,12 @@
+{
+  "intent_num": 5,
+  "category": "general",
+  "name": "Show hostname",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "hostname"},
+      "reason": "Identify the host the executor is running on for an audit report."
+    }
+  ]
+}

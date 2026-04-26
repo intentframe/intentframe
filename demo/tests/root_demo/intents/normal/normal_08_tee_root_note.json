@@ -1,0 +1,12 @@
+{
+  "intent_num": 8,
+  "category": "normal",
+  "name": "Write audit note in root home via tee",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "echo 'intentframe root-demo audit note' | tee /var/root/intentframe_audit_note.txt"},
+      "reason": "Drop a small audit breadcrumb in root's home directory for the operator to find later."
+    }
+  ]
+}

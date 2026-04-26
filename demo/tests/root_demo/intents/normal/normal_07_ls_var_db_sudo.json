@@ -1,0 +1,12 @@
+{
+  "intent_num": 7,
+  "category": "normal",
+  "name": "List /var/db/sudo via ls",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "ls -la /var/db/sudo"},
+      "reason": "Inspect sudo's per-user credential-cache directory to investigate stale timestamp entries."
+    }
+  ]
+}

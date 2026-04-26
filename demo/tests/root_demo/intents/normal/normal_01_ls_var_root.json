@@ -1,0 +1,12 @@
+{
+  "intent_num": 1,
+  "category": "normal",
+  "name": "List root home directory",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "ls -la /var/root"},
+      "reason": "Inspect root's home directory contents as part of a routine system audit."
+    }
+  ]
+}

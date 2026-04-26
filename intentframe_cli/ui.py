@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 from prompt_toolkit.formatted_text import FormattedText
 from rich.console import Console
@@ -9,6 +11,17 @@ from rich.panel import Panel
 from rich.table import Table
 
 console = Console(force_terminal=True)
+
+# User-space marker written by ``intentframe_setup_root_demo.sh``; its
+# presence on disk is the simplest local signal that the machine has
+# root-demo escalation provisioned.  Shared here so the pre-flight
+# warning (main.py) and the post-shutdown hint (repl.py) agree.
+ROOT_DEMO_MARKER = Path.home() / ".intentframe" / "state" / "root-demo.json"
+
+
+def root_demo_installed() -> bool:
+    """True iff the root-demo marker exists on disk for this user."""
+    return ROOT_DEMO_MARKER.exists()
 
 # ── Prompt styling ───────────────────────────────────────────────────────────
 
@@ -93,6 +106,61 @@ def print_service_status(health_data: dict) -> None:
     console.print()
     console.print(table)
     console.print()
+
+
+def print_profile_banner(health_data: dict) -> None:
+    """Render the root-demo profile/escalation banner.
+
+    Reads the ``root_demo`` block emitted by
+    ``GET /system/health`` (see intentframe_gateway/routes/system.py).
+    Stays silent for the vanilla user profile when escalation is
+    disarmed -- banners in the default dev flow would be noise.  Renders
+    a one-line status (plus install hint when relevant) for the root
+    profile, and still renders for the user profile if the machine is
+    armed, so operators who forget to pass ``--profile root`` after
+    installing root-demo aren't surprised.
+    """
+    rd = health_data.get("root_demo") or {}
+    profile = rd.get("profile", "user")
+    armed = bool(rd.get("escalation_armed", False))
+    exec_root = bool(rd.get("executor_running_as_root", False))
+
+    if profile == "user" and not armed and not exec_root:
+        return
+
+    armed_label = "[green]ARMED[/]" if armed else "[red bold]DISARMED[/]"
+    exec_label = "[green]yes[/]" if exec_root else "[dim]no[/]"
+    console.print(
+        f"[bold]Profile:[/] {profile}   "
+        f"[bold]Escalation:[/] {armed_label}   "
+        f"[bold]Executor running_as_root:[/] {exec_label}"
+    )
+    if profile == "root" and not armed:
+        console.print(
+            "[dim]Install:  sudo bash intentframe_setup_root_demo.sh[/]"
+        )
+    console.print()
+
+
+def print_root_demo_uninstall_hint() -> None:
+    """Post-shutdown reminder that the machine still has root-demo armed.
+
+    Called after ``Gateway stopped.`` when ``root-demo.json`` is present.
+    The sudoers entry persists across gateway lifetimes -- as long as it
+    sits under ``/etc/sudoers.d/``, the *next* gateway launch will
+    re-advertise ``INTENTFRAME_ESCALATION_ARMED=1`` regardless of which
+    profile the user picks.  Remind the operator so they don't forget
+    they're still carrying a NOPASSWD sudo entry for sandbox-exec.
+    """
+    if not root_demo_installed():
+        return
+    console.print(
+        "[yellow]Note:[/] root-demo is still installed on this machine -- "
+        "the next gateway launch will pick it up automatically."
+    )
+    console.print(
+        "[dim]Uninstall:  sudo bash intentframe_uninstall_root_demo.sh[/]"
+    )
 
 
 def print_credential_checklist(creds: list[dict]) -> None:

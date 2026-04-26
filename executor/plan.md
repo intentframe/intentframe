@@ -375,11 +375,12 @@ The credential vault provides credentials directly to adapters in-process;
 they are never serialized, never passed over the socket, never written to disk
 outside of macOS Keychain.
 
-### Invariant 4: Virtual Paths Only
+### Invariant 4: Virtual Paths Only (File I/O Tools)
 
-Agents operate in a sandboxed virtual filesystem. They see `/invoices/` not
-`/Users/john/Documents/finance/invoices/`. The Executor's files adapter resolves
-virtual paths to real paths via MountPoints. This prevents:
+Agents operate in a sandboxed virtual filesystem for file I/O tools
+(`READ_FILE`, `WRITE_FILE`, `LIST_DIRECTORY`, `DELETE_FILE`). They see
+`/invoices/` not `/Users/john/Documents/finance/invoices/`. The Executor's
+files adapter resolves virtual paths to real paths via MountPoints. This prevents:
 
 - Path traversal attacks (`../../../etc/passwd`)
 - Information leakage (agent learning OS, username, directory structure)
@@ -387,6 +388,13 @@ virtual paths to real paths via MountPoints. This prevents:
 
 The existing MountPoint system from `demo/data_structures.py` and
 `demo/resources/file_system.py` is carried forward into the production executor.
+
+**Note:** `RUN_COMMAND` intentionally bypasses VFS — shell commands operate on
+the real filesystem because they need access to system binaries, interpreters,
+and OS paths that virtual path translation cannot cover. Instead of VFS,
+`RUN_COMMAND` is constrained by a kernel-enforced Seatbelt sandbox that
+restricts writes according to runtime configuration and blocks network access
+unless the command's template permits it. See Part 20 and `executor/sandbox.md`.
 
 ---
 
@@ -1204,10 +1212,16 @@ when Jarvis interacts with the OS programmatically.
 
 ### Seed policy coverage
 
-All 43 actions from enabled adapters now have policy entries in
-`jarvis_pa/seed_policies.py` (23 safe + 20 unsafe). Previously only 27 of 45
-were covered, blocking Jarvis from using contacts, reading messages/notes,
-completing reminders, deleting events/notes, and system controls.
+Jarvis's default policy surface now covers all 67 currently declared actions
+(34 safe + 33 unsafe), including the host-file family
+(`READ_HOST_FILE`, `WRITE_HOST_FILE`, `LIST_HOST_DIRECTORY`,
+`DELETE_HOST_FILE`).
+
+At runtime, the default policy is seeded from
+`intentframe_gateway/bootstrap.py`. `jarvis_pa/seed_policies.py` is kept as a
+manual mirror of the same defaults for dev workflows — profile-aware
+(`INTENTFRAME_PROFILE=user|root`) and idempotent, so it seeds the same
+user- or root-profile shape as bootstrap and is safe to rerun.
 
 ### What this enables next
 
@@ -1228,3 +1242,61 @@ observation bus — the last piece that PyXA could not provide.
 adapters: import, instantiation, `supported_actions()`, `manifest()`, subclass
 check, registry population, factory round-trip, action uniqueness, and pyobjc
 framework availability. All pass.
+
+---
+
+## Part 20: Progress — Kernel-Enforced RUN_COMMAND Sandbox (Apr 2026)
+
+Every `RUN_COMMAND` is now wrapped in a macOS Seatbelt sandbox before subprocess
+execution. The sandbox is entirely internal to the executor — no pipeline, Guardian,
+or agent changes.
+
+See `executor/sandbox.md` for the full implementation reference.
+
+### Design principles
+
+- `(deny default)` — kernel blocks everything not explicitly allowed
+- `(allow file-read*)` — reads are globally allowed; sensitive paths denied last
+- Write scope controlled by `SandboxConfig.allowed_write_paths` (independent of VFS)
+- All commands run under `max(allowed_templates)` — the admin-configured privilege ceiling
+- Non-negotiable deny overrides placed last (Seatbelt last-match-wins)
+- All paths canonicalized via `os.path.realpath()` before entering SBPL rules
+- Controlled `TMPDIR` (`/tmp/intentframe`) instead of blanket-allowing `/var/folders`
+- Clean system `PATH` (from `/etc/paths`) prevents executor venv leaking into sandbox
+- Per-request rejection if sandbox engine unavailable (fail-closed)
+
+### New module
+
+`executor/sandbox/` — planner, pathing, templates, engine, macOS platform.
+Dynamic SBPL profile generation following Anthropic's `sandbox-runtime` pattern.
+
+The engine returns a `SandboxedCommand(argv, env_overrides)` dataclass. The adapter
+passes `argv` directly to `asyncio.create_subprocess_exec` — no shell re-parsing,
+no `shlex.quote()` issues.
+
+### What changed in existing code
+
+| File | Change |
+|---|---|
+| `executor/config/schema.py` | Added `SandboxConfig` with `working_directory`, `allowed_write_paths` |
+| `executor/main.py` | Engine/planner init from `SandboxConfig` (no VFS dependency) |
+| `executor/platforms/macos/adapters/terminal.py` | Classify → plan → wrap → `create_subprocess_exec` with `env_overrides` |
+| `executor/sandbox/engine.py` | `SandboxedCommand` dataclass (argv + env_overrides) |
+| `executor/sandbox/planner.py` | Write paths from `SandboxConfig`, not VFS mounts |
+| `executor/sandbox/platforms/macos.py` | Global `(allow file-read*)`, clean `PATH` override, config-driven writes |
+| `jarvis_pa/executor.yaml` | `sandbox:` section with `working_directory` and `allowed_write_paths` |
+
+### Default Jarvis sandbox behavior
+
+- Template ceiling: `pure_compute`, `file_read_only`, `file_read_write`, `network_outbound`
+- Default cwd: `~/` (from `SandboxConfig.working_directory`)
+- Write scope: `~/` (from `SandboxConfig.allowed_write_paths`)
+- Opaque commands (scripts, eval) use `file_read_write` fallback
+- `~/.intentframe` blocked from read and write
+- System directories blocked from write
+
+### Verification
+
+`tests/test_sandbox.py` — 146 tests including real `sandbox-exec` kernel
+enforcement tests that run actual commands through Seatbelt and verify the
+kernel blocks or allows operations.

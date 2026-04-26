@@ -39,6 +39,14 @@
     "source": "hardstop-patterns",
     "category": "macos_persistence"
   },
+  {
+    "id": "IF-LAUNCHCTL-ADMIN-001",
+    "regex": "\\blaunchctl\\s+(bootstrap|bootout|kickstart|enable|disable|submit|remove)\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Registers, removes, or forces a launchd service (persistence / lateral movement)",
+    "source": "intentframe",
+    "category": "macos_persistence"
+  },
 
   {
     "id": "CRON-001",
@@ -54,6 +62,30 @@
     "verdict": "NEEDS_REVIEW",
     "description": "Pipes to crontab (potential persistence)",
     "source": "hardstop-patterns",
+    "category": "scheduled_persistence"
+  },
+  {
+    "id": "IF-CRONTAB-EDIT-001",
+    "regex": "\\bcrontab\\s+-[eE]\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Edits user crontab (scheduled persistence)",
+    "source": "intentframe",
+    "category": "scheduled_persistence"
+  },
+  {
+    "id": "IF-CRONTAB-STDIN-001",
+    "regex": "\\bcrontab\\s+-(\\s|$)",
+    "verdict": "CATASTROPHIC",
+    "description": "Replaces crontab from stdin (scheduled persistence)",
+    "source": "intentframe",
+    "category": "scheduled_persistence"
+  },
+  {
+    "id": "IF-AT-SCHEDULE-001",
+    "regex": "\\bat\\s+(now|-f\\b|[0-9])",
+    "verdict": "CATASTROPHIC",
+    "description": "Schedules a job via at (scheduled persistence)",
+    "source": "intentframe",
     "category": "scheduled_persistence"
   },
 

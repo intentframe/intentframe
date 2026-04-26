@@ -14,9 +14,9 @@ hierarchy's sake.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from executor.constants import (
     DEFAULT_ADAPTER_TIMEOUT,
@@ -26,6 +26,11 @@ from executor.constants import (
     DEFAULT_UNIX_SOCKET_PATH,
 )
 
+# ``resource_registry.floor`` transitively imports ``executor.sandbox.venv``
+# which imports ``SandboxConfig`` from this very module.  To break the
+# circular import we defer the canonicalize import to the field validator
+# body — by the time the validator runs, both modules are fully loaded.
+
 __all__ = [
     "ExecutorConfig",
     "TransportConfig",
@@ -33,6 +38,8 @@ __all__ = [
     "CredentialConfig",
     "WorkerPoolConfig",
     "AdapterConfig",
+    "HostFilesConfig",
+    "SandboxConfig",
     "StorageConfig",
     "LoggingConfig",
 ]
@@ -165,6 +172,130 @@ class FilesystemConfig(BaseModel):
     )
 
 
+class HostFilesConfig(BaseModel):
+    """Configuration for the HOST_FILE action family.
+
+    The HOST_FILE adapter operates on real host filesystem paths rather
+    than virtual-filesystem paths.  These allowlists are the executor-
+    side ceiling — the per-action policy constraints
+    (``HostFileConstraints.allowed_host_paths``) ride alongside and
+    must not grant paths that this config denies.
+
+    Both lists are normalized at load time via
+    :func:`resource_registry.floor.canonicalize_real_path` so that a
+    YAML-supplied ``~/Documents`` and a runtime-supplied
+    ``/Users/<me>/Documents`` compare as the same path.
+
+    These entries are executor-side *scope roots*, not policy-style
+    glob patterns.  Nested access is admitted by subtree containment
+    under the canonicalized root; trailing ``/`` carries no special
+    meaning here because canonicalization strips it.
+
+    This field is **required** on :class:`ExecutorConfig` (no default
+    factory): host-file access is a security-sensitive surface and
+    every executor YAML must declare intent explicitly.  Empty lists
+    are permitted and mean "no host-file paths allowed" — paired with
+    ``host_files`` absent from ``adapters.enabled`` that is the
+    deliberate "demo declines host-file access" declaration.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    allowed_read_paths: list[str] = Field(
+        description=(
+            "Real-path scope roots (with ~ allowed) that host-file reads may "
+            "touch; subtree access is granted by containment under each "
+            "canonicalized root, not by glob or trailing-slash syntax."
+        ),
+    )
+    allowed_write_paths: list[str] = Field(
+        description=(
+            "Real-path scope roots (with ~ allowed) that host-file "
+            "writes/deletes may touch; subtree access is granted by "
+            "containment under each canonicalized root, not by glob or "
+            "trailing-slash syntax."
+        ),
+    )
+
+    @field_validator("allowed_read_paths", "allowed_write_paths", mode="after")
+    @classmethod
+    def _canonicalize(cls, paths: list[str]) -> list[str]:
+        """Expand ``~`` + resolve symlinks on each path once at load time."""
+        from resource_registry.floor import canonicalize_real_path
+
+        return [canonicalize_real_path(p) for p in paths]
+
+
+class SandboxConfig(BaseModel):
+    """Configuration for RUN_COMMAND kernel-enforced sandboxing.
+
+    When enabled, the executor wraps shell commands with a platform-specific
+    sandbox (macOS Seatbelt via sandbox-exec, Linux bubblewrap in the future).
+    All commands run under the highest-privilege template in
+    ``allowed_templates`` — the admin-approved ceiling.
+
+    If the sandbox engine is unavailable at runtime (wrong platform, missing
+    binary), individual RUN_COMMAND requests are rejected -- the rest of the
+    executor keeps running normally.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        description="Master switch for RUN_COMMAND sandboxing.",
+    )
+    allowed_templates: list[str] = Field(
+        default_factory=lambda: ["pure_compute", "file_read_only", "file_read_write"],
+        description=(
+            "Sandbox template ceiling. All commands run under the "
+            "highest-privilege template in this list."
+        ),
+    )
+    working_directory: str = Field(
+        default="~/",
+        description="Default cwd for sandboxed shell commands. Expanded at runtime.",
+    )
+    allowed_write_paths: list[str] = Field(
+        default_factory=lambda: ["~/"],
+        description="Paths where sandboxed commands can write. Expanded at runtime.",
+    )
+    executor_venv_path: str | None = Field(
+        default=None,
+        description=(
+            "Absolute path to the executor's dedicated Python venv. When set "
+            "(or auto-resolved from the owning user's HOME), sandboxed "
+            "RUN_COMMAND gets VIRTUAL_ENV, a <venv>/bin-prefixed PATH, and "
+            "PYTHONNOUSERSITE=1 so 'python', 'python3', 'pip', and 'uv pip' "
+            "resolve to this venv. Package installs land here, never in the "
+            "source-code venv or user-site. None + auto-resolution disabled "
+            "means sandboxed Python falls back to system python3."
+        ),
+    )
+    executor_venv_required: bool = Field(
+        default=True,
+        description=(
+            "If True, the executor fails to start when the resolved venv is "
+            "missing or lacks bin/python3. Recommended: True (fail loud at "
+            "startup rather than silent wrong-Python at first RUN_COMMAND). "
+            "Set False for minimal dev setups that want system python3."
+        ),
+    )
+    escalate: Literal["none", "sudo"] = Field(
+        default="none",
+        description=(
+            "Per-command privilege escalation for RUN_COMMAND. 'none' runs "
+            "sandbox-exec under the executor's own UID. 'sudo' prepends "
+            "'sudo -n' so the kernel sandbox subprocess runs as root -- "
+            "requires the machine to be provisioned by "
+            "intentframe_setup_root_demo.sh (writes a NOPASSWD sudoers "
+            "entry for sandbox-exec and a marker file). Takes effect only "
+            "when the gateway reports INTENTFRAME_ESCALATION_ARMED=1; "
+            "otherwise falls back to unprivileged execution."
+        ),
+    )
+
+
 class StorageConfig(BaseModel):
     """Configuration for database, log file paths, and backend selection.
 
@@ -232,5 +363,14 @@ class ExecutorConfig(BaseModel):
     worker_pool: WorkerPoolConfig = Field(default_factory=WorkerPoolConfig)
     adapters: AdapterConfig = Field(default_factory=AdapterConfig)
     filesystem: FilesystemConfig = Field(default_factory=FilesystemConfig)
+    host_files: HostFilesConfig = Field(
+        description=(
+            "Host-file allowlists (read + write).  Required: every YAML "
+            "must declare intent explicitly — empty lists are allowed "
+            "and mean 'no host-file paths', pair that with the adapter "
+            "absent from adapters.enabled to fully opt out."
+        ),
+    )
+    sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

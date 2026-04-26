@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from action_registry import ActionType
 from command_shield import quick_check
@@ -35,8 +36,16 @@ DEFAULT_COMMAND_TIMEOUT = 30.0
 class TerminalAdapter(CapabilityAdapter):
     """Shell command execution adapter."""
 
-    def __init__(self, **_kwargs) -> None:
-        pass
+    def __init__(
+        self,
+        sandbox_engine=None,
+        sandbox_planner=None,
+        sandbox_config=None,
+        **_kwargs,
+    ) -> None:
+        self._sandbox_engine = sandbox_engine
+        self._sandbox_planner = sandbox_planner
+        self._sandbox_config = sandbox_config
 
     def supported_actions(self) -> list[str]:
         return [ActionType.RUN_COMMAND.value]
@@ -68,16 +77,45 @@ class TerminalAdapter(CapabilityAdapter):
             )
 
         working_dir = params.get("working_directory")
+        if working_dir is None and self._sandbox_config and self._sandbox_config.enabled:
+            working_dir = os.path.expanduser(self._sandbox_config.working_directory)
         timeout = params.get("timeout", DEFAULT_COMMAND_TIMEOUT)
 
-        try:
-            process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=working_dir,
-                env=clean_env(),
+        # ── Sandbox wrapping ──────────────────────────────────────────────
+        sandboxed = None
+        if self._sandbox_config and self._sandbox_config.enabled:
+            if not self._sandbox_engine or not self._sandbox_planner:
+                return ExecutionResult(
+                    success=False,
+                    error="Sandbox enabled but engine unavailable on this platform -- RUN_COMMAND blocked",
+                )
+
+            plan = self._sandbox_planner.plan(working_directory=working_dir)
+            sandboxed = self._sandbox_engine.wrap(command, plan)
+            logger.debug(
+                "Sandbox: template=%s command=%s",
+                plan.template.value, command[:120],
             )
+
+        try:
+            if sandboxed is not None:
+                run_env = clean_env()
+                run_env.update(sandboxed.env_overrides)
+                process = await asyncio.create_subprocess_exec(
+                    *sandboxed.argv,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=working_dir,
+                    env=run_env,
+                )
+            else:
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=working_dir,
+                    env=clean_env(),
+                )
 
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(), timeout=timeout

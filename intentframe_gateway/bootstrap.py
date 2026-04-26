@@ -2,11 +2,34 @@
 
 Replaces the standalone ``jarvis_pa/seed_policies.py`` script.  Safe to
 re-run: checks for existing state before creating anything.
+
+Profiles
+--------
+The gateway seeds different policy / workspace shapes depending on the
+``INTENTFRAME_PROFILE`` environment variable:
+
+* ``user`` (default) — home-scoped host-file access (``~/*``), virtual
+  workspace rooted at ``/home/``.  Mirrors ``jarvis_pa/executor.yaml``.
+* ``root`` — full-filesystem host-file access (``/*``), virtual workspace
+  rooted at ``/``.  Mirrors ``jarvis_pa/executor_root.yaml``.
+
+The profile only changes three values (host constraint, workspace mount,
+policy user id + metadata label).  Everything else (SAFE/UNSAFE action
+sets, blocked command patterns, email/message constraints, intent limits,
+and the gateway's non-negotiable floor enforced by
+``resource_registry/floor.py``) is intentionally identical across
+profiles — the root profile still blocks ``sudo`` because the demo
+claim is "already root, no need to escalate".
+
+``_build_default_policy`` is a stable alias for the user profile so the
+``tests/test_jarvis_host_scope_mirror.py`` mirror invariant against
+``jarvis_pa/executor.yaml`` stays pinned.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 
 from intentframe_gateway.config import GatewayConfig
 from intentframe_gateway.proxy import UDSProxy
@@ -16,7 +39,7 @@ logger = logging.getLogger(__name__)
 # ── Default policy seed data ─────────────────────────────────────────────────
 
 SAFE_ACTIONS = [
-    "READ_FILE", "LIST_DIRECTORY",
+    "READ_HOST_FILE", "LIST_HOST_DIRECTORY",
     "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
     "GET_CLIPBOARD", "SET_CLIPBOARD",
     "SEARCH_SPOTLIGHT", "SHOW_NOTIFICATION",
@@ -25,14 +48,14 @@ SAFE_ACTIONS = [
     "LIST_NOTES", "READ_NOTE",
     "READ_MESSAGES",
     "SEARCH_CONTACTS", "GET_CONTACT",
-    "SEARCH_WEB", "GET_PAGE_CONTENT",
+    "GET_PAGE_CONTENT",
     "SEARCH_EMAIL", "READ_EMAIL", "GET_EMAIL", "DOWNLOAD_ATTACHMENT",
     "HTTP_GET",
     "GET_SYSTEM_INFO", "GET_BRIGHTNESS", "GET_VOLUME", "GET_MUTE", "GET_DARK_MODE",
 ]
 
 UNSAFE_ACTIONS = [
-    "WRITE_FILE", "APPEND_ROW", "DELETE_FILE",
+    "WRITE_HOST_FILE", "DELETE_HOST_FILE",
     "RUN_COMMAND",
     "SEND_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL",
     "MARK_READ_EMAIL", "MOVE_EMAIL", "DELETE_EMAIL",
@@ -70,15 +93,90 @@ WORKSPACE_MOUNTS = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
 
+# Root-profile workspace: the virtual root coincides with the real root
+# so the agent's path model matches the operator's.  Mirrors
+# ``jarvis_pa/executor_root.yaml::filesystem.mounts``.
+ROOT_WORKSPACE_MOUNTS = [
+    {"virtual_path": "/", "real_path": "/", "writable": True},
+]
+
+_VALID_PROFILES = ("user", "root")
+
+
+def _resolve_profile() -> str:
+    """Active profile from ``INTENTFRAME_PROFILE`` (default: ``user``).
+
+    Unknown values fall back to ``user`` with a warning so a typo never
+    silently relaxes policy.
+    """
+    raw = (os.environ.get("INTENTFRAME_PROFILE") or "user").strip().lower()
+    if raw not in _VALID_PROFILES:
+        logger.warning(
+            "Unknown INTENTFRAME_PROFILE=%r — falling back to 'user'", raw
+        )
+        return "user"
+    return raw
+
 
 def _resolve_user_id() -> str:
+    """Base user id from system config (ignores profile suffix)."""
     from intentframe_gateway.config_loader import build_config_env
     return build_config_env().get("JARVIS_USER_ID", "jarvis_default")
 
 
-def _build_default_policy() -> dict:
+def _profile_user_id(profile: str) -> str:
+    """User id scoped to a profile.
+
+    Root uses a ``_root`` suffix so the two profiles' policies and
+    workspaces coexist in the registry without colliding.
+    """
+    base = _resolve_user_id()
+    return f"{base}_root" if profile == "root" else base
+
+
+def _profile_workspace_mounts(profile: str) -> list[dict]:
+    return ROOT_WORKSPACE_MOUNTS if profile == "root" else WORKSPACE_MOUNTS
+
+
+def _build_policy(profile: str = "user") -> dict:
+    """Build a seeded policy for the given profile.
+
+    Profiles differ only in three values:
+      * ``host_constraint.allowed_host_paths`` — ``~/*`` (user) vs ``/*``
+        (root).  Mirrors the matching executor YAML's
+        ``host_files.allowed_{read,write}_paths``.
+      * ``user_id`` — profile-suffixed (see :func:`_profile_user_id`).
+      * ``metadata.profile`` — label for audit visibility.
+
+    Everything else — SAFE/UNSAFE sets, terminal ``blocked_patterns``,
+    email/message constraints, intent limits — is intentionally shared.
+    The root profile deliberately keeps ``sudo`` in ``blocked_patterns``
+    because the demo stance is "executor already runs as root; agents
+    must not attempt privilege escalation".
+    """
     allowed_actions: dict[str, dict] = {}
-    home_constraint = {"allowed_paths": ["/home/*"]}
+
+    # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py
+    # for the user profile; the root profile mirrors
+    # ``jarvis_pa/executor_root.yaml::host_files.allowed_write_paths``).
+    # ``host_path_constraint.allowed_host_paths`` MUST mirror the matching
+    # executor YAML's ``host_files.allowed_write_paths`` (and by extension
+    # the read paths).  The executor YAML is the source of truth for the
+    # adapter floor; this policy is the per-action allowlist the guardian
+    # checks.  If an executor.yaml narrows (e.g. to
+    # ``[~/Documents/*, ~/Downloads/*]``), update the matching profile
+    # branch here in lockstep — otherwise adapter and guardian disagree at
+    # the path boundary and users see inconsistent deny reasons.
+    # HostFileConstraints rejects trailing-slash shorthand (``dir/``) at
+    # load time, so use explicit subtree globs only.  The disjoint field
+    # name ``allowed_host_paths`` (vs ``allowed_paths``) is required — it
+    # is what drives Pydantic Union-dispatch to HostFileConstraints
+    # instead of FileConstraints.
+    if profile == "root":
+        host_constraint = {"allowed_host_paths": ["/*"]}
+    else:
+        host_constraint = {"allowed_host_paths": ["~/*"]}
+
     email_constraint = {
         "allowed_recipients": [],
         "recipient_sources": [{"source": "contacts_all", "filter": "", "enabled": True}],
@@ -94,7 +192,10 @@ def _build_default_policy() -> dict:
     }
 
     for action in SAFE_ACTIONS:
-        constraint = home_constraint if action in ("READ_FILE", "LIST_DIRECTORY") else None
+        if action in ("READ_HOST_FILE", "LIST_HOST_DIRECTORY"):
+            constraint = host_constraint
+        else:
+            constraint = None
         allowed_actions[action] = {"safe": True, "constraints": constraint}
 
     for action in UNSAFE_ACTIONS:
@@ -102,23 +203,41 @@ def _build_default_policy() -> dict:
             constraint = email_constraint
         elif action == "SEND_MESSAGE":
             constraint = message_constraint
-        elif action in ("WRITE_FILE", "DELETE_FILE"):
-            constraint = home_constraint
+        elif action in ("WRITE_HOST_FILE", "DELETE_HOST_FILE"):
+            constraint = host_constraint
         elif action == "RUN_COMMAND":
             constraint = terminal_constraint
         else:
             constraint = None
         allowed_actions[action] = {"safe": False, "constraints": constraint}
 
+    profile_label = "jarvis-root" if profile == "root" else "jarvis-dev"
+
     return {
-        "user_id": _resolve_user_id(),
+        "user_id": _profile_user_id(profile),
         "allowed_actions": allowed_actions,
         "intent_limits": INTENT_LIMITS,
         "metadata": {
-            "profile": "jarvis-dev",
+            "profile": profile_label,
             "note": "Auto-seeded by gateway bootstrap",
         },
     }
+
+
+def _build_default_policy() -> dict:
+    """Backwards-compatible alias for the user-profile policy.
+
+    Intentionally env-independent: ``tests/test_jarvis_host_scope_mirror.py``
+    calls this directly to pin the ``jarvis_pa/executor.yaml`` ↔ policy
+    mirror, so its return value must not change under
+    ``INTENTFRAME_PROFILE=root``.
+    """
+    return _build_policy("user")
+
+
+def _build_root_policy() -> dict:
+    """Root-profile seeded policy (host-file scope ``/*``)."""
+    return _build_policy("root")
 
 
 # ── Bootstrapper ─────────────────────────────────────────────────────────────
@@ -143,19 +262,23 @@ class Bootstrapper:
 
         client = await proxy._get_client()
 
-        user_id = _resolve_user_id()
+        profile = _resolve_profile()
+        user_id = _profile_user_id(profile)
         resp = await client.get(f"/policies/{user_id}")
         if resp.status_code == 200:
-            logger.info("Policy %s already exists — skipping seed", user_id)
+            logger.info(
+                "Policy %s already exists (profile=%s) — skipping seed",
+                user_id, profile,
+            )
             return
 
-        policy = _build_default_policy()
+        policy = _build_policy(profile)
         resp = await client.post("/policies", json=policy)
         if resp.status_code in (200, 201):
             total = len(SAFE_ACTIONS) + len(UNSAFE_ACTIONS)
             logger.info(
-                "Policy seeded for %s: %d actions (%d safe, %d unsafe), %d intent limits",
-                user_id, total, len(SAFE_ACTIONS), len(UNSAFE_ACTIONS), len(INTENT_LIMITS),
+                "Policy seeded for %s (profile=%s): %d actions (%d safe, %d unsafe), %d intent limits",
+                user_id, profile, total, len(SAFE_ACTIONS), len(UNSAFE_ACTIONS), len(INTENT_LIMITS),
             )
         else:
             logger.error("Failed to seed policy: %s %s", resp.status_code, resp.text)
@@ -174,16 +297,25 @@ class Bootstrapper:
 
         client = await rr_proxy._get_client()
 
-        user_id = _resolve_user_id()
+        profile = _resolve_profile()
+        user_id = _profile_user_id(profile)
+        mounts = _profile_workspace_mounts(profile)
+        profile_label = "root" if profile == "root" else "consumer"
         payload = {
             "workspace_id": user_id,
-            "mounts": WORKSPACE_MOUNTS,
-            "metadata": {"agent": "jarvis", "profile": "consumer"},
+            "mounts": mounts,
+            "metadata": {"agent": "jarvis", "profile": profile_label},
         }
         resp = await client.post("/workspaces", json=payload)
         if resp.status_code == 409:
-            logger.info("Workspace %s already exists — skipping seed", user_id)
+            logger.info(
+                "Workspace %s already exists (profile=%s) — skipping seed",
+                user_id, profile,
+            )
         elif resp.status_code in (200, 201):
-            logger.info("Workspace seeded: %d mount(s)", len(WORKSPACE_MOUNTS))
+            logger.info(
+                "Workspace seeded (profile=%s): %d mount(s)",
+                profile, len(mounts),
+            )
         else:
             logger.error("Failed to seed workspace: %s %s", resp.status_code, resp.text)

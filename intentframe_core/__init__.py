@@ -10,6 +10,7 @@ from intentframe_core.paths import VIRTUAL_HOME, normalize_virtual_path
 from intentframe_core.types import (
     AgentCapabilities,
     AnalysisReport,
+    ExecutionContext,
     ExecutionResult,
     IntentFrame,
     RuntimeContext,

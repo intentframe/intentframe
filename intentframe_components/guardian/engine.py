@@ -31,16 +31,37 @@ from pydantic import BaseModel, Field
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ACTION_DOMAINS, DomainType
-from intentframe_core.types import IntentFrame, AnalysisReport, ValidationResult, UserContext
+from intentframe_core.types import (
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
+    FileIntel,
+    IntentFrame,
+    UserContext,
+    ValidationResult,
+)
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.guardian.domains import DOMAIN_MODULES
 from intentframe_components.guardian.checkers import CONSTRAINT_CHECKERS
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
+from intentframe_components.prompt.library import (
+    GUARDIAN_PROMPT_IDS,
+    GUARDIAN_PROMPTS,
+)
+from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import GUARDIAN_ROLE
+from intentframe_components.prompt.strategy import (
+    DefaultPromptStrategy,
+    PromptStrategy,
+)
 from policy_registry.models import ActionPermission
 from policy_registry.domains.base import DomainConstraints
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -121,89 +142,54 @@ class AIGuardian(Guardian):
     # left at the factory default.  Passing explicit ModelSettings
     # overrides that, so we must set reasoning ourselves.
 
-    def __init__(self, model: str = "gpt-5-mini-2025-08-07", verbose: bool = True):
+    def __init__(
+        self,
+        model: str = "gpt-5-mini-2025-08-07",
+        verbose: bool = True,
+        prompt_strategy: PromptStrategy | None = None,
+    ):
         self.model = model
         self.verbose = verbose
+        self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
 
-        self._agent = Agent(
-            name="Policy Guardian",
-            instructions=self._hardener.harden_system_prompt(
-                base_instructions=self._base_instructions(),
-                role_preamble=GUARDIAN_ROLE,
-            ),
-            model=self.model,
-            output_type=AIGuardianOutput,
-            # model_settings=ModelSettings(
-            #     reasoning=Reasoning(effort="high"),
-            # ),
-        )
+        # Build one Agent per prompt id.  Guardian has coarser
+        # specialisation than AE (two ids: standard / critical).  The
+        # role preamble and hardening wrapper are identical across
+        # ids; only the base_instructions body differs.
+        self._agents: dict[str, Agent] = {
+            pid: Agent(
+                name=f"Policy Guardian ({pid})",
+                instructions=self._hardener.harden_system_prompt(
+                    base_instructions=body,
+                    role_preamble=GUARDIAN_ROLE,
+                ),
+                model=self.model,
+                output_type=AIGuardianOutput,
+                # model_settings=ModelSettings(
+                #     reasoning=Reasoning(effort="high"),
+                # ),
+            )
+            for pid, body in GUARDIAN_PROMPTS.items()
+        }
+        # Back-compat: tests and callers that reach for `self._agent`
+        # get the standard lane.
+        self._agent = self._agents["standard"]
+
+        # Last-used prompt id, populated by validate().  The pipeline
+        # reads this for audit only; concurrent writes are bounded by
+        # the runtime's per-request asyncio.Lock.
+        self.last_prompt_id: str | None = None
 
     @staticmethod
     def _base_instructions() -> str:
-        return """You make ALLOW/BLOCK decisions by applying user policies.
+        """Return the standard-lane Guardian system-prompt body.
 
-You receive:
-1. Context (task and agent identity) — in trusted pipeline tags
-2. IntentFrame fields (target, reason, data) — in untrusted boundary markers
-3. AnalysisReport (factual description of what the action will do) — in trusted pipeline tags
-4. UserContext (user policies: allowed_actions with constraints) — in trusted pipeline tags
-
-Your responsibilities:
-- Apply UserContext policies to the action described in the IntentFrame and AnalysisReport.
-- Do NOT re-analyze the action or infer new facts.
-- Do NOT perform separate detection; use the facts in the AnalysisReport.
-
-Decision rules:
-- ALLOW if all policies are satisfied.
-- BLOCK if any policy is violated:
-    • Social engineering or phishing detected in the analysis
-    • Scope mismatch (actual scope exceeds stated scope)
-    • Hidden behaviors that represent a genuine security concern (not exhaustive): data exfiltration,
-      unauthorized access, privilege escalation, data deception (claimed values
-      contradict the actual payload or data fields contain structurally inappropriate content),
-      and other kinds of hidden behavior
-    • Risk factors at HIGH or CRITICAL level
-    • Clear mismatch between what the intentframe structure reason field is and actual behaviours
-
-CRITICAL — ASK_USER / SHOW_MESSAGE / GET_CONFIRMATION are QUESTIONS, not commits:
-    Financial constraints do NOT apply to user-IO actions.
-    An agent asking "this invoice is $12K, what should I do?" is NOT spending $12K.
-    For ASK_USER, validate ONLY:
-      • Whether the prompt is safe (not phishing or social engineering)
-
-Important:
-- This action has ALREADY passed deterministic permission and constraint checks.
-- You are validating semantic safety: scope mismatches and actual security risks.
-- You do NOT suggest alternatives or construct modified actions.
-- You do NOT enforce business logic (duplicates, workflow choices, data validation).
-- If you BLOCK, the agent (the business domain expert) decides what to do next.
-
-Intent Limits:
-- You may receive a list of user-defined intent limits (spending caps, communication rules, etc.).
-- Important: You are responsible for finalizing the effective set of semantic domains
-  (e.g. ["spending"], ["communication", "deletion"]) and checking them against the
-  intent limits and user policy.
-- You receive semantic domain signals from two trusted sources, already merged in the Analysis Report:
-  1. Policy-declared domains — deterministically extracted from the user's rules (always present).
-  2. AE-classified domains — the Analysis Engine's best-effort semantic classification of what this action does.
-  The "Merged Semantic Domains" field you see is the union of both. This is your
-  starting point, not your final set of effective semantic domains. It ensures that limits are evaluated when
-  the user has a rule for that domain, even if the AE missed it.
-- Intent limits are BOUNDARIES, not suggestions. Your job is ENFORCEMENT:
-  1. Start with the merged semantic domains.
-  2. Additionally, inspect the untrusted intent fields (target, reason, data) yourself.
-  3. If you identify a domain that is clearly relevant but missing from the merged semantic
-     domains (e.g. target is stripe.com/charges but "spending" is absent, or data
-     contains a recipient email but "communication" is absent), add it to your final
-     effective set and treat domain as active for limit matching. Earlier layers can miss things; you are the last gate.
-  4. Match your final effective set of semantic domains against each limit's domain.
-  5. If a domain matches AND the limit is violated (threshold exceeded, pattern matched, etc.),
-     BLOCK. You do NOT second-guess the limit. You do NOT make exceptions.
-     The user set this boundary deliberately.
-- If violated, BLOCK (or apply the specified effect) and cite the limit_id in your limit_violated field.
-- If no intent limits are provided, skip this check.
-
-Be brief and cite the specific concern that caused your decision."""
+        Thin facade over :data:`GUARDIAN_PROMPTS` so existing tests and
+        external callers that reach for this static method keep working
+        unchanged.  The full set of lane bodies lives in
+        :mod:`intentframe_components.prompt.library.guardian`.
+        """
+        return GUARDIAN_PROMPTS["standard"]
 
     # ── Domain Constraint Lookup ─────────────────────────────────────
 
@@ -222,18 +208,32 @@ Be brief and cite the specific concern that caused your decision."""
         self,
         intent: IntentFrame,
         permission: ActionPermission,
+        command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> tuple[bool, str]:
         """Evaluate per-category constraints against the intent.
 
         Dispatches to the registered ConstraintChecker for the constraint type.
         Returns (passed, reason).
+
+        ``command_intel`` and ``file_intel`` are forwarded as
+        ``CheckContext`` fields to checkers that can consume them
+        (TerminalChecker uses ``command_intel``; a future payload-aware
+        FileChecker would use ``file_intel``).  Checkers that don't
+        care simply ignore the context.
         """
+        from intentframe_components.guardian.checkers.base import CheckContext
+
         constraints = permission.constraints
         if constraints is None:
             return True, ""
         checker = CONSTRAINT_CHECKERS.get(type(constraints))
         if checker:
-            return checker.check(intent, constraints)
+            context = CheckContext(
+                command_intel=command_intel,
+                file_intel=file_intel,
+            )
+            return checker.check(intent, constraints, context)
         return True, ""
 
     # ── Risk Flag Check ────────────────────────────────────────────
@@ -260,6 +260,9 @@ Be brief and cite the specific concern that caused your decision."""
         analysis: AnalysisReport,
         user_context: UserContext,
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
+        command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies.
@@ -268,8 +271,17 @@ Be brief and cite the specific concern that caused your decision."""
         1. Permission check  → BLOCK if action not in allowed_actions
         2. Constraint check  → BLOCK if per-category constraints violated
         3. Safety routing    → fast ALLOW or AI validation
+
+        ``command_intel`` carries deterministic command_shield facts
+        (verdict, capability tags).  It is consumed by per-category
+        checkers (see TerminalChecker) and otherwise ignored here.
         """
         action = intent.action.value
+
+        # Reset before any early return so stale prompt ids from a
+        # previous request never leak into audit on deterministic
+        # BLOCK or fast-path ALLOW cases.
+        self.last_prompt_id = None
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
@@ -280,12 +292,17 @@ Be brief and cite the specific concern that caused your decision."""
                 intent=intent,
                 analysis=analysis,
                 message=f"Action '{action}' is not permitted by user policy",
+                decision_path="ai_path",
             )
 
         permission = user_context.allowed_actions[action]
 
         # ── Step 2: Constraint check (deterministic) ───────────────
-        passed, reason = self._check_constraints(intent, permission)
+        passed, reason = self._check_constraints(
+            intent, permission,
+            command_intel=command_intel,
+            file_intel=file_intel,
+        )
         if not passed:
             if self.verbose:
                 print(f"    │  ✘ BLOCK: {action} — {reason}")
@@ -294,6 +311,7 @@ Be brief and cite the specific concern that caused your decision."""
                 intent=intent,
                 analysis=analysis,
                 message=f"Constraint violation: {reason}",
+                decision_path="ai_path",
             )
 
         # ── Step 2.5: Domain module enforcement (structural hard gate) ──
@@ -311,6 +329,7 @@ Be brief and cite the specific concern that caused your decision."""
                         intent=intent,
                         analysis=analysis,
                         message=f"Domain violation ({domain.value}): {reason}",
+                        decision_path="ai_path",
                     )
                 if self.verbose:
                     print(f"    │  ✓ Domain check passed ({domain.value}) — proceeding to AI")
@@ -324,20 +343,58 @@ Be brief and cite the specific concern that caused your decision."""
                 intent=intent,
                 analysis=analysis,
                 message=f"Permitted (fast-path): {action}",
+                decision_path="fast_path",
             )
 
         # ── AI path: semantic validation ───────────────────────────
         prompt = self._build_validation_prompt(
             intent, analysis, user_context, permission,
             active_domains=active_domains,
+            execution_context=execution_context,
         )
 
-        if self.verbose:
-            print(f"    │  AI judging: {action}...")
+        prompt_id = self._resolve_prompt_id(
+            intent, analysis, command_intel, file_intel,
+        )
+        self.last_prompt_id = prompt_id
+        agent = self._agents[prompt_id]
 
-        result = await Runner.run(self._agent, prompt)
+        if self.verbose:
+            print(f"    │  AI judging: {action} (prompt={prompt_id})...")
+
+        log_prompt_dump("guardian", prompt, prompt_id=prompt_id)
+        result = await Runner.run(agent, prompt)
 
         return self._convert_to_result(intent, analysis, result.final_output)
+
+    def _resolve_prompt_id(
+        self,
+        intent: IntentFrame,
+        analysis: AnalysisReport,
+        command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
+    ) -> str:
+        """Ask the strategy for a Guardian prompt id, fail-closed.
+
+        Unknown / erroring ids are downgraded to ``standard`` with a
+        warning.  Raising inside a Guardian AI call would turn a
+        config bug into a policy outage, so we explicitly avoid it.
+        """
+        try:
+            pid = self._prompt_strategy.select_guardian_prompt_id(
+                intent, analysis, command_intel, file_intel,
+            )
+        except Exception:
+            logger.exception("Guardian prompt strategy raised; falling back to 'standard'")
+            return "standard"
+
+        if pid not in GUARDIAN_PROMPT_IDS:
+            logger.warning(
+                "Guardian prompt strategy returned unknown id %r; falling back to 'standard'",
+                pid,
+            )
+            return "standard"
+        return pid
 
     def _build_validation_prompt(
         self,
@@ -346,12 +403,13 @@ Be brief and cite the specific concern that caused your decision."""
         user_context: UserContext,
         permission: ActionPermission,
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> str:
         """Build a hardened prompt for the AI guardian.
 
         Trusted sections: action (enum-validated), agent metadata,
-        analysis report, policy context, intent limits — all
-        pipeline-controlled.
+        analysis report, policy context, execution privilege level,
+        intent limits — all pipeline-controlled.
         Untrusted section: target, reason, data — the fields the
         agent LLM actually controls.
         """
@@ -434,6 +492,15 @@ Be brief and cite the specific concern that caused your decision."""
         ]
         trusted_sections["Policy Context"] = "\n".join(policy_lines)
 
+        if execution_context and execution_context.executor_running_as_root:
+            trusted_sections["Execution Privilege"] = (
+                "The executor is running as root (uid=0). All commands execute "
+                "with full root privileges. Apply heightened scrutiny — filesystem "
+                "modifications affect the entire system, not just the user's home "
+                "directory. The agent should never need sudo; its presence in a "
+                "command is itself a red flag."
+            )
+
         if user_context.intent_limits:
             limit_lines: list[str] = []
             for i, limit in enumerate(user_context.intent_limits, 1):
@@ -503,4 +570,5 @@ Be brief and cite the specific concern that caused your decision."""
             intent=intent,
             analysis=analysis,
             message=message,
+            decision_path="ai_path",
         )

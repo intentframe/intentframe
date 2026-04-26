@@ -142,6 +142,8 @@ class PolicyRegistry:
             merged_constraints = TerminalConstraints(
                 blocked_patterns=merged,
                 allowed_commands=list(perm.constraints.allowed_commands),
+                allow_capabilities=perm.constraints.allow_capabilities,
+                deny_capabilities=perm.constraints.deny_capabilities,
             )
         else:
             return policy

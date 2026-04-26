@@ -146,6 +146,14 @@
     "source": "hardstop-patterns",
     "category": "macos_directory_services"
   },
+  {
+    "id": "IF-DSCL-ACCOUNT-001",
+    "regex": "\\bdscl\\s+\\.\\s+-(create|passwd|change|merge|append)\\s+/(Users|Groups)/",
+    "verdict": "CATASTROPHIC",
+    "description": "Creates or modifies macOS local user/group account (dscl)",
+    "source": "intentframe",
+    "category": "macos_directory_services"
+  },
 
   {
     "id": "MAC-SEC-001",
@@ -177,6 +185,54 @@
     "verdict": "CATASTROPHIC",
     "description": "Modifies macOS boot arguments",
     "source": "hardstop-patterns",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "IF-OSASCRIPT-ADMIN-001",
+    "regex": "(?i)with\\s+administrator\\s+privileges",
+    "verdict": "CATASTROPHIC",
+    "description": "AppleScript privilege escalation (with administrator privileges)",
+    "source": "intentframe",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "IF-CSRUTIL-ANY-001",
+    "regex": "\\bcsrutil\\s+(enable|clear)\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Modifies System Integrity Protection configuration (csrutil enable/clear)",
+    "source": "intentframe",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "IF-NVRAM-WRITE-001",
+    "regex": "\\bnvram\\s+(-[dcf]\\b|[A-Za-z_][A-Za-z0-9_-]*=)",
+    "verdict": "CATASTROPHIC",
+    "description": "Modifies macOS NVRAM firmware variables",
+    "source": "intentframe",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "IF-BLESS-001",
+    "regex": "\\bbless\\s+-",
+    "verdict": "CATASTROPHIC",
+    "description": "Modifies macOS boot volume / startup disk (bless)",
+    "source": "intentframe",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "IF-KEXT-LOAD-001",
+    "regex": "\\b(kextload|kextunload)\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Loads or unloads a macOS kernel extension",
+    "source": "intentframe",
+    "category": "macos_system_security"
+  },
+  {
+    "id": "IF-KMUTIL-001",
+    "regex": "\\bkmutil\\s+(load|unload|install|create|rebuild|configure)\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Modifies macOS kernel extension collection (kmutil)",
+    "source": "intentframe",
     "category": "macos_system_security"
   },
 

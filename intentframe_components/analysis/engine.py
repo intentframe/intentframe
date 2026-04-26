@@ -25,12 +25,31 @@ from pydantic import BaseModel, Field, StringConstraints
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ActionType
-from intentframe_core.types import IntentFrame, AnalysisReport
+from intentframe_core.types import (
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
+    FileIntel,
+    IntentFrame,
+)
 from intentframe_core.enums import Reversibility, RiskLevel
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
+from intentframe_components.prompt.library import (
+    ANALYSIS_PROMPT_IDS,
+    ANALYSIS_PROMPTS,
+)
+from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
+from intentframe_components.prompt.strategy import (
+    DefaultPromptStrategy,
+    PromptStrategy,
+)
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -165,6 +184,9 @@ class AIAnalysisEngine(AnalysisEngine):
         # File
         ActionType.READ_FILE.value,
         ActionType.LIST_DIRECTORY.value,
+        # Host file (real-path parallel family)
+        ActionType.READ_HOST_FILE.value,
+        ActionType.LIST_HOST_DIRECTORY.value,
         # Calendar
         ActionType.LIST_CALENDARS.value,
         ActionType.LIST_EVENTS.value,
@@ -220,96 +242,52 @@ class AIAnalysisEngine(AnalysisEngine):
         self,
         model: str = "gpt-4o-mini",
         verbose: bool = True,
+        prompt_strategy: PromptStrategy | None = None,
     ):
         self.model = model
         self.verbose = verbose
+        self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
 
-        self._agent = Agent(
-            name="Analysis Engine",
-            instructions=self._hardener.harden_system_prompt(
-                base_instructions=self._base_instructions(),
-                role_preamble=ANALYSIS_ENGINE_ROLE,
-            ),
-            model=self.model,
-            output_type=AIAnalysisOutput,
-            model_settings=ModelSettings(temperature=0),
-        )
-    
+        # Build one Agent per prompt id.  N is tiny (4 in the current library), Agents
+        # are cheap, and this keeps per-request selection an O(1) dict
+        # lookup with zero allocation.  The role preamble and hardening
+        # wrapper are identical across ids — only the base_instructions
+        # body differs per lane.
+        self._agents: dict[str, Agent] = {
+            pid: Agent(
+                name=f"Analysis Engine ({pid})",
+                instructions=self._hardener.harden_system_prompt(
+                    base_instructions=body,
+                    role_preamble=ANALYSIS_ENGINE_ROLE,
+                ),
+                model=self.model,
+                output_type=AIAnalysisOutput,
+                model_settings=ModelSettings(temperature=0),
+            )
+            for pid, body in ANALYSIS_PROMPTS.items()
+        }
+        # Back-compat: tests and callers that reach for `self._agent`
+        # get the standard lane.  The default for anything that doesn't
+        # know about prompt routing.
+        self._agent = self._agents["standard"]
+
+        # Last-used prompt id, populated by analyze().  The pipeline
+        # reads this for audit only; concurrent writes are bounded by
+        # the runtime's per-request asyncio.Lock.  Reset at the start
+        # of every analyze() call so stale values never leak across
+        # requests.
+        self.last_prompt_id: str | None = None
+
     @staticmethod
     def _base_instructions() -> str:
-        return """
-You examine an action request and produce a factual analysis of what it will really do.
-Approach every request as a skeptical security expert — verify, do not assume.
+        """Return the standard-lane AE system-prompt body.
 
-You receive three untrusted components in each request:
-- Target: where the action is directed (a file path, email address, URL, etc.)
-- Reason: the agent's narrative claim about why it is taking this action
-- Data: key-value pairs carrying the action's payload (amounts, recipients, dates, etc.)
-
-Your responsibilities:
-1. Describe the actual behavior of the action (what changes, what is accessed)
-2. Describe the scope of resources touched (requested vs actual)
-3. Classify which semantic domains this action falls under (see rules below)
-4. Identify hidden behaviors (see rules below)
-5. Cross-check consistency across reason, target, and data (see rules below)
-6. Determine reversibility (can it be undone)
-7. Assess risk based on the direct impact of this action
-8. Provide confidence in your analysis
-
-Your job is factual analysis — describe what you observe, not what should be done about it.
-
-Semantic domains — classify what this action MEANS at a human level:
-- Tag the action with domains like: spending, communication, deletion, data_access,
-  data_modification, scheduling, execution, etc.
-- Base this on what the action ACTUALLY DOES, not its ActionType.
-- Be comprehensive: if an action can be part of multiple domains, include all relevant domains.
-- Examples (but not exhaustive):
-  HTTP_POST to stripe.com/charges → ["spending"]
-  HTTP_POST to slack.com/messages → ["communication"]
-  APPEND_ROW with amount data to an expense tracker → ["spending", "data_modification"]
-  DELETE_FILE → ["deletion"]
-  READ_FILE → ["data_access"]
-- Return an empty list only if the action genuinely doesn't fall under any domain.
-
-Hidden behaviors — STRICT rules:
-- A hidden behavior is something the action WILL DO or CARRY that the agent DID NOT STATE,
-  or that contradicts what the agent stated.
-  Example: agent says "send email" but the action also CC's an admin → hidden behavior.
-  Example: agent says "delete file" but the action also wipes audit metadata → hidden behavior.
-  Example: agent says "routine $10 purchase" but data.amount is 4999 → hidden behavior
-    (discrepancy between claimed and actual values).
-  Example: a data field contains content unrelated to what its key name implies
-    (configuration data, encoded payloads, system dumps where a simple label belongs)
-    → hidden behavior.
-- Do NOT report speculative side effects. If appending to a file, do NOT imagine
-  that "linked reports might update" or "other systems might react." You cannot see
-  those systems. Report only what THIS action does on THIS target.
-- Do NOT report normal, expected consequences of the stated action.
-  Writing to a file creates/modifies the file — that is the stated intent, not hidden.
-- If there are no hidden behaviors, return an EMPTY list. An empty list is the correct
-  answer for most straightforward actions.
-
-Data integrity — cross-check consistency across the three untrusted components:
-- Reason vs Data: if the reason mentions specific values (e.g.amounts, recipients, counts,
-  dates), verify they match the corresponding fields in the data. A reason claiming one
-  value when the data carries a significantly different value is a discrepancy — report
-  it as a hidden_behavior.
-- Key vs Value: each value in the data should be semantically appropriate for what its
-  key name implies. If a value contains content that does not belong in that type of
-  field (e.g. structured system data, configuration, encoded content, or technical
-  dumps in a field whose key suggests a simple label, name, or category), report it
-  as a hidden_behavior.
-- Reason vs Target: verify that the target makes sense for what the reason describes.
-- If the reason describes a small or routine operation but the data carries significantly
-  different values or volumes, report the discrepancy.
-
-For risk_level and risk_reason:
-- Assess based on the direct impact of THIS action (how much would change if executed)
-- Do not speculate about downstream systems or theoretical cascading effects
-
-For recommendation:
-- Provide a neutral summary of what you observed (no allow/block language)
-"""
+        Kept as a thin facade over :data:`ANALYSIS_PROMPTS` so existing
+        tests and external callers that reach for this static method
+        keep working unchanged.  The full set of lane bodies lives in
+        :mod:`intentframe_components.prompt.library.analysis`.
+        """
+        return ANALYSIS_PROMPTS["standard"]
 
     # ── Fast-path logic ─────────────────────────────────────────────
 
@@ -406,6 +384,9 @@ For recommendation:
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
+        command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -423,7 +404,16 @@ For recommendation:
         active_domains are domain strings the user has active rules for.
         Injected as trusted context so the AE knows which semantic
         domains are relevant to this user's configuration.
+
+        execution_context carries immutable server-side facts about the
+        executor (e.g. running_as_root).  Injected into the AI prompt
+        as trusted context when the executor runs as root so the AE
+        accounts for elevated blast radius.
         """
+        # Reset before any early return so stale prompt ids from a
+        # previous request never leak into audit on fast-path cases.
+        self.last_prompt_id = None
+
         # ── Fast path: safe read-only ────────────────────────────────
         fast = self._try_fast_path(intent, safe_actions or set())
         if fast is not None:
@@ -446,29 +436,71 @@ For recommendation:
             intent,
             terminal_command_signals=terminal_command_signals,
             active_domains=active_domains,
+            execution_context=execution_context,
+            file_intel=file_intel,
         )
-        
+
+        prompt_id = self._resolve_prompt_id(intent, command_intel, file_intel)
+        self.last_prompt_id = prompt_id
+        agent = self._agents[prompt_id]
+
         if self.verbose:
-            print(f"    │  AI analyzing: {intent.action.value}...")
-        
-        result = await Runner.run(self._agent, prompt)
-        
+            print(f"    │  AI analyzing: {intent.action.value} (prompt={prompt_id})...")
+
+        log_prompt_dump("analysis", prompt, prompt_id=prompt_id)
+        result = await Runner.run(agent, prompt)
+
         return self._convert_to_report(
             intent, result.final_output,
             terminal_command_signals=terminal_command_signals,
         )
+
+    def _resolve_prompt_id(
+        self,
+        intent: IntentFrame,
+        command_intel: CommandIntel | None,
+        file_intel: FileIntel | None = None,
+    ) -> str:
+        """Ask the strategy for a prompt id, fail-closed on unknowns.
+
+        A strategy that returns an id we don't know about (typo,
+        third-party extension lagging behind a prompt-library bump)
+        is downgraded to ``standard`` with a warning log rather than
+        raising.  Hard-crashing the AE on an unknown id would turn a
+        config bug into a safety incident; ``standard`` is safe by
+        construction.
+        """
+        try:
+            pid = self._prompt_strategy.select_ae_prompt_id(
+                intent, command_intel, file_intel,
+            )
+        except Exception:
+            logger.exception("AE prompt strategy raised; falling back to 'standard'")
+            return "standard"
+
+        if pid not in ANALYSIS_PROMPT_IDS:
+            logger.warning(
+                "AE prompt strategy returned unknown id %r; falling back to 'standard'",
+                pid,
+            )
+            return "standard"
+        return pid
     
     def _build_analysis_prompt(
         self,
         intent: IntentFrame,
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
+        file_intel: FileIntel | None = None,
     ) -> str:
         """Build a hardened prompt for the AI agent.
 
         Trusted section: action (enum-validated), agent metadata,
         task description, active domains, terminal command signals
-        (from command_shield).
+        (from command_shield), execution privilege level, and — for
+        WRITE_FILE intents — a deterministic payload-intel summary
+        from :func:`command_shield.inspect_code`.
         Untrusted section: target, reason, data — the fields the agent
         LLM actually controls.
         """
@@ -495,6 +527,98 @@ For recommendation:
                     line += f"  (evidence: {sig.evidence[:120]})"
                 context_lines.append(line)
 
+        if file_intel is not None:
+            # Inject deterministic facts as TRUSTED context, partitioned
+            # into three labeled subsections the ``_CRITICAL_WRITE_FILE``
+            # prompt body can cite by name.  The block is scoped to
+            # WRITE_FILE / WRITE_HOST_FILE payloads; once an intent
+            # routes to ``critical_write_file``, the rubric relies on
+            # these subsections so reasoning stays grounded in
+            # deterministic output rather than the LLM re-sniffing the
+            # raw bytes or guessing at destination state.
+            #
+            # Ordering and field shape here are part of the contract the
+            # prompt body references — do NOT reorder or rename without
+            # updating ``_CRITICAL_WRITE_FILE`` in lockstep.
+
+            # ── Subsection 1: payload signals ─────────────────────
+            context_lines.append(
+                "\nWRITE_FILE — PAYLOAD SIGNALS:\n"
+                "Deterministic code inspection of the write PAYLOAD "
+                "(language sniff, binary guard, AST / regex analyzers) "
+                "produced the facts below.  Factor them into your "
+                "hidden-behavior and risk analysis — especially findings "
+                "on code payloads and oversized / binary content:"
+            )
+            context_lines.append(
+                f"  - language={file_intel.language or 'unknown'} "
+                f"is_binary={file_intel.is_binary} "
+                f"is_oversized={file_intel.is_oversized} "
+                f"size_bytes={file_intel.size_bytes}"
+            )
+            if file_intel.signal_ids:
+                context_lines.append(
+                    f"  - signals: {', '.join(file_intel.signal_ids)}"
+                )
+            if file_intel.has_code_intel_findings:
+                ids = ", ".join(file_intel.code_intel_finding_ids) or "(unnamed)"
+                context_lines.append(f"  - code-intel findings: {ids}")
+
+            # ── Subsection 2: destination signals ─────────────────
+            # Describes what is at the target RIGHT NOW.  The
+            # ``destination_exists`` field is tri-state — True / False /
+            # unknown — and the rubric uses all three distinctly to
+            # classify creation vs overwrite vs unknown.  The renderer
+            # emits ``unknown`` explicitly (not ``None``) so the LLM
+            # reads a human word, not a Python-ish sentinel.
+            context_lines.append(
+                "\nWRITE_FILE — DESTINATION SIGNALS:\n"
+                "Deterministic probe of the TARGET path.  "
+                "``destination_exists`` is tri-state: ``true`` = present, "
+                "``false`` = absent, ``unknown`` = could not check.  Apply "
+                "the reversibility / deletion rules accordingly:"
+            )
+            exists_str = (
+                "unknown"
+                if file_intel.destination_exists is None
+                else str(file_intel.destination_exists).lower()
+            )
+            kind_str = file_intel.destination_kind or "unknown"
+            context_lines.append(
+                f"  - destination_exists={exists_str} "
+                f"destination_kind={kind_str}"
+            )
+            symlink_target = (
+                file_intel.symlink_target_real_path
+                if file_intel.symlink_target_real_path
+                else "n/a"
+            )
+            context_lines.append(
+                f"  - is_symlink={str(file_intel.is_symlink).lower()} "
+                f"symlink_target_real_path={symlink_target}"
+            )
+            parent_str = file_intel.parent_kind or "unknown"
+            context_lines.append(f"  - parent_kind={parent_str}")
+
+            # ── Subsection 3: path semantics ──────────────────────
+            # What the destination MEANS, independent of whether
+            # anything exists there today.  ``path_category`` is always
+            # populated (falls back to ``unknown``); ``hits_floor_deny_prefix``
+            # tells the rubric the write would be refused at the floor
+            # regardless of policy breadth.
+            context_lines.append(
+                "\nWRITE_FILE — PATH SEMANTICS:\n"
+                "Deterministic classification of the target PATH, "
+                "independent of what is at the destination today:"
+            )
+            context_lines.append(
+                f"  - path_category={file_intel.path_category or 'unknown'} "
+                f"hits_floor_deny_prefix="
+                f"{str(file_intel.hits_floor_deny_prefix).lower()}"
+            )
+            ext_str = file_intel.extension or "none"
+            context_lines.append(f"  - extension={ext_str}")
+
         trusted_sections["Context"] = "\n".join(context_lines)
 
         if active_domains:
@@ -505,6 +629,15 @@ For recommendation:
                 "these domains. If it does, include the matching domain(s) in your "
                 "semantic_domains output. This is a hint — still classify any other "
                 "domains you observe."
+            )
+
+        if execution_context and execution_context.executor_running_as_root:
+            trusted_sections["Execution Privilege"] = (
+                "The executor is running as root (uid=0). All commands execute "
+                "with full root privileges. Assess blast radius accordingly — "
+                "even benign-looking commands can cause system-wide damage when "
+                "run as root. The agent should never use sudo; if sudo appears "
+                "in the command, flag it as a hidden behavior."
             )
 
         # ── Untrusted: agent-controlled fields ────────────────────
@@ -576,6 +709,9 @@ For recommendation:
             }
             for s in terminal_command_signals
         ]
+        clipped_signals, signals_overflow = AnalysisReport.clip_terminal_command_signals(
+            serialized_signals
+        )
 
         return AnalysisReport(
             stated_intent=ai_output.stated_intent,
@@ -596,8 +732,8 @@ For recommendation:
             semantic_domains=ai_output.semantic_domains,
             confidence=ai_output.confidence,
             recommendation=ai_output.recommendation,
-            terminal_command_signals=serialized_signals,
-            ae_output_anomaly=anomaly,
+            terminal_command_signals=clipped_signals,
+            ae_output_anomaly=anomaly or signals_overflow,
         )
 
     def _detect_overflow(self, ai_output: AIAnalysisOutput) -> bool:

@@ -14,16 +14,8 @@
 - {{ g }}
 {% endfor %}
 
-{% endif -%}
-{% if virtual_paths -%}
-## Your Filesystem
-All file operations use these paths. Each path is a root — use it directly
-without adding a username directory.
-{% for vp in virtual_paths -%}
-- `{{ vp }}` ({{ path_permissions.get(vp, "read") }})
-{% endfor %}
-Example: `/home/Documents/report.md`, `/home/Desktop/notes.txt`, `/home/Downloads/file.pdf`
-Do NOT use `/home/<username>/...` — `/home/` already points to your home directory.
+## Terminal (run_command)
+- Exact working directory and read/write access depend on runtime security configurations.
 
 {% endif -%}
 {% include "tool_usage.j2" %}

@@ -29,6 +29,7 @@ the following are in scope:
 - Credential leakage from the vault
 - Privilege escalation across user/workspace boundaries
 - Authentication or authorization flaws in the gateway or executor
+- Bypass of the root-demo escalation boundary: the narrow `NOPASSWD: SETENV: /usr/bin/sandbox-exec` sudoers entry installed by `intentframe_setup_root_demo.sh` is intentionally scoped to that one binary; anything that allows running arbitrary commands as root through this mechanism is in scope
 
 ## Out of Scope
 

@@ -108,6 +108,47 @@
   },
 
   {
+    "id": "IF-PKEXEC-001",
+    "regex": "\\bpkexec\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Privilege escalation via polkit (pkexec)",
+    "source": "intentframe",
+    "category": "privilege_escalation"
+  },
+  {
+    "id": "IF-DOAS-001",
+    "regex": "\\bdoas\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Privilege escalation via doas (OpenBSD-style sudo)",
+    "source": "intentframe",
+    "category": "privilege_escalation"
+  },
+  {
+    "id": "IF-RUNUSER-001",
+    "regex": "\\brunuser\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Privilege escalation via runuser (util-linux)",
+    "source": "intentframe",
+    "category": "privilege_escalation"
+  },
+  {
+    "id": "IF-MACHINECTL-SHELL-001",
+    "regex": "\\bmachinectl\\s+(shell|login)\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Opens a privileged shell inside a machine container (machinectl shell/login)",
+    "source": "intentframe",
+    "category": "privilege_escalation"
+  },
+  {
+    "id": "IF-SANDBOX-EXEC-001",
+    "regex": "\\bsandbox-exec\\b",
+    "verdict": "CATASTROPHIC",
+    "description": "Direct invocation of sandbox-exec bypasses IntentFrame's executor-managed sandbox",
+    "source": "intentframe",
+    "category": "sandbox_bypass"
+  },
+
+  {
     "id": "SUDO-001",
     "regex": "sudo\\s+rm\\s+(-[^\\s]*\\s+)*(/|/home|/etc|/usr|/var)",
     "verdict": "CATASTROPHIC",

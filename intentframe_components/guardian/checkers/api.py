@@ -5,14 +5,20 @@ from __future__ import annotations
 import fnmatch
 
 from intentframe_core.types import IntentFrame
-from intentframe_components.guardian.checkers.base import ConstraintChecker
+from intentframe_components.guardian.checkers.base import CheckContext, ConstraintChecker
 from policy_registry.constraints.api import ApiConstraints
 
 
 class ApiChecker(ConstraintChecker):
     """Financial and endpoint constraint enforcement for API operations."""
 
-    def check(self, intent: IntentFrame, constraints: ApiConstraints) -> tuple[bool, str]:
+    def check(
+        self,
+        intent: IntentFrame,
+        constraints: ApiConstraints,
+        context: CheckContext | None = None,
+    ) -> tuple[bool, str]:
+        del context
         if constraints.max_amount is not None:
             amount = (intent.data or {}).get("amount")
             if amount is not None:

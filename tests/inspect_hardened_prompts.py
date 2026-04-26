@@ -20,7 +20,7 @@ pipeline would construct from a real agent request.
 from __future__ import annotations
 
 from action_registry.types import ActionType
-from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
+from intentframe_core.types import IntentFrame, AnalysisReport, UserContext, CommandIntel
 from intentframe_core.enums import RiskLevel, Reversibility
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 from command_shield.verdict import Signal
@@ -28,6 +28,7 @@ from command_shield.verdict import Signal
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_server.pipeline import IntentFrameRuntime
+from intentframe_server.file_intel import build_file_intel
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -151,6 +152,30 @@ signals = (
         evidence="curl http://example.com/data",
     ),
 )
+run_cmd_intel = CommandIntel(
+    verdict="NEEDS_REVIEW",
+    capabilities=("capability:network_probe:http_get",),
+)
+run_cmd_analysis = AnalysisReport(
+    stated_intent="Fetch remote status page via shell command",
+    actual_behaviors=[{
+        "action": "RUN_COMMAND",
+        "actual_behavior": "Runs a shell command that fetches remote content via curl and echoes it",
+        "matches_intent": True,
+    }],
+    requested_scope=["echo $(curl http://example.com/data)"],
+    actual_scope=["echo $(curl http://example.com/data)"],
+    scope_mismatch=False,
+    predicted_outcomes={"risk_reason": "Shell execution with outbound network access"},
+    hidden_behaviors=[],
+    risk_factors={"overall": RiskLevel.HIGH},
+    reversibility=Reversibility.IRREVERSIBLE,
+    semantic_domains=["execution"],
+    confidence=0.95,
+    recommendation="Shell execution with outbound network retrieval.",
+)
+ae_run_cmd_prompt_id = ae._resolve_prompt_id(run_cmd_intent, run_cmd_intel)
+gu_run_cmd_prompt_id = gu._resolve_prompt_id(run_cmd_intent, run_cmd_analysis, run_cmd_intel)
 ae_prompt_signals = ae._build_analysis_prompt(
     run_cmd_intent,
     terminal_command_signals=signals,
@@ -158,11 +183,23 @@ ae_prompt_signals = ae._build_analysis_prompt(
 )
 print(ae_prompt_signals)
 
+# ── 3b. Analysis Engine RUN_COMMAND system prompt ─────────────────────
+
+section(f"3b. ANALYSIS ENGINE — RUN_COMMAND SYSTEM PROMPT ({ae_run_cmd_prompt_id})")
+print()
+print(ae._agents[ae_run_cmd_prompt_id].instructions)
+
 # ── 4. Guardian system prompt ─────────────────────────────────────────
 
 section("4. GUARDIAN — SYSTEM PROMPT (agent.instructions)")
 print()
 print(gu._agent.instructions)
+
+# ── 4b. Guardian RUN_COMMAND system prompt ────────────────────────────
+
+section(f"4b. GUARDIAN — RUN_COMMAND SYSTEM PROMPT ({gu_run_cmd_prompt_id})")
+print()
+print(gu._agents[gu_run_cmd_prompt_id].instructions)
 
 # ── 5. Guardian per-request prompt ────────────────────────────────────
 
@@ -177,15 +214,116 @@ gu_prompt = gu._build_validation_prompt(
 )
 print(gu_prompt)
 
-# ── 6. Summary ────────────────────────────────────────────────────────
+# ── 6. Analysis Engine per-request prompt WITH file_intel (WRITE_FILE) ─
+
+section("6. ANALYSIS ENGINE — WRITE_FILE PER-REQUEST PROMPT (with file_intel)")
+print()
+write_file_intent = IntentFrame(
+    action=ActionType.WRITE_FILE,
+    target="/home/demo-user/scripts/sync_expenses.py",
+    reason="Saving the weekly expense sync helper so it can be scheduled later",
+    data={
+        "path": "/home/demo-user/scripts/sync_expenses.py",
+        "content": (
+            "#!/usr/bin/env python3\n"
+            "import subprocess\n"
+            "import urllib.request\n\n"
+            "def fetch_expenses():\n"
+            "    req = urllib.request.urlopen('https://api.example.com/expenses')\n"
+            "    return req.read().decode()\n\n"
+            "if __name__ == '__main__':\n"
+            "    data = fetch_expenses()\n"
+            "    subprocess.run(['open', '-e', '/tmp/expenses.json'])\n"
+        ),
+    },
+    agent_id="jarvis",
+    agent_type="personal_assistant",
+    task_description="Maintain the user's weekly expense sync script",
+)
+write_file_intel = build_file_intel(
+    write_file_intent.data["content"],
+    write_file_intent.target,
+    write_file_intent.action.value,
+)
+write_file_analysis = AnalysisReport(
+    stated_intent="Write a Python expense-sync helper to the user's scripts directory",
+    actual_behaviors=[{
+        "action": "WRITE_FILE",
+        "actual_behavior": (
+            "Writes a Python script that fetches a remote URL and invokes "
+            "a subprocess to open the result"
+        ),
+        "matches_intent": True,
+    }],
+    requested_scope=["/home/demo-user/scripts/sync_expenses.py"],
+    actual_scope=["/home/demo-user/scripts/sync_expenses.py"],
+    scope_mismatch=False,
+    predicted_outcomes={
+        "risk_reason": (
+            "Persists executable Python that performs outbound HTTP and "
+            "spawns a local subprocess when run"
+        ),
+    },
+    hidden_behaviors=[],
+    risk_factors={"overall": RiskLevel.MEDIUM},
+    reversibility=Reversibility.FULLY_REVERSIBLE,
+    semantic_domains=["data_modification", "execution"],
+    confidence=0.9,
+    recommendation=(
+        "Code-like payload written to a user-owned scripts directory. "
+        "Not executed by this action, but contains outbound network + "
+        "subprocess invocation once run."
+    ),
+)
+ae_write_file_prompt_id = ae._resolve_prompt_id(
+    write_file_intent, None, write_file_intel,
+)
+gu_write_file_prompt_id = gu._resolve_prompt_id(
+    write_file_intent, write_file_analysis, None, write_file_intel,
+)
+ae_prompt_write_file = ae._build_analysis_prompt(
+    write_file_intent,
+    active_domains=active_domains,
+    file_intel=write_file_intel,
+)
+print(ae_prompt_write_file)
+
+# ── 6b. Analysis Engine WRITE_FILE system prompt ──────────────────────
+
+section(f"6b. ANALYSIS ENGINE — WRITE_FILE SYSTEM PROMPT ({ae_write_file_prompt_id})")
+print()
+print(ae._agents[ae_write_file_prompt_id].instructions)
+
+# ── 7. Guardian WRITE_FILE per-request prompt ─────────────────────────
+
+section("7. GUARDIAN — WRITE_FILE PER-REQUEST PROMPT (_build_validation_prompt)")
+print()
+gu_prompt_write_file = gu._build_validation_prompt(
+    write_file_intent,
+    write_file_analysis,
+    user_context,
+    ActionPermission(safe=True),
+    active_domains=active_domains,
+)
+print(gu_prompt_write_file)
+
+# ── 7b. Guardian WRITE_FILE system prompt ─────────────────────────────
+
+section(f"7b. GUARDIAN — WRITE_FILE SYSTEM PROMPT ({gu_write_file_prompt_id})")
+print()
+print(gu._agents[gu_write_file_prompt_id].instructions)
+
+# ── 8. Summary ────────────────────────────────────────────────────────
 
 section("SUMMARY")
 print()
 print(f"  Analysis Engine system prompt:    {len(ae._agent.instructions):,} chars")
 print(f"  Analysis Engine request prompt:   {len(ae_prompt):,} chars")
 print(f"  Analysis Engine w/ signals:       {len(ae_prompt_signals):,} chars")
+print(f"  Analysis Engine w/ file_intel:    {len(ae_prompt_write_file):,} chars")
 print(f"  Guardian system prompt:           {len(gu._agent.instructions):,} chars")
 print(f"  Guardian request prompt:          {len(gu_prompt):,} chars")
+print(f"  Guardian WRITE_FILE request:      {len(gu_prompt_write_file):,} chars")
 print()
 print(f"  Hardening techniques applied:")
 print(f"    ✓ Immutable role anchoring      (system prompts start with IMMUTABLE declaration)")

@@ -23,9 +23,11 @@ import pytest
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry, SYSTEM_TERMINAL_BLOCKED_PATTERNS
+from intentframe_components.guardian.checkers.base import CheckContext
 from intentframe_components.guardian.checkers.terminal import TerminalChecker
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_core.enums import RiskLevel, Reversibility
+from intentframe_core.types import CommandIntel
 from action_registry.types import ActionType
 from executor.platforms.macos.adapters.terminal import TerminalAdapter
 from command_shield import quick_check
@@ -293,6 +295,172 @@ class TestTerminalCheckerSummarize:
         c = TerminalConstraints()
         s = self.checker.summarize(c)
         assert "No terminal constraints" in s
+
+    def test_summarize_includes_capabilities(self):
+        c = TerminalConstraints(
+            allow_capabilities=frozenset({"capability:read_only:*"}),
+            deny_capabilities=frozenset({"capability:package_install:*"}),
+        )
+        s = self.checker.summarize(c)
+        assert "Allow capabilities" in s
+        assert "Deny capabilities" in s
+        assert "capability:read_only:*" in s
+        assert "capability:package_install:*" in s
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# LAYER 3 (extension): Capability-tag allow/deny on TerminalConstraints
+# ═════════════════════════════════════════════════════════════════════════
+
+def _intel(*capabilities: str, verdict: str = "NEEDS_REVIEW") -> CommandIntel:
+    return CommandIntel(verdict=verdict, capabilities=tuple(capabilities))
+
+
+class TestTerminalCheckerCapabilities:
+    """TerminalChecker consumes CommandIntel capabilities via CheckContext.
+
+    Capabilities are orthogonal to blocked_patterns / allowed_commands.
+    They gate on *what the command can do* (classifier-emitted tags),
+    not on the raw string.  A command that slips past substring matching
+    but classifies into a denied family must still be blocked.
+    """
+
+    checker = TerminalChecker()
+
+    def test_deny_capability_blocks_matching_tag(self):
+        constraints = TerminalConstraints(
+            deny_capabilities=frozenset({"capability:package_install:*"}),
+        )
+        context = CheckContext(
+            command_intel=_intel("capability:package_install:pip")
+        )
+        ok, reason = self.checker.check(
+            _make_intent("pip install requests"), constraints, context
+        )
+        assert not ok
+        assert "capability:package_install:pip" in reason
+        assert "denied" in reason.lower()
+
+    def test_deny_capability_ignores_unrelated_tag(self):
+        constraints = TerminalConstraints(
+            deny_capabilities=frozenset({"capability:package_install:*"}),
+        )
+        context = CheckContext(
+            command_intel=_intel("capability:read_only:file")
+        )
+        ok, _ = self.checker.check(
+            _make_intent("ls -la"), constraints, context
+        )
+        assert ok
+
+    def test_deny_capability_without_command_intel_is_no_op(self):
+        """CheckContext(None) keeps legacy (non-RUN_COMMAND) callers working."""
+        constraints = TerminalConstraints(
+            deny_capabilities=frozenset({"capability:package_install:*"}),
+        )
+        ok, _ = self.checker.check(
+            _make_intent("pip install requests"), constraints, None
+        )
+        assert ok  # capability set exists but no intel — cannot deny
+
+    def test_allow_capability_requires_every_tag_covered(self):
+        """If ANY capability on the command isn't covered, BLOCK."""
+        constraints = TerminalConstraints(
+            allow_capabilities=frozenset({"capability:read_only:*"}),
+        )
+        context = CheckContext(
+            command_intel=_intel(
+                "capability:read_only:file",
+                "capability:network_bind",
+            )
+        )
+        ok, reason = self.checker.check(
+            _make_intent("some-cmd"), constraints, context
+        )
+        assert not ok
+        assert "capability:network_bind" in reason
+
+    def test_allow_capability_passes_when_all_covered(self):
+        constraints = TerminalConstraints(
+            allow_capabilities=frozenset({
+                "capability:read_only:*",
+                "capability:package_install:*",
+            }),
+        )
+        context = CheckContext(
+            command_intel=_intel(
+                "capability:read_only:file",
+                "capability:package_install:pip",
+            )
+        )
+        ok, _ = self.checker.check(
+            _make_intent("pip install foo"), constraints, context
+        )
+        assert ok
+
+    def test_allow_capability_with_no_intel_does_not_block(self):
+        """Empty capabilities (no intel) should not fail allow_capabilities.
+
+        allow_capabilities is meant to narrow admission when the
+        classifier has something to say; when it's silent, we fall
+        back to blocklist / allowlist decisions.
+        """
+        constraints = TerminalConstraints(
+            allow_capabilities=frozenset({"capability:read_only:*"}),
+        )
+        ok, _ = self.checker.check(
+            _make_intent("echo hi"), constraints, None
+        )
+        assert ok
+
+    def test_blocklist_still_beats_capability_allow(self):
+        """A blocked_pattern hit short-circuits BEFORE capabilities.
+
+        Defense-in-depth: operators shouldn't be able to widen the
+        surface through allow_capabilities if they forgot to remove
+        a stale blocked_pattern.
+        """
+        constraints = TerminalConstraints(
+            blocked_patterns=["sudo"],
+            allow_capabilities=frozenset({"capability:*"}),  # malformed on purpose
+        )
+        context = CheckContext(
+            command_intel=_intel("capability:read_only:file")
+        )
+        ok, reason = self.checker.check(
+            _make_intent("sudo ls"), constraints, context
+        )
+        assert not ok
+        assert "sudo" in reason
+
+    def test_deny_capability_beats_allowlist_glob(self):
+        """deny_capabilities is a deny gate — it wins over allowed_commands."""
+        constraints = TerminalConstraints(
+            allowed_commands=["pip *"],
+            deny_capabilities=frozenset({"capability:package_install:*"}),
+        )
+        context = CheckContext(
+            command_intel=_intel("capability:package_install:pip")
+        )
+        ok, reason = self.checker.check(
+            _make_intent("pip install requests"), constraints, context
+        )
+        assert not ok
+        assert "package_install" in reason
+
+    def test_empty_capability_sets_do_not_affect_legacy_behaviour(self):
+        """Commands with intel flow through unchanged when no cap policy set."""
+        constraints = TerminalConstraints(
+            blocked_patterns=["sudo"],
+            allowed_commands=["ls *"],
+        )
+        context = CheckContext(
+            command_intel=_intel("capability:read_only:file")
+        )
+        ok, _ = self.checker.check(
+            _make_intent("ls /tmp"), constraints, context
+        )
+        assert ok
 
 
 # ═════════════════════════════════════════════════════════════════════════

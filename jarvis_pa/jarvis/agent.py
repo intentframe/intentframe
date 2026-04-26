@@ -59,7 +59,7 @@ _CAPABILITY_LIST = [
 ]
 
 _ACTION_TYPES = [
-    "READ_FILE", "WRITE_FILE", "LIST_DIRECTORY", "DELETE_FILE",
+    "READ_HOST_FILE", "WRITE_HOST_FILE", "LIST_HOST_DIRECTORY", "DELETE_HOST_FILE",
     "RUN_COMMAND",
     "SEND_EMAIL", "READ_EMAIL", "SEARCH_EMAIL",
     "GET_EMAIL", "REPLY_EMAIL", "FORWARD_EMAIL", "MARK_READ_EMAIL",
@@ -72,10 +72,14 @@ _ACTION_TYPES = [
     "SEND_MESSAGE", "READ_MESSAGES",
     "SEARCH_CONTACTS", "GET_CONTACT", "ADD_CONTACT",
     "UPDATE_CONTACT", "DELETE_CONTACT",
-    "OPEN_URL", "SEARCH_WEB", "GET_PAGE_CONTENT",
+    "OPEN_URL", "GET_PAGE_CONTENT",
     "GET_CLIPBOARD", "SET_CLIPBOARD",
     "SEARCH_SPOTLIGHT", "SHOW_NOTIFICATION", "ASK_USER",
-    "GET_SYSTEM_INFO", "SET_VOLUME", "SET_BRIGHTNESS", "TOGGLE_DARK_MODE",
+    "GET_SYSTEM_INFO",
+    "SET_VOLUME", "GET_VOLUME",
+    "TOGGLE_MUTE", "GET_MUTE",
+    "SET_BRIGHTNESS", "GET_BRIGHTNESS",
+    "TOGGLE_DARK_MODE", "GET_DARK_MODE",
 ]
 
 
@@ -186,15 +190,9 @@ class JarvisAgent:
         heartbeat_md = await self.memory.read_file("HEARTBEAT.md")
 
         guardrails: list[str] = []
-        virtual_paths: list[str] = []
-        path_permissions: dict[str, str] = {}
         if self.runtime_ctx is not None:
             if hasattr(self.runtime_ctx, "guardrails"):
                 guardrails = self.runtime_ctx.guardrails or []
-            if hasattr(self.runtime_ctx, "virtual_paths"):
-                virtual_paths = self.runtime_ctx.virtual_paths or []
-            if hasattr(self.runtime_ctx, "path_permissions"):
-                path_permissions = self.runtime_ctx.path_permissions or {}
 
         # 4. Session ID.
         import uuid
@@ -241,8 +239,6 @@ class JarvisAgent:
                 memory=memory,
                 heartbeat=heartbeat_md,
                 guardrails=guardrails,
-                virtual_paths=virtual_paths,
-                path_permissions=path_permissions,
                 skills_xml=skills_xml,
                 config=self.config,
                 session_id=self._session_id,

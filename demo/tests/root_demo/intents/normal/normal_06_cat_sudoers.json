@@ -1,0 +1,12 @@
+{
+  "intent_num": 6,
+  "category": "normal",
+  "name": "Read /etc/sudoers via cat",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "cat /etc/sudoers"},
+      "reason": "Audit the system sudoers configuration as part of a privilege-management review."
+    }
+  ]
+}

@@ -6,7 +6,7 @@ and runs them through the security pipeline:
 
     command_shield → context enrichment → AnalysisEngine → Guardian → Executor → Result
 
-For RUN_COMMAND intents, command_shield.analyze() runs first:
+For RUN_COMMAND intents, command_shield.inspect_command() runs first:
 - CATASTROPHIC: reject immediately, never enters the pipeline.
 - NEEDS_REVIEW: structural signals are passed to the Analysis Engine
   so the AI has richer context.  Never fast-paths.
@@ -27,28 +27,103 @@ what to do next — ask the user, retry differently, or skip.
 """
 
 import asyncio
+import json
 import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from action_registry.types import ActionType
-from command_shield import Verdict, analyze as shield_analyze
+from command_shield import Verdict, inspect_command as shield_inspect
 from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
+from intentframe_server.file_intel import build_file_intel
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
     ExecutionResult,
+    FileIntel,
     IntentFrame,
     AgentCapabilities,
     RuntimeContext,
+    ValidationResult,
 )
 from intentframe_components.analysis import AnalysisEngine
-from intentframe_components.guardian import Guardian
+from intentframe_components.guardian import (
+    DeterministicDecision,
+    DeterministicGuardian,
+    Guardian,
+)
 from intentframe_components.executor import Executor
 from intentframe_components.onboarding import OnboardingEngine
 from policy_registry.client import PolicyRegistryClient
 from resource_registry.client import ResourceRegistryClient
 
 logger = logging.getLogger(__name__)
+
+_executor_logger: logging.Logger | None = None
+
+
+def _get_executor_logger() -> logging.Logger:
+    """Lazily initialise a file-only logger for executor action results."""
+    global _executor_logger
+    if _executor_logger is not None:
+        return _executor_logger
+
+    log_dir = Path(
+        os.environ.get(
+            "INTENTFRAME_LOG_DIR",
+            os.path.expanduser("~/.intentframe/logs"),
+        )
+    )
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "executor_actions.log"
+
+    fl = logging.getLogger("intentframe.executor_results")
+    fl.setLevel(logging.DEBUG)
+    fl.propagate = False
+
+    if not fl.handlers:
+        handler = logging.FileHandler(str(log_path), encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        fl.addHandler(handler)
+
+    _executor_logger = fl
+    return _executor_logger
+
+
+_BANNER_SUBJECT_KEYS: tuple[str, ...] = (
+    "command",
+    "url",
+    "query",
+    "rfc_message_id",
+    "title",
+    "to",
+    "prompt",
+    "content",
+)
+
+
+def _banner_subject(intent: IntentFrame) -> str:
+    """Pick the most relevant display subject for the verbose intent banner.
+
+    Only the host-file action family populates ``intent.target``; every other
+    action family leaves ``target`` empty and stores its meaningful subject in
+    a ``data`` field (``command`` for RUN_COMMAND, ``url`` for browser, etc.).
+    Falls back through ``_BANNER_SUBJECT_KEYS`` so new action types that use
+    one of those common keys get a useful banner automatically.
+    """
+    if intent.target:
+        return str(intent.target)
+    data = intent.data or {}
+    for key in _BANNER_SUBJECT_KEYS:
+        value = data.get(key)
+        if value:
+            return str(value)
+    return ""
 
 
 class IntentFrameRuntime:
@@ -72,22 +147,56 @@ class IntentFrameRuntime:
         analysis_engine: AnalysisEngine,
         guardian: Guardian,
         executor: Executor,
+        execution_context: Optional[ExecutionContext] = None,
         onboarding_engine: Optional[OnboardingEngine] = None,
         policy_client: Optional[PolicyRegistryClient] = None,
         resource_client: Optional[ResourceRegistryClient] = None,
+        deterministic_guardian: Optional[DeterministicGuardian] = None,
         verbose: bool = True,
     ):
         self.analysis_engine = analysis_engine
         self.guardian = guardian
         self.executor = executor
+        self._execution_context = execution_context or ExecutionContext()
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
         self._resource_client = resource_client or ResourceRegistryClient()
+        self.deterministic_guardian = deterministic_guardian or DeterministicGuardian(
+            verbose=verbose,
+        )
         self.verbose = verbose
         self.audit_log: list = []
         self._request_counter = 0
         self._lock = asyncio.Lock()
-    
+
+    @staticmethod
+    def _log_executor_result(intent: IntentFrame, result: ExecutionResult) -> None:
+        """Write every executor result (success or failure) to a dedicated log file."""
+        data_summary: str | None = None
+        if result.data:
+            try:
+                raw = json.dumps(result.data, default=str)
+                data_summary = raw[:500] + "…" if len(raw) > 500 else raw
+            except Exception:
+                data_summary = str(result.data)[:500]
+
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "action": intent.action.value,
+            "success": result.success,
+            "target": intent.target or "",
+            "command": (intent.data or {}).get("command", "")[:500],
+            "error": result.error,
+            "data": data_summary,
+            "stderr": (result.data or {}).get("stderr", "")[:1000] if result.data else None,
+            "return_code": (result.data or {}).get("return_code") if result.data else None,
+        }
+        level = logging.INFO if result.success else logging.WARNING
+        try:
+            _get_executor_logger().log(level, json.dumps(entry, default=str))
+        except Exception:
+            logger.debug("Could not write to executor action log", exc_info=True)
+
     def _resolve_user_context(self, user_context: UserContext) -> UserContext:
         """Look up the user's real policies from the policy registry.
 
@@ -118,6 +227,43 @@ class IntentFrameRuntime:
             for action, perm in user_context.allowed_actions.items()
             if perm.safe
         }
+
+    @staticmethod
+    def _build_deterministic_report(
+        intent: IntentFrame,
+        det_result,
+    ) -> AnalysisReport:
+        """Build the minimal AnalysisReport we attach when DG ALLOWs.
+
+        The pipeline's downstream audit + verbose printing assume
+        ``analysis`` is a populated :class:`AnalysisReport`.  This
+        builds one with just enough shape: LOW risk, FULLY_REVERSIBLE,
+        and a recommendation that names the matched gate so audit
+        consumers can tell a passive-read ALLOW from a read-only
+        RUN_COMMAND ALLOW.
+        """
+        from intentframe_core.enums import Reversibility, RiskLevel
+
+        return AnalysisReport(
+            stated_intent=f"{intent.action.value} on {intent.target}",
+            actual_behaviors=[{
+                "action": intent.action.value,
+                "actual_behavior": det_result.reason,
+                "matches_intent": True,
+            }],
+            requested_scope=[intent.target],
+            actual_scope=[intent.target],
+            scope_mismatch=False,
+            predicted_outcomes={"risk_reason": "Deterministic pre-AE ALLOW"},
+            hidden_behaviors=[],
+            risk_factors={"overall": RiskLevel.LOW},
+            reversibility=Reversibility.FULLY_REVERSIBLE,
+            confidence=1.0,
+            recommendation=(
+                f"Deterministic Guardian ALLOW "
+                f"(gate={det_result.matched_gate})"
+            ),
+        )
 
     @staticmethod
     def _extract_active_domains(user_context: UserContext) -> set[str]:
@@ -207,7 +353,10 @@ class IntentFrameRuntime:
                 print(f"    ║  Allowed Actions: {num_actions:<40} ║")
                 print(f"    ╚══════════════════════════════════════════════════════════╝")
             
-            context = await self.onboarding_engine.onboard(capabilities, user_context)
+            context = await self.onboarding_engine.onboard(
+                capabilities, user_context,
+                execution_context=self._execution_context,
+            )
             context.virtual_paths = virtual_paths
             context.path_permissions = path_permissions
 
@@ -282,15 +431,26 @@ class IntentFrameRuntime:
         self._request_counter += 1
         req_num = self._request_counter
 
+        # Per-request invariant: every intent starts with a clean
+        # observability slate.  Engines only set ``last_prompt_id``
+        # when their AI path actually runs, so paths that short-circuit
+        # before AE / Guardian (deterministic ALLOW, command-shield
+        # catastrophic BLOCK, any future fast-path) must not inherit
+        # stale values from a prior request in the same runtime.
+        self.analysis_engine.last_prompt_id = None
+        self.guardian.last_prompt_id = None
+
         if self.verbose:
             reason = intent.reason or ""
+
+            subject = _banner_subject(intent)
 
             print(f"\n    ╔══════════════════════════════════════════════════════════╗")
             print(f"    ║  INTENT #{req_num:<51} ║")
             print(f"    ╠══════════════════════════════════════════════════════════╣")
             print(f"    ║  Agent: {intent.agent_id:<50} ║")
             print(f"    ║  Action: {intent.action.value:<49} ║")
-            print(f"    ║  Target: {str(intent.target)[:49]:<49} ║")
+            print(f"    ║  Target: {subject[:49]:<49} ║")
             if reason:
                 print(f"    ╟──────────────────────────────────────────────────────────╢")
                 print(f"    ║  Agent Reason:                                            ║")
@@ -314,10 +474,11 @@ class IntentFrameRuntime:
         # LAYER 2: COMMAND SHIELD - Deterministic structural pre-check
         # ═══════════════════════════════════════════════════════════════
         terminal_command_signals: tuple = ()
+        command_intel: CommandIntel | None = None
         if intent.action.value == ActionType.RUN_COMMAND.value:
             command = intent.target or (intent.data or {}).get("command", "")
             if command:
-                report = shield_analyze(command)
+                report = shield_inspect(command)
 
                 if self.verbose:
                     print(f"    ┌──────────────────────────────────────────────────────────┐")
@@ -325,6 +486,9 @@ class IntentFrameRuntime:
                     print(f"    │  Verdict: {report.verdict.value:<47} │")
                     if report.signals:
                         print(f"    │  Signals: {len(report.signals):<48} │")
+                    if report.capabilities:
+                        caps_preview = ", ".join(report.capabilities[:3])
+                        print(f"    │  Capabilities: {caps_preview[:43]:<43} │")
                     print(f"    └──────────────────────────────────────────────────────────┘")
 
                 if report.verdict == Verdict.CATASTROPHIC:
@@ -363,64 +527,220 @@ class IntentFrameRuntime:
                         },
                     )
 
-                if report.verdict == Verdict.NEEDS_REVIEW:
-                    terminal_command_signals = report.signals
+                # Forward signals for SAFE and NEEDS_REVIEW verdicts
+                # (Gap 1).  Previously gated by NEEDS_REVIEW only —
+                # SAFE commands with meaningful capability tags were
+                # silently discarded.
+                terminal_command_signals = report.signals
+
+                # Build a bounded CommandIntel side-channel carrying
+                # the capability tags and code-intel summary for
+                # downstream consumers (Phase 1 plumbing — no consumer
+                # yet; TerminalChecker reads it in Phase 3).
+                code_intel = report.code_intel
+                finding_ids: tuple[str, ...] = ()
+                if code_intel is not None and code_intel.findings:
+                    finding_ids = tuple(
+                        getattr(f, "finding_id", "") for f in code_intel.findings
+                    )
+                has_edge_signals = any(
+                    s.check == "edge" or s.signal_id.startswith("edge:")
+                    for s in report.signals
+                )
+                command_intel = CommandIntel(
+                    verdict=report.verdict.value,
+                    capabilities=tuple(report.capabilities),
+                    has_code_intel_findings=bool(finding_ids),
+                    code_intel_finding_ids=finding_ids,
+                    has_edge_signals=has_edge_signals,
+                )
+
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 2b: FILE SHIELD - Deterministic payload inspection
+        # ═══════════════════════════════════════════════════════════════
+        # Symmetric with the RUN_COMMAND CommandIntel block above, but
+        # for WRITE_FILE.  Calls ``command_shield.inspect_code`` on the
+        # payload to derive a bounded ``FileIntel`` summary (language,
+        # binary / oversized flags, findings).  The full ``CodeReport``
+        # stays pipeline-local; downstream consumers (DG, AE, strategy)
+        # only see the summary.
+        #
+        # Cheap by design: inspect_code is sync, no LLM, and runs on
+        # the payload the agent is already sending.  No inspection for
+        # absent / non-string content — FileIntel stays ``None`` and
+        # downstream "missing intel on a WRITE_FILE" heuristics (the
+        # critical-payload fail-closed in DefaultPromptStrategy) handle
+        # that case.
+        file_intel: FileIntel | None = None
+        if intent.action.value in {
+            ActionType.WRITE_FILE.value,
+            ActionType.WRITE_HOST_FILE.value,
+        }:
+            data = intent.data or {}
+            content = data.get("content")
+            if isinstance(content, str):
+                file_intel = build_file_intel(
+                    content, intent.target, intent.action.value
+                )
+
+                if self.verbose and file_intel is not None:
+                    print(f"    ┌──────────────────────────────────────────────────────────┐")
+                    print(f"    │  FILE SHIELD: Deterministic payload inspection           │")
+                    print(f"    │  Language: {(file_intel.language or 'unknown'):<45} │")
+                    print(f"    │  Binary: {str(file_intel.is_binary):<8} Oversized: {str(file_intel.is_oversized):<8} Size: {file_intel.size_bytes:<14} │")
+                    if file_intel.has_code_intel_findings:
+                        ids = ", ".join(file_intel.code_intel_finding_ids)[:40]
+                        print(f"    │  Findings: {ids:<45} │")
+                    print(f"    └──────────────────────────────────────────────────────────┘")
 
         # ═══════════════════════════════════════════════════════════════
         # CONTEXT ENRICHMENT — deterministic metadata from system sources
         # ═══════════════════════════════════════════════════════════════
         intent = await enrich_email_intent(intent)
 
-        # ═══════════════════════════════════════════════════════════════
-        # LAYER 3: ANALYSIS ENGINE - Understand the intent
-        # ═══════════════════════════════════════════════════════════════
-        if self.verbose:
-            print(f"    ┌──────────────────────────────────────────────────────────┐")
-            print(f"    │  ANALYSIS ENGINE: Understanding intent                   │")
-        
         safe_actions = self._extract_safe_actions(user_context)
         active_domains = self._extract_active_domains(user_context)
-        analysis = await self.analysis_engine.analyze(
+
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 4a: DETERMINISTIC GUARDIAN (pre-AE pass)
+        # ═══════════════════════════════════════════════════════════════
+        # Splits Guardian's deterministic stage out so BLOCK / ALLOW can
+        # render BEFORE paying the AE LLM cost.  UNDECIDED falls through
+        # to the AI path (AE + AIGuardian) exactly as before.
+        det_result = self.deterministic_guardian.decide(
             intent,
-            safe_actions=safe_actions,
-            terminal_command_signals=terminal_command_signals,
+            user_context,
             active_domains=active_domains,
+            execution_context=self._execution_context,
+            command_intel=command_intel,
         )
-        
-        if self.verbose:
-            print(f"    │  AI analyzing: {intent.action.value}...")
-            print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
-            print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
-            if analysis.hidden_behaviors:
-                print(f"    │  ⚠️  Hidden behaviors: {str(analysis.hidden_behaviors)[:33]:<33} │")
-            if analysis.semantic_domains:
-                domains_str = ", ".join(analysis.semantic_domains)
-                print(f"    │  Domains: {domains_str:<48} │")
-            if analysis.risk_factors:
-                overall = max(analysis.risk_factors.values(), key=lambda r: list(RiskLevel).index(r))
-                factors_str = ", ".join(f"{k}: {v.value}" for k, v in analysis.risk_factors.items())
-                print(f"    │  Risk factors: {factors_str[:44]:<44} │")
-            if analysis.scope_mismatch:
-                print(f"    │  ⚠️  Scope mismatch detected                              │")
-            print(f"    └──────────────────────────────────────────────────────────┘")
-        
-        # ═══════════════════════════════════════════════════════════════
-        # LAYER 4: GUARDIAN - Validate SECURITY (not business logic!)
-        # ═══════════════════════════════════════════════════════════════
         if self.verbose:
             print(f"    ┌──────────────────────────────────────────────────────────┐")
-            print(f"    │  GUARDIAN: Security validation                           │")
-            print(f"    │  (Checks authority, NOT business logic)                  │")
-        
-        validation = await self.guardian.validate(
-            intent, analysis, user_context, active_domains=active_domains,
-        )
+            print(f"    │  DETERMINISTIC GUARDIAN: pre-AE pass                     │")
+            print(f"    │  Decision: {det_result.decision.value:<46} │")
+            if det_result.matched_gate:
+                print(f"    │  Gate:     {det_result.matched_gate:<46} │")
+            print(f"    └──────────────────────────────────────────────────────────┘")
+
+        if det_result.decision is DeterministicDecision.BLOCK:
+            # ───── Deterministic BLOCK — skip AE + AIGuardian ─────
+            audit_entry = {
+                "action": intent.action.value,
+                "target": intent.target,
+                "data": intent.data,
+                "reason": intent.reason,
+                "decision": "BLOCK",
+                "message": det_result.reason,
+                "decision_path": "deterministic",
+                "matched_gate": det_result.matched_gate,
+                "executed": False,
+            }
+            self.audit_log.append(audit_entry)
+            if self.verbose:
+                print(f"")
+                print(f"    ╔══════════════════════════════════════════════════════════╗")
+                print(f"    ║  ⛔ ACTION BLOCKED (Deterministic)                        ║")
+                print(f"    ╠══════════════════════════════════════════════════════════╣")
+                print(f"    ║  {det_result.reason[:56]:<56} ║")
+                print(f"    ╚══════════════════════════════════════════════════════════╝")
+                print(f"")
+            return ExecutionResult(
+                success=False,
+                error=f"Blocked: {det_result.reason}",
+                data={
+                    "decision": "BLOCK",
+                    "reason": det_result.reason,
+                    "layer": "deterministic_guardian",
+                    "matched_gate": det_result.matched_gate,
+                },
+            )
+
+        # Captured here so the shared audit entry below can reference
+        # it without keeping a reference to det_result at call sites.
+        dg_matched_gate: str | None = None
+
+        if det_result.decision is DeterministicDecision.ALLOW:
+            # ───── Deterministic ALLOW — skip AE + AIGuardian ─────
+            # Build a minimal AnalysisReport mirroring the shape AE's
+            # own fast-path produces.  Audit + log formatting below
+            # assume `analysis` is a real report, so we give them one.
+            analysis = self._build_deterministic_report(intent, det_result)
+            validation = ValidationResult(
+                decision=Decision.ALLOW,
+                intent=intent,
+                analysis=analysis,
+                message=det_result.reason,
+                decision_path="deterministic",
+            )
+            dg_matched_gate = det_result.matched_gate
+            if self.verbose:
+                print(f"    │  ⚡ Deterministic ALLOW — AE + AIGuardian skipped        │")
+        else:
+            # ═══════════════════════════════════════════════════════════════
+            # LAYER 4b: ANALYSIS ENGINE (UNDECIDED path only)
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"    ┌──────────────────────────────────────────────────────────┐")
+                print(f"    │  ANALYSIS ENGINE: Understanding intent                   │")
+
+            analysis = await self.analysis_engine.analyze(
+                intent,
+                safe_actions=safe_actions,
+                terminal_command_signals=terminal_command_signals,
+                active_domains=active_domains,
+                execution_context=self._execution_context,
+                command_intel=command_intel,
+                file_intel=file_intel,
+            )
+
+            if self.verbose:
+                print(f"    │  AI analyzing: {intent.action.value}...")
+                print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
+                print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
+                if analysis.hidden_behaviors:
+                    print(f"    │  ⚠️  Hidden behaviors: {str(analysis.hidden_behaviors)[:33]:<33} │")
+                if analysis.semantic_domains:
+                    domains_str = ", ".join(analysis.semantic_domains)
+                    print(f"    │  Domains: {domains_str:<48} │")
+                if analysis.risk_factors:
+                    overall = max(analysis.risk_factors.values(), key=lambda r: list(RiskLevel).index(r))
+                    factors_str = ", ".join(f"{k}: {v.value}" for k, v in analysis.risk_factors.items())
+                    print(f"    │  Risk factors: {factors_str[:44]:<44} │")
+                if analysis.scope_mismatch:
+                    print(f"    │  ⚠️  Scope mismatch detected                              │")
+                print(f"    └──────────────────────────────────────────────────────────┘")
+
+            # ═══════════════════════════════════════════════════════════════
+            # LAYER 4c: AI GUARDIAN - Validate SECURITY (not business logic!)
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"    ┌──────────────────────────────────────────────────────────┐")
+                print(f"    │  GUARDIAN: Security validation                           │")
+                print(f"    │  (Checks authority, NOT business logic)                  │")
+
+            validation = await self.guardian.validate(
+                intent, analysis, user_context,
+                active_domains=active_domains,
+                execution_context=self._execution_context,
+                command_intel=command_intel,
+                file_intel=file_intel,
+            )
         
         # ═══════════════════════════════════════════════════════════════
         # DECISION: ALLOW / BLOCK
         # ═══════════════════════════════════════════════════════════════
         
-        is_fast_path = "fast-path" in (validation.message or "").lower()
+        # decision_path is authoritative; fall back to message substring
+        # only if a Guardian implementation predates the field (defensive
+        # — all first-party Guardians set it explicitly).
+        decision_path = getattr(validation, "decision_path", None)
+        if not decision_path:
+            decision_path = (
+                "fast_path"
+                if "fast-path" in (validation.message or "").lower()
+                else "ai_path"
+            )
+        is_fast_path = decision_path == "fast_path"
 
         # Build audit entry
         audit_entry = {
@@ -430,10 +750,25 @@ class IntentFrameRuntime:
             "reason": intent.reason,
             "decision": validation.decision.value,
             "message": validation.message,
-            "decision_path": "fast_path" if is_fast_path else "ai_path",
+            "decision_path": decision_path,
             "risk_level": str(analysis.risk_factors) if analysis.risk_factors else None,
             "confidence": analysis.confidence,
         }
+        if dg_matched_gate:
+            audit_entry["matched_gate"] = dg_matched_gate
+
+        # Prompt-lane audit — record which AE / Guardian prompt lane ran.
+        # `last_prompt_id` is populated by the engines when (and only
+        # when) an AI call was made; deterministic and fast-path
+        # outcomes leave it at None, so absent fields here correctly
+        # reflect "no AI prompt was used".  Audit-only — no change
+        # to AnalysisReport / ValidationResult surface.
+        ae_prompt_id = getattr(self.analysis_engine, "last_prompt_id", None)
+        if ae_prompt_id:
+            audit_entry["ae_prompt_id"] = ae_prompt_id
+        guardian_prompt_id = getattr(self.guardian, "last_prompt_id", None)
+        if guardian_prompt_id:
+            audit_entry["guardian_prompt_id"] = guardian_prompt_id
         
         if validation.decision == Decision.ALLOW:
             # ───────────────────────────────────────────────────────────
@@ -472,7 +807,21 @@ class IntentFrameRuntime:
                     if msg:
                         msg_short = msg[:52] + "…" if len(msg) > 52 else msg
                         print(f"    │  Shown:  {msg_short:<49} │")
+                if not result.success and result.error:
+                    hint = result.error.replace("\n", " ")
+                    hint = hint[:49] + "…" if len(hint) > 49 else hint
+                    print(f"    │  Reason: {hint:<49} │")
+                elif result.success and result.data:
+                    try:
+                        raw = json.dumps(result.data, default=str)
+                    except Exception:
+                        raw = str(result.data)
+                    info = raw.replace("\n", " ")
+                    info = info[:49] + "…" if len(info) > 49 else info
+                    print(f"    │  Result Info:   {info:<49} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
+
+            self._log_executor_result(intent, result)
             
             # Log the outcome
             audit_entry["executed"] = result.success

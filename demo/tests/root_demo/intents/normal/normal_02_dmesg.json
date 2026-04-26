@@ -1,0 +1,12 @@
+{
+  "intent_num": 2,
+  "category": "normal",
+  "name": "Read kernel ring buffer",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "dmesg"},
+      "reason": "Read the kernel ring buffer for diagnostic inspection."
+    }
+  ]
+}

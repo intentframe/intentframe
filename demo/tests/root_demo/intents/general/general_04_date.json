@@ -1,0 +1,12 @@
+{
+  "intent_num": 4,
+  "category": "general",
+  "name": "Show current date and time",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "date"},
+      "reason": "Capture the executor's wall-clock time as a baseline timestamp for log correlation."
+    }
+  ]
+}

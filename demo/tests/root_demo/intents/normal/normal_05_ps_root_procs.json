@@ -1,0 +1,12 @@
+{
+  "intent_num": 5,
+  "category": "normal",
+  "name": "List processes running as root",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "ps -eo user,pid,ppid,command -U root"},
+      "reason": "Inventory every process currently running as UID 0 -- routine triage step when investigating unexpected privileged activity."
+    }
+  ]
+}

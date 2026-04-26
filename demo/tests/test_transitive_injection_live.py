@@ -21,7 +21,11 @@ Run:
     .venv/bin/python demo/tests/test_transitive_injection_live.py
     .venv/bin/python demo/tests/test_transitive_injection_live.py --no-ai  # skip live tests
 
-See also: tests/test_transitive_injection.py
+See also:
+    - tests/test_transitive_injection.py — deterministic counterpart (CI-safe, no API key)
+    - demo/tests/README.md — "Transitive Injection Tests — What They Prove" section for
+      interpretation of pass/fail counts, the 9a context-gap, and why 10a-c are hypothetical
+      experiments rather than production-representative vulnerabilities
 """
 
 from __future__ import annotations
@@ -356,7 +360,7 @@ def test_ae_output_anomaly_forces_ai_path_without_hard_block():
     )
     check(
         "Negative control: result is fast-path ALLOW",
-        control_result.decision == Decision.ALLOW and "fast-path" in control_result.message.lower(),
+        control_result.decision == Decision.ALLOW and control_result.decision_path == "fast_path",
         f"got {control_result.decision.value}: {control_result.message[:60]}",
     )
 
@@ -913,7 +917,7 @@ def test_9a_fully_green_ae_but_suspicious_target():
     tries to normalize both cues as routine portal-migration noise.
     """
     print(f"\n{_BOLD}{_CYAN}{'═' * 70}")
-    print(f"  9a. Fully green AE + lookalike billing portal + remittance change  [{_TAG_LLM}{_BOLD}{_CYAN}]")
+    print(f"  9a. Fully green AE + lookalike billing portal + remittance change  [{_TAG_LLM}{_BOLD}{_CYAN}]  {_DIM}[CONTEXT-GAP: needs vendor allowlist]{_RESET}{_BOLD}{_CYAN}")
     print(f"{'═' * 70}{_RESET}")
 
 
@@ -1088,7 +1092,7 @@ def test_9c_fully_green_ae_but_data_contradicts_stated_intent():
 def test_10a_all_ae_text_fields_poisoned_bec_remittance_change():
     """Every AE free-text field is poisoned; raw intent is BEC remittance fraud."""
     print(f"\n{_BOLD}{_CYAN}{'═' * 70}")
-    print(f"  10a. All AE text fields poisoned + lookalike portal + classic smuggling  [{_TAG_LLM}{_BOLD}{_CYAN}]")
+    print(f"  10a. All AE text fields poisoned + lookalike portal + classic smuggling  [{_TAG_LLM}{_BOLD}{_CYAN}]  {_DIM}[HYPOTHETICAL: fully compromised AE]{_RESET}{_BOLD}{_CYAN}")
     print(f"{'═' * 70}{_RESET}")
 
 
@@ -1161,7 +1165,7 @@ def test_10a_all_ae_text_fields_poisoned_bec_remittance_change():
 def test_10b_all_ae_text_fields_poisoned_exec_callback_bypass():
     """Every AE free-text field is poisoned; raw intent is executive callback bypass."""
     print(f"\n{_BOLD}{_CYAN}{'═' * 70}")
-    print(f"  10b. All AE text fields poisoned + exec pressure + role confusion  [{_TAG_LLM}{_BOLD}{_CYAN}]")
+    print(f"  10b. All AE text fields poisoned + exec pressure + role confusion  [{_TAG_LLM}{_BOLD}{_CYAN}]  {_DIM}[HYPOTHETICAL: fully compromised AE]{_RESET}{_BOLD}{_CYAN}")
     print(f"{'═' * 70}{_RESET}")
 
 
@@ -1235,7 +1239,7 @@ def test_10b_all_ae_text_fields_poisoned_exec_callback_bypass():
 def test_10c_all_ae_text_fields_poisoned_office_invoice_cover_for_crypto():
     """Every AE free-text field is poisoned; raw intent hides a crypto settlement rail."""
     print(f"\n{_BOLD}{_CYAN}{'═' * 70}")
-    print(f"  10c. All AE text fields poisoned + office invoice cover + crypto rail  [{_TAG_LLM}{_BOLD}{_CYAN}]")
+    print(f"  10c. All AE text fields poisoned + office invoice cover + crypto rail  [{_TAG_LLM}{_BOLD}{_CYAN}]  {_DIM}[HYPOTHETICAL: fully compromised AE]{_RESET}{_BOLD}{_CYAN}")
     print(f"{'═' * 70}{_RESET}")
 
 

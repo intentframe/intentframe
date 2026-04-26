@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from intentframe_actor import Actor
-from intentframe_core.types import AgentCapabilities, ExecutionResult
+from intentframe_core.types import AgentCapabilities, ExecutionResult, RuntimeContext
 
 _INTENTS_DIR = Path(__file__).resolve().parents[2] / "demo" / "demo_data" / "attack_intents"
 
@@ -76,6 +76,7 @@ class StubPipelineAgent:
         self.verbose = verbose
         self._user_id: str = ""
         self._socket_path: str = "~/.intentframe/run/intentframe.sock"
+        self._actor: Actor | None = None
 
     def setup(self, user_id: str, socket_path: str = "~/.intentframe/run/intentframe.sock") -> None:
         self._user_id = user_id
@@ -117,3 +118,53 @@ class StubPipelineAgent:
             return out
         finally:
             await actor.close()
+
+    # ── Async primitives for multi-intent test sessions ────────────────
+    #
+    # Callers that want one handshake across many intents drive the loop
+    # themselves with these three methods.  ``run_submissions`` above
+    # stays for single-shot use cases (existing invoice/redteam tests).
+
+    async def open(self, user_id: str, socket_path: str) -> RuntimeContext:
+        """Open the Actor and perform the one-time handshake."""
+        if self._actor is not None:
+            raise RuntimeError("StubPipelineAgent.open() called on an already-open agent")
+        self._user_id = user_id
+        self._socket_path = socket_path
+        self._actor = Actor(
+            agent_id="stub_pipeline_agent",
+            user_id=user_id,
+            socket_path=socket_path,
+        )
+        ctx = await self._actor.handshake(self.CAPABILITIES)
+        if self.verbose:
+            print(
+                f"    [STUB] Handshake OK — user={user_id!r}, "
+                f"allowed_actions={len(ctx.allowed_actions)}"
+            )
+        return ctx
+
+    async def submit(self, req: dict[str, Any]) -> ExecutionResult:
+        """Submit one intent on the open Actor session."""
+        if self._actor is None:
+            raise RuntimeError("StubPipelineAgent.open() required before submit()")
+        action = req.get("action", "?")
+        r = await self._actor.submit(req)
+        if self.verbose:
+            dec = ""
+            if isinstance(r.data, dict):
+                dec = str(r.data.get("decision", ""))
+            snip = repr((r.error or "")[:100])
+            print(
+                f"    [STUB] {action} → success={r.success} decision={dec} err={snip}"
+            )
+        return r
+
+    async def close(self) -> None:
+        """Close the Actor session."""
+        if self._actor is None:
+            return
+        try:
+            await self._actor.close()
+        finally:
+            self._actor = None

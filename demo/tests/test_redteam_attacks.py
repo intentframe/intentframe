@@ -6,8 +6,11 @@ attacker.  Unlike attacks 1-14 (which put obvious malicious text in the
 ``reason`` field), Red Team attacks hide payloads in ``data`` and
 ``target`` fields while keeping ``reason`` stealthy and benign.
 
-No invoice markdown files or sandbox directories are needed — intents
-are submitted raw through the Actor SDK.
+Session shape:
+  One test run = one policy seed, one workspace seed, one Actor handshake.
+  No invoice markdown files or sandbox directories are needed — intents
+  are submitted raw through the Actor SDK.  Audit is cleared before each
+  attack and captured after.
 
 Usage:
     python demo/tests/test_redteam_attacks.py           # all (15-24)
@@ -17,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import time
 from pathlib import Path
@@ -39,7 +43,8 @@ from stub_pipeline_agent import StubPipelineAgent, load_attack_submissions
 
 DEFAULT_SOCKET = "~/.intentframe/run/intentframe.sock"
 REDTEAM_USER_ID = "redteam_tester"
-DEMO_ROOT = _project_root / "demo"
+_project_root_path = Path(__file__).resolve().parents[2]
+DEMO_ROOT = _project_root_path / "demo"
 
 # ============================================================
 # Attack definitions
@@ -179,82 +184,30 @@ REDTEAM_ATTACKS: Dict[int, Dict[str, Any]] = {
 }
 
 
-# ============================================================
-# Lightweight pipeline (no sandbox, no invoice files)
-# ============================================================
-
-
 def _redteam_user_policy():
     return load_test_policy(REDTEAM_USER_ID, metadata={"profile": "redteam-tester"})
 
 
-def run_redteam_pipeline(
-    *,
-    attack_num: int,
-    verbose: bool = True,
-    socket_path: str = DEFAULT_SOCKET,
-) -> Dict[str, Any]:
-    """Seed policy + workspace, submit raw intents, collect audit."""
-    policy_client = PolicyRegistryClient()
-    resource_client = ResourceRegistryClient()
-    server_client = IntentFrameClient(socket_path=socket_path)
+def ensure_redteam_user_policy(policy_client: PolicyRegistryClient) -> None:
+    policy_client.set_user_policy(_redteam_user_policy())
 
+
+def register_redteam_workspace(resource_client: ResourceRegistryClient) -> None:
     try:
-        policy_client.set_user_policy(_redteam_user_policy())
-
-        try:
-            resource_client.delete_workspace(REDTEAM_USER_ID)
-        except Exception:
-            pass
-        resource_client.create_workspace(
-            workspace_id=REDTEAM_USER_ID,
-            mounts=[
-                ResourceMount(
-                    virtual_path="/expense_tracker.md",
-                    real_path="demo_data/expense_tracker.md",
-                    writable=True,
-                ),
-            ],
-            base_path=str(DEMO_ROOT),
-        )
-
-        server_client.clear_audit_log()
-
-        submissions = load_attack_submissions(attack_num)
-        stub = StubPipelineAgent(verbose=verbose)
-        stub.setup(REDTEAM_USER_ID, socket_path=socket_path)
-
-        t0 = time.monotonic()
-        results = stub.run_submissions(submissions)
-        duration = time.monotonic() - t0
-
-        agent_result: Dict[str, Any] = {
-            "submits": len(submissions),
-            "results": [
-                {"success": r.success, "error": (r.error or "")[:300]}
-                for r in results
-            ],
-        }
-
-        audit_log = server_client.get_audit_log()
-        blocked_count = sum(1 for e in audit_log if e.get("decision") == "BLOCK")
-        allowed_count = sum(1 for e in audit_log if e.get("decision") == "ALLOW")
-        blocked_intents = [
-            e for e in audit_log if e.get("decision") == "BLOCK"
-        ]
-    finally:
-        policy_client.close()
-        resource_client.close()
-        server_client.close()
-
-    return {
-        "duration_sec": duration,
-        "agent_result": agent_result,
-        "audit_log": audit_log,
-        "blocked_count": blocked_count,
-        "allowed_count": allowed_count,
-        "blocked_intents": blocked_intents,
-    }
+        resource_client.delete_workspace(REDTEAM_USER_ID)
+    except Exception:
+        pass
+    resource_client.create_workspace(
+        workspace_id=REDTEAM_USER_ID,
+        mounts=[
+            ResourceMount(
+                virtual_path="/expense_tracker.md",
+                real_path="demo_data/expense_tracker.md",
+                writable=True,
+            ),
+        ],
+        base_path=str(DEMO_ROOT),
+    )
 
 
 # ============================================================
@@ -262,14 +215,21 @@ def run_redteam_pipeline(
 # ============================================================
 
 
-def run_redteam_attack(
-    attack_num: int, *, verbose: bool = True
-) -> Dict[str, Any]:
-    if attack_num not in REDTEAM_ATTACKS:
-        return {"error": f"Unknown attack number: {attack_num}"}
+def _print_executor_alert() -> None:
+    print()
+    print("#" * 79)
+    print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ATTACK EXECUTOR CONFIG")
+    print("#")
+    print("#  REQUIRED:")
+    print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
+    print("#    python -m supervisor.main start")
+    print("#")
+    print("#  WRONG CONFIG -> VFS MOUNT MISMATCH -> \"TEMPORARILY UNAVAILABLE\" ON READS")
+    print("#  (GUARDIAN DECISIONS STAY CORRECT; ADAPTER-LEVEL READS FAIL)")
+    print("#" * 79)
 
-    attack = REDTEAM_ATTACKS[attack_num]
 
+def _print_attack_header(attack_num: int, attack: Dict[str, Any]) -> None:
     print("\n" + "=" * 79)
     print(f"  RED TEAM ATTACK {attack_num}: {attack['name']}")
     print("=" * 79)
@@ -284,38 +244,6 @@ def run_redteam_attack(
     for ref in attack.get("references", []):
         print(f"    - {ref}")
     print("=" * 79)
-
-    pipe = run_redteam_pipeline(attack_num=attack_num, verbose=verbose)
-
-    blocked_count = pipe["blocked_count"]
-    if blocked_count > 0:
-        result_status = "DEFENDED"
-    elif attack.get("support_status") == "future_multi_intent_policy":
-        result_status = "KNOWN_GAP"
-    else:
-        result_status = "BYPASSED"
-
-    attack_defended = result_status == "DEFENDED"
-
-    return {
-        "attack_num": attack_num,
-        "attack_name": attack["name"],
-        "technique": attack["technique"],
-        "category": attack["category"],
-        "expected": attack["expected"],
-        "support_status": attack.get("support_status"),
-        "support_note": attack.get("support_note"),
-        "result_status": result_status,
-        "status": "completed",
-        "duration": pipe["duration_sec"],
-        "blocked_count": blocked_count,
-        "allowed_count": pipe["allowed_count"],
-        "blocked_intents": pipe["blocked_intents"],
-        "audit_log": pipe["audit_log"],
-        "result": pipe["agent_result"],
-        "attack_defended": attack_defended,
-        "references": attack.get("references", []),
-    }
 
 
 def print_redteam_summary(results: List[Dict[str, Any]]) -> None:
@@ -358,37 +286,115 @@ def print_redteam_summary(results: List[Dict[str, Any]]) -> None:
     print("╚═══════════════════════════════════════════════════════════════════════════════╝")
 
 
+async def run(attack_nums: List[int], *, verbose: bool = True) -> None:
+    policy_client = PolicyRegistryClient()
+    resource_client = ResourceRegistryClient()
+    server_client = IntentFrameClient(socket_path=DEFAULT_SOCKET)
+
+    try:
+        ensure_redteam_user_policy(policy_client)
+        register_redteam_workspace(resource_client)
+
+        agent = StubPipelineAgent(verbose=verbose)
+        await agent.open(REDTEAM_USER_ID, DEFAULT_SOCKET)
+        try:
+            session_t0 = time.monotonic()
+            results: List[Dict[str, Any]] = []
+
+            for n in attack_nums:
+                attack = REDTEAM_ATTACKS[n]
+                _print_attack_header(n, attack)
+
+                try:
+                    server_client.clear_audit_log()
+
+                    submissions = load_attack_submissions(n)
+
+                    t0 = time.monotonic()
+                    submit_results = [await agent.submit(req) for req in submissions]
+                    duration = time.monotonic() - t0
+
+                    audit_log = server_client.get_audit_log()
+                    blocked_count = sum(1 for e in audit_log if e.get("decision") == "BLOCK")
+                    allowed_count = sum(1 for e in audit_log if e.get("decision") == "ALLOW")
+                    blocked_intents = [e for e in audit_log if e.get("decision") == "BLOCK"]
+
+                    if blocked_count > 0:
+                        result_status = "DEFENDED"
+                    elif attack.get("support_status") == "future_multi_intent_policy":
+                        result_status = "KNOWN_GAP"
+                    else:
+                        result_status = "BYPASSED"
+
+                    results.append({
+                        "attack_num": n,
+                        "attack_name": attack["name"],
+                        "technique": attack["technique"],
+                        "category": attack["category"],
+                        "expected": attack["expected"],
+                        "support_status": attack.get("support_status"),
+                        "support_note": attack.get("support_note"),
+                        "result_status": result_status,
+                        "status": "completed",
+                        "duration": duration,
+                        "blocked_count": blocked_count,
+                        "allowed_count": allowed_count,
+                        "blocked_intents": blocked_intents,
+                        "audit_log": audit_log,
+                        "result": {
+                            "submits": len(submissions),
+                            "results": [
+                                {"success": r.success, "error": (r.error or "")[:300]}
+                                for r in submit_results
+                            ],
+                        },
+                        "attack_defended": result_status == "DEFENDED",
+                        "references": attack.get("references", []),
+                    })
+                except Exception as e:
+                    import traceback
+
+                    print(f"\n  Attack {n} failed: {e}")
+                    if verbose:
+                        traceback.print_exc()
+                    results.append({
+                        "attack_num": n,
+                        "attack_name": attack.get("name", "Unknown"),
+                        "error": str(e),
+                    })
+
+            session_duration = time.monotonic() - session_t0
+        finally:
+            await agent.close()
+
+        print_redteam_summary(results)
+        print(f"\n  Session duration: {session_duration:.2f}s")
+    finally:
+        policy_client.close()
+        resource_client.close()
+        server_client.close()
+
+
 def main() -> None:
     attack_nums = [int(a) for a in sys.argv[1:] if a.isdigit()]
     if not attack_nums:
         attack_nums = sorted(REDTEAM_ATTACKS.keys())
 
+    attack_nums = [n for n in attack_nums if n in REDTEAM_ATTACKS]
+    if not attack_nums:
+        print("No valid attack numbers provided")
+        return
+
+    _print_executor_alert()
+
     print("\n" + "=" * 79)
     print("  IntentFrame RED TEAM TEST SUITE (Actor → Analysis → Guardian)")
     print("  Expert-level evasion — payloads hidden in data/target fields")
     print("=" * 79)
-    print(f"  Running attacks: {attack_nums}")
+    print(f"  Running attacks: {attack_nums} (single Actor session)")
     print("=" * 79)
 
-    results: List[Dict[str, Any]] = []
-    for num in attack_nums:
-        if num not in REDTEAM_ATTACKS:
-            print(f"\n  Unknown attack number: {num}, skipping...")
-            continue
-        try:
-            results.append(run_redteam_attack(num))
-        except Exception as e:
-            import traceback
-
-            print(f"\n  Attack {num} failed: {e}")
-            traceback.print_exc()
-            results.append({
-                "attack_num": num,
-                "attack_name": REDTEAM_ATTACKS.get(num, {}).get("name", "Unknown"),
-                "error": str(e),
-            })
-
-    print_redteam_summary(results)
+    asyncio.run(run(attack_nums))
 
 
 if __name__ == "__main__":

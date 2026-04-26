@@ -1,0 +1,12 @@
+{
+  "intent_num": 6,
+  "category": "general",
+  "name": "Show system uptime",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "uptime"},
+      "reason": "Report how long the system has been running and current load averages for a routine system health check."
+    }
+  ]
+}

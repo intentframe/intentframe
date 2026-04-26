@@ -6,7 +6,13 @@ Semantic AI - SECRET, Cloud Only
 
 from abc import ABC, abstractmethod
 
-from intentframe_core.types import IntentFrame, AnalysisReport
+from intentframe_core.types import (
+    AnalysisReport,
+    CommandIntel,
+    ExecutionContext,
+    FileIntel,
+    IntentFrame,
+)
 
 
 class AnalysisEngine(ABC):
@@ -38,6 +44,9 @@ class AnalysisEngine(ABC):
         safe_actions: set[str] | None = None,
         terminal_command_signals: tuple = (),
         active_domains: set[str] | None = None,
+        execution_context: ExecutionContext | None = None,
+        command_intel: CommandIntel | None = None,
+        file_intel: FileIntel | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do.
@@ -69,5 +78,23 @@ class AnalysisEngine(ABC):
                 as trusted context so the AE knows which domains to
                 check for.  Does not reveal policy details — only
                 the domain vocabulary the system cares about.
+            execution_context: Immutable server-side facts about the
+                executor (privilege level, uid/euid).  Probed once at
+                startup.  Allows risk assessment to account for
+                whether commands will actually execute as root.
+            command_intel: Bounded summary of command_shield facts
+                (verdict, capability tags, code-intel findings).
+                Populated only for RUN_COMMAND intents; ``None`` for
+                every other action.  Additive context — Phase 1 wiring
+                forwards it but existing implementations need not
+                consume it yet.
+            file_intel: Bounded summary of ``inspect_code`` facts for
+                the WRITE_FILE payload (language, binary/oversized
+                flags, code-intel findings).  Populated only for
+                WRITE_FILE intents; ``None`` for every other action.
+                Consumed by the prompt strategy to route WRITE_FILE to
+                the ``critical_write_file`` AE lane when the payload is
+                code-like and by the critical prompt body to ground
+                reasoning in deterministic payload facts.
         """
         pass

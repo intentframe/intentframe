@@ -84,6 +84,34 @@ adapters:
     # - lambda_invoke
     # - cloud_storage
 
+# ─── HOST_FILE allowlists (required) ─────────────────────────────────────────
+# Real-path allowlist for host-file tools. Required in every executor YAML.
+# Use plain roots like ``~/`` or ``~/Documents``.
+# Do not use globs here. ``~/Documents`` already covers files under it.
+# ``~/Documents/`` works the same as ``~/Documents``.
+# Empty lists + no ``host_files`` adapter means "no host-file access".
+host_files:
+  allowed_read_paths: []
+  allowed_write_paths: []
+
+# ─── RUN_COMMAND Sandboxing ─────────────────────────────────────────────────
+# Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
+# Write scope is controlled by allowed_write_paths below (independent of VFS).
+# All commands run under the highest-privilege template in allowed_templates.
+# If the sandbox engine is unavailable, every RUN_COMMAND is rejected (fail-closed).
+sandbox:
+  enabled: true
+  working_directory: ~/
+  allowed_write_paths:
+    - ~/
+  allowed_templates:
+    - pure_compute
+    - file_read_only
+    - file_read_write
+    # - network_outbound    # uncomment to allow outbound network in sandboxed commands
+    # - network_full        # uncomment to allow port binding
+    # - unrestricted        # NOT recommended — bypasses most sandbox restrictions
+
 # ─── Storage: Database and log paths ────────────────────────────────────────
 # null = platform default (macOS: ~/Library/Application Support/IntentFrame/)
 storage:

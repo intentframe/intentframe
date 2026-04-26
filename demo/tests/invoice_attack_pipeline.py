@@ -1,13 +1,11 @@
 """
-Shared setup for attack tests against the live supervisor stack.
+Shared setup helpers for invoice-based attack tests.
 
-Flow:
-  1. PolicyRegistryClient + ResourceRegistryClient seed server-side state.
-  2. demo/demo_data/attack_invoices_sandbox/ is populated with the current
-     attack's *.md so the executor VFS matches the registry.
-  3. ``StubPipelineAgent`` does one Actor handshake then scripted
-     ``submit()`` calls.  Each intent still goes through the full
-     Analysis + Guardian pipeline on the server.
+Tests import these helpers and drive the Actor session themselves — seed
+policy + workspace once, open the stub agent once, then loop through attacks
+resetting only per-attack state (tracker, sandbox, audit) between runs.  The
+single-session pattern means onboarding fires exactly once per test run
+regardless of how many attacks are exercised.
 
 Prerequisites:
   - Repo root as current working directory when starting supervisor.
@@ -19,7 +17,6 @@ Prerequisites:
 from __future__ import annotations
 
 import shutil
-import time
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +27,6 @@ from resource_registry.models import ResourceMount
 from intentframe_server.client import IntentFrameClient
 
 from policy_loader import load_test_policy
-from stub_pipeline_agent import StubPipelineAgent, load_attack_submissions
 
 DEFAULT_INTENTFRAME_SOCKET = "~/.intentframe/run/intentframe.sock"
 
@@ -90,7 +86,12 @@ def register_attack_workspace(resource_client: ResourceRegistryClient) -> None:
     )
 
 
-def _finalize_audit(server_client: IntentFrameClient) -> dict[str, Any]:
+def snapshot_audit(server_client: IntentFrameClient) -> dict[str, Any]:
+    """Pull the current audit log and bucket it by decision type.
+
+    ``blocked_append_rows`` is invoice-specific — used by test summaries to
+    surface "Blocked: <vendor> (<amount>)" rows.
+    """
     audit_log = server_client.get_audit_log()
     blocked_count = sum(1 for e in audit_log if e.get("decision") == "BLOCK")
     allowed_count = sum(1 for e in audit_log if e.get("decision") == "ALLOW")
@@ -105,54 +106,3 @@ def _finalize_audit(server_client: IntentFrameClient) -> dict[str, Any]:
         "allowed_count": allowed_count,
         "blocked_append_rows": blocked_append_rows,
     }
-
-
-def run_attack_pipeline(
-    *,
-    attack_num: int,
-    attack_folder: str,
-    verbose: bool = True,
-    socket_path: str = DEFAULT_INTENTFRAME_SOCKET,
-) -> dict[str, Any]:
-    """
-    Reset tracker, sandbox, registries, clear audit; run stub agent.
-
-    ``attack_num`` selects the scripted submit sequence.
-    """
-    reset_expense_tracker()
-    populate_attack_sandbox(attack_folder)
-
-    policy_client = PolicyRegistryClient()
-    resource_client = ResourceRegistryClient()
-    server_client = IntentFrameClient(socket_path=socket_path)
-
-    try:
-        ensure_attack_user_policy(policy_client)
-        register_attack_workspace(resource_client)
-        server_client.clear_audit_log()
-
-        submissions = load_attack_submissions(attack_num)
-        stub = StubPipelineAgent(verbose=verbose)
-        stub.setup(ATTACK_USER_ID, socket_path=socket_path)
-
-        t0 = time.monotonic()
-        results = stub.run_submissions(submissions)
-        duration = time.monotonic() - t0
-
-        agent_result: dict[str, Any] = {
-            "submits": len(submissions),
-            "results": [
-                {"success": r.success, "error": (r.error or "")[:300]}
-                for r in results
-            ],
-        }
-
-        out = _finalize_audit(server_client)
-    finally:
-        policy_client.close()
-        resource_client.close()
-        server_client.close()
-
-    out["duration_sec"] = duration
-    out["agent_result"] = agent_result
-    return out

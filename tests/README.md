@@ -9,32 +9,44 @@ None of these tests call OpenAI. They are fast, free, and fully deterministic.
 
 ## Test Files
 
-### `test_command_shield.py` — Standalone Command Classification Engine
+### `command_shield/tests/` — Standalone Command Classification Engine
 
-Tests the `command_shield` module **in isolation** — no pipeline, no mocks, no runtime.
-Pure pattern matching, normalization, AST decomposition, and signal detection.
+Module-local tests for the `command_shield` package — no pipeline, no mocks, no runtime.
+Covers patterns, normalization, AST decomposition, language sniffing, edge extraction,
+file resolution, code inspection, and full `inspect_command` pipeline integration.
 
-| Test Class | What It Covers |
+These tests are not limited to toy strings.  They include realistic command families such as:
+
+- destructive shell commands (`sudo rm -rf /`, `mkfs`, `dd`, `wipefs`),
+- macOS admin / persistence commands (`diskutil`, `security`, `launchctl`, `tmutil`, `csrutil`),
+- exfiltration and download-and-exec patterns (`curl ... | bash`, reverse shells, credential reads),
+- git footguns (`git reset --hard`, `git clean -fd`, force-push),
+- benign day-to-day commands (`git status`, `git diff`, `npm install`, `pip install`).
+
+Path-bearing behavior is also covered: relative paths, absolute paths, home-directory paths,
+literal referenced scripts, `source .env`, allow-roots enforcement, symlink handling, and
+dynamic path forms like `$SCRIPT`, `$(gen)`, and globs.  What the tests do **not** try to prove
+is broad codebase understanding; they validate command inspection and focused code/script analysis.
+
+| File | What It Covers |
 |---|---|
-| `TestCatastrophicPatterns` | Core destroyers: `sudo`, `rm -rf /`, fork bomb, `chmod 777`, `dd`, `mkfs`, `shutdown`, device writes |
-| `TestMacOSPatterns` | macOS-specific: `diskutil` (erase/partition/wipe), keychain access, `tmutil`, `dscl`, `csrutil`, `nvram`, TCC database |
-| `TestPersistencePatterns` | Attacker persistence: `launchctl load/unload`, `cp`/`mv` to LaunchDaemons/LaunchAgents |
-| `TestExfiltrationPatterns` | Remote code execution: `curl\|bash`, `wget\|sh`, `base64\|sh`, reverse shells (`/dev/tcp`), `ssh` remote rm |
-| `TestCredentialAccessPatterns` | Credential theft: reads of `~/.ssh/id_rsa`, `~/.aws/credentials`, `.env`, `~/.kube/config`, and exfil via `curl`/`scp` |
-| `TestGitPatterns` | Destructive git: `reset --hard`, `clean -fd`, `push --force`, `push -f`, `stash clear` |
-| `TestShellWrapperPatterns` | Wrapped destruction: `bash -c 'rm ...'`, `find -exec rm`, `xargs rm`, `find / -delete` |
-| `TestNormalization` | Deobfuscation: strips empty quotes (`su""do` → `sudo`), mixed quotes, preserves safe commands |
-| `TestStructuralDecomposition` | Chained commands: `&&`, `;`, pipes — catches `sudo` hidden after safe prefix |
-| `TestEvasionSignals` | NEEDS_REVIEW triggers: `$(...)`, backticks, `${VAR}` — flagged for AI review |
-| `TestInterpreterIndirection` | Hidden execution via interpreters: `python3 -c`, `bash -c`, `osascript`, `perl -e`, `node --eval` |
-| `TestQuickCheck` | Executor's fast-path subset: catches catastrophic, passes safe, catches obfuscated |
-| `TestSafeCommands` | False-positive checks: `echo`, `ls`, `pwd`, `git status`, `npm install`, `rm` in safe dirs |
-| `TestParseFailure` | Edge cases: malformed commands, empty string, whitespace-only |
-| `TestAdversarialBypasses` | Evasion attacks: empty-quote sudo, `$(echo sudo)`, base64 pipe, `curl\|bash` |
-| `TestCleanEnv` | Environment sanitization: PATH included, secrets (`AWS_SECRET_ACCESS_KEY`, `OPENAI_API_KEY`) stripped |
-| `TestPatternDataIntegrity` | Data integrity: 50+ compiled patterns, 5 JSON files loaded, every pattern has required fields |
+| `test_patterns.py` | Catastrophic, macOS, persistence, exfiltration, credential, git, shell wrapper patterns; safe commands; pattern data integrity; direct `match_patterns` calls |
+| `test_structural.py` | `normalize`, `decompose`, parse failure robustness |
+| `test_quick_check.py` | `quick_check()`: catastrophic block, safe pass, obfuscated catch |
+| `test_env.py` | `clean_env()`: PATH included, secrets (`AWS_SECRET_ACCESS_KEY`, `OPENAI_API_KEY`) stripped |
+| `test_edges.py` | `extract_edges()`: inline, referenced, dynamic, interactive, piped_stdin edge kinds; depth; nesting; robustness |
+| `test_resolve.py` | `resolve_script()`: file reading, `ResolveSession` interactions, symlinks, unsafe paths, allow-roots, truncation |
+| `test_language_sniff.py` | `language_from_extension`, `language_from_shebang`, `language_from_content`, `sniff_language`, `detect_binary` |
+| `test_code_inspector.py` | `inspect_code()`: language detection, signals (unsupported, oversize, binary), Python/shell findings |
+| `test_pipeline.py` | End-to-end `inspect_command()`: edge/resolved signals, capabilities (`capability:stdin_exec`), verdict stability, dataclass immutability |
 
-**Total:** 17 test classes, ~70 test cases (including parametrized expansions).
+**Total:** 9 test files, 246 test cases.
+
+Run them with:
+
+```bash
+uv run pytest command_shield/tests/ -v
+```
 
 ---
 
@@ -119,14 +131,31 @@ out of scope for this test suite:
 - **Actor SDK** (client-side, not a security boundary)
 - **Onboarding Engine** (handshake guardrail generation)
 
+For manual onboarding experiments, use the standalone script:
+
+```bash
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode vfs
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode host
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode none
+.venv/bin/python tests/test_onboarding_jarvis_policy.py --fs-mode both
+```
+
+That harness does **not** start the full gateway/runtime stack. It builds
+Jarvis capabilities plus the gateway bootstrap policy in-process and
+runs only `AIOnboardingEngine.onboard()`. See
+[`docs/vfs-vs-host-tools.md`](../docs/vfs-vs-host-tools.md) for why the
+filesystem family split matters when reading those outputs.
+
 ## Running
 
 ```bash
-# All tests
+# All workspace-level tests
 uv run pytest tests/ -v
 
-# Individual files
-uv run pytest tests/test_command_shield.py -v
+# command_shield module tests (standalone, no runtime)
+uv run pytest command_shield/tests/ -v
+
+# Runtime integration tests
 uv run pytest tests/test_pipeline_shield.py -v
 uv run pytest tests/test_terminal_blocklist.py -v
 ```

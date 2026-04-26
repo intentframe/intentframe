@@ -61,6 +61,12 @@ On first launch, the gateway CLI starts the gateway stack. If the OpenAI API key
 has not been stored yet, the system enters setup mode and tells you exactly how
 to add it to the credential vault. After that, restart the CLI and continue.
 
+For the demo-only root command-execution profile on macOS, see
+[`docs/executor-root-mode.md`](docs/executor-root-mode.md). That flow uses
+`intentframe-gateway-cli --profile root` plus a one-time
+`intentframe_setup_root_demo.sh` installer; it is intentionally separate from
+normal setup and is not the default operating mode.
+
 ### Re-running Setup
 
 `intentframe_setup.sh` is safe to rerun after dependency changes or after
@@ -115,11 +121,19 @@ AI Agent: "I want to do X"
 
 ## Jarvis Policies
 
-Jarvis (the local personal-assistant stack) ships with a default set of allowed and blocked actions, path constraints, and intent limits. These defaults are seeded at gateway startup from hardcoded values in `intentframe_gateway/bootstrap.py` and `jarvis_pa/seed_policies.py`.
+Jarvis (the local personal-assistant stack) ships with a default set of allowed and blocked actions, path constraints, and intent limits. The runtime default is seeded at gateway startup from hardcoded values in `intentframe_gateway/bootstrap.py`. `jarvis_pa/seed_policies.py` is kept as a manual mirror of the same defaults for dev workflows — profile-aware (`INTENTFRAME_PROFILE=user|root`) and idempotent, so reruns are safe and the root-profile shape is seeded identically to bootstrap.
 
 There is currently no file-based or CLI-based way to customise policies without editing those source files directly and re-running bootstrap. The gateway exposes a read-only `/policies` endpoint; writes are not routed through it.
 
 A full policy-editing surface — via a web app, the CLI, or a macOS app — is planned for a future release.
+
+IntentFrame also supports two filesystem tool families: workspace/VFS
+tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools
+(`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce
+either family, but real product profiles should usually expose only one
+family to a given LLM tool list. See
+[`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design
+guidance, tradeoffs, and test harness modes.
 
 ---
 

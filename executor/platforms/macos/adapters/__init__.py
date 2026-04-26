@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 _ADAPTER_SPECS: list[tuple[str, str, str]] = [
     # Core adapters (stdlib / POSIX)
     ("files", "executor.platforms.macos.adapters.files", "FilesAdapter"),
+    ("host_files", "executor.platforms.macos.adapters.host_files", "HostFilesAdapter"),
     ("terminal", "executor.platforms.macos.adapters.terminal", "TerminalAdapter"),
     ("http_api", "executor.platforms.macos.adapters.http_api", "HttpApiAdapter"),
     ("user_io", "executor.platforms.macos.adapters.user_io", "UserIOAdapter"),

@@ -275,6 +275,27 @@ class VirtualFileSystem(ABC):
         ...
 
     @abstractmethod
+    def delete_file(self, virtual_path: str) -> bool:
+        """Delete a file under a writable mount.
+
+        Unlinks the real path the *virtual_path* resolves to.  Implementations
+        must apply the same deny-write floor as :meth:`write_file` so agents
+        cannot remove files under protected locations (launchd plists, ssh
+        configs, shell rc, etc.).
+
+        Args:
+            virtual_path: Virtual file path to delete.
+
+        Returns:
+            ``True`` if the file was deleted or did not exist (idempotent).
+
+        Raises:
+            VirtualFileSystemError: Mount is read-only, the destination is
+                under the deny-write floor, or the unlink itself failed.
+        """
+        ...
+
+    @abstractmethod
     def file_exists(self, virtual_path: str) -> bool:
         """Check if a virtual path points to an existing file."""
         ...

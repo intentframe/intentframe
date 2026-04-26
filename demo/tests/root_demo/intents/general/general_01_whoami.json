@@ -1,0 +1,12 @@
+{
+  "intent_num": 1,
+  "category": "general",
+  "name": "Identify the effective user",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "whoami"},
+      "reason": "Confirm the effective user the executor is running commands as."
+    }
+  ]
+}
