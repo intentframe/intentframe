@@ -134,6 +134,19 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - HIGH RISK - always flag as warning
 - Specify allowed command patterns from constraints
 - Require confirmation for destructive operations
+- `deny_capabilities` (when present in the constraints brief) lists the FULL
+  capability deny set. Treat it as constraint data, not as text to copy into
+  the agent's guardrails. Your job is NOT to mirror the deny set back as a
+  list of "do not run X" guardrails: that bloats the system prompt and fights
+  LLM training on canonical one-liners (awk, perl -e, node -e) without adding
+  useful steering.
+- Instead, when you see a language-surface clamp (recognisable by
+  script_execution + compilation + package_install denies — i.e. shell + Python
+  only), emit ONE positive-steering guardrail that points the agent at the
+  canonical path. Example: "Use `python3 -c '...'` for text manipulation
+  beyond standard unix tools (grep/sed/cut/sort/find); stay within shell +
+  Python." That single bullet replaces what would otherwise be 5+ defensive
+  enumeration bullets.
 
 ### Data Modification (WRITE_FILE, DELETE_FILE, WRITE_HOST_FILE, DELETE_HOST_FILE)
 - Flag as irreversible operations
@@ -159,81 +172,61 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 
     @staticmethod
     def _summarize_deny_capabilities(deny_caps) -> str:
-        """Conceptual summary of ``deny_capabilities`` for guardrail prose.
+        """Render `deny_capabilities` as a structured, lossless brief.
 
-        The onboarding LLM consumes this string to author guardrails — so
-        the goal is to make the agent's *intent layer* aware of what will
-        be blocked at Gate 2 (DG), not to dump literal capability tags.
-        Enumerating denied interpreter / ecosystem names IS appropriate
-        here (unlike file paths or email recipients) because:
+        Design: feed the meta-LLM the FULL deny set (no summarisation,
+        no information loss) and let `_build_instructions` carry the
+        rendering hint (one positive-steering guardrail, not deny
+        enumeration). This keeps two concerns cleanly separated:
 
-        - the deny-set is public policy, not sensitive configuration,
-        - the agent benefits from knowing which interpreters to avoid
-          *before* attempting them (saves tokens, improves UX), and
-        - a short list of denied languages is far more legible than a
-          frozenset of capability strings.
+          - Input to the meta-LLM: lossless structured policy data, so
+            its reasoning about guardrail shape is grounded in the real
+            deny set rather than this layer's interpretation of it.
+            Critical for audit, for robustness to policy changes (no
+            shadow summary drifts as new families/tags are added), and
+            for letting the LLM judge edge cases (compilation-only vs
+            full python+shell clamp vs a partial mix) on its own.
 
-        Special-cased shape: when the deny-set covers ``script_execution``
-        AND ``compilation`` AND ``package_install``, we recognise it as
-        the python+shell-only clamp and emit the high-level statement
-        first so the LLM internalises the headline before details.
+          - Output (the guardrail bullets the meta-LLM authors): minimal
+            positive steering, enforced via the meta-prompt in
+            `_build_instructions`. The LLM-facing layer's job is only
+            to steer the agent toward the canonical path, not to repeat
+            the deny list as guardrail prose.
+
+        Tags are grouped by capability family for legibility — every
+        tag is preserved verbatim under its family bucket.
         """
+        if not deny_caps:
+            return f"{len(deny_caps)} capability families denied"
+
         SCRIPT_PREFIX = "capability:script_execution:"
         STDIN_PREFIX = "capability:stdin_exec:"
         PKG_PREFIX = "capability:package_install:"
-        denied_script_langs = sorted(
-            tag[len(SCRIPT_PREFIX):] for tag in deny_caps
-            if tag.startswith(SCRIPT_PREFIX)
-        )
-        denied_stdin_langs = sorted(
-            tag[len(STDIN_PREFIX):] for tag in deny_caps
-            if tag.startswith(STDIN_PREFIX)
-        )
-        denied_pkg_managers = sorted(
-            tag[len(PKG_PREFIX):] for tag in deny_caps
-            if tag.startswith(PKG_PREFIX)
-        )
-        compilation_denied = "capability:compilation" in deny_caps
-        network_bind_denied = "capability:network_bind" in deny_caps
 
-        is_python_shell_clamp = (
-            denied_script_langs
-            and compilation_denied
-            and denied_pkg_managers
+        by_family: dict[str, list[str]] = {
+            "script_execution": [],
+            "stdin_exec": [],
+            "package_install": [],
+            "other": [],
+        }
+        for tag in sorted(deny_caps):
+            if tag.startswith(SCRIPT_PREFIX):
+                by_family["script_execution"].append(tag[len(SCRIPT_PREFIX):])
+            elif tag.startswith(STDIN_PREFIX):
+                by_family["stdin_exec"].append(tag[len(STDIN_PREFIX):])
+            elif tag.startswith(PKG_PREFIX):
+                by_family["package_install"].append(tag[len(PKG_PREFIX):])
+            else:
+                by_family["other"].append(tag.removeprefix("capability:"))
+
+        parts: list[str] = []
+        for family, items in by_family.items():
+            if items:
+                parts.append(f"{family}={{{', '.join(items)}}}")
+
+        return (
+            f"deny_capabilities: {'; '.join(parts)}"
         )
-        details: list[str] = []
-        if is_python_shell_clamp:
-            details.append(
-                "language clamp: RUN_COMMAND is restricted to a python + "
-                "shell surface; the agent must not attempt to invoke "
-                "other interpreters or build toolchains via run_command"
-            )
-        if denied_script_langs:
-            details.append(
-                f"non-python/shell interpreters denied: "
-                f"{', '.join(denied_script_langs)}"
-            )
-        if denied_stdin_langs:
-            details.append(
-                f"stdin-piped code execution denied for: "
-                f"{', '.join(denied_stdin_langs)} "
-                "(e.g. `cat foo.js | node`)"
-            )
-        if compilation_denied:
-            details.append(
-                "compilation / build toolchains denied (gcc, clang, make, "
-                "cargo build, go build, javac, …)"
-            )
-        if denied_pkg_managers:
-            details.append(
-                f"package installs denied for: "
-                f"{', '.join(denied_pkg_managers)}"
-            )
-        if network_bind_denied:
-            details.append("local network listeners denied")
-        if not details:
-            return f"{len(deny_caps)} capability families denied at guardian"
-        return "; ".join(details)
 
     @staticmethod
     def _summarize_constraints(action: str, constraints: ConstraintTypes) -> str:

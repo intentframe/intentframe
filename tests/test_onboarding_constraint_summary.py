@@ -6,22 +6,38 @@ deny set surfaces to the onboarding LLM.  Before this seam was wired,
 the LLM only saw `blocked_patterns` + `allowed_commands`; the language
 clamp was invisible, and the agent (e.g. Jarvis) generated guardrails
 that didn't reflect the python+shell-only restriction.  The downstream
-effect was: defense held at Gate 2 (DG denied), but the LLM kept
-attempting `node`/`ruby`/etc., wasting tokens and surfacing noisy
-"blocked" events instead of polite "outside policy" responses.
+effect was: runtime enforcement held, but the LLM kept attempting
+`node`/`ruby`/etc., wasting tokens and surfacing noisy "blocked" events
+instead of polite "outside policy" responses.
 
-These tests pin:
+The summarizer's contract has two halves, intentionally separated:
 
-  - `deny_capabilities` IS surfaced in the constraint summary string
-  - the summary recognises the python+shell-only shape and emits the
-    high-level statement first
-  - per-family details enumerate denied interpreters / package
-    managers (legible for the LLM without dumping raw capability
-    strings)
-  - empty deny set → no language-clamp text leaks into the summary
+  1. INPUT to the meta-LLM (this helper):  render the deny set
+     **losslessly** and **structured by family**.  The meta-LLM gets
+     full visibility into actual policy — no shadow prose summary that
+     can drift from the live deny set as policy evolves.
+
+  2. OUTPUT from the meta-LLM (the actual guardrail bullets it authors):
+     minimal positive steering, enforced via the meta-prompt in
+     `_build_instructions`.  The LLM-facing layer's job is to steer
+     toward the canonical path, not to repeat the deny list as guardrail
+     prose.
+
+These tests pin the INPUT half:
+
+  - the brief is **lossless**: every denied tag's suffix appears,
+  - the brief is **grouped by capability family** for legibility,
+  - the brief is plain constraint data and does **not** leak enforcement
+    architecture into the onboarding prompt,
+  - the brief is **stable under unknown future families** (no crash, no
+    silent drop),
   - `blocked_patterns` and `allowed_commands` continue to be summarised
-    alongside `deny_capabilities` (no regression of the existing
-    behaviour)
+    alongside `deny_capabilities` (no regression of existing behaviour).
+
+The OUTPUT half (the meta-LLM's guardrail authoring) is enforced by
+the meta-prompt in `_build_instructions`; it cannot be unit-tested here
+without invoking the real LLM, but the meta-prompt is reviewed by hand
+and documented in the engine module docstring.
 """
 
 from __future__ import annotations
@@ -51,78 +67,114 @@ PYTHON_SHELL_ONLY_DENY = frozenset({
 })
 
 
-class TestSummarizeDenyCapabilitiesShape:
-    def test_python_shell_clamp_emits_headline(self) -> None:
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
+class TestSummarizeDenyCapabilitiesIsLossless:
+    def test_every_deny_tag_suffix_appears_in_brief(self) -> None:
+        """No information loss: every denied tag's suffix appears in the
+        rendered brief.  Pre-summarising in this layer (e.g. "non-python
+        interpreters denied: …") creates a shadow representation that
+        drifts from the live deny set as families/tags evolve and drops
+        information the meta-LLM needs to judge guardrail shape.
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(
             PYTHON_SHELL_ONLY_DENY
         )
-        assert "language clamp" in summary
-        assert "python" in summary.lower() and "shell" in summary.lower()
-
-    def test_enumerates_denied_interpreters(self) -> None:
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
-            PYTHON_SHELL_ONLY_DENY
-        )
-        for lang in ("node", "ruby", "perl", "java", "go", "php"):
-            assert lang in summary, (
-                f"summary {summary!r} should enumerate interpreter {lang!r}"
+        for tag in PYTHON_SHELL_ONLY_DENY:
+            suffix = tag.split(":", 2)[-1]
+            assert suffix in brief, (
+                f"deny tag {tag!r} (suffix {suffix!r}) missing from brief — "
+                "summarising in this layer drops information the meta-LLM "
+                "needs"
             )
 
-    def test_enumerates_denied_package_managers(self) -> None:
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
+    def test_grouped_by_capability_family(self) -> None:
+        """Tags are grouped by family for legibility (script_execution,
+        stdin_exec, package_install, other).  Grouping is a structural
+        cue that lets the meta-LLM recognise the python+shell-only
+        clamp shape without us having to call it out in prose.
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(
             PYTHON_SHELL_ONLY_DENY
         )
-        for pkg in ("npm", "gem", "cargo", "composer"):
-            assert pkg in summary, (
-                f"summary {summary!r} should enumerate package manager {pkg!r}"
+        for family in ("script_execution", "stdin_exec", "package_install"):
+            assert family in brief, (
+                f"capability family {family!r} should be a labelled bucket "
+                "in the brief"
             )
 
-    def test_mentions_compilation(self) -> None:
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
+    def test_brief_does_not_leak_enforcement_architecture(self) -> None:
+        """The brief is constraint data for onboarding, not a primer on
+        internal enforcement architecture.  The actual *don't enumerate*
+        directive lives in `_build_instructions`.
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(
             PYTHON_SHELL_ONLY_DENY
         )
-        assert "compil" in summary.lower()
-
-    def test_mentions_stdin_pipe_shape(self) -> None:
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
-            PYTHON_SHELL_ONLY_DENY
-        )
-        assert "stdin" in summary.lower(), (
-            "stdin-piped exec is the user-surfaced gap class — the "
-            "summary must mention it so the LLM knows `cat foo.js | "
-            "node` is denied just as `node app.js` is"
-        )
+        lowered = brief.lower()
+        for internal in ("gate 2", "guardian", "deterministic"):
+            assert internal not in lowered
 
 
 class TestSummarizeDenyCapabilitiesEdgeCases:
     def test_empty_deny_set_returns_count_fallback(self) -> None:
-        # Defensive: caller filters this case out (empty deny → no
-        # call), but if it does get here the helper must not crash
-        # or invent language-clamp text.
-        summary = AIOnboardingEngine._summarize_deny_capabilities(frozenset())
-        assert "language clamp" not in summary
+        """Defensive: caller filters this case out (empty deny → no
+        call), but if it does get here the helper must not crash or
+        invent policy text.
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(frozenset())
+        assert "deny_capabilities" not in brief
+        assert "0" in brief or "no" in brief.lower()
 
-    def test_only_compilation_does_not_claim_language_clamp(self) -> None:
-        # If a profile only denies compilation but not script_execution
-        # or package_install, that is NOT the python+shell-only clamp
-        # and the headline must not be emitted.
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
+    def test_compilation_only_renders_under_other(self) -> None:
+        """`capability:compilation` is a binary tag (no suffix), so it
+        falls under the `other` bucket.  Lossless: the tag is preserved
+        verbatim.
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(
             frozenset({"capability:compilation"})
         )
-        assert "language clamp" not in summary
-        assert "compil" in summary.lower()
+        assert "compilation" in brief
+        assert "other" in brief
 
-    def test_unknown_capability_family_does_not_break(self) -> None:
-        summary = AIOnboardingEngine._summarize_deny_capabilities(
+    def test_unknown_capability_family_renders_under_other(self) -> None:
+        """A future deny tag from a family this helper doesn't know
+        about (e.g. `capability:future_family:special`) MUST still
+        appear in the brief.  This is the robustness-to-policy-changes
+        property: this helper does not need a code change every time
+        a new capability family is added; the meta-LLM can reason
+        about novel families given the raw tag.
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(
             frozenset({"capability:future_family:special"})
         )
-        # Unknown families fall through to the count fallback rather
-        # than crashing with a KeyError.
-        assert "denied" in summary.lower() or "configured" in summary.lower()
+        assert "future_family:special" in brief, (
+            "unknown future capability families must still surface "
+            "verbatim — pre-summarising drops them and creates a "
+            "shadow drift hazard"
+        )
+
+    def test_stdin_exec_tags_grouped_separately_from_script_execution(self) -> None:
+        """`stdin_exec:<lang>` and `script_execution:<lang>` are
+        distinct family buckets.  The meta-LLM can use the
+        co-occurrence as a structural cue (per-interpreter pipe-deny
+        AND per-interpreter file-deny → full clamp).
+        """
+        brief = AIOnboardingEngine._summarize_deny_capabilities(
+            frozenset({
+                "capability:script_execution:node",
+                "capability:stdin_exec:node",
+            })
+        )
+        assert "script_execution=" in brief
+        assert "stdin_exec=" in brief
 
 
 class TestSummarizeConstraintsIntegration:
-    def test_terminal_constraints_summary_includes_deny_capabilities(self) -> None:
+    def test_terminal_constraints_summary_includes_full_deny_set(self) -> None:
+        """End-to-end: the terminal constraints summary includes the
+        lossless deny brief alongside `blocked_patterns`.  Concrete
+        denied items (node, npm, compilation) are visible to the
+        meta-LLM in the constraints brief.
+        """
         constraints = TerminalConstraints(
             blocked_patterns=("sudo", "rm -rf /"),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
@@ -131,11 +183,14 @@ class TestSummarizeConstraintsIntegration:
             "RUN_COMMAND", constraints
         )
         assert "blocked patterns" in summary
-        assert "language clamp" in summary
+        assert "node" in summary
+        assert "npm" in summary
+        assert "compilation" in summary
 
     def test_terminal_constraints_with_only_blocked_patterns(self) -> None:
-        # No deny_capabilities → no language-clamp leak; existing
-        # behaviour preserved.
+        """No deny_capabilities → no deny brief leak; existing
+        behaviour preserved.
+        """
         constraints = TerminalConstraints(
             blocked_patterns=("sudo",),
         )
@@ -143,8 +198,9 @@ class TestSummarizeConstraintsIntegration:
             "RUN_COMMAND", constraints
         )
         assert "blocked patterns" in summary
-        assert "language clamp" not in summary
-        assert "deny" not in summary.lower()
+        assert "deny_capabilities" not in summary
+        assert "Gate 2" not in summary
+        assert "guardian" not in summary.lower()
 
     def test_terminal_constraints_with_only_deny_capabilities(self) -> None:
         constraints = TerminalConstraints(
@@ -153,7 +209,8 @@ class TestSummarizeConstraintsIntegration:
         summary = AIOnboardingEngine._summarize_constraints(
             "RUN_COMMAND", constraints
         )
-        assert "language clamp" in summary
+        assert "deny_capabilities" in summary
+        assert "node" in summary
         assert "blocked patterns" not in summary
 
     def test_terminal_constraints_with_allowed_and_deny(self) -> None:
@@ -165,7 +222,7 @@ class TestSummarizeConstraintsIntegration:
             "RUN_COMMAND", constraints
         )
         assert "allowed commands" in summary
-        assert "language clamp" in summary
+        assert "deny_capabilities" in summary
 
     def test_empty_terminal_constraints_returns_generic_string(self) -> None:
         constraints = TerminalConstraints()
