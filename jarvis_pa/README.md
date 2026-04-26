@@ -91,6 +91,19 @@ virtual-filesystem family for agents that need path isolation; a
 background on when each fits lives in
 [`../docs/vfs-vs-host-tools.md`](../docs/vfs-vs-host-tools.md).
 
+**Terminal commands** — Jarvis's default gateway policy keeps command and
+script work on bash/shell commands, POSIX utilities, and Python. POSIX tools
+such as `grep`, `sed`, `awk`, `cut`, `sort`, `find`, `tr`, `head`, `tail`,
+and `wc` are part of the supported shell surface. Other language runtimes
+such as Node, Ruby, Perl, PHP, Java, Go, Lua, R, Julia, Swift, and Deno/Bun
+are outside that surface and are denied by command capability policy before
+execution.
+
+`run_command` tool results keep the historic `content` field for stdout and
+also include `stderr` on success or failure. This lets Jarvis explain cases
+where a shell pipeline exits successfully but an earlier stage wrote an error
+to stderr, without changing the output field the model already reads.
+
 **Web search** — handled by OpenAI's hosted `WebSearchTool` (Responses API),
 not an IntentFrame actor action. This means web searches bypass the
 guardian pipeline and don't appear in the intent audit trail. Fetching

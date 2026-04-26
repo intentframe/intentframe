@@ -95,6 +95,7 @@ covered in `tests/test_terminal_blocklist.py`.
 | `developer` | Typical dev loop — pip/npm/git allowed, no listeners | `deny_capabilities = {network_bind, network_bind:*}` |
 | `data_analyst` | Notebook user — no installs, no listeners | `deny_capabilities = {package_install, package_install:*, network_bind, network_bind:*}` |
 | `locked_down` | Observation only — every cap must be `read_only:*` | `allow_capabilities = {capability:read_only:*}` |
+| `python_shell_only` | Jarvis gateway profile — use bash/shell commands, POSIX utilities, and Python only | Denies non-python/non-shell runtimes, compilation, non-python package ecosystems, and stdin-exec into non-shell runtimes; keeps POSIX tools such as `awk` available |
 | `no_run_command` | RUN_COMMAND not allowed at all | empty `allowed_actions` |
 
 **On the `{bare, :*}` pairing in deny sets.** The classifier currently
