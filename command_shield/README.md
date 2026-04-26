@@ -166,7 +166,7 @@ The regex pack lives at `command_shield/patterns/*.json` and is loaded at import
 - `macos.json` — macOS-specific primitives: `diskutil erase*`, keychain dump / password extraction, Time Machine deletion, directory-services account / group mutation (`dscl . -create|passwd|change|merge|append /Users|Groups/…`), Gatekeeper / SIP / boot-arg tampering (`spctl --master-disable`, `csrutil disable|enable|clear`, `nvram` writes, `bless -…`), kernel-extension loading (`kextload`, `kextunload`, `kmutil load|unload|install|…`), TCC database access, and **AppleScript privilege escalation** (`…with administrator privileges`, case-insensitive).
 - `persistence.json` — launchd / cron / at persistence: `launchctl load|unload` of specific system paths, the broader modern launchd verbs (`launchctl bootstrap|bootout|kickstart|enable|disable|submit|remove`), plist moves into `/Library/Launch*`, `crontab -e`, `crontab -` (stdin replace), `at now|<digit>|-f …`, `systemctl stop|disable|mask` of critical services, bash-history clearing.
 - `credential_access.json` — reads / exfil of `~/.ssh/`, `~/.aws/`, `~/.kube/`, `~/.gnupg/`, `.env`, `~/.git-credentials`, etc.
-- `exfiltration.json` — `curl … | sh`, base64-piped exec, reverse shells, `ssh host 'rm -rf /'`, etc.
+- `exfiltration.json` — remote-code and exfiltration shapes. `curl … | sh` / `wget … | sh`, base64-piped exec, reverse shells, and `ssh host 'rm -rf /'` remain `CATASTROPHIC`. `curl … | python` (`RCE-003`) is deliberately `NEEDS_REVIEW`: it is still a named signal, but benign LLM-native data plumbing such as fetching JSON and parsing it with Python is reviewed by AE/Guardian instead of being hard-blocked at the pattern layer.
 
 Every pattern either produces a `CATASTROPHIC` or a `NEEDS_REVIEW` verdict; `SAFE` is the default when nothing matches.  Patterns never look at user policy, privilege level, or session state — they encode fixed-system facts only.
 
@@ -857,6 +857,7 @@ Useful for offline triage or explicit deep-review flows.
 - Deny any code touching system paths? → deny `FILE_SYSTEM_ESCAPE_OPEN`
 - Flag any code that references runtime internals? → deny `REFERENCES_INTENTFRAME`
 - Deny commands that stream code into an interpreter? → deny `capability:stdin_exec` or `edge:piped_stdin`
+- Treat `curl … | python` specially? → consume the `RCE-003` `NEEDS_REVIEW` signal and inspect the Python body / command context downstream; it is no longer a `CATASTROPHIC` hard stop.
 
 ### 7. Investigation examples
 

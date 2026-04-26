@@ -183,10 +183,17 @@ purely from `ExecutionResult` (no audit-log peek):
 
 Decision source: every line above derives from `ExecutionResult` fields the
 actor actually receives (`success`, `data["decision"]`, `data["reason"]`,
-`data["layer"]`, `data["matched_gate"]`, `data["content"]` / `data["stdout"]`).
+`data["layer"]`, `data["matched_gate"]`, `data["content"]`, `data["stderr"]`).
 The Guardian's ALLOW prose isn't in `ExecutionResult` by design (it lives in
 the audit log on the server); the test deliberately doesn't reach into the
 audit log just to enrich its own output.
+
+For `RUN_COMMAND`, executor clients intentionally preserve the historic
+`data["content"] == stdout` shape and add `data["stderr"]` beside it on both
+success and failure. They do not forward the adapter's `command` or
+`return_code` fields to the actor-facing payload; shell pipelines can return
+`0` while an earlier stage wrote diagnostics to stderr, so stderr is the
+operator-visible signal the tests and agents consume.
 
 Exit status:
 
