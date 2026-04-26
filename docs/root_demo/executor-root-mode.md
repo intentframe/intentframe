@@ -6,6 +6,12 @@ IntentFrame now supports a **Jarvis root demo profile** on macOS where only the 
 
 This exists for one reason: to demonstrate that IntentFrame's policy pipeline and deterministic gates still constrain an agent even when command execution has maximum local POSIX privilege available.
 
+The root demo is not a benchmark of the agent's LLM, model provider, refusal
+behavior, or prompt-injection resistance. It assumes the agent may already be
+compromised and tests IntentFrame's runtime boundary instead: policy,
+deterministic gates, command inspection, and the Analysis Engine / Guardian
+layers that are hardened and tested against prompt-injection-style inputs.
+
 ---
 
 ## What shipped

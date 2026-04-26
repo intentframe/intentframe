@@ -11,6 +11,12 @@ IntentFrame is a post-compromise runtime control plane. It does not claim that
 the model cannot be tricked. It asks what damage can happen after the model,
 planner, memory, tool output, or surrounding agent loop has already failed.
 
+The root demo therefore does not test the agent's LLM, model provider, prompt,
+refusal behavior, or live jailbreak resistance. Those variables are intentionally
+out of scope. The system under test is IntentFrame itself: policy, deterministic
+gates, command inspection, and the Analysis Engine / Guardian layers that are
+hardened and tested against prompt-injection-style inputs.
+
 ## Why Not Require A Real LLM?
 
 A live LLM demo mainly tests whether one prompt can make one model misbehave on
@@ -26,6 +32,8 @@ That is useful for storytelling, but it is weak as a containment proof:
 - a successful jailbreak can be hard to reproduce later.
 
 For this demo, model refusal is noise. The proof starts after refusal has failed.
+The interesting question is not "which model did the agent use?" The interesting
+question is "what happens after any agent submits this intent?"
 
 ## What The Stub Proves
 
@@ -50,6 +58,9 @@ In IntentFrame terms, an agent is any program that can authenticate, receive a
 policy-bound session, and submit intents. The agent may be an LLM loop, a
 workflow engine, a CLI harness, or a deterministic test program. The safety
 boundary should not depend on which one produced the intent.
+
+That is why a fixed stub is valid here: it removes the agent model from the
+measurement and forces the IntentFrame boundary to handle the submitted action.
 
 ## Why This Is Stricter
 
@@ -117,6 +128,12 @@ contained by the same runtime boundary."
 No. That is not the claim. Existing prompt-injection research and real incidents
 already show that agents can be compromised. This demo assumes compromise and
 tests containment.
+
+It also does not compare models or score the agent model's jailbreak resistance.
+IntentFrame's own AI layers are separate runtime components with prompt
+hardening, structured outputs, deterministic pre-gates, and test coverage for
+prompt-injection-style inputs. The root demo evaluates that runtime boundary,
+not the agent's chosen LLM.
 
 ### "Does this prove every agent is safe?"
 

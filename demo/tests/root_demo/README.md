@@ -14,6 +14,13 @@ today (`normal`, `general`, `attacks`); future categories (persistence,
 egress, interpreter indirection, TCC circumvention) will land in sibling
 test files and share the same harness.
 
+The suite is not a live LLM or model-refusal benchmark. It deliberately removes
+the agent model from the measurement and tests IntentFrame's resilience boundary:
+policy, deterministic gates, command inspection, and the Analysis Engine /
+Guardian layers that are hardened and tested against prompt-injection-style
+inputs. The agent is treated as already compromised; the question is whether the
+submitted action reaches the machine.
+
 ---
 
 ## 1. One-time setup

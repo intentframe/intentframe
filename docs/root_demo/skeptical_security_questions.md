@@ -10,12 +10,21 @@ not impressed by "we blocked `rm -rf /`." They want to know whether the demo
 proves a real containment boundary, whether root is isolated, whether Python
 creates a bypass, and whether the presentation is honest about the stub agent.
 
+The root demo should answer those questions without turning into a model
+benchmark. It is not testing the agent's LLM, provider, prompt, refusal behavior,
+or live jailbreak resistance. It is testing whether IntentFrame's policy,
+deterministic gates, command inspection, and hardened Analysis Engine / Guardian
+layers contain the action after an agent has already submitted it.
+
 ## Short Verdict
 
 Yes, these are valid questions.
 
 Most are not attacks on the demo. They are the questions the demo must answer to
 earn credibility with the intended audience.
+
+The central answer is: the model behind the agent is not the system under test.
+The IntentFrame boundary is.
 
 One question needs reframing after the crash-test decision:
 
@@ -162,6 +171,10 @@ For the primary proof, it is a deterministic compromised-agent harness.
 That is intentional. The root demo is a crash test. It starts after the agent has
 already failed and asks whether the runtime boundary contains the result.
 
+The harness deliberately removes the agent's model from the measurement. A real
+agent could use GPT, Claude, a local model, a workflow script, or a buggy planner;
+the containment question is the same once it submits an intent.
+
 The stub is valid if the demo shows that it uses the same Actor handshake,
 policy-bound session, submit path, Analysis Engine, Guardian, and executor
 boundary as a real agent.
@@ -265,6 +278,7 @@ The spec is ready for a technically skeptical audience only when it answers:
 - Does Python code get inspected, or is it opaque?
 - What exactly happens on `NEEDS_REVIEW`?
 - Is the demo using a stub, live LLM, or both?
+- Is it clear that the agent model is not the system under test?
 - Which claims are reproducible locally?
 - Which workflows are intentionally unsupported?
 - Which known gaps remain?

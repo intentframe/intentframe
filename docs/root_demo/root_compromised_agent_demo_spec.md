@@ -45,6 +45,13 @@ It claims something narrower and stronger:
 
 The root demo is the stress condition. Root is not the product. Root proves the containment boundary still matters when the executor is powerful.
 
+The root demo is also not an evaluation of the agent's LLM, model provider,
+prompt, refusal behavior, or jailbreak resistance. The model behind the agent is
+deliberately not the system under test. The system under test is IntentFrame's
+runtime boundary: user policy, deterministic gates, command inspection, and the
+Analysis Engine / Guardian layers that are already hardened and tested against
+prompt-injection-style inputs.
+
 ## Demo Mode: Crash Test, Not Live Jailbreak
 
 The primary demo is a deterministic compromised-agent crash test, not a live
@@ -67,6 +74,11 @@ makes live jailbreak demos noisy and non-reproducible. IntentFrame's claim is
 post-compromise containment, so the demo intentionally starts after the model,
 planner, memory, tool output, or agent loop has already failed.
 
+In other words, the root demo should not spend credibility proving that a
+particular model can be tricked. It should spend credibility proving that once an
+agent submits a bad action, IntentFrame's policy, deterministic gates, and
+hardened AI review layers contain the action before execution.
+
 The compromised agent can be a stub because an agent, in IntentFrame terms, is
 any authenticated program that receives a policy-bound session and submits
 intents through the Actor path. The stub is not a bypass around IntentFrame; it
@@ -88,7 +100,7 @@ normal utility, but it is not the proof.
 
 ## What The Demo Must Prove
 
-The demo must prove four things:
+The demo must prove:
 
 1. The executor really has root-capable command execution.
 2. Useful root/admin inspection still works.
@@ -97,6 +109,8 @@ The demo must prove four things:
 5. The proof does not depend on a particular model being easy to jailbreak live.
 6. The presentation is clear about which segment is a deterministic crash test
    and which segment is optional interactive product feel.
+7. The system under test is IntentFrame's resilience boundary, not the agent
+   model's prompt-injection resistance.
 
 ## Non-Goals
 
@@ -104,6 +118,7 @@ This demo should not claim:
 
 - IntentFrame prevents prompt injection.
 - A live LLM must fail on camera for the result to be valid.
+- The demo measures the quality or safety of the agent's chosen model.
 - IntentFrame makes root shell access safe in all cases.
 - IntentFrame replaces OS sandboxing, EDR, MDM, or human approval.
 - IntentFrame can contain actions that bypass its boundary.
