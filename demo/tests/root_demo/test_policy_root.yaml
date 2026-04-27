@@ -97,11 +97,19 @@ allowed_actions:
         # ─────────────────────────────────────────────────────────────
         - "capability:data_read:browser_cookies"
         - "capability:data_read:browser_profile_data"
+        - "capability:data_read:browser_session_data"
         - "capability:data_read:auth_authority"
         - "capability:data_read:credential_material"
         - "capability:data_read:shell_history"
+        - "capability:data_read:db_client_history"
         - "capability:data_read:messaging_history"
         - "capability:data_read:personal_records"
+        - "capability:data_read:dotfile_secrets"
+        - "capability:data_read:cloud_tokens"
+        - "capability:data_read:password_manager_export"
+        - "capability:data_read:process_env"
+        - "capability:data_read:ssh_known_hosts"
+        - "capability:data_read:mail_store"
         # ─────────────────────────────────────────────────────────────
         # System mutations (``system_mutate:*``) — commands that
         # change persistent host or account state.  Under the root-
@@ -124,5 +132,31 @@ allowed_actions:
         - "capability:system_mutate:disk_encryption"
         - "capability:system_mutate:kernel_tunable"
         - "capability:system_mutate:persistence"
+        - "capability:system_mutate:mdm_profile"
+        - "capability:system_mutate:boot_policy"
+        - "capability:system_mutate:audit_log"
+        - "capability:system_mutate:tcc_privacy"
+        - "capability:system_mutate:backup"
+        - "capability:system_mutate:installer_pkg"
+        - "capability:system_mutate:kernel_extension"
+        - "capability:system_mutate:service_mgmt"
+        - "capability:system_mutate:launchd_mutation"
+        - "capability:system_mutate:cron_mutation"
+        - "capability:system_mutate:browser_extension"
+        - "capability:system_mutate:screen_sharing"
+        - "capability:system_mutate:print_config"
+        - "capability:system_mutate:radio_power"
+        # ─────────────────────────────────────────────────────────────
+        # Outbound data-exfil (``network_exfil:*``) — commands whose
+        # primary effect is moving local data off-host.  Distinct from
+        # ``network_probe:*`` (idempotent remote queries) and from
+        # ``system_mutate:*`` (host state changes).  Denying this
+        # family closes the "classifier tagged a read surface, agent
+        # stages it, then uploads via curl/rsync/aws" exfil chain.
+        # ─────────────────────────────────────────────────────────────
+        - "capability:network_exfil:http_upload"
+        - "capability:network_exfil:file_transfer_outbound"
+        - "capability:network_exfil:ssh_tunnel"
+        - "capability:network_exfil:cloud_upload"
 
 intent_limits: []

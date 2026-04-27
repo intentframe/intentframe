@@ -135,6 +135,61 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                   Mail V* stores, iOS MobileSync
                                                   Backup, *.photoslibrary,
                                                   *.calendar stores
+    capability:data_read:dotfile_secrets       — .env / .envrc / .env.<stage> /
+                                                  .npmrc / .pypirc / .netrc /
+                                                  .gemrc / .pgpass / .my.cnf /
+                                                  .pip/pip.conf /
+                                                  .docker/config.json — the
+                                                  canonical "secrets in a
+                                                  dotfile" surface
+    capability:data_read:cloud_tokens          — .aws/credentials, .aws/config,
+                                                  .kube/config,
+                                                  .config/gcloud/** credentials,
+                                                  .azure/accessTokens.json,
+                                                  .terraform.d/credentials.tfrc
+                                                  .json, .vault-token,
+                                                  .hcp/credentials, Kubernetes
+                                                  service-account token mount,
+                                                  gcloud/aws/az access-token
+                                                  print verbs
+    capability:data_read:db_client_history     — mongosh history / .mongorc.js
+                                                  / .mongoshrc.js / .dbshell /
+                                                  .snowsql/history / .duckdbrc
+                                                  / .cqlshrc (db-client history
+                                                  files not already covered by
+                                                  ``shell_history``)
+    capability:data_read:browser_session_data  — Chromium-family Local Storage
+                                                  / Session Storage / IndexedDB
+                                                  / Service Worker / Cache /
+                                                  {Current,Last} {Session,Tabs};
+                                                  Firefox sessionstore /
+                                                  storage/default / cache2
+                                                  entries
+    capability:data_read:password_manager_export
+                                              — 1Password *.1pif exports,
+                                                  bitwarden/lastpass/dashlane/
+                                                  keepass/enpass/roboform
+                                                  _export.{csv,json,xml,zip,
+                                                  1pif}; password-manager app
+                                                  data containers beyond the
+                                                  ``credential_material``
+                                                  shapes
+    capability:data_read:process_env           — /proc/<pid>/environ reads,
+                                                  ``ps`` invocations with an
+                                                  ``e`` flag (BSD env dump),
+                                                  ``launchctl print`` /
+                                                  ``procinfo``
+    capability:data_read:ssh_known_hosts       — ~/.ssh/known_hosts /
+                                                  ~/.ssh/config reads — lateral-
+                                                  movement recon surface
+    capability:data_read:mail_store            — Thunderbird profile ImapMail/
+                                                  Mail/Messages, Microsoft
+                                                  Outlook for Mac app data,
+                                                  Airmail / Spark app data,
+                                                  raw *.mbox stores (Apple
+                                                  Mail's Library/Mail/V* is
+                                                  already covered by
+                                                  ``personal_records``)
 
     capability:system_mutate:host_network_config   — networksetup -set*/
                                                       -create*/-delete*/-add*/
@@ -245,6 +300,129 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                       involving ``System Events``
                                                       + ``login item`` or ``make
                                                       [new] login item``
+    capability:system_mutate:mdm_profile            — profiles -I / -R / -E /
+                                                      install / remove / renew
+                                                      (configuration-profile
+                                                      install / removal)
+    capability:system_mutate:boot_policy            — bputil set-* / disable-*;
+                                                      bless --setBoot / --bootefi;
+                                                      nvram <name>=<value> / -d /
+                                                      -c; firmwarepasswd
+                                                      -setpasswd / -delete /
+                                                      -setmode (boot / firmware
+                                                      trust state)
+    capability:system_mutate:audit_log              — audit -n / -s / -t / -R /
+                                                      -A / -c; log erase; log
+                                                      config (BSM / unified
+                                                      logging subsystem
+                                                      mutation)
+    capability:system_mutate:tcc_privacy            — tccutil reset / insert;
+                                                      sqlite3 .TCC.db with
+                                                      INSERT / UPDATE / DELETE /
+                                                      REPLACE verbs
+    capability:system_mutate:backup                 — tmutil disable / enable /
+                                                      startbackup / stopbackup /
+                                                      delete / inherit /
+                                                      setdestination /
+                                                      removedestination /
+                                                      addexclusion /
+                                                      removeexclusion; asr
+                                                      restore / create /
+                                                      imagescan
+    capability:system_mutate:installer_pkg          — installer -pkg / -package;
+                                                      softwareupdate --install /
+                                                      -i; pkgutil --forget
+    capability:system_mutate:kernel_extension       — kextload / kextunload /
+                                                      kmutil load / unload
+                                                      (kernel / system
+                                                      extensions)
+    capability:system_mutate:service_mgmt           — systemctl start / stop /
+                                                      restart / enable /
+                                                      disable / mask / unmask /
+                                                      daemon-reload / …;
+                                                      service <name>
+                                                      (start|stop|…);
+                                                      rc-update add / del;
+                                                      chkconfig --add / --del /
+                                                      on / off; update-rc.d
+    capability:system_mutate:launchd_mutation       — launchctl load / unload /
+                                                      bootstrap / bootout /
+                                                      enable / disable /
+                                                      remove / stop / start /
+                                                      kickstart / submit /
+                                                      setenv / unsetenv /
+                                                      override / limit /
+                                                      config — superset of
+                                                      ``security_daemon``
+                                                      (which fires
+                                                      additionally when the
+                                                      target service name is a
+                                                      known security daemon)
+    capability:system_mutate:cron_mutation          — crontab -e / -r / -u /
+                                                      <file> (install from
+                                                      file); redirect / tee /
+                                                      cp / mv / install / ln
+                                                      targeting
+                                                      /etc/cron.{d,daily,
+                                                      hourly,weekly,monthly}/
+    capability:system_mutate:browser_extension      — defaults write on
+                                                      Chrome/Edge/Firefox
+                                                      ExtensionInstall*
+                                                      policy keys; writes to
+                                                      browser policies.json /
+                                                      External Extensions
+                                                      directories
+    capability:system_mutate:screen_sharing         — Apple Remote Desktop
+                                                      ``kickstart`` activate /
+                                                      configure / access /
+                                                      restart / deactivate /
+                                                      uninstall; com.apple.
+                                                      RemoteDesktop kickstart
+                                                      path invocation
+    capability:system_mutate:print_config           — cupsenable / cupsdisable
+                                                      / cupsaccept / cupsreject
+                                                      / lpadmin / lpoptions
+    capability:system_mutate:radio_power            — networksetup
+                                                      -setairportpower /
+                                                      -setairportnetwork;
+                                                      airport -z /
+                                                      --disassociate /
+                                                      --associate; blueutil
+                                                      -p / --power
+
+    capability:network_exfil:http_upload           — curl/wget/http/xh requests
+                                                      that reference a LOCAL
+                                                      file as the body / upload
+                                                      payload: curl -T /
+                                                      --upload-file, -F ...=@,
+                                                      -d|--data|--data-binary|
+                                                      --data-ascii|--data-
+                                                      urlencode @file; wget
+                                                      --post-file / --body-file;
+                                                      HTTPie/xh ``name@path`` /
+                                                      ``name=@path`` request-
+                                                      item syntax
+    capability:network_exfil:file_transfer_outbound — scp / rsync commands whose
+                                                      final positional is a
+                                                      ``[user@]host:`` remote
+                                                      endpoint (LOCAL → REMOTE
+                                                      direction); sftp batch
+                                                      mode with -b
+    capability:network_exfil:ssh_tunnel             — ssh -R / -L / -D (remote /
+                                                      local / dynamic port
+                                                      forwarding)
+    capability:network_exfil:cloud_upload           — aws s3 cp / sync / mv /
+                                                      mb / rb; aws s3api
+                                                      put-object /
+                                                      upload-part(-copy) /
+                                                      create-multipart-upload;
+                                                      gsutil cp / mv / rsync;
+                                                      gcloud storage cp / mv /
+                                                      rsync; az storage blob /
+                                                      file upload(-batch); mc
+                                                      cp / mv / mirror; b2
+                                                      upload-file /
+                                                      upload-unbound-stream
 
 Each hit produces a Signal with check="capability" and signal_id set to
 the capability tag.  Multiple capabilities per command are expected;
@@ -322,31 +500,40 @@ CAPABILITY_FILESYSTEM_WRITE = "capability:filesystem_write"
 CAPABILITY_READ_ONLY = "capability:read_only"
 CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 # ── Sensitive surface families (refined-only) ────────────────────────
-# Both are emitted only as ``<base>:<suffix>`` refined tags — the bare
-# base form is never seen on a command.  Consumers MUST prefix-match
-# these families (literal equality against ``capability:data_read`` /
-# ``capability:system_mutate`` will never fire).
+# All three are emitted only as ``<base>:<suffix>`` refined tags — the
+# bare base form is never seen on a command.  Consumers MUST prefix-
+# match these families (literal equality against ``capability:data_read``
+# / ``capability:system_mutate`` / ``capability:network_exfil`` will
+# never fire).
 #
 #   * ``capability:data_read:*`` — reads that yield information an
 #     agent must not exfiltrate under the root-compromised-agent threat
-#     model.  Today's suffixes cover browser cookies (``browser_cookies``),
+#     model.  Suffixes cover browser cookies (``browser_cookies``),
 #     macOS Directory-Services account records (``auth_authority``),
 #     keychain / TCC.db / GPG secret-key / password-manager vault
 #     contents (``credential_material``), shell-history stores
 #     (``shell_history``), browser saved-login / history / bookmark /
 #     form-autofill data beyond cookies (``browser_profile_data``),
-#     messaging-client on-disk histories (``messaging_history``), and
-#     high-PII personal stores — Contacts, Notes, Mail, Photos,
-#     Calendar, iOS backup (``personal_records``).  Structurally these
-#     commands are read-shaped, so this family is treated as read-only-
-#     incompatible in the classifier gate (``_safe_for_read_only``):
-#     emitting ``data_read:*`` suppresses ``read_only:*`` on the same
-#     command so the consumer fast-path license is not accidentally
-#     available for a sensitive read.
+#     messaging-client on-disk histories (``messaging_history``),
+#     high-PII personal stores (``personal_records``), dotfile secrets
+#     (``dotfile_secrets``), cloud-provider CLI tokens / token-printing
+#     verbs (``cloud_tokens``), non-shell DB-client history files
+#     (``db_client_history``), browser Local/Session storage / IndexedDB
+#     / Service Worker / Firefox sessionstore (``browser_session_data``),
+#     password-manager export files and app containers
+#     (``password_manager_export``), process-environment dumps
+#     (``process_env``), ~/.ssh/known_hosts / config / authorized_keys
+#     (``ssh_known_hosts``), and non-Apple mail stores
+#     (``mail_store``).  Structurally these commands are read-shaped,
+#     so this family is treated as read-only-incompatible in the
+#     classifier gate (``_safe_for_read_only``): emitting
+#     ``data_read:*`` suppresses ``read_only:*`` on the same command so
+#     the consumer fast-path license is not accidentally available for
+#     a sensitive read.
 #
 #   * ``capability:system_mutate:*`` — commands that change host /
-#     network / identity / trust-surface state.  Today's suffixes cover
-#     routing and interface config (``host_network_config``), hostname
+#     network / identity / trust-surface state.  Suffixes cover routing
+#     and interface config (``host_network_config``), hostname
 #     (``hostname``), NTP / clock (``time_sync``), launchd jobs for
 #     EDR / TCC / security daemons plus the macOS trust-disable shapes
 #     (``security_daemon``), browser security preferences
@@ -357,13 +544,39 @@ CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 #     (``user_account``), systemsetup remote-access and power toggles
 #     (``remote_access``), FileVault encryption toggles
 #     (``disk_encryption``), kernel tunable writes (``kernel_tunable``),
-#     and ``at`` / AppleScript login-item persistence shapes not
-#     already pattern-catastrophic (``persistence``).  Structurally
-#     these are mutating and so would not qualify for ``read_only:*``
-#     on their own; the read-only-incompatible membership is belt-and-
-#     braces against an unanticipated co-occurrence.
+#     ``at`` / AppleScript login-item persistence
+#     (``persistence``), MDM ``profiles`` install / remove
+#     (``mdm_profile``), boot-chain mutation — bputil / bless / nvram
+#     / firmwarepasswd (``boot_policy``), audit / unified-logging
+#     subsystem mutation (``audit_log``), tccutil reset / TCC.db writes
+#     (``tcc_privacy``), Time Machine / asr backup mutation
+#     (``backup``), installer / softwareupdate / pkgutil --forget
+#     (``installer_pkg``), kext / kmutil load / unload
+#     (``kernel_extension``), Linux service-manager verbs
+#     (``service_mgmt``), generic launchctl mutation superset
+#     (``launchd_mutation``), crontab -e / -r / -u / <file> and
+#     /etc/cron.* writes (``cron_mutation``), browser extension-install
+#     policy writes (``browser_extension``), ARD ``kickstart``
+#     (``screen_sharing``), CUPS printer daemon mutation
+#     (``print_config``), and Wi-Fi / Bluetooth radio power
+#     (``radio_power``).  Structurally these are mutating and so would
+#     not qualify for ``read_only:*`` on their own; the read-only-
+#     incompatible membership is belt-and-braces against an
+#     unanticipated co-occurrence.
+#
+#   * ``capability:network_exfil:*`` — commands whose primary effect is
+#     moving local-host data outbound over the network, distinct from
+#     ``network_probe:*`` (which is idempotent remote queries).
+#     Suffixes cover HTTP-body / file-upload shapes (``http_upload``),
+#     scp / rsync / sftp with a remote destination
+#     (``file_transfer_outbound``), ssh port forwarding
+#     (``ssh_tunnel``), and cloud-object-store / MinIO / B2 upload
+#     verbs (``cloud_upload``).  Treated as read-only-incompatible in
+#     the classifier gate so a ``curl -T secrets.tar …`` can never be
+#     blessed as a read-only fast-path candidate.
 CAPABILITY_DATA_READ = "capability:data_read"
 CAPABILITY_SYSTEM_MUTATE = "capability:system_mutate"
+CAPABILITY_NETWORK_EXFIL = "capability:network_exfil"
 
 
 # ── Detection rules ─────────────────────────────────────────────────
@@ -645,6 +858,180 @@ _DATA_READ_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "personal_records",
     ),
+    # Dotfile secrets — the canonical "secrets in a dotfile" surface.
+    # ``.env[.stage]`` covers ``.env``, ``.env.local``, ``.env.prod``,
+    # etc.  ``(?<![\w.])`` lookbehind prevents matches inside larger
+    # identifiers / filenames (``foo.env``, ``my.netrc.backup``) while
+    # still firing for bare file references, ``/path/to/.env`` forms,
+    # and ``~/.env`` shapes (``/`` and ``~`` are neither word chars
+    # nor ``.``).
+    (
+        re.compile(
+            r"(?<![\w.])\.env(?:\.[A-Za-z0-9][\w.-]*)?\b"
+            r"|(?<![\w.])\.envrc\b"
+            r"|(?<![\w.])\.npmrc\b"
+            r"|(?<![\w.])\.pypirc\b"
+            r"|(?<![\w.])\.netrc\b"
+            r"|(?<![\w.])\.gemrc\b"
+            r"|(?<![\w.])\.pgpass\b"
+            r"|(?<![\w.])\.my\.cnf\b"
+            r"|(?<![\w.])\.pip/pip\.conf\b"
+            r"|(?<![\w.])\.docker/config\.json\b"
+        ),
+        "dotfile_secrets",
+    ),
+    # Cloud-provider CLI tokens — file shapes.  Each cloud CLI
+    # stores its long-lived credentials in a well-known location
+    # under the user's home directory.  The Kubernetes in-cluster
+    # service-account token mount uses an absolute path rather than
+    # a dotfile so it is listed separately.
+    (
+        re.compile(
+            r"(?<![\w.])\.aws/(?:credentials|config)\b"
+            r"|(?<![\w.])\.kube/config\b"
+            r"|(?<![\w.])\.config/gcloud/"
+            r"(?:credentials\.db|legacy_credentials|"
+            r"application_default_credentials\.json|access_tokens\.db)\b"
+            r"|(?<![\w.])\.azure/"
+            r"(?:accessTokens\.json|azureProfile\.json|"
+            r"msal_token_cache\.json|service_principal_entries\.json|"
+            r"clouds\.config)\b"
+            r"|(?<![\w.])\.terraform\.d/credentials\.tfrc\.json\b"
+            r"|(?<![\w.])\.vault-token\b"
+            r"|(?<![\w.])\.hcp/(?:creds-cache\.json|config\.json)\b"
+            r"|(?<![\w.])/var/run/secrets/kubernetes\.io/serviceaccount/token\b"
+        ),
+        "cloud_tokens",
+    ),
+    # Cloud-provider CLI tokens — verb shapes.  ``aws sts
+    # get-session-token`` / ``get-federation-token`` return short-
+    # lived credentials; ``gcloud auth print-*-token`` /
+    # ``gcloud auth application-default print-access-token`` print
+    # bearer tokens directly; ``az account get-access-token``
+    # likewise.  All four are idiomatic "give me a token I can
+    # exfil" invocations.
+    (
+        re.compile(
+            r"\baws\s+sts\s+get-(?:session|federation)-token\b"
+            r"|\bgcloud\s+auth\s+"
+            r"(?:print-access-token|print-identity-token"
+            r"|application-default\s+print-access-token)\b"
+            r"|\baz\s+account\s+get-access-token\b"
+        ),
+        "cloud_tokens",
+    ),
+    # DB-client history files not already covered by ``shell_history``.
+    # ``.dbshell`` is mongo's interactive history; ``.mongorc.js`` /
+    # ``.mongoshrc.js`` contain shell startup commands that may
+    # include connection strings; ``.snowsql/history`` +
+    # ``.snowsql/config`` hold Snowflake query history + account
+    # creds; ``.duckdbrc`` + ``.cqlshrc`` are DuckDB / Cassandra
+    # shell configs.
+    (
+        re.compile(
+            r"(?<![\w.])\.mongorc\.js\b"
+            r"|(?<![\w.])\.mongoshrc(?:\.js)?\b"
+            r"|(?<![\w.])\.dbshell\b"
+            r"|(?<![\w.])\.snowsql/(?:history|config)\b"
+            r"|(?<![\w.])\.duckdbrc\b"
+            r"|(?<![\w.])\.cqlshrc\b"
+        ),
+        "db_client_history",
+    ),
+    # Browser Local Storage / Session Storage / IndexedDB / Service
+    # Worker caches / tab-session files — beyond cookies + profile
+    # data, these hold session-bound auth state, single-page-app
+    # tokens, draft messages, etc.  Chromium layout is one well-
+    # known directory per subsystem under the profile root; Firefox
+    # uses ``sessionstore.*`` and ``storage/default`` / ``cache2``.
+    (
+        re.compile(
+            r"/(?:Google/Chrome|Chromium|BraveSoftware|"
+            r"Microsoft\s+Edge|Vivaldi|Arc)"
+            r"[^|;&]*?/(?:Local\s+Storage|Session\s+Storage|IndexedDB"
+            r"|Service\s+Worker|Cache|Current\s+(?:Session|Tabs)"
+            r"|Last\s+(?:Session|Tabs))\b"
+            r"|/Firefox/Profiles/[^\s/|;&]+/"
+            r"(?:sessionstore\.(?:js|jsonlz4)|sessionstore-backups"
+            r"|storage/default|cache2/entries)\b"
+        ),
+        "browser_session_data",
+    ),
+    # Password-manager export files + app containers not already
+    # covered by ``credential_material``.  ``.1pif`` is 1Password's
+    # export format; the ``*_export.{csv,json,xml,zip,1pif}`` shape
+    # catches Bitwarden / LastPass / Dashlane / KeePass / Enpass /
+    # Roboform plaintext exports.  App containers are included so
+    # any ``cat|cp|sqlite3|ls`` over the vault data directory fires.
+    (
+        re.compile(
+            r"\b[^\s|;&]*\.1pif\b"
+            r"|\b[^\s|;&]*(?:bitwarden|lastpass|dashlane|keepass"
+            r"|enpass|roboform)[^\s|;&]*_export"
+            r"\.(?:csv|json|xml|zip|1pif)\b"
+            r"|\bLibrary/Application\s+Support/1Password\b"
+            r"|\bLibrary/Application\s+Support/"
+            r"(?:Bitwarden|Dashlane|LastPass|Enpass|Roboform)\b"
+            r"|\bLibrary/Group\s+Containers/[^\s|;&]*1[Pp]assword\b"
+        ),
+        "password_manager_export",
+    ),
+    # Process-environment dumps.  ``/proc/<pid>/environ`` is the
+    # canonical Linux read; ``/proc/self/environ`` is the running
+    # process's own env.  BSD-style ``ps`` with an ``e`` letter in
+    # the bundle (``ps e``, ``ps eww``, ``ps auxe``) prints
+    # environment variables for every process.  We deliberately
+    # require the bundle to NOT start with a dash so POSIX flags
+    # like ``ps -ef`` (which is "every process, full format" — no
+    # env) stay untagged.  ``launchctl print`` dumps launchd
+    # service internals including inherited env; ``procinfo`` is a
+    # legacy Linux tool that prints env among other things.
+    (
+        re.compile(
+            r"(?<![\w.])/proc/(?:\d+|self)/environ\b"
+            r"|(?:^|[\s;&|])ps\s+(?!-)[^\s|;&]*e[^\s|;&]*"
+            r"(?=\s|$|\||;|&)"
+            r"|\blaunchctl\s+print\b"
+            r"|(?:^|[\s;&|])procinfo(?=\s|$|\||;|&)"
+        ),
+        "process_env",
+    ),
+    # ~/.ssh lateral-movement recon surface — known_hosts (+ .old /
+    # .new rotations), config (+ config.d/* includes), and
+    # authorized_keys / authorized_keys2 (who can log in).  Reading
+    # these does not yield credentials directly but maps the host's
+    # SSH trust graph, which is the next-hop data for any laterally
+    # moving attacker.  ``~/.ssh/id_*`` direct reads are already
+    # pattern-catastrophic via CAT-SSHKEY-*; the ``cp|mv|rsync|scp``
+    # stage shape is already tagged under ``credential_material``.
+    (
+        re.compile(
+            r"(?<![\w.])\.ssh/known_hosts(?:\.old|\.new)?\b"
+            r"|(?<![\w.])\.ssh/config(?:\.d/[^\s|;&]*)?\b"
+            r"|(?<![\w.])\.ssh/authorized_keys2?\b"
+        ),
+        "ssh_known_hosts",
+    ),
+    # Mail stores other than Apple Mail.  Apple Mail's
+    # ``Library/Mail/V*`` is already covered by
+    # ``personal_records``.  Thunderbird profile ImapMail / Mail /
+    # Messages, Microsoft Outlook for Mac (both legacy and modern
+    # Office group containers), Airmail, Readdle Spark; and the
+    # generic ``*.mbox`` store that any mail client can land
+    # messages into.
+    (
+        re.compile(
+            r"\bLibrary/Thunderbird/Profiles/[^\s/|;&]+/"
+            r"(?:ImapMail|Mail|Messages)\b"
+            r"|\bLibrary/Application\s+Support/"
+            r"(?:Microsoft/Outlook|com\.microsoft\.Outlook"
+            r"|Airmail|Readdle/Spark)\b"
+            r"|\bLibrary/Group\s+Containers/"
+            r"UBF8T346G9\.(?:Office|OfficeOsfWebHost|msoutlook)\b"
+            r"|\b[^\s|;&]+\.mbox(?:/[^\s|;&]*)?\b"
+        ),
+        "mail_store",
+    ),
 )
 
 
@@ -921,6 +1308,345 @@ _SYSTEM_MUTATE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "persistence",
     ),
+    # MDM configuration-profile install / removal.  ``profiles -I|-R|
+    # -E`` are the short-flag forms; ``profiles install|remove|renew``
+    # are the verb forms.  Read verbs (``-L``/``list``, ``-P``,
+    # ``show``, ``status``) stay outside the alternation.  The
+    # ``install`` shape is the primary attack surface — a malicious
+    # MDM profile can pin trust roots, force VPN config, or redirect
+    # time / DNS.
+    (
+        re.compile(
+            r"\bprofiles\s+(?:-[A-Za-z]+\s+)*"
+            r"(?:-I|-R|-E|install|remove|renew)\b"
+        ),
+        "mdm_profile",
+    ),
+    # Boot-chain / firmware trust-state mutation.  ``bputil`` manages
+    # Apple-silicon recovery / security settings; ``bless`` sets the
+    # active boot efi / kernel; ``nvram`` writes NVRAM variables
+    # (``foo=bar``, ``-d foo``, ``-c`` to clear all); ``firmwarepasswd``
+    # adds / removes / reconfigures the firmware password.  ``nvram``
+    # bare / ``-p`` (print) / ``-xp`` stay outside the alternation.
+    (
+        re.compile(
+            r"\bbputil\s+(?:-[a-zA-Z]+|set-[a-zA-Z-]+|"
+            r"disable-[a-zA-Z-]+|enable-[a-zA-Z-]+)\b"
+            r"|\bbless\s+(?:[^|;&]*\s)?"
+            r"(?:--setBoot|--bootefi|--mount\b[^|;&]*\s--setBoot)\b"
+            r"|\bnvram\s+(?:-[a-zA-Z]+\s+)*"
+            r"[A-Za-z_][\w.-]*="
+            r"|\bnvram\s+-d\s+[A-Za-z_]"
+            r"|\bnvram\s+-c\b"
+            r"|\bfirmwarepasswd\s+-(?:setpasswd|delete|setmode)\b"
+        ),
+        "boot_policy",
+    ),
+    # Audit subsystem / unified-logging mutation.  macOS BSM
+    # ``audit`` control verbs (``-n`` rotate, ``-s`` signal the
+    # daemon, ``-t`` terminate, ``-R`` restart, ``-A`` reconfigure,
+    # ``-c`` send config).  Unified-logging ``log erase`` wipes the
+    # persistent logstore; ``log config`` changes subsystem logging
+    # levels (defeats telemetry).  ``aslmanager -a/-s/-e`` manages
+    # ASL archive state.
+    (
+        re.compile(
+            r"\baudit\s+-(?:n|t|s|r|A|R|c)\b"
+            r"|\blog\s+(?:erase|config)\b"
+            r"|\baslmanager\s+-(?:a|s|e)\b"
+        ),
+        "audit_log",
+    ),
+    # TCC (Transparency, Consent, Control) privacy DB mutation.
+    # ``tccutil reset`` wipes consent records for a service /
+    # bundle-id; ``tccutil insert`` is a less-common admin form.
+    # Direct ``sqlite3 TCC.db`` INSERT / UPDATE / DELETE / REPLACE
+    # is the stealth route — read access is already tagged under
+    # ``data_read:credential_material``; here we catch the write
+    # verbs specifically.
+    (
+        re.compile(
+            r"\btccutil\s+(?:reset|insert)\b"
+            r"|\bsqlite3\b[^|;&]*\bTCC\.db\b[^|;&]*"
+            r"\b(?:INSERT|UPDATE|DELETE|REPLACE)\b"
+        ),
+        "tcc_privacy",
+    ),
+    # Backup subsystem mutation.  Time Machine ``tmutil`` control
+    # verbs (disable / enable / start / stop the daemon, delete a
+    # snapshot, inherit a new backup disk, set / remove a
+    # destination, add / remove an exclusion); Apple Software
+    # Restore ``asr restore|create|imagescan`` manipulate disk
+    # images.  Read verbs (``tmutil status``, ``tmutil
+    # listbackups``, ``asr help``) stay outside the alternation.
+    (
+        re.compile(
+            r"\btmutil\s+(?:disable|enable|startbackup|stopbackup|"
+            r"delete|inherit|setdestination|removedestination|"
+            r"addexclusion|removeexclusion)\b"
+            r"|\basr\s+(?:restore|create|imagescan)\b"
+        ),
+        "backup",
+    ),
+    # Installer / package-system mutation.  ``installer -pkg`` /
+    # ``-package`` runs a .pkg; ``softwareupdate --install`` / ``-i``
+    # installs Apple-signed updates; ``pkgutil --forget`` purges
+    # install receipts (letting a rogue re-install masquerade).
+    # Read verbs (``installer -pkginfo``, ``softwareupdate -l``,
+    # ``pkgutil --pkgs``) stay outside the alternation.
+    (
+        re.compile(
+            r"\binstaller\s+(?!(?:[^|;&]*\s)?-pkginfo\b)"
+            r"(?:[^|;&]*\s)?-(?:pkg|package)\b"
+            r"|\bsoftwareupdate\s+(?:--install|-i)\b"
+            r"|\bpkgutil\s+--forget\b"
+        ),
+        "installer_pkg",
+    ),
+    # Kernel / system extension load / unload.  ``kextload`` /
+    # ``kextunload`` are the long-standing macOS kext verbs;
+    # ``kextutil -l`` is the force-load alias.  ``kmutil load`` /
+    # ``kmutil unload`` are the modern replacement on Big-Sur+.
+    # ``kextstat`` / ``kmutil showloaded`` (read forms) stay
+    # outside the alternation.
+    (
+        re.compile(
+            r"\b(?:kextload|kextunload)\b"
+            r"|\bkextutil\s+(?:-[a-zA-Z]+\s+)*-l\b"
+            r"|\bkmutil\s+(?:load|unload)\b"
+        ),
+        "kernel_extension",
+    ),
+    # Linux service-manager mutation verbs.  ``systemctl`` covers
+    # the modern shape; ``service <name>`` the SysV compatibility
+    # shape; ``rc-update`` OpenRC; ``chkconfig`` /
+    # ``update-rc.d`` legacy RHEL / Debian.  ``systemctl status|
+    # list-units|show|cat|is-active|is-enabled`` etc. stay outside
+    # the alternation.
+    (
+        re.compile(
+            r"\bsystemctl\s+(?:start|stop|restart|reload|enable|"
+            r"disable|mask|unmask|daemon-reload|daemon-reexec|"
+            r"set-default|isolate|kill|reset-failed|edit|link|"
+            r"revert|preset|preset-all|reenable)\b"
+            r"|(?:^|[\s;&|])service\s+\S+\s+"
+            r"(?:start|stop|restart|reload|force-reload|try-restart)\b"
+            r"|\brc-update\s+(?:add|del|delete)\b"
+            r"|\bchkconfig\s+(?:--add|--del|--level(?:\s+\S+)?"
+            r"|(?:--level\s+\S+\s+)?\S+\s+(?:on|off|reset|resetpriorities))\b"
+            r"|\bupdate-rc\.d\s+\S+\s+"
+            r"(?:defaults|enable|disable|remove|start|stop)\b"
+        ),
+        "service_mgmt",
+    ),
+    # Generic launchctl mutation — superset of ``security_daemon``.
+    # Both rules can fire on the same command when the target is a
+    # known security daemon, and that's intentional: the
+    # combination ``system_mutate:launchd_mutation`` +
+    # ``system_mutate:security_daemon`` says "this launchctl call
+    # mutates a security daemon specifically", which is a stricter
+    # policy hook than either alone.  ``launchctl print`` is a
+    # READ verb (tagged under ``data_read:process_env``) and is
+    # deliberately excluded.
+    (
+        re.compile(
+            r"\blaunchctl\s+(?:load|unload|bootstrap|bootout|enable|"
+            r"disable|remove|stop|start|kickstart|submit|setenv|"
+            r"unsetenv|override|limit|config|reboot|userswitch)\b"
+        ),
+        "launchd_mutation",
+    ),
+    # Cron mutation.  ``crontab -e`` opens the user's crontab for
+    # edit, ``-r`` removes it, ``crontab <file>`` installs a new
+    # crontab verbatim from a file — all mutation.  ``crontab -l``
+    # (list) stays untagged because the shape starts with a dash
+    # other than ``-e``/``-r``.  The /etc/cron.* drop-in shapes
+    # are standard DNS-hijack / persistence routes — same write-
+    # path alternation as ``hosts_file``.
+    (
+        re.compile(
+            r"\bcrontab\s+(?:-[uU]\s+\S+\s+)*(?:-r|-e)\b"
+            r"|\bcrontab\s+(?:-[uU]\s+\S+\s+)*"
+            r"[^-\s|;&][^\s|;&]*(?=\s|$|\||;|&)"
+            r"|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*"
+            r"/etc/cron\.(?:d|daily|hourly|weekly|monthly)/[^\s|;&]+"
+            r"|\btee\s+(?:-[a-zA-Z]+\s+)*"
+            r"/etc/cron\.(?:d|daily|hourly|weekly|monthly)/[^\s|;&]+"
+            r"|\b(?:cp|mv|install|ln)\b[^|;&]*\s+"
+            r"/etc/cron\.(?:d|daily|hourly|weekly|monthly)/[^\s|;&]+"
+        ),
+        "cron_mutation",
+    ),
+    # Browser extension-install policy mutation.  Chrome / Edge /
+    # Firefox accept JSON policy files that can force-install
+    # extensions; ``defaults write`` on the extension-policy keys
+    # is the macOS route.  Separately, writes to the distribution
+    # ``policies.json`` / ``External Extensions`` directories are
+    # the cross-platform shape.
+    (
+        re.compile(
+            r"\bdefaults\s+write\s+"
+            r"(?:com\.google\.Chrome|com\.microsoft\.Edge"
+            r"|org\.mozilla\.firefox)"
+            r"\s+ExtensionInstall"
+            r"(?:Forcelist|Allowlist|Blocklist|Sources)\b"
+            r"|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*"
+            r"[^\s|;&]*/(?:distribution/policies\.json"
+            r"|Chrome/External\s+Extensions/[^\s|;&]+)\b"
+            r"|\btee\s+(?:-[a-zA-Z]+\s+)*"
+            r"[^\s|;&]*/(?:distribution/policies\.json"
+            r"|Chrome/External\s+Extensions/[^\s|;&]+)\b"
+            r"|\b(?:cp|mv|install|ln)\b[^|;&]*\s+"
+            r"[^\s|;&]*/(?:distribution/policies\.json"
+            r"|Chrome/External\s+Extensions/[^\s|;&]+)\b"
+        ),
+        "browser_extension",
+    ),
+    # Apple Remote Desktop / screen-sharing enable.  The canonical
+    # incantation is the absolute-path invocation of the
+    # ``kickstart`` binary under the RemoteManagement bundle, with
+    # mutation verbs (``-activate``, ``-configure``, ``-access``,
+    # ``-restart``, ``-deactivate``, ``-uninstall``).  A bare
+    # ``kickstart`` binary with the same verbs (symlinked into
+    # PATH) is also tagged via the word-boundary fallback.  The
+    # lookbehind ``(?<![a-zA-Z])`` prevents substring matches
+    # inside unrelated tokens.
+    (
+        re.compile(
+            r"\b/System/Library/CoreServices/RemoteManagement/"
+            r"ARDAgent\.app/Contents/Resources/kickstart\b"
+            r"|(?<![a-zA-Z])kickstart\s+"
+            r"-(?:activate|configure|access|restart|deactivate|"
+            r"uninstall)\b"
+        ),
+        "screen_sharing",
+    ),
+    # CUPS printer daemon mutation.  ``cupsenable|cupsdisable|
+    # cupsaccept|cupsreject`` manage queue state; ``lpadmin``
+    # creates / removes / reconfigures printers; ``lpoptions`` sets
+    # default printer / options.  No read form of any of these
+    # verbs; ``lpstat`` (read) is a separate binary and stays
+    # outside the alternation.
+    (
+        re.compile(
+            r"\b(?:cupsenable|cupsdisable|cupsaccept|cupsreject"
+            r"|lpadmin|lpoptions)\b"
+        ),
+        "print_config",
+    ),
+    # Radio power / association control — Wi-Fi + Bluetooth.  macOS
+    # ``networksetup -setairportpower`` toggles the 802.11 radio;
+    # ``-setairportnetwork`` joins a specific SSID.  ``airport
+    # -z|--disassociate|--associate`` controls association state
+    # (disassociate drops you off-network; associate forces SSID).
+    # ``blueutil`` manages Bluetooth power — both short (``-p``)
+    # and long (``--power``) flags.  All overlap with
+    # ``host_network_config`` (which also matches
+    # ``networksetup -set*``); both tags firing together gives the
+    # consumer a "radio-specific" vs "generic network config"
+    # distinction.
+    (
+        re.compile(
+            r"\bnetworksetup\s+-(?:setairportpower|setairportnetwork)\b"
+            r"|\bairport\s+(?:-z|--disassociate|--associate)\b"
+            r"|\bblueutil\b(?:\s+-[a-zA-Z]+)*\s+-(?:p|power)\b"
+            r"|\bblueutil\b[^|;&]*--power\b"
+        ),
+        "radio_power",
+    ),
+)
+
+
+# Network-exfil refined rules — one per exfil surface.  Distinct from
+# ``network_probe:*`` (idempotent remote queries) in that every tag
+# here says "this command carries LOCAL data outbound".  Emission is
+# driven purely by the main ``_RULES`` loop (no structural-bareness
+# gate), since the point of the family is to tag the command whether
+# it is bare, composed, pipelined, or hidden behind indirection — a
+# policy that denies ``capability:network_exfil:cloud_upload`` wants
+# the deny to fire in all shapes.
+_NETWORK_EXFIL_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    # HTTP body / file-upload shapes.  curl's ``-T|--upload-file``
+    # uploads a file; ``-F name=@path`` / ``--form name=@path``
+    # attaches a file as a multipart part; ``-d|--data|
+    # --data-binary|--data-ascii|--data-urlencode @file`` reads the
+    # body from a file (the ``@`` prefix is what makes curl expand a
+    # local path — ``--data-raw`` does NOT expand ``@`` and is
+    # intentionally excluded).  wget's ``--post-file`` and
+    # ``--body-file`` are the analogous shapes.  HTTPie / xh use
+    # ``name@path`` (legacy) or ``name=@path`` (modern) in the
+    # request-item grammar.
+    (
+        re.compile(
+            r"\bcurl\b[^|;&]*"
+            r"(?:\s-T\b|\s--upload-file\b"
+            r"|\s-F\s+[^\s]*=@"
+            r"|\s--form\s+[^\s]*=@"
+            r"|\s-d\s+@"
+            r"|\s--data(?:-(?:ascii|binary|urlencode))?\s+@)"
+            r"|\bwget\b[^|;&]*\s--(?:post-file|body-file)\b"
+            r"|\b(?:http|https|xh)\b[^|;&]*"
+            r"\s[A-Za-z_][\w.-]*=?@[^@\s|;&]"
+        ),
+        "http_upload",
+    ),
+    # Outbound file transfer — LOCAL to REMOTE direction.
+    # ``scp|rsync`` with a trailing ``[user@]host:<path>`` positional
+    # puts the remote side as the destination (exfil direction).
+    # The regex requires the remote endpoint to sit at command-end
+    # (possibly followed only by whitespace before a pipe / semicolon
+    # / end-of-string) so ``scp user@host:/r /l`` (inbound) stays
+    # untagged.  ``sftp -b <batch-file> [user@]host`` is exfil-
+    # ambiguous (``put`` vs ``get`` inside the batch file); tagged
+    # as a conservative surface.  ``scp|rsync`` where the remote is
+    # NOT the final positional (inbound) stays untagged here but
+    # is still tagged under ``network_probe:file_transfer`` for
+    # structurally-bare forms.
+    (
+        re.compile(
+            r"\b(?:scp|rsync)\b[^|;&]*\s"
+            r"(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:[^\s|;&]*"
+            r"(?=\s*(?:\||;|&|$))"
+            r"|\bsftp\b[^|;&]*\s-b\b"
+        ),
+        "file_transfer_outbound",
+    ),
+    # SSH port forwarding.  ``-R`` reverse (remote listens,
+    # forwards to local), ``-L`` local (local listens, forwards
+    # to remote), ``-D`` dynamic / SOCKS.  All three are classic
+    # pivot / data-tunnel shapes.  Requires a spec argument after
+    # the flag (the forward definition) to keep ``ssh --help``
+    # style invocations untagged.
+    (
+        re.compile(
+            r"\bssh\b[^|;&]*\s-[RLD]\s*\S"
+        ),
+        "ssh_tunnel",
+    ),
+    # Cloud-object-store / MinIO / B2 upload verbs.  Direction-
+    # agnostic: the same ``aws s3 cp`` can be inbound or outbound,
+    # but the verb itself indicates a potential-exfil surface, and
+    # policy can deny the whole family regardless of source /
+    # destination.  ``aws s3api put-object`` /
+    # ``upload-part(-copy)`` / ``create-multipart-upload`` are
+    # strictly outbound by shape.  Intentionally NARROWER than
+    # the corresponding ``network_probe:file_transfer`` rclone
+    # allowlist — only the upload / mirror / mv verbs for each
+    # provider are tagged here.
+    (
+        re.compile(
+            r"\baws\s+s3\s+(?:cp|sync|mv|mb|rb)\b"
+            r"|\baws\s+s3api\s+"
+            r"(?:put-object|upload-part(?:-copy)?"
+            r"|create-multipart-upload)\b"
+            r"|\bgsutil\s+(?:cp|mv|rsync)\b"
+            r"|\bgcloud\s+storage\s+(?:cp|mv|rsync)\b"
+            r"|\baz\s+storage\s+(?:blob|file)\s+upload(?:-batch)?\b"
+            r"|\bmc\s+(?:cp|mv|mirror)\b"
+            r"|\bb2\s+upload-(?:file|unbound-stream)\b"
+        ),
+        "cloud_upload",
+    ),
 )
 
 
@@ -978,6 +1704,16 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         _SYSTEM_MUTATE_RULES,
         CAPABILITY_SYSTEM_MUTATE,
         "Command mutates host {suffix} state",
+    ),
+    # Refined: network-exfil surfaces (one rule per exfil shape).
+    # No base ``capability:network_exfil`` tag is emitted; consumers
+    # prefix-match on ``capability:network_exfil:*``.  Treated as
+    # read-only-incompatible so an exfil-shaped curl / rsync / aws-s3
+    # command never receives a ``read_only:*`` fast-path tag.
+    *_expand_refined(
+        _NETWORK_EXFIL_RULES,
+        CAPABILITY_NETWORK_EXFIL,
+        "Command moves local data outbound via {suffix}",
     ),
     # Compilation / build — compilers and build drivers.
     (
@@ -2098,8 +2834,9 @@ def _safe_for_read_only(
     ``background_exec``, ``download_and_exec``, ``binary_download``,
     ``process_signal``, ``compilation``, or any refined
     ``package_install:*`` / ``script_execution:*`` / ``data_read:*``
-    / ``system_mutate:*`` tag disqualifies the command from receiving
-    any ``read_only:*`` tag.  The ``data_read:*`` / ``system_mutate:*``
+    / ``system_mutate:*`` / ``network_exfil:*`` tag disqualifies the
+    command from receiving any ``read_only:*`` tag.  The
+    ``data_read:*`` / ``system_mutate:*`` / ``network_exfil:*``
     suppression is the classifier-side Option-A gate that prevents a
     sensitive-surface command from also being blessed as a cheap
     read-only fast-path candidate downstream.
@@ -2122,6 +2859,8 @@ def _safe_for_read_only(
         if cap_id.startswith(f"{CAPABILITY_DATA_READ}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SYSTEM_MUTATE}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_NETWORK_EXFIL}:"):
             return False
 
     return True
@@ -2148,16 +2887,16 @@ def _composition_is_all_read_only(
        interpreter indirection).
     4. No already-emitted capability in the read-only-incompatible
        set or the refined package_install / script_execution /
-       data_read / system_mutate families.  This is the single
-       broadest safety gate: any sub-segment that emits
+       data_read / system_mutate / network_exfil families.  This is
+       the single broadest safety gate: any sub-segment that emits
        ``filesystem_write`` (redirects, ``tee``), ``spawns_process``
        (``xargs``, ``sudo``, ``ssh``, ``docker run``, …),
        ``stdin_exec`` (``| sh``, ``| python -``),
        ``download_and_exec`` (``curl … | sh``), ``background_exec``
        (trailing ``&``), ``network_bind``, ``data_read:*``
        (sensitive data reads), ``system_mutate:*`` (host-state
-       mutations), etc. disqualifies the whole composition
-       automatically.
+       mutations), ``network_exfil:*`` (outbound data transfer),
+       etc. disqualifies the whole composition automatically.
     5. Every bare shell token in the re-tokenised command that lies
        in ``_SHELL_COMPOSITION_TOKENS`` must also lie in
        ``_READ_ONLY_COMPOSITION_JOINERS`` — i.e. only ``|``, ``||``,
@@ -2187,6 +2926,8 @@ def _composition_is_all_read_only(
         if cap_id.startswith(f"{CAPABILITY_DATA_READ}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SYSTEM_MUTATE}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_NETWORK_EXFIL}:"):
             return False
 
     try:

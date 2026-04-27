@@ -231,8 +231,9 @@ PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
 })
 
 
-# Sensitive-surface clamp (``data_read:*`` + ``system_mutate:*``).  See
-# the canonical definition in ``intentframe_gateway/bootstrap.py``
+# Sensitive-surface clamp (``data_read:*`` + ``system_mutate:*`` +
+# ``network_exfil:*``).  See the canonical definition in
+# ``intentframe_gateway/bootstrap.py``
 # (``SENSITIVE_SURFACE_DENY_CAPABILITIES``) — both seeders are run
 # against the same registry and an asymmetric seed would silently let
 # whichever seeder ran second relax the other's policy.  This clamp
@@ -244,11 +245,19 @@ SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
     # Sensitive reads (``data_read:*``).
     "capability:data_read:browser_cookies",
     "capability:data_read:browser_profile_data",
+    "capability:data_read:browser_session_data",
     "capability:data_read:auth_authority",
     "capability:data_read:credential_material",
     "capability:data_read:shell_history",
+    "capability:data_read:db_client_history",
     "capability:data_read:messaging_history",
     "capability:data_read:personal_records",
+    "capability:data_read:dotfile_secrets",
+    "capability:data_read:cloud_tokens",
+    "capability:data_read:password_manager_export",
+    "capability:data_read:process_env",
+    "capability:data_read:ssh_known_hosts",
+    "capability:data_read:mail_store",
     # System mutations (``system_mutate:*``).
     "capability:system_mutate:host_network_config",
     "capability:system_mutate:hostname",
@@ -263,6 +272,25 @@ SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:system_mutate:disk_encryption",
     "capability:system_mutate:kernel_tunable",
     "capability:system_mutate:persistence",
+    "capability:system_mutate:mdm_profile",
+    "capability:system_mutate:boot_policy",
+    "capability:system_mutate:audit_log",
+    "capability:system_mutate:tcc_privacy",
+    "capability:system_mutate:backup",
+    "capability:system_mutate:installer_pkg",
+    "capability:system_mutate:kernel_extension",
+    "capability:system_mutate:service_mgmt",
+    "capability:system_mutate:launchd_mutation",
+    "capability:system_mutate:cron_mutation",
+    "capability:system_mutate:browser_extension",
+    "capability:system_mutate:screen_sharing",
+    "capability:system_mutate:print_config",
+    "capability:system_mutate:radio_power",
+    # Outbound data-exfil surfaces (``network_exfil:*``).
+    "capability:network_exfil:http_upload",
+    "capability:network_exfil:file_transfer_outbound",
+    "capability:network_exfil:ssh_tunnel",
+    "capability:network_exfil:cloud_upload",
 })
 
 
