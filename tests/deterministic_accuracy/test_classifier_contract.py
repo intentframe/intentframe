@@ -229,7 +229,106 @@ _TAGGED: list[Pin] = [
 ]
 
 
-PINS: list[Pin] = _CATASTROPHIC + _TAGGED
+# ── Sensitive-surface pins: data_read:* and system_mutate:* ────────
+# These families are the load-bearing carriers of the "sensitive
+# surface" clamp in
+# :data:`intentframe_gateway.bootstrap.SENSITIVE_SURFACE_DENY_CAPABILITIES`.
+# Two contracts matter for each command:
+#
+#   1. The classifier emits the specific sensitive tag so the deny
+#      set in ``python_shell_only`` (and any future profile that
+#      wants to deny the family) actually fires.
+#   2. The classifier does NOT emit ``capability:read_only:*`` \u2014
+#      that's the "Option A" invariant.  A command that is
+#      structurally read-only (``cat``, ``plutil -p``, ``sqlite3 ...
+#      select``) but touches a sensitive surface must never ride
+#      DG's read-only fast-path.  If a regression reintroduces the
+#      read_only tag on any of these, DG would fast-path ALLOW under
+#      laxer profiles and the corpus matrix would regress with a
+#      noisier failure; pinning here keeps blame on the classifier.
+_SENSITIVE_SURFACE: list[Pin] = [
+    # data_read:*
+    Pin(
+        command="plutil -p ~/Library/Cookies/Cookies.binarycookies",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:data_read:browser_cookies"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="browser cookie store read must not ride read_only fast-path",
+    ),
+    Pin(
+        command="cat ~/.zsh_history",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:data_read:shell_history"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="shell history read \u2014 sensitive despite being cat",
+    ),
+    Pin(
+        command=(
+            "sqlite3 ~/Library/Messages/chat.db "
+            "'select text from message limit 5'"
+        ),
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:data_read:messaging_history"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="iMessage DB select \u2014 select does not make it read_only here",
+    ),
+    Pin(
+        command="gpg --export-secret-keys",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:data_read:credential_material"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="secret key export \u2014 classic pre-exfil shape",
+    ),
+    # system_mutate:*
+    Pin(
+        command="networksetup -setdnsservers Wi-Fi 1.2.3.4",
+        verdict="SAFE",
+        must_have_caps=frozenset(
+            {"capability:system_mutate:host_network_config"}
+        ),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="host DNS override",
+    ),
+    Pin(
+        command="scutil --set HostName attacker-controlled.local",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:system_mutate:hostname"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="hostname change",
+    ),
+    Pin(
+        command="pfctl -d",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:system_mutate:firewall"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="firewall disable",
+    ),
+    Pin(
+        command="sysctl -w net.ipv4.ip_forward=1",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:system_mutate:kernel_tunable"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="kernel tunable write",
+    ),
+    Pin(
+        command="echo '1.2.3.4 evil.local' | tee -a /etc/hosts",
+        verdict="SAFE",
+        must_have_caps=frozenset({"capability:system_mutate:hosts_file"}),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        note="hosts-file tamper \u2014 tee -a emits system_mutate + filesystem_write",
+    ),
+]
+
+
+PINS: list[Pin] = _CATASTROPHIC + _TAGGED + _SENSITIVE_SURFACE
 
 
 @pytest.mark.parametrize("pin", PINS, ids=lambda p: p.command)

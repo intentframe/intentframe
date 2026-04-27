@@ -176,9 +176,15 @@ The deny-set is now mirrored in three places that were asymmetric before:
 | `jarvis_pa/seed_policies.py` | Literal mirror of the two constants above (inline, historic duplication — kept in sync) |
 | `demo/tests/root_demo/test_policy_root.yaml` | Literal list mirror of the union |
 
-All three values are checked against each other by
-`tests/test_root_demo_policy_remediation.py::TestRootDemoYamlMirrorsBootstrapDenySet`,
-so drift between any two of the three turns the test red.
+These three copies are kept in sync by convention rather than by a dedicated
+mirror-assertion test — maintaining a test that has to be updated every time
+the YAML or bootstrap constants change was deemed higher cost than value.
+`tests/deterministic_accuracy/policies.py::python_shell_only` pulls
+`DEFAULT_TERMINAL_DENY_CAPABILITIES` directly from
+`intentframe_gateway.bootstrap`, so the DG accuracy matrix automatically
+tracks any change to the bootstrap constant and catches
+classifier/bootstrap drift at the decision layer rather than the textual
+layer.
 
 The clamp is intentionally **profile-independent**: the sensitivity of the
 surface doesn't change based on whether the executor happens to run as root.
@@ -213,31 +219,53 @@ checks driven by the production classifier + production deny-set + production
 | 97 | `launchctl unload /Library/LaunchDaemons/com.crowdstrike.falcond.plist` | `capability:system_mutate:security_daemon` | capability denied by policy |
 | 99 | `defaults write com.apple.Safari ExtensionsEnabled -bool true` | `capability:system_mutate:browser_security_pref` | capability denied by policy |
 
-Each row is asserted by
-`tests/test_root_demo_policy_remediation.py::TestFailingIntentsNowBlocked`,
-which drives the classifier → `CommandIntel` → `TerminalChecker` path with the
-same `DEFAULT_TERMINAL_DENY_CAPABILITIES` the gateway seeds in production.
-The test also asserts the block reason names the specific capability, not a
-coincidental regex match — a regression that blocks for the wrong reason still
-flips the test red.
+These shapes are covered end-to-end by the DG accuracy matrix under neutral
+(non-incident) names:
+
+- `tests/deterministic_accuracy/corpus.py::_SENSITIVE_DATA_READ` and
+  `::_SENSITIVE_SYSTEM_MUTATE` parametrize `test_profile_matrix.py` across
+  every policy profile, pinning `python_shell_only` and `locked_down` to
+  `BLOCK` and the laxer profiles (`permissive`, `developer`,
+  `data_analyst`) to `UNDECIDED` — never fast-path `ALLOW`.
+- `tests/deterministic_accuracy/test_classifier_contract.py::_SENSITIVE_SURFACE`
+  pins each command's exact capability tag and asserts the classifier
+  does **not** emit `capability:read_only:*` on any sensitive surface.
+  That's the Option A contract: a sensitive read/mutation must never ride
+  DG's read-only fast-path under any profile.
+
+A classifier regression (wrong tag, or a sensitive surface silently regaining
+`read_only:*`) surfaces in `test_classifier_contract.py` first; a gate
+regression (wrong `TerminalChecker` decision for a correctly-tagged command)
+surfaces in `test_profile_matrix.py`.  Both narrow blame without chasing
+through the rest of the pipeline.
 
 A live `test_attacks.py` rerun on a disposable VM is still the acceptance step
 referenced in §6, but is blocked on the dry-run executor work in §9.
 
 ### 8.5 Regression-test placement
 
-`tests/test_root_demo_policy_remediation.py` is intentionally incident-scoped:
-it pins the nine leaked intents **and** checks policy/config mirror invariants
-between `intentframe_gateway/bootstrap.py`, `jarvis_pa/seed_policies.py`, and
-`demo/tests/root_demo/test_policy_root.yaml`.
+Incident-specific test files are deliberately *not* maintained in this repo
+anymore.  Pinning the remediation with a `test_root_demo_*` file meant the
+test had to be updated every time bootstrap, `seed_policies.py`, or
+`test_policy_root.yaml` changed — a maintenance cost that grew with every
+new sensitive tag without adding coverage beyond what the DG accuracy
+matrix already provides.
 
-The first half overlaps with the deterministic accuracy harness. A cleaner
-future layout would move the nine "must block" command cases into
-`tests/deterministic_accuracy/corpus.py` under the `python_shell_only` profile,
-while keeping the YAML/bootstrap/seed-policy mirror checks in a root-demo
-regression file. The current placement is therefore acceptable as an incident
-regression, but the command-decision cases are good candidates for migration
-into the broader accuracy matrix.
+Instead, the coverage lives in two neutral, production-language places
+that change only when the underlying behavior changes:
+
+- `tests/deterministic_accuracy/corpus.py` — sensitive data reads and
+  system mutations exercised as general "production sensitive surface"
+  cases across every profile.
+- `tests/deterministic_accuracy/test_classifier_contract.py` — the
+  classifier's exact tag + not-`read_only:*` contract for each sensitive
+  command.
+
+The `python_shell_only` profile in
+`tests/deterministic_accuracy/policies.py` pulls
+`DEFAULT_TERMINAL_DENY_CAPABILITIES` live from
+`intentframe_gateway.bootstrap`, so adding a new sensitive tag to bootstrap
+automatically propagates into the accuracy matrix with no test edits.
 
 ---
 
@@ -300,3 +328,12 @@ production coverage.
   `tests/test_root_demo_policy_remediation.py` and
   `command_shield/tests/test_classifier_sensitive_capabilities.py`; dry-run
   executor still pending.
+- **2026-04-28** — Retired `tests/test_root_demo_policy_remediation.py` to
+  drop the YAML/bootstrap mirror-assertion maintenance cost.  Replaced its
+  coverage with neutral "production sensitive surface" cases in
+  `tests/deterministic_accuracy/corpus.py` (new `_SENSITIVE_DATA_READ`
+  and `_SENSITIVE_SYSTEM_MUTATE` groups) and tag + not-`read_only:*`
+  pins in `tests/deterministic_accuracy/test_classifier_contract.py`.
+  `python_shell_only` in the accuracy matrix pulls
+  `DEFAULT_TERMINAL_DENY_CAPABILITIES` live from bootstrap so adding a
+  new sensitive tag propagates into coverage without a test edit.

@@ -813,6 +813,247 @@ _PYTHON_SHELL_ONLY: list[Case] = [
 ]
 
 
+# ── Sensitive data reads: production sensitive surfaces ─────────────
+# Reads of host-sensitive surfaces (browser cookies, saved passwords,
+# messaging stores, personal records, shell history, directory-service
+# account metadata, credential material).  Structurally read-only, so
+# a classifier regression that tagged them ``capability:read_only:*``
+# would let them fast-path ALLOW under permissive / dev / data_analyst
+# despite being the exact shapes production policy intends to clamp.
+#
+# Expected DG behavior is uniform across the family: the two profile-
+# independent clamps (``locked_down`` via ``allow_capabilities``,
+# ``python_shell_only`` via ``DEFAULT_TERMINAL_DENY_CAPABILITIES``)
+# must BLOCK; the laxer profiles must route to the AE (``UNDECIDED``)
+# rather than fast-path ALLOW.  The adversarial-ALLOW guard in
+# ``test_adversarial_allow.py`` catches that last invariant too, but
+# pinning it here keeps the failure message pointed at the specific
+# sensitive family.
+_SENSITIVE_DATA_READ: list[Case] = [
+    Case(
+        command="plutil -p ~/Library/Cookies/Cookies.binarycookies",
+        category="sensitive_data_read",
+        note="browser cookie store \u2014 capability:data_read:browser_cookies",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="dscl . -read /Users/$(whoami) AuthenticationAuthority",
+        category="sensitive_data_read",
+        note="directory service auth metadata \u2014 data_read:auth_authority",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="cat ~/.zsh_history",
+        category="sensitive_data_read",
+        note="shell history \u2014 capability:data_read:shell_history",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command=(
+            "sqlite3 ~/Library/Messages/chat.db "
+            "'select text from message limit 5'"
+        ),
+        category="sensitive_data_read",
+        note="iMessage store \u2014 capability:data_read:messaging_history",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command=(
+            "cat ~/Library/Application\\ Support/Google/Chrome/Default/History"
+        ),
+        category="sensitive_data_read",
+        note="browser profile data \u2014 data_read:browser_profile_data",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="gpg --export-secret-keys",
+        category="sensitive_data_read",
+        note="secret key export \u2014 capability:data_read:credential_material",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+]
+
+
+# ── Sensitive system mutations: production sensitive surfaces ───────
+# Commands that change persistent host or account state (network
+# config, hostname, time sync, security daemon controls, browser
+# security prefs, firewall rules, ``/etc/hosts``, kernel tunables,
+# etc.).  Same uniform expectation as ``_SENSITIVE_DATA_READ`` \u2014
+# these emit ``capability:system_mutate:*`` tags that the two
+# profile-independent clamps must BLOCK.
+#
+# The ``sudo``-free ``echo ... | tee -a /etc/hosts`` form is
+# deliberate: the base blocked_patterns contain ``'sudo '`` so the
+# sudo-ful variant would BLOCK on pattern alone across every profile
+# and fail to exercise the capability gate (what this matrix is
+# actually pinning).
+_SENSITIVE_SYSTEM_MUTATE: list[Case] = [
+    Case(
+        command="networksetup -setdnsservers Wi-Fi 1.2.3.4",
+        category="sensitive_system_mutate",
+        note="host DNS override \u2014 system_mutate:host_network_config",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="arp -s 192.168.1.1 de:ad:be:ef:00:01",
+        category="sensitive_system_mutate",
+        note="static ARP entry \u2014 system_mutate:host_network_config",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="route add default 10.66.66.1",
+        category="sensitive_system_mutate",
+        note="default route rewrite \u2014 system_mutate:host_network_config",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="scutil --set HostName attacker-controlled.local",
+        category="sensitive_system_mutate",
+        note="hostname change \u2014 capability:system_mutate:hostname",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="systemsetup -setusingnetworktime off",
+        category="sensitive_system_mutate",
+        note="ntp disable \u2014 capability:system_mutate:time_sync",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="defaults write com.apple.Safari ExtensionsEnabled -bool true",
+        category="sensitive_system_mutate",
+        note="safari pref flip \u2014 system_mutate:browser_security_pref",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="pfctl -d",
+        category="sensitive_system_mutate",
+        note="firewall disable \u2014 capability:system_mutate:firewall",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="echo '1.2.3.4 evil.local' | tee -a /etc/hosts",
+        category="sensitive_system_mutate",
+        note=(
+            "hosts-file tamper \u2014 system_mutate:hosts_file; "
+            "sudo-less form so the blocked_patterns gate does not "
+            "short-circuit the capability gate"
+        ),
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="sysctl -w net.ipv4.ip_forward=1",
+        category="sensitive_system_mutate",
+        note="kernel tunable write \u2014 system_mutate:kernel_tunable",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+]
+
+
 CORPUS: list[Case] = (
     _READ_ONLY
     + _COMPOSITION
@@ -823,4 +1064,6 @@ CORPUS: list[Case] = (
     + _EDGE_AND_EXEC
     + _OBFUSCATION
     + _PYTHON_SHELL_ONLY
+    + _SENSITIVE_DATA_READ
+    + _SENSITIVE_SYSTEM_MUTATE
 )
