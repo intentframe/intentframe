@@ -224,6 +224,21 @@ flips the test red.
 A live `test_attacks.py` rerun on a disposable VM is still the acceptance step
 referenced in §6, but is blocked on the dry-run executor work in §9.
 
+### 8.5 Regression-test placement
+
+`tests/test_root_demo_policy_remediation.py` is intentionally incident-scoped:
+it pins the nine leaked intents **and** checks policy/config mirror invariants
+between `intentframe_gateway/bootstrap.py`, `jarvis_pa/seed_policies.py`, and
+`demo/tests/root_demo/test_policy_root.yaml`.
+
+The first half overlaps with the deterministic accuracy harness. A cleaner
+future layout would move the nine "must block" command cases into
+`tests/deterministic_accuracy/corpus.py` under the `python_shell_only` profile,
+while keeping the YAML/bootstrap/seed-policy mirror checks in a root-demo
+regression file. The current placement is therefore acceptable as an incident
+regression, but the command-decision cases are good candidates for migration
+into the broader accuracy matrix.
+
 ---
 
 ## 9. Remaining work
@@ -248,6 +263,32 @@ material", "no mutating host network without explicit authorization") would
 give the AE explicit operator boundaries for shapes the regex can't reduce
 cleanly (e.g. `cat $(echo ~)/Library/Keychains/...`).  These should mirror a
 future production `INTENT_LIMITS` extension in `intentframe_gateway/bootstrap.py`.
+
+### 9.3 Capability taxonomy gaps — pending
+
+The new `capability:data_read:*` and `capability:system_mutate:*` families close
+the nine observed leak surfaces and their nearest siblings; they do **not** make
+`command_shield` a complete sensitive-surface ontology. Known remaining areas
+include:
+
+- Sensitive reads: dotfile secrets such as `.env`, `.npmrc`, and `.pypirc`;
+  additional cloud token stores; database client histories; browser Local
+  Storage / Session Storage / IndexedDB; more password-manager vault/export
+  formats; and process environment dumps.
+- System mutations: MDM/profile installs; boot-policy and firmware settings
+  (`bless`, `nvram`, `bputil`, `csrutil`); audit/log tampering; Time Machine /
+  backup tampering; TCC/privacy database writes; browser extension install
+  policy paths; `installer -pkg`; system extension / kext management; CUPS
+  administration; Bluetooth/Wi-Fi/screen-sharing toggles; and Linux service
+  management.
+- Exfiltration / C2: many obvious cases are already catastrophic, but there is
+  no clean policy-grippable `capability:network_exfil:*` family yet.
+
+`command_shield/README.md` now documents these gaps explicitly. The classifier
+infrastructure can emit these as additional refined capabilities without
+changing the public `CommandReport` contract, but each new subtag should land
+with positive/negative tests and policy-deny mirroring before being treated as
+production coverage.
 
 ---
 

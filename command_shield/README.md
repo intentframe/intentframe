@@ -349,6 +349,31 @@ Current capability families:
   - `capability:network_probe:http_download` (`curl -o` / `-O` / `--output` / `--remote-name`, `wget` in default (non-`-O -`) mode — response persisted to disk; does NOT imply `capability:filesystem_write` which is reserved for shell redirects / `tee`)
   - `capability:network_probe:port_scan`     (`nmap`, `masscan`, `zmap`, `nc` / `ncat` / `netcat` in connect mode — `-l` / `-k` listen forms stay under `network_bind`)
   - `capability:network_probe:file_transfer` (`scp`, `sftp`, `rsync` with a `[user@]host:` endpoint, `rclone` `copy` / `sync` / `move` / `mount` / `serve` / `ls` / `cat` / `md5sum` / `check` / etc.)
+- sensitive data read (policy-grippable family — emitted for reads of
+  high-risk local data even when the tool itself is otherwise read-only):
+  - `capability:data_read:browser_cookies`   (browser cookie stores such as Safari / Chrome / Firefox cookie databases)
+  - `capability:data_read:browser_profile_data` (browser login/profile artifacts such as `Login Data`, `Web Data`, `History`, `Bookmarks`, and Firefox profile stores)
+  - `capability:data_read:auth_authority`    (local account authentication metadata such as macOS `AuthenticationAuthority`)
+  - `capability:data_read:credential_material` (credential-bearing files and commands: SSH private-key reads, GPG secret-key exports, password-manager vault/database examples, selected token stores)
+  - `capability:data_read:shell_history`     (`.bash_history`, `.zsh_history`, `.fish_history`, and similar shell histories)
+  - `capability:data_read:messaging_history` (local chat/message databases such as iMessage, WhatsApp, Signal, and Telegram stores)
+  - `capability:data_read:personal_records`  (local contacts, notes, mail, and photo-library data)
+- system mutation (policy-grippable family — emitted for commands that
+  alter host security, identity, account, networking, or persistence
+  surfaces):
+  - `capability:system_mutate:host_network_config` (DNS, ARP, routing, network interface, Wi-Fi/networksetup changes)
+  - `capability:system_mutate:hostname`       (`hostname`, `scutil --set HostName`, and related host identity changes)
+  - `capability:system_mutate:time_sync`      (`systemsetup` time/NTP changes and related trust-time settings)
+  - `capability:system_mutate:security_daemon` (security product / daemon load-unload or disable attempts)
+  - `capability:system_mutate:browser_security_pref` (browser security preference writes such as Safari extension toggles)
+  - `capability:system_mutate:firewall`       (`pfctl`, `iptables`, `nft`, `ufw`, `firewall-cmd`, `socketfilterfw` mutations)
+  - `capability:system_mutate:hosts_file`     (writes to `/etc/hosts` via redirects, `tee`, copy/move, `sed -i`, or interpreter writes)
+  - `capability:system_mutate:privilege_config` (`visudo`, sudoers/passwd/shadow/group/PAM config mutations)
+  - `capability:system_mutate:user_account`   (`dseditgroup`, `pwpolicy`, `dscl` account deletes/password changes, `sysadminctl`, `useradd`, `usermod`, `passwd <user>`, etc.)
+  - `capability:system_mutate:remote_access`  (`systemsetup` remote-login, wake-on-network, and sleep/remote-access settings)
+  - `capability:system_mutate:disk_encryption` (`fdesetup` FileVault enable/disable/user/recovery-key mutations)
+  - `capability:system_mutate:kernel_tunable` (`sysctl -w`, `sysctl name=value`, `sysctl -p`)
+  - `capability:system_mutate:persistence`    (`at` jobs not already catastrophic, AppleScript login-item persistence, and related persistence setup)
 - `capability:compilation`
 - `capability:filesystem_write`
 - `capability:network_bind`
@@ -367,11 +392,15 @@ or `capability:read_only:*`.
 
 The gateway's default Jarvis command policy uses these tags to keep the
 runtime command surface to bash/shell commands, POSIX utilities, and
-Python. It denies non-python, non-shell language runtimes (Node, Ruby,
+Python while also denying the profile-independent sensitive surfaces
+above. It denies non-python, non-shell language runtimes (Node, Ruby,
 Perl, PHP, Java, Go, Lua, R, Julia, Swift, Deno/Bun, local binaries,
 compilers, and non-python package ecosystems) while keeping POSIX tools
 such as `awk`, `sed`, `grep`, `cut`, `sort`, `find`, `tr`, `head`,
-`tail`, and `wc` available.
+`tail`, and `wc` available. Separately, it denies
+`capability:data_read:*` and `capability:system_mutate:*` tags so a
+normally read-only tool like `cat`, `sqlite3`, `plutil`, or `dscl` does
+not fast-path when it targets sensitive local state.
 
 #### The read-only fast-path family
 
@@ -397,7 +426,8 @@ when **all** of the following hold:
 5. No incompatible capability already emitted on the same command —
    `stdin_exec`, `filesystem_write`, `spawns_process`, `network_bind`,
    `background_exec`, `download_and_exec`, `binary_download`,
-   `process_signal`, `compilation`, `package_install:*`, `script_execution:*`.
+   `process_signal`, `compilation`, `package_install:*`,
+   `script_execution:*`, `data_read:*`, or `system_mutate:*`.
 6. The normalized command (with trusted-path head normalisation
    applied — see below) fully matches one of the per-family head
    regexes (which themselves exclude destructive flag modes like
@@ -417,8 +447,8 @@ sub-tag is emitted iff **all** of the following hold:
    `filesystem_write` (redirect, `tee`), `spawns_process` (`xargs`,
    `sudo`, `ssh`, `docker run`), `stdin_exec` (`| sh`, `| python -`),
    `download_and_exec` (`curl … | sh`), `background_exec` (trailing
-   `&`), `package_install:*`, or `script_execution:*` disqualifies
-   the whole composition automatically.
+   `&`), `package_install:*`, `script_execution:*`, `data_read:*`, or
+   `system_mutate:*` disqualifies the whole composition automatically.
 4. Every sub-command is independently either (a) a safe literal `cd`
    — `cd`, `cd -`, or `cd <arg>` with no shell metacharacters in the
    arg — or (b) a head that matches one of the single-head read-only
@@ -464,6 +494,8 @@ use the combination
     and "capability:filesystem_write" not in report.capabilities
     and "capability:stdin_exec"        not in report.capabilities
     and not any(c.startswith("capability:network_probe:") for c in report.capabilities)
+    and not any(c.startswith("capability:data_read:") for c in report.capabilities)
+    and not any(c.startswith("capability:system_mutate:") for c in report.capabilities)
     and not any(s.signal_id.startswith("edge:") for s in report.signals)
     and (report.code_intel is None or not report.code_intel.findings)
 
@@ -474,7 +506,37 @@ passive reads — `ls`, `cat README.md`, `ps aux`, `grep foo src/`,
 explicit `not …network_probe` exclusion is defensive — the structural
 gate already prevents a single command from carrying both a
 `read_only:*` and a `network_probe:*` tag, but the belt-and-braces
-check keeps the fast-path honest if either family expands.
+check keeps the fast-path honest if any of these families expands.
+
+#### Sensitive-surface capability families
+
+`capability:data_read:*` and `capability:system_mutate:*` are
+policy-grippable facts added after the 2026-04-27 root-profile attack
+sweep exposed commands that were syntactically ordinary but security
+sensitive in context. Examples:
+
+```
+cat ~/.zsh_history
+sqlite3 ~/Library/Messages/chat.db 'select text from message limit 5'
+plutil -p ~/Library/Cookies/Cookies.binarycookies
+networksetup -setdnsservers Wi-Fi 1.2.3.4
+route add default 10.66.66.1
+systemsetup -setusingnetworktime off
+defaults write com.apple.Safari ExtensionsEnabled -bool true
+```
+
+These tags do not change `CommandReport.verdict`. A sensitive read can
+still return `SAFE` from the fixed-pattern layer, because `SAFE` means
+"no hard-coded catastrophic/review pattern matched", not "this is
+allowed". The policy layer decides whether to block by matching
+capabilities.
+
+The read-only family has an explicit **Option A** interaction with these
+families: if a command emits any `capability:data_read:*` or
+`capability:system_mutate:*` tag, no `capability:read_only:*` tag is
+emitted for the same command. This prevents a command like
+`cat ~/.bash_history | tail -50` from looking like a passive
+read-only composition to the deterministic Guardian fast-path.
 
 #### The network-probe family
 
@@ -514,6 +576,47 @@ Within a single command only one HTTP sub-tag is emitted: the rule
 table is ordered `http_mutate` → `http_download` → `http_get` so the
 strictest applicable tag wins.  A POST `curl` is never downgraded to
 `http_get` and a `curl -o file` is never masqueraded as idempotent.
+
+#### Known taxonomy gaps
+
+The capability taxonomy is deliberately incremental. It now covers the
+root-demo leak surfaces and their immediate siblings, but it is not a
+complete sensitive-surface ontology. Known missing or partial areas:
+
+- **Sensitive reads:** dotfile secrets (`.env`, `.envrc`, `.npmrc`,
+  `.pypirc`, language package-manager configs), cloud token stores
+  beyond the currently catastrophic AWS/Kube examples, database client
+  histories (`.mysql_history`, `.sqlite_history`, `.rediscli_history`,
+  Mongo shell history), browser `Local Storage` / `Session Storage` /
+  `IndexedDB`, more password-manager export and vault formats, process
+  environment dumps (`/proc/<pid>/environ`, `ps eww`,
+  `launchctl print`), and SSH/config reconnaissance surfaces.
+- **System mutations:** MDM/profile installs, boot-policy and firmware
+  settings (`bless`, `nvram`, `bputil`, `csrutil`), audit/log tampering,
+  Time Machine / backup tampering, TCC/privacy database writes, browser
+  extension install-policy paths, `installer -pkg`, system extension /
+  kext management, CUPS/printer administration, Bluetooth/Wi-Fi/screen
+  sharing toggles, and Linux service management (`systemctl`, `service`,
+  `chkconfig`, `update-rc.d`).
+- **Network exfiltration / C2:** obvious reverse shells,
+  download-and-exec shapes, and some credential exfiltration commands
+  are already caught by `patterns/exfiltration.json` or existing
+  network/file-transfer tags. They are not yet represented as a clean
+  policy family such as `capability:network_exfil:http_post_data`,
+  `capability:network_exfil:file_transfer_outbound`,
+  `capability:network_exfil:reverse_shell`,
+  `capability:network_exfil:ssh_tunnel`,
+  `capability:network_exfil:dns_exfil`, or
+  `capability:network_exfil:cloud_upload`.
+
+The existing infrastructure can emit all of these without changing the
+public `CommandReport` contract: add refined classifier rules for new
+capability tags, add pattern-pack entries for verdict-bearing hard
+stops, or surface structural signals when the command is too dynamic to
+classify safely. Policy consumers should treat the current list as
+coverage for known high-value surfaces, not as a promise that every
+sensitive read, host mutation, or exfiltration technique has a named
+capability today.
 
 ### 4. Containment-edge extraction and walk
 
@@ -852,6 +955,8 @@ Useful for offline triage or explicit deep-review flows.
 - Allow `pip` but deny `apt`? → allow `capability:package_install:pip`, deny `capability:package_install:apt`
 - Allow Python scripts but deny Node? → allow `capability:script_execution:python`, deny `capability:script_execution:node`
 - Fast-path obviously read-only commands (no AE call)? → allow on `capability:read_only:*` when no deny capabilities fire
+- Deny sensitive local data reads? → deny `capability:data_read:*`
+- Deny host/account/security-surface mutations? → deny `capability:system_mutate:*`
 - Deny all listeners? → deny `capability:network_bind`
 - Deny any file writes via shell redirection? → deny `capability:filesystem_write`
 - Deny any code touching system paths? → deny `FILE_SYSTEM_ESCAPE_OPEN`
