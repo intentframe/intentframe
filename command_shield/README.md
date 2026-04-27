@@ -397,16 +397,11 @@ Current capability families:
     `capability:stdin_exec:perl`, and `capability:stdin_exec:php`
 
 Callers can match exact tags or prefixes like `capability:package_install:*`
-or `capability:read_only:*`.  Policy patterns can also bind to the
-MITRE ATT&CK tactic a rule rolls up to — e.g.
-`capability:credential_access:*` transparently matches every tag
-whose `mitre_family` is `credential_access` in the YAML corpus
-(`capability:data_read:browser_cookies`,
-`capability:data_read:dotfile_secrets`, …).  The aliasing is
-metadata-only: the classifier still emits the legacy ID, so adding a
-new sub-tag under an already-covered tactic requires zero policy
-edits.  See [`COVERAGE.md`](COVERAGE.md) for the full tactic →
-rule table.
+or `capability:read_only:*`.  The YAML corpus also records the MITRE
+ATT&CK tactic each rule rolls up to, but that mapping is documentation
+metadata: the classifier still emits Command Shield's native IDs, such
+as `capability:data_read:browser_cookies`.  See
+[`COVERAGE.md`](COVERAGE.md) for the full tactic → rule table.
 
 ### Source of truth
 
@@ -414,20 +409,18 @@ The three refined sensitive-surface families (`data_read:*`,
 `system_mutate:*`, `network_exfil:*`) live in
 [`command_shield/capabilities/*.yaml`](capabilities/) — the
 classifier loads them at import time and compiles the regex column
-in place.  Adding a new sub-tag is now a two-file change:
+in place.  Adding a new sub-tag is now a Command Shield-local data
+change:
 
 1. Append a row to the relevant YAML with `id`, `family`, `suffix`,
    `pattern`, `sensitive: true`, `mitre_family`, and
    `mitre_techniques`.
 2. Regenerate the coverage table with
-   `.venv/bin/python scripts/generate_coverage_md.py`.
+   `.venv/bin/python command_shield/generate_coverage_md.py`.
 
-`SENSITIVE_SURFACE_DENY_CAPABILITIES` in both
-`intentframe_gateway/bootstrap.py` and `jarvis_pa/seed_policies.py`
-auto-derives from the YAML's `sensitive: true` column — there is no
-longer a parallel frozen-set to keep in sync.  A contract test
-(`command_shield/tests/test_capabilities_corpus.py`) locks the
-parity.
+Consumers continue to see the same emitted `capability:*` tags as
+before.  Any policy deny-list, allow-list, or bootstrap behavior that
+uses those tags is outside Command Shield's package boundary.
 
 ### Coverage telemetry
 

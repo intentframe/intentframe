@@ -13,7 +13,7 @@ Each YAML file is a list of rules with the following shape::
       family:           data_read | system_mutate | network_exfil
       suffix:           snake_case sub-tag name
       pattern:          Python regex (compiled with re.compile, no flags)
-      sensitive:        true | false     # auto-derives the deny clamp
+      sensitive:        true | false     # included in sensitive-tag summaries
       mitre_family:     MITRE ATT&CK tactic (credential_access, persistence,
                                              defense_evasion, collection,
                                              exfiltration, privilege_escalation,
@@ -21,11 +21,11 @@ Each YAML file is a list of rules with the following shape::
                                              lateral_movement, command_and_control)
       mitre_techniques: list of MITRE ATT&CK technique IDs (T####[.###])
 
-Adding a new sub-tag is now a pure data PR: append a row to the
-relevant YAML and add a fixture.  The classifier, the policy frozen-
-sets in :mod:`intentframe_gateway.bootstrap` and
-:mod:`jarvis_pa.seed_policies`, and the coverage map in
-``command_shield/COVERAGE.md`` are all auto-derived from this data.
+Adding a new sub-tag is a data-first change inside Command Shield:
+append a row to the relevant YAML and add a fixture.  The classifier
+and the coverage map in ``command_shield/COVERAGE.md`` are derived
+from this data; downstream consumers decide independently how to use
+the emitted ``capability:*`` tags.
 """
 
 from __future__ import annotations
@@ -84,12 +84,10 @@ class CapabilityCorpus:
     def sensitive_capability_ids(self) -> frozenset[str]:
         """Set of ``capability:<family>:<suffix>`` IDs where ``sensitive``.
 
-        Used by the bootstrap / seeder frozen-sets as the single source
-        of truth for which tags are denied by the default terminal
-        constraints.  Stable across ordering: de-duplicates the
+        Stable across ordering: de-duplicates the
         ``<family>:<suffix>`` pair across rows that share a suffix
         (e.g. ``data_read:cloud_tokens`` splits across file and verb
-        shapes but is a single deny-list entry).
+        shapes but is a single emitted capability tag).
         """
         return frozenset(
             f"capability:{r.family}:{r.suffix}"
@@ -112,16 +110,11 @@ class CapabilityCorpus:
                 ...
             }
 
-        Consumed by :mod:`policy_registry.constraints._capability_match`
-        so a policy expressed against MITRE tactic names (``capability:
-        credential_access:*``, ``capability:persistence:*``) matches
-        today's legacy ``capability:data_read:*`` /
-        ``capability:system_mutate:*`` / ``capability:network_exfil:*``
-        tags without requiring the classifier to emit two IDs per rule.
-        This is the "one-release alias" layer: new policies can use
-        MITRE names now; old policies using legacy names keep working;
-        whenever emission flips to MITRE names the alias map becomes
-        the legacy-compat shim.
+        The classifier still emits Command Shield's native families
+        (``capability:data_read:*``, ``capability:system_mutate:*``,
+        ``capability:network_exfil:*``).  This helper exposes the
+        documentation mapping to MITRE-aligned names without changing
+        that emission contract.
         """
         out: dict[str, str] = {}
         for r in self.rules:
@@ -133,10 +126,8 @@ class CapabilityCorpus:
     def mitre_family_names(self) -> frozenset[str]:
         """Set of MITRE tactic names referenced by any rule.
 
-        Used to decide whether a policy pattern like
-        ``capability:credential_access:*`` is a MITRE-alias pattern
-        (in which case it needs the alias lookup) or a legacy
-        top-level pattern (``capability:data_read:*``, straight match).
+        Useful for coverage summaries and presentations that group
+        Command Shield's native emitted tags by MITRE tactic.
         """
         return frozenset(r.mitre_family for r in self.rules)
 

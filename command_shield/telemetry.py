@@ -16,8 +16,8 @@ top N — stopping when the counter flat-lines.  Until that counter
 exists, the classifier's coverage argument is untestable.
 
 Disabled by default (log level DEBUG) so turning telemetry on is an
-opt-in decision.  Enable via :data:`LOG_NAME` at DEBUG in the
-gateway's logging config:
+opt-in decision.  Enable via :data:`LOG_NAME` at DEBUG in the caller's
+logging config:
 
 .. code-block:: python
 
@@ -43,12 +43,11 @@ LOG_NAME: Final[str] = "command_shield.telemetry"
 _logger = logging.getLogger(LOG_NAME)
 
 
-# Top-level capability families that count as "already covered by a
-# sensitive-surface tag" for the purposes of this hook.  Covers both
-# the legacy ``data_read`` / ``system_mutate`` / ``network_exfil``
-# families and the MITRE aliases — so a future emission flip (see
-# ``policy_registry.constraints._capability_match``) is transparent
-# to this check.
+# Capability prefixes that count as "already covered by a
+# sensitive-surface tag" for the purposes of this hook.  The first
+# three are Command Shield's native emitted families; the MITRE-aligned
+# prefixes are retained as accepted presentation aliases for callers
+# that choose to normalize tags before recording telemetry.
 _SENSITIVE_CAPABILITY_PREFIXES: Final[frozenset[str]] = frozenset({
     "capability:data_read:",
     "capability:system_mutate:",

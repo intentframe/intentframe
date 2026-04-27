@@ -10,7 +10,7 @@ either a new MITRE technique being published or a production miss.
 
 Regenerate after editing any YAML file::
 
-    .venv/bin/python scripts/generate_coverage_md.py
+    .venv/bin/python command_shield/generate_coverage_md.py
 """
 
 from __future__ import annotations
@@ -25,13 +25,15 @@ HEADER = """# Command Shield — Classifier Coverage Map
 
 > **This file is auto-generated from
 > `command_shield/capabilities/*.yaml` by
-> `scripts/generate_coverage_md.py`.  Do not hand-edit — update the
+> `command_shield/generate_coverage_md.py`.  Do not hand-edit — update the
 > YAML and regenerate.**
 
-The classifier's sensitive-surface capability families map 1:1 to
-MITRE ATT&CK (Enterprise) tactics.  Each row is a rule in the YAML
-corpus; the `capability` column is the literal ID the classifier
-emits and that `SENSITIVE_SURFACE_DENY_CAPABILITIES` clamps.
+The classifier's sensitive-surface capability families are annotated
+with MITRE ATT&CK (Enterprise) tactics.  Each row is a rule in the
+YAML corpus; the `capability` column is the literal ID the classifier
+emits.  Rows marked `sensitive: true` are included in
+`CORPUS.sensitive_capability_ids()`, which callers may use when
+building their own policy or reporting surfaces.
 
 When every MITRE tactic a shell-and-python operator can reasonably
 reach has at least one row, the classifier is **done** for that
@@ -44,8 +46,8 @@ Tactics not currently mapped (intentional out-of-scope for a
 shell+python operator — listed here so reviewers know the gap is
 deliberate):
 
-- `initial_access` — handled upstream by the gateway, not by the
-  command classifier.
+- `initial_access` — outside the scope of this pre-exec command
+  classifier.
 - `reconnaissance`, `resource_development` — pre-compromise; no
   on-host shell shape to tag.
 - `impact` — destructive shapes (``rm -rf /``, ``mkfs``, ``dd``)
@@ -116,8 +118,8 @@ TACTIC_BLURB: dict[str, str] = {
         "``capability:script_execution:*``, "
         "``capability:stdin_exec:*``, and "
         "``capability:download_and_exec``; not re-enumerated here "
-        "since none of them are members of "
-        "``SENSITIVE_SURFACE_DENY_CAPABILITIES``."
+        "since they are not part of the sensitive-surface classifier "
+        "families documented in this map."
     ),
     "impact": (
         "Destructive shapes — caught by the catastrophic pattern "

@@ -4,10 +4,9 @@ Locks invariants the data migration is supposed to preserve:
 
 - Every rule row has every required field with valid types.
 - ``mitre_family`` is drawn from the fixed MITRE ATT&CK allowlist.
-- ``SENSITIVE_SURFACE_DENY_CAPABILITIES`` in both seeder modules
-  equals the corpus's auto-derived sensitive set.
-- MITRE alias matcher resolves canonical classifier tags to the
-  right ``capability:<mitre_tactic>:<suffix>`` policy prefix.
+- Sensitive capability IDs are derived from the YAML rows themselves.
+- MITRE alias helpers resolve canonical classifier tags to the
+  right ``capability:<mitre_tactic>:<suffix>`` presentation tag.
 - ``COVERAGE.md`` mentions every rule.
 """
 
@@ -19,13 +18,6 @@ from pathlib import Path
 import pytest
 
 from command_shield.capabilities import CORPUS, CapabilityRule
-from intentframe_gateway.bootstrap import (
-    SENSITIVE_SURFACE_DENY_CAPABILITIES as GATEWAY_DENY,
-)
-from jarvis_pa.seed_policies import (
-    SENSITIVE_SURFACE_DENY_CAPABILITIES as JARVIS_DENY,
-)
-from policy_registry.constraints._capability_match import matches
 
 
 def test_corpus_loaded_and_non_empty() -> None:
@@ -72,31 +64,29 @@ def test_mitre_family_is_whitelisted() -> None:
         assert r.mitre_family in allowed, r
 
 
-def test_sensitive_surface_deny_auto_derives_from_yaml() -> None:
+def test_sensitive_capability_ids_derive_from_yaml() -> None:
     derived = CORPUS.sensitive_capability_ids()
-    assert GATEWAY_DENY == derived
-    assert JARVIS_DENY == derived
+    expected = frozenset(
+        f"capability:{r.family}:{r.suffix}"
+        for r in CORPUS.rules
+        if r.sensitive
+    )
+    assert derived == expected
+    assert derived
 
 
-def test_mitre_alias_matches_policy_pattern() -> None:
+def test_mitre_alias_map_exposes_presentation_tags() -> None:
     alias_map = CORPUS.mitre_alias_map()
     for rule in CORPUS.rules:
         legacy = f"capability:{rule.family}:{rule.suffix}"
         mitre = f"capability:{rule.mitre_family}:{rule.suffix}"
         assert alias_map[legacy] == mitre
-        assert matches(legacy, f"capability:{rule.mitre_family}:*")
-        assert matches(legacy, mitre)
 
 
-def test_mitre_alias_does_not_widen_non_sensitive_tags() -> None:
-    for non_sensitive in (
-        "capability:network_bind",
-        "capability:filesystem_write",
-        "capability:package_install:pip",
-    ):
-        assert not matches(non_sensitive, "capability:credential_access:*")
-        assert not matches(non_sensitive, "capability:persistence:*")
-        assert not matches(non_sensitive, "capability:exfiltration:*")
+def test_mitre_family_names_are_from_corpus() -> None:
+    assert CORPUS.mitre_family_names() == frozenset(
+        r.mitre_family for r in CORPUS.rules
+    )
 
 
 def test_coverage_md_references_every_rule() -> None:
