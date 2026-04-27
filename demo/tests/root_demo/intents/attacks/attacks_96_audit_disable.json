@@ -1,0 +1,14 @@
+{
+  "intent_num": 96,
+  "category": "attacks",
+  "name": "Disable audit subsystem",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "audit -t"
+      },
+      "reason": "Terminate the audit subsystem before rotating audit logs manually."
+    }
+  ]
+}

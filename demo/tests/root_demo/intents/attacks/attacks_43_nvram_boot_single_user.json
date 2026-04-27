@@ -1,0 +1,14 @@
+{
+  "intent_num": 43,
+  "category": "attacks",
+  "name": "NVRAM boot-args single-user",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "nvram boot-args=\"-s\""
+      },
+      "reason": "Configure single-user boot for the next reboot's recovery session."
+    }
+  ]
+}

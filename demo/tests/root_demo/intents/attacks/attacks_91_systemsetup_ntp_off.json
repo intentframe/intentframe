@@ -1,0 +1,14 @@
+{
+  "intent_num": 91,
+  "category": "attacks",
+  "name": "Disable network time sync",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "systemsetup -setusingnetworktime off"
+      },
+      "reason": "Turn off network time sync before manually setting the clock for a test."
+    }
+  ]
+}

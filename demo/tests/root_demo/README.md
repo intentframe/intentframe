@@ -125,12 +125,26 @@ python demo/tests/root_demo/test_normal.py
 # General — common non-root commands a sysadmin runs in a root shell (all ALLOW)
 python demo/tests/root_demo/test_general.py
 
-# Attacks — adversarial commands the pipeline should BLOCK end-to-end
+# Attacks — full sweep of 100 adversarial RUN_COMMAND intents (all BLOCK)
 python demo/tests/root_demo/test_attacks.py
+
+# Attacks — per-tactic subsets (preferred for demo recording; one screen each)
+python demo/tests/root_demo/test_attacks_destructive.py       # intents 1-11
+python demo/tests/root_demo/test_attacks_persistence.py       # intents 12-22
+python demo/tests/root_demo/test_attacks_privilege.py         # intents 23-31
+python demo/tests/root_demo/test_attacks_credentials.py       # intents 32-38
+python demo/tests/root_demo/test_attacks_defense_evasion.py   # intents 39-48
+python demo/tests/root_demo/test_attacks_egress.py            # intents 49-56
+python demo/tests/root_demo/test_attacks_impact.py            # intents 57-60
+python demo/tests/root_demo/test_attacks_obfuscation.py       # intents 61-71  (Tier 2)
+python demo/tests/root_demo/test_attacks_interpreter.py       # intents 72-79  (Tier 2 / spec Act 6)
+python demo/tests/root_demo/test_attacks_reason_lies.py       # intents 80-84  (AI-layer proof)
+python demo/tests/root_demo/test_attacks_realistic.py         # intents 85-100 (Tier 3)
 
 # Single intent or subset (any of the suites)
 python demo/tests/root_demo/test_normal.py 1
 python demo/tests/root_demo/test_attacks.py 1 3
+python demo/tests/root_demo/test_attacks_reason_lies.py 80 84
 ```
 
 Expected output shape — verdict shows expected vs actual decision sourced
@@ -228,7 +242,18 @@ demo/tests/root_demo/
 ├── root_test_runner.py                 RootIntentSuite — shared exec/eval/print
 ├── test_normal.py                      normal-intent runner (root-only ops)
 ├── test_general.py                     general unix commands (non-root)
-├── test_attacks.py                     adversarial commands (expected BLOCK)
+├── test_attacks.py                     aggregator — imports + unions the 11 per-tactic files below
+├── test_attacks_destructive.py         regex-catchable destructives (1-11)
+├── test_attacks_persistence.py         launchd / cron / rc / .pth / login-item (12-22)
+├── test_attacks_privilege.py           sudoers / sshd / PAM / dscl / authorized_keys (23-31)
+├── test_attacks_credentials.py         keychain / ssh-key / aws / cookies / TCC.db (32-38)
+├── test_attacks_defense_evasion.py     gatekeeper / sip / pf / nvram / kmutil (39-48)
+├── test_attacks_egress.py              curl|sh / nc / bash-tcp / ssh-R / scp exfil (49-56)
+├── test_attacks_impact.py              find-rm / openssl / fdesetup / diskutil (57-60)
+├── test_attacks_obfuscation.py         base64 / hex / chain / subshell (Tier 2, 61-71)
+├── test_attacks_interpreter.py         python3 -c / bash -c / env -i (Tier 2, 72-79)
+├── test_attacks_reason_lies.py         benign reason + malicious cmd (Tier 2, 80-84)
+├── test_attacks_realistic.py           DNS / ARP / MDM / boot / EDR (Tier 3, 85-100)
 └── intents/
     ├── normal/
     │   ├── normal_01_ls_var_root.json
@@ -246,13 +271,47 @@ demo/tests/root_demo/
     │   ├── general_04_date.json
     │   ├── general_05_hostname.json
     │   └── general_06_uptime.json
-    └── attacks/
-        ├── attacks_01_sudo.json
-        ├── attacks_02_rm_rf_root.json
-        ├── attacks_03_mkfs.json
-        ├── attacks_04_dd_block_device.json
-        ├── attacks_05_dev_redirect.json
-        └── attacks_06_chmod_777.json
+    └── attacks/                         100 adversarial RUN_COMMAND fixtures
+        ├── attacks_01..11_*.json        Warm-up: regex-catchable destructives
+        │                                (sudo, rm -rf /, mkfs, dd, dev redirect,
+        │                                 chmod 777, rm -rf /var/root, fork bomb,
+        │                                 shutdown, reboot, …)
+        ├── attacks_12..22_*.json        Persistence (T1543 / T1546 / T1037):
+        │                                launchctl bootstrap / load, direct plist
+        │                                write, crontab, at, zshrc, bash_profile,
+        │                                Python .pth, LoginHook, osascript login item
+        ├── attacks_23..31_*.json        Privilege escalation (T1548 / T1136 / T1098):
+        │                                sudoers append / drop-in, visudo, sshd_config,
+        │                                PAM, dscl user create + admin join,
+        │                                setuid root-bash, authorized_keys inject
+        ├── attacks_32..38_*.json        Credential access (T1555 / T1552): keychain
+        │                                retrieval / dump, SSH key, AWS creds,
+        │                                Safari cookies, TCC.db, dscl auth authority
+        ├── attacks_39..48_*.json        Defense evasion (T1562 / T1070 / T1547.006):
+        │                                spctl, csrutil, pfctl, socketfilterfw, nvram
+        │                                boot-args, log erase, rm /var/log, kmutil,
+        │                                unload tccd, tmutil disable
+        ├── attacks_49..56_*.json        Egress / C2 (T1071 / T1219 / T1041): curl|sh,
+        │                                wget|bash, nc -e, bash /dev/tcp, reverse SSH,
+        │                                curl-POST exfil, tar|nc, scp
+        ├── attacks_57..60_*.json        Impact (T1485 / T1486 / T1529): find-exec rm,
+        │                                openssl bulk encrypt, fdesetup, diskutil erase
+        ├── attacks_61..66_*.json        Tier 2 — encoding / obfuscation: base64, hex,
+        │                                string-split, variable alias, eval indirection
+        ├── attacks_67..71_*.json        Tier 2 — chaining / composition hiding:
+        │                                read-chain hide, && chain, subshell, group,
+        │                                pipe-loop exfil
+        ├── attacks_72..79_*.json        Tier 2 — interpreter indirection (spec Act 6):
+        │                                python3 -c (os.system / shutil / urllib /
+        │                                ctypes), bash -c stage2, env -i bypass
+        ├── attacks_80..84_*.json        Tier 2 — reason-vs-target lies: benign-sounding
+        │                                reason, malicious command. The AI-layer proof.
+        └── attacks_85..100_*.json       Tier 3 — realistic attacker surface: DNS
+                                         exfil / hijack, ARP spoof, route hijack,
+                                         hostname takeover, NTP off, MDM install /
+                                         wipe, bless boot hijack, audit disable,
+                                         EDR unload, malicious installer pkg,
+                                         Safari extension enable, Chrome cookie theft
 ```
 
 All execution / evaluation / printing logic lives in
@@ -346,6 +405,12 @@ verbatim to `actor.submit()`.
    `name`, `action`, `target`, `expected_decision`. The runner reads from
    `INTENTS[n]`, so both sources are kept in sync by hand.
 
+For the `attacks` category specifically, the `INTENTS` dict is split
+across `test_attacks_<tactic>.py` files (one per MITRE tactic / Tier-2
+evasion class / Tier-3 attacker-surface bucket), so add the entry to the
+tactic file the new intent belongs to.  The aggregator `test_attacks.py`
+auto-picks it up via the `{**a, **b, ...}`-merge — no edit needed there.
+
 Open maintenance gap: nothing stops an orphan JSON (no `INTENTS` entry —
 silently skipped when running without args) or an orphan `INTENTS` entry
 (no JSON — `FileNotFoundError` at load time). Good future cleanup is a
@@ -355,13 +420,22 @@ directory-scan loader.
 
 ## 8. Adding a new category (e.g. `network`, `timeout`)
 
+"Category" here means a fixture directory + matching filename prefix
+that the loader in `root_stub_agent.py::load_root_intents()` globs —
+`normal`, `general`, `attacks` ship today.  Within a category you can
+have any number of per-tactic test files (see the `attacks` split above);
+they all share `CATEGORY = "attacks"` and read from `intents/attacks/`.
+
 1. Create `intents/<category>/` with `<category>_<NN>_<slug>.json` fixtures.
 2. Create `test_<category>.py` — copy `test_general.py` as a template, change:
    - `CATEGORY = "<category>"`
    - `SUITE_TITLE = "IntentFrame ROOT-DEMO <CATEGORY> INTENT SUITE"`
    - `INTENTS` dict content (each row is `name`, `action`, `target`,
      `expected_decision`).
-3. That's it. All execution / evaluation / printing comes from
+3. Optional — split the category's `INTENTS` across `test_<category>_<subset>.py`
+   files the way `attacks` does, and keep `test_<category>.py` as a thin
+   aggregator that imports and unions the per-subset INTENTS dicts.
+4. That's it. All execution / evaluation / printing comes from
    `RootIntentSuite` in [`root_test_runner.py`](root_test_runner.py); a new
    category file is ~30 lines plus the INTENTS dict.
 
