@@ -163,6 +163,78 @@ PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
 })
 
 
+# Capability tags denied by every profile's ``terminal_constraint`` to
+# close the "sensitive surface" gap surfaced by the 2026-04-27 root-demo
+# attack sweep (see
+# ``demo/tests/root_demo/results/2026-04-27-attack-sweep-host-impact.md``
+# and ``demo/tests/root_demo/results/root-demo-policy-remediation.md``).
+#
+# Two families live here, matching ``command_shield.classifier``:
+#
+#   * ``capability:data_read:*`` — reads of host-sensitive surfaces
+#     (browser cookies / profile data / saved passwords, messaging
+#     stores, personal records, shell history, directory-service
+#     account metadata, credential material).  These are structurally
+#     read-only, so the Analysis Engine reliably rates them
+#     ``LOW`` / ``MEDIUM`` and Guardian allows them.  That is the
+#     exact failure mode that leaked intents 36 (``plutil`` of Safari
+#     cookies) and 38 (``dscl -read AuthenticationAuthority``) under
+#     the root-compromised-agent threat model; denying the capability
+#     at Gate 2 stops the pre-exfil read before the AE burns a token.
+#
+#   * ``capability:system_mutate:*`` — commands that change persistent
+#     host or account state (network config, hostname, time sync,
+#     security daemon, browser-security preferences, firewall rules,
+#     ``/etc/hosts``, sudoers/PAM, user accounts, remote-access
+#     toggles, disk-encryption policy, kernel tunables, persistence
+#     surfaces).  Intents 87–91, 97, 99 from the sweep fell in this
+#     family and mutated host state before the pipeline could catch
+#     them.  Under the root-compromised-agent model the policy stance
+#     is "mutations are privileged operations; a root agent must not
+#     issue them without an explicit policy carve-out".
+#
+# This clamp is intentionally profile-independent for the same reason
+# as :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES`: sensitivity of the
+# surface doesn't change based on whether the executor happens to run
+# as root.  Mirror invariant: ``jarvis_pa/seed_policies.py`` defines
+# the same constant inline, and ``demo/tests/root_demo/
+# test_policy_root.yaml`` mirrors the values literally as well.  Keep
+# all three copies in sync.
+SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    # ── Sensitive reads (data_read:*) ────────────────────────────
+    "capability:data_read:browser_cookies",
+    "capability:data_read:browser_profile_data",
+    "capability:data_read:auth_authority",
+    "capability:data_read:credential_material",
+    "capability:data_read:shell_history",
+    "capability:data_read:messaging_history",
+    "capability:data_read:personal_records",
+    # ── System mutations (system_mutate:*) ───────────────────────
+    "capability:system_mutate:host_network_config",
+    "capability:system_mutate:hostname",
+    "capability:system_mutate:time_sync",
+    "capability:system_mutate:security_daemon",
+    "capability:system_mutate:browser_security_pref",
+    "capability:system_mutate:firewall",
+    "capability:system_mutate:hosts_file",
+    "capability:system_mutate:privilege_config",
+    "capability:system_mutate:user_account",
+    "capability:system_mutate:remote_access",
+    "capability:system_mutate:disk_encryption",
+    "capability:system_mutate:kernel_tunable",
+    "capability:system_mutate:persistence",
+})
+
+
+# Union of the two profile-independent clamps.  ``terminal_constraint``
+# below denies the full set; we keep the two constants distinct so the
+# *why* of each deny is reviewable (a language-surface clamp vs. a
+# sensitive-surface clamp) without grepping through a single flat list.
+DEFAULT_TERMINAL_DENY_CAPABILITIES: frozenset[str] = (
+    PYTHON_SHELL_ONLY_DENY_CAPABILITIES | SENSITIVE_SURFACE_DENY_CAPABILITIES
+)
+
+
 WORKSPACE_MOUNTS = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
@@ -280,7 +352,7 @@ def _build_policy(profile: str = "user") -> dict:
         "blocked_patterns": [
             "sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777",
         ],
-        "deny_capabilities": sorted(PYTHON_SHELL_ONLY_DENY_CAPABILITIES),
+        "deny_capabilities": sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES),
     }
 
     for action in SAFE_ACTIONS:

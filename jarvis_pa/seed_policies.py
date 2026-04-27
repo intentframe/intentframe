@@ -231,6 +231,48 @@ PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
 })
 
 
+# Sensitive-surface clamp (``data_read:*`` + ``system_mutate:*``).  See
+# the canonical definition in ``intentframe_gateway/bootstrap.py``
+# (``SENSITIVE_SURFACE_DENY_CAPABILITIES``) — both seeders are run
+# against the same registry and an asymmetric seed would silently let
+# whichever seeder ran second relax the other's policy.  This clamp
+# closes the root-demo attack-sweep gap (intents 36, 38, 87–91, 97,
+# 99) where the AE reliably rated sensitive reads / host mutations as
+# LOW/MEDIUM and Guardian allowed them; denying at Gate 2 on the
+# classifier tag catches those shapes without burning an AE call.
+SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    # Sensitive reads (``data_read:*``).
+    "capability:data_read:browser_cookies",
+    "capability:data_read:browser_profile_data",
+    "capability:data_read:auth_authority",
+    "capability:data_read:credential_material",
+    "capability:data_read:shell_history",
+    "capability:data_read:messaging_history",
+    "capability:data_read:personal_records",
+    # System mutations (``system_mutate:*``).
+    "capability:system_mutate:host_network_config",
+    "capability:system_mutate:hostname",
+    "capability:system_mutate:time_sync",
+    "capability:system_mutate:security_daemon",
+    "capability:system_mutate:browser_security_pref",
+    "capability:system_mutate:firewall",
+    "capability:system_mutate:hosts_file",
+    "capability:system_mutate:privilege_config",
+    "capability:system_mutate:user_account",
+    "capability:system_mutate:remote_access",
+    "capability:system_mutate:disk_encryption",
+    "capability:system_mutate:kernel_tunable",
+    "capability:system_mutate:persistence",
+})
+
+
+# Union of the two profile-independent clamps; mirrors
+# ``intentframe_gateway/bootstrap.py::DEFAULT_TERMINAL_DENY_CAPABILITIES``.
+DEFAULT_TERMINAL_DENY_CAPABILITIES: frozenset[str] = (
+    PYTHON_SHELL_ONLY_DENY_CAPABILITIES | SENSITIVE_SURFACE_DENY_CAPABILITIES
+)
+
+
 def _build_policy(profile: str = "user") -> dict:
     allowed_actions: dict[str, dict] = {}
     # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py for
@@ -281,7 +323,7 @@ def _build_policy(profile: str = "user") -> dict:
             "> /dev/",
             "chmod 777",
         ],
-        "deny_capabilities": sorted(PYTHON_SHELL_ONLY_DENY_CAPABILITIES),
+        "deny_capabilities": sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES),
     }
 
     for action in UNSAFE_ACTIONS:

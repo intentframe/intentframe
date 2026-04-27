@@ -17,7 +17,10 @@ from __future__ import annotations
 from typing import Callable
 
 from intentframe_core.types import UserContext
-from intentframe_gateway.bootstrap import PYTHON_SHELL_ONLY_DENY_CAPABILITIES
+from intentframe_gateway.bootstrap import (
+    DEFAULT_TERMINAL_DENY_CAPABILITIES,
+    PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
+)
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission
 
@@ -101,19 +104,21 @@ def locked_down() -> UserContext:
 
 def python_shell_only() -> UserContext:
     """Mirror of the production gateway profile (user / root) — python and
-    shell only.
+    shell only, plus the sensitive-surface clamp.
 
     Pulls the canonical deny set from
-    :data:`intentframe_gateway.bootstrap.PYTHON_SHELL_ONLY_DENY_CAPABILITIES`
-    so the accuracy corpus automatically tracks any future change to
-    the production seed.  This is the profile most consumers actually
-    run under, so failing accuracy here represents real-world breakage
-    rather than fixture drift.
+    :data:`intentframe_gateway.bootstrap.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+    (union of :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` and
+    :data:`SENSITIVE_SURFACE_DENY_CAPABILITIES`) so the accuracy corpus
+    automatically tracks any future change to the production seed.
+    This is the profile most consumers actually run under, so failing
+    accuracy here represents real-world breakage rather than fixture
+    drift.
     """
     return _user(
         TerminalConstraints(
             blocked_patterns=list(_BASE_BLOCKED),
-            deny_capabilities=PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
+            deny_capabilities=DEFAULT_TERMINAL_DENY_CAPABILITIES,
         )
     )
 

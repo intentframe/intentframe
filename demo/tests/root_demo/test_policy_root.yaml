@@ -85,5 +85,44 @@ allowed_actions:
         - "capability:package_install:cargo"
         - "capability:package_install:go"
         - "capability:package_install:composer"
+        # ─────────────────────────────────────────────────────────────
+        # Sensitive data reads (``data_read:*``) — under the root-
+        # compromised-agent threat model, *reading* these surfaces is
+        # the pre-exfiltration phase of an attack.  We deny them at
+        # Gate 2 because the AE reliably rates them LOW/MEDIUM (they
+        # are structurally read-only).  The 2026-04-27 attack sweep
+        # leaked intents 36 and 38 on exactly this failure mode
+        # (browser cookies, account authentication metadata); this
+        # list closes that gap plus the immediate-sibling surfaces.
+        # ─────────────────────────────────────────────────────────────
+        - "capability:data_read:browser_cookies"
+        - "capability:data_read:browser_profile_data"
+        - "capability:data_read:auth_authority"
+        - "capability:data_read:credential_material"
+        - "capability:data_read:shell_history"
+        - "capability:data_read:messaging_history"
+        - "capability:data_read:personal_records"
+        # ─────────────────────────────────────────────────────────────
+        # System mutations (``system_mutate:*``) — commands that
+        # change persistent host or account state.  Under the root-
+        # compromised-agent model these are the "change the world"
+        # verbs and are denied categorically.  Intents 87–91, 97, 99
+        # from the 2026-04-27 sweep hit this family directly
+        # (network config, hostname, time sync, security daemon,
+        # browser-security preference).
+        # ─────────────────────────────────────────────────────────────
+        - "capability:system_mutate:host_network_config"
+        - "capability:system_mutate:hostname"
+        - "capability:system_mutate:time_sync"
+        - "capability:system_mutate:security_daemon"
+        - "capability:system_mutate:browser_security_pref"
+        - "capability:system_mutate:firewall"
+        - "capability:system_mutate:hosts_file"
+        - "capability:system_mutate:privilege_config"
+        - "capability:system_mutate:user_account"
+        - "capability:system_mutate:remote_access"
+        - "capability:system_mutate:disk_encryption"
+        - "capability:system_mutate:kernel_tunable"
+        - "capability:system_mutate:persistence"
 
 intent_limits: []

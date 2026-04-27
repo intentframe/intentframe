@@ -97,7 +97,44 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                   Password / SMBPasswordServerList
     capability:data_read:credential_material   — security dump-keychain,
                                                   security find-*-password -w/-g,
-                                                  sqlite3 / cp on TCC.db
+                                                  sqlite3 / cp on TCC.db,
+                                                  gpg --export-secret-keys /
+                                                  --export-secret-subkeys /
+                                                  --export-ownertrust, reads of
+                                                  ~/.gnupg/private-keys-v1.d,
+                                                  *.kdbx / *.agilekeychain /
+                                                  *.opvault password vaults,
+                                                  Bitwarden Group Container,
+                                                  cp|mv|rsync|scp of ~/.ssh/id_*
+    capability:data_read:shell_history         — .bash_history / .zsh_history /
+                                                  .fish_history / .ksh_history /
+                                                  .sh_history / .history /
+                                                  .psql_history / .mysql_history
+                                                  / .node_repl_history /
+                                                  .python_history / .sqlite_history
+                                                  / .rediscli_history / .lesshst
+    capability:data_read:browser_profile_data  — Chrome/Chromium/Brave/Edge/
+                                                  Vivaldi/Arc Login Data /
+                                                  History / Web Data / Bookmarks
+                                                  / Top Sites / Visited Links /
+                                                  Network Action Predictor /
+                                                  Shortcuts; Firefox
+                                                  places.sqlite /
+                                                  formhistory.sqlite /
+                                                  logins.json / key*.db /
+                                                  signons.sqlite /
+                                                  permissions.sqlite
+    capability:data_read:messaging_history     — iMessage chat.db / Attachments,
+                                                  WhatsApp Group Container,
+                                                  Messages Group Container,
+                                                  Telegram Desktop, Signal,
+                                                  Slack storage, Discord
+    capability:data_read:personal_records      — AddressBook Application Support
+                                                  / *.abcddb, Notes Group
+                                                  Container / NoteStore.sqlite,
+                                                  Mail V* stores, iOS MobileSync
+                                                  Backup, *.photoslibrary,
+                                                  *.calendar stores
 
     capability:system_mutate:host_network_config   — networksetup -set*/
                                                       -create*/-delete*/-add*/
@@ -124,6 +161,90 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                       com.apple.Safari /
                                                       com.google.Chrome /
                                                       org.mozilla.firefox
+    capability:system_mutate:firewall              — pfctl -d|-e|-f|-F;
+                                                      ip[6]tables / iptables-
+                                                      save / iptables-restore /
+                                                      iptables-legacy
+                                                      -F|-X|-Z|-D|-I|-A|-N|-E|
+                                                      -P <chain> ACCEPT|DROP|
+                                                      REJECT|QUEUE;
+                                                      nft flush|delete|add|
+                                                      insert|replace|create|
+                                                      rename; ufw disable|enable
+                                                      |reset|default|allow|deny
+                                                      |reject|limit|delete|
+                                                      insert; firewall-cmd
+                                                      --add/remove/change/set-*
+                                                      / --panic-on/-off /
+                                                      --reload; socketfilterfw
+                                                      --setglobalstate /
+                                                      --setallowsigned(app) /
+                                                      --setloggingmode /
+                                                      --setblockall /
+                                                      --setstealthmode /
+                                                      --unblockapp / --blockapp;
+                                                      ipfw add|delete|flush|
+                                                      zero|resetlog|disable|
+                                                      enable
+    capability:system_mutate:hosts_file            — redirect / tee / cp / mv /
+                                                      install / ln / sed -i /
+                                                      python|perl|ruby|awk write
+                                                      shapes that land at
+                                                      /etc/hosts
+    capability:system_mutate:privilege_config      — visudo (not ``-c``);
+                                                      redirect / tee / cp / mv /
+                                                      install / ln / sed -i
+                                                      targeting /etc/sudoers,
+                                                      /etc/sudoers.d/<file>,
+                                                      /etc/passwd, /etc/shadow,
+                                                      /etc/gshadow, /etc/group,
+                                                      /etc/pam.d/<file>
+    capability:system_mutate:user_account          — dseditgroup -o edit|create|
+                                                      delete; pwpolicy -set*/
+                                                      -clear*/-resetpolicy/
+                                                      -disableuser/-enableuser;
+                                                      dscl . -passwd|-delete|
+                                                      -append|-merge|-change|
+                                                      -create; sysadminctl
+                                                      -addUser|-deleteUser|
+                                                      -resetPasswordFor|
+                                                      -secureTokenOn/-Off|
+                                                      -newPassword|-adminUser|
+                                                      -*GuestAccess|
+                                                      -guestAccount|-filesystem;
+                                                      Linux useradd|usermod|
+                                                      userdel|adduser|deluser|
+                                                      groupadd|groupmod|
+                                                      groupdel|addgroup|
+                                                      delgroup|chpasswd|
+                                                      newusers;
+                                                      passwd <other-user>
+    capability:system_mutate:remote_access         — systemsetup
+                                                      -setremotelogin /
+                                                      -setremoteappleevents /
+                                                      -setwakeonnetworkaccess /
+                                                      -setwakeonmodem /
+                                                      -setcomputersleep /
+                                                      -setdisplaysleep /
+                                                      -setharddisksleep /
+                                                      -setrestartfreeze /
+                                                      -setrestartpoweron /
+                                                      -setallowpowerbuttontosleep
+                                                      computer / -setstartupdisk
+                                                      / -setdisableloginchime
+    capability:system_mutate:disk_encryption       — fdesetup enable|disable|
+                                                      add|remove|changerecovery
+                                                      |sync|authrestart
+    capability:system_mutate:kernel_tunable        — sysctl -w / sysctl -p /
+                                                      sysctl <name>=<value>;
+                                                      redirect or tee into
+                                                      /proc/sys/<path>
+    capability:system_mutate:persistence           — at noon|midnight|teatime|
+                                                      today|tomorrow|<HH[:MM]>
+                                                      [am|pm]|now|+|-f; osascript
+                                                      involving ``System Events``
+                                                      + ``login item`` or ``make
+                                                      [new] login item``
 
 Each hit produces a Signal with check="capability" and signal_id set to
 the capability tag.  Multiple capabilities per command are expected;
@@ -208,20 +329,39 @@ CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 #
 #   * ``capability:data_read:*`` — reads that yield information an
 #     agent must not exfiltrate under the root-compromised-agent threat
-#     model (browser cookies, account authentication material,
-#     keychain / TCC.db contents).  Structurally these commands are
-#     read-shaped, so this family is treated as read-only-incompatible
-#     in the classifier gate (``_safe_for_read_only``) — emitting
-#     ``data_read:*`` suppresses ``read_only:*`` on the same command so
-#     the consumer fast-path license is not accidentally available for
-#     a sensitive read.
+#     model.  Today's suffixes cover browser cookies (``browser_cookies``),
+#     macOS Directory-Services account records (``auth_authority``),
+#     keychain / TCC.db / GPG secret-key / password-manager vault
+#     contents (``credential_material``), shell-history stores
+#     (``shell_history``), browser saved-login / history / bookmark /
+#     form-autofill data beyond cookies (``browser_profile_data``),
+#     messaging-client on-disk histories (``messaging_history``), and
+#     high-PII personal stores — Contacts, Notes, Mail, Photos,
+#     Calendar, iOS backup (``personal_records``).  Structurally these
+#     commands are read-shaped, so this family is treated as read-only-
+#     incompatible in the classifier gate (``_safe_for_read_only``):
+#     emitting ``data_read:*`` suppresses ``read_only:*`` on the same
+#     command so the consumer fast-path license is not accidentally
+#     available for a sensitive read.
 #
 #   * ``capability:system_mutate:*`` — commands that change host /
-#     network / identity / trust-surface state (DNS, routing, hostname,
-#     NTP, EDR launchd jobs, browser security preferences).  Structurally
-#     these are mutating and so would not qualify for ``read_only:*`` on
-#     their own; the read-only-incompatible membership is belt-and-braces
-#     against an unanticipated co-occurrence.
+#     network / identity / trust-surface state.  Today's suffixes cover
+#     routing and interface config (``host_network_config``), hostname
+#     (``hostname``), NTP / clock (``time_sync``), launchd jobs for
+#     EDR / TCC / security daemons plus the macOS trust-disable shapes
+#     (``security_daemon``), browser security preferences
+#     (``browser_security_pref``), packet-filter / firewall mutations
+#     (``firewall``), DNS-hijack writes to /etc/hosts (``hosts_file``),
+#     sudoers / pam.d / passwd / shadow / group / gshadow writes
+#     (``privilege_config``), user-and-group account mutation verbs
+#     (``user_account``), systemsetup remote-access and power toggles
+#     (``remote_access``), FileVault encryption toggles
+#     (``disk_encryption``), kernel tunable writes (``kernel_tunable``),
+#     and ``at`` / AppleScript login-item persistence shapes not
+#     already pattern-catastrophic (``persistence``).  Structurally
+#     these are mutating and so would not qualify for ``read_only:*``
+#     on their own; the read-only-incompatible membership is belt-and-
+#     braces against an unanticipated co-occurrence.
 CAPABILITY_DATA_READ = "capability:data_read"
 CAPABILITY_SYSTEM_MUTATE = "capability:system_mutate"
 
@@ -355,9 +495,9 @@ _SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 # since the point of the family is to tag the command regardless of shape;
 # a policy that denies ``capability:data_read:browser_cookies`` wants the
 # deny to fire whether the command is bare, composed, or hidden behind
-# an indirection.  Suffixes correspond 1:1 to the failing-intent buckets
-# in the root-demo remediation plan; credential_material is a narrow
-# bucket today (keychain / TCC.db) extended one rule at a time.
+# an indirection.  Multiple rules may share a suffix — the first one to
+# match adds the tag, subsequent rules with the same suffix are skipped
+# by the main classification loop (``if cap_id in seen``).
 _DATA_READ_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     # Browser cookies on macOS — Safari on-disk store + Chromium-family
     # profile cookies + Firefox SQLite cookie store.  shlex normalisation
@@ -389,10 +529,12 @@ _DATA_READ_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "auth_authority",
     ),
-    # Credential-material reads — narrow bucket for keychain dumps and
-    # TCC.db contents.  Keep each rule a positive match on the mutation
-    # verb + secret-bearing flag so bare ``security`` / ``sqlite3``
-    # invocations on unrelated files do not fire.
+    # Credential-material reads — pattern layer already catches the
+    # common catastrophic shapes (``security dump-keychain``,
+    # ``security find-generic-password -w``, ``sqlite3 … TCC.db``)
+    # via MAC-KEY-002 / MAC-KEY-003 / MAC-PRIV-001; keeping these
+    # alternatives here is belt-and-braces so a future pattern-set
+    # change that drops any of them does not silently lose the tag.
     (
         re.compile(
             r"\bsecurity\s+dump-keychain\b"
@@ -402,6 +544,106 @@ _DATA_READ_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
             r"|\bcp\b[^|;&]*\bTCC\.db\b"
         ),
         "credential_material",
+    ),
+    # Credential-material (extension) — GPG secret-key export verbs,
+    # the GnuPG private-key directory itself, cleartext password-
+    # manager database files (KeePass, 1Password legacy vaults,
+    # Bitwarden exports), and ``cp|mv|rsync|scp`` of ``~/.ssh/id_*``
+    # (the direct *read* of ``id_rsa`` etc. is already pattern-
+    # catastrophic via CAT-SSHKEY-*; we tag the *copy* shape so
+    # "stage then exfil via a second command" is visible to policy).
+    (
+        re.compile(
+            r"\bgpg\s+[^|;&]*--export-secret-(?:keys?|subkeys?)\b"
+            r"|\bgpg\s+--export-ownertrust\b"
+            r"|(?<![\w.])\.gnupg/private-keys-v1\.d\b"
+            r"|\b[^\s|;&]*\.kdbx\b"
+            r"|\b[^\s|;&]*\.agilekeychain\b"
+            r"|\b[^\s|;&]*\.opvault\b"
+            r"|\bLibrary/Group\s+Containers/group\.com\.bitwarden\b"
+            r"|\b(?:cp|mv|rsync|scp)\b[^|;&]*\s~?/?\.ssh/"
+            r"(?:id_[A-Za-z0-9_]+|identity)\b"
+        ),
+        "credential_material",
+    ),
+    # Shell history files — may contain pasted secrets, API keys,
+    # typo'd passwords.  Lookbehind ``(?<![\w.])`` prevents matches
+    # inside larger identifiers (``foo.bash_history_x``) while still
+    # firing when the path starts with ``/`` or ``~/`` or a space.
+    (
+        re.compile(
+            r"(?<![\w.])\.(?:bash|zsh|fish|ksh|sh)_history\b"
+            r"|(?<![\w.])\.history\b"
+            r"|(?<![\w.])\.psql_history\b"
+            r"|(?<![\w.])\.mysql_history\b"
+            r"|(?<![\w.])\.node_repl_history\b"
+            r"|(?<![\w.])\.python_history\b"
+            r"|(?<![\w.])\.sqlite_history\b"
+            r"|(?<![\w.])\.rediscli_history\b"
+            r"|(?<![\w.])\.lesshst\b"
+        ),
+        "shell_history",
+    ),
+    # Browser saved-login / saved-form / browsing-history / bookmark
+    # stores — everything beyond ``cookies`` that lives under a
+    # Chromium-family or Firefox profile directory.  Chromium
+    # profiles: ``Login Data`` (saved passwords, encrypted with OS
+    # keychain but still sensitive), ``History`` (URL + visit times),
+    # ``Web Data`` (form autofill incl. card numbers), ``Bookmarks``,
+    # ``Top Sites``, ``Visited Links``.  Firefox profiles:
+    # ``places.sqlite`` (bookmarks + history), ``formhistory.sqlite``
+    # (autofill), ``logins.json`` + ``key*.db`` (saved passwords).
+    # The outer ``[^\s|;&]*?`` non-greedy segment spans the profile-
+    # name token (e.g. ``Default``, ``Profile 1``) without crossing
+    # shell metacharacters.
+    (
+        re.compile(
+            r"/(?:Google/Chrome|Chromium|BraveSoftware|"
+            r"Microsoft\s+Edge|Vivaldi|Arc)"
+            r"[^|;&]*?/(?:Login\s+Data|History|Web\s+Data|Bookmarks|"
+            r"Top\s+Sites|Visited\s+Links|Network\s+Action\s+Predictor|"
+            r"Shortcuts)\b"
+            r"|/Firefox/Profiles/[^\s/|;&]+/"
+            r"(?:places\.sqlite|formhistory\.sqlite|logins\.json"
+            r"|key\d*\.db|signons\.sqlite|permissions\.sqlite)\b"
+        ),
+        "browser_profile_data",
+    ),
+    # Messaging histories — on-disk databases and container
+    # directories for the major macOS messaging clients.  iMessage
+    # lives at ``~/Library/Messages/chat.db``; WhatsApp / Signal /
+    # Telegram / Slack / Discord use Group Containers or per-app
+    # Application Support trees.  Matching by container / DB name
+    # so any ``cat|cp|sqlite3|ls`` over the path fires the tag.
+    (
+        re.compile(
+            r"\bLibrary/Messages/(?:chat\.db|Attachments)\b"
+            r"|\bLibrary/Group\s+Containers/group\.net\.whatsapp\b"
+            r"|\bLibrary/Group\s+Containers/group\.com\.apple\.Messages\b"
+            r"|\bLibrary/Application\s+Support/Telegram\s+Desktop\b"
+            r"|\bLibrary/Application\s+Support/Signal\b"
+            r"|\bLibrary/Application\s+Support/Slack/storage\b"
+            r"|\bLibrary/Application\s+Support/discord\b"
+        ),
+        "messaging_history",
+    ),
+    # Personal records — Contacts, Notes, Mail, Photos, Calendar,
+    # iOS backup.  Not "credentials" but high-PII under the root-
+    # compromised-agent threat model: one root shell yields every
+    # contact, private note, saved photo, and calendared meeting.
+    (
+        re.compile(
+            r"\bLibrary/Application\s+Support/AddressBook\b"
+            r"|\bAddressBook[^\s|;&]*\.abcddb\b"
+            r"|\bLibrary/Group\s+Containers/group\.com\.apple\.notes\b"
+            r"|\bNoteStore\.sqlite\b"
+            r"|\bLibrary/Mail/V\d+\b"
+            r"|\bLibrary/Group\s+Containers/group\.com\.apple\.mail\b"
+            r"|\bLibrary/Application\s+Support/MobileSync/Backup\b"
+            r"|\.photoslibrary\b"
+            r"|\bLibrary/Calendars/[^\s|;&]*\.calendar\b"
+        ),
+        "personal_records",
     ),
 )
 
@@ -494,6 +736,190 @@ _SYSTEM_MUTATE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\b"
         ),
         "browser_security_pref",
+    ),
+    # Firewall / packet-filter mutations.  Covers macOS ``pfctl``
+    # (``-d`` disable, ``-e`` enable, ``-f`` load rules file, ``-F``
+    # flush), Linux ``ip[6]tables`` / ``iptables-restore`` /
+    # ``iptables-legacy`` (``-F|-X|-Z|-D|-I|-A|-N|-E|-P`` mutation
+    # verbs), nftables (``nft flush|delete|add|insert|replace|
+    # create|rename``), the distro-neutral ``ufw``, RHEL's
+    # ``firewall-cmd`` write verbs, macOS Application Firewall
+    # ``socketfilterfw --set* / --block* / --unblock*``, and
+    # FreeBSD ``ipfw``.  Read forms (``-s``, ``-L``, ``-S``,
+    # ``list``, ``status``, ``--list-all``, ``--getglobalstate``)
+    # stay outside every alternation and remain untagged.
+    (
+        re.compile(
+            r"\bpfctl\s+(?:-[a-zA-Z]+\s+)*-[dfeF]\b"
+            r"|\bip6?tables-restore\b"
+            r"|\bip6?tables(?:-legacy)?\s+"
+            r"(?:-[a-zA-Z]+\s+)*"
+            r"(?:-F|-X|-Z|-D|-I|-A|-N|-E|"
+            r"-P\s+\S+\s+(?:ACCEPT|DROP|REJECT|QUEUE))\b"
+            r"|\bnft\s+(?:flush|delete|add|insert|replace|create|rename)\b"
+            r"|\bufw\s+(?:disable|enable|reset|default|allow|deny|"
+            r"reject|limit|delete|insert)\b"
+            r"|\bfirewall-cmd\s+(?:--(?:add|remove|change|set)-"
+            r"[a-zA-Z-]+|--panic-on|--panic-off|--reload|"
+            r"--complete-reload|--runtime-to-permanent)\b"
+            r"|\bsocketfilterfw\s+--(?:setglobalstate|setallowsigned"
+            r"(?:app)?|setloggingmode|setblockall|setstealthmode|"
+            r"unblockapp|blockapp|add|remove)\b"
+            r"|\bipfw\s+(?:add|delete|flush|zero|resetlog|disable|enable)\b"
+        ),
+        "firewall",
+    ),
+    # /etc/hosts mutations — the classic DNS hijack surface.
+    # Deliberately narrow to write shapes that actually land at
+    # ``/etc/hosts``: redirect, tee, cp/mv/install/ln, sed -i,
+    # or any interpreter argument.  ``filesystem_write`` also
+    # fires on redirect writes, but ``hosts_file`` is the policy
+    # hook that says "…and the target is /etc/hosts specifically".
+    (
+        re.compile(
+            r"(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/hosts\b"
+            r"|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/hosts\b"
+            r"|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/hosts\b"
+            r"|\bsed\s+[^|;&]*-i\b[^|;&]*\s+/etc/hosts\b"
+            r"|\b(?:python3?|perl|ruby|awk)\b[^|;&]*/etc/hosts\b"
+        ),
+        "hosts_file",
+    ),
+    # Privilege config files — the system-ACL surface.
+    # ``visudo`` opens /etc/sudoers for edit; ``visudo -c`` is the
+    # syntax-check read form and stays untagged via negative
+    # lookahead.  Direct redirects / tees / copies / in-place seds
+    # on /etc/sudoers{,.d/<file>}, /etc/passwd, /etc/shadow,
+    # /etc/gshadow, /etc/group, or /etc/pam.d/<file> all fire.
+    # ``chmod 777 /etc/shadow`` is already pattern-catastrophic
+    # via SYSD-001 and never reaches the classifier; other chmods
+    # on the same files go through ``filesystem_write`` plus this
+    # tag via the cp/mv/install/ln alternation in many shapes.
+    (
+        re.compile(
+            r"\bvisudo\b(?!\s+-c)"
+            r"|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/"
+            r"(?:sudoers(?:\.d/[^\s|;&]*)?|passwd|shadow|gshadow|"
+            r"group|pam\.d/[^\s|;&]*)\b"
+            r"|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/"
+            r"(?:sudoers(?:\.d/[^\s|;&]*)?|passwd|shadow|gshadow|"
+            r"group|pam\.d/[^\s|;&]*)\b"
+            r"|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/"
+            r"(?:sudoers(?:\.d/?[^\s|;&]*)?|passwd|shadow|gshadow|"
+            r"group|pam\.d/?[^\s|;&]*)\b"
+            r"|\bsed\s+[^|;&]*-i\b[^|;&]*\s+/etc/"
+            r"(?:sudoers|passwd|shadow|gshadow|group)\b"
+        ),
+        "privilege_config",
+    ),
+    # User / group account mutation surfaces across macOS and Linux.
+    # macOS: ``dseditgroup -o edit|create|delete``, ``pwpolicy
+    # -set*|-clear*|-resetpolicy|-disableuser|-enableuser``,
+    # ``dscl . -passwd|-delete|-append|-merge|-change|-create``
+    # (the first four are already pattern-catastrophic via
+    # IF-DSCL-ACCOUNT-001 / MAC-DS-001; kept here for belt-and-
+    # braces), ``sysadminctl -addUser|-deleteUser|-resetPassword*|
+    # -secureTokenOn|-secureTokenOff|-newPassword|-adminUser``.
+    # Linux: the full ``useradd|usermod|userdel|adduser|deluser|
+    # groupadd|groupmod|groupdel|addgroup|delgroup|chpasswd|
+    # newusers`` family.  Finally ``passwd <other-user>`` is the
+    # mutation shape — plain ``passwd`` (no args) is an own-
+    # password interactive prompt which we intentionally leave
+    # untagged; an attacker with root already has easier routes.
+    (
+        re.compile(
+            r"\bdseditgroup\b[^|;&]*-o\s+(?:edit|create|delete)\b"
+            r"|\bpwpolicy\b[^|;&]*-(?:setpolicy|setaccountpolicies|"
+            r"clearaccountpolicies|setglobalpolicy|resetpolicy|"
+            r"disableuser|enableuser)\b"
+            r"|\bdscl\b[^|;&]*\s-(?:passwd|delete|append|merge|change|"
+            r"create)\b"
+            r"|\bsysadminctl\b[^|;&]*-(?:addUser|deleteUser|"
+            r"resetPasswordFor|secureTokenOn|secureTokenOff|newPassword|"
+            r"adminUser|afpGuestAccess|smbGuestAccess|guestAccount|"
+            r"filesystem)\b"
+            r"|\b(?:useradd|usermod|userdel|adduser|deluser|groupadd|"
+            r"groupmod|groupdel|addgroup|delgroup|chpasswd|newusers)\b"
+            # ``passwd <other-user>`` — mutation.  Require the verb to
+            # sit at command-start position (either at the beginning of
+            # the string or immediately after a shell-composition
+            # separator), so that tool arguments like ``getent passwd
+            # <user>``, ``grep passwd /etc/nss.conf``, or ``ldapsearch
+            # passwd`` — all of which put ``passwd`` in an argument
+            # slot after a plain whitespace separator — do NOT fire.
+            r"|(?:^|[;&|])\s*passwd\s+[A-Za-z_][A-Za-z0-9_-]*"
+        ),
+        "user_account",
+    ),
+    # Remote-access and power / startup toggles via ``systemsetup``.
+    # Siblings to the existing ``time_sync`` family — same tool,
+    # different surfaces: SSH daemon on/off (-setremotelogin), Remote
+    # Apple Events (-setremoteappleevents), wake-on-LAN / wake-on-
+    # modem, sleep / display-sleep / hard-disk-sleep, restart on
+    # freeze / power-on, power-button-sleep, boot-disk selection,
+    # login-chime toggle.  ``systemsetup -get*`` / ``-list*`` stay
+    # untagged (read forms).
+    (
+        re.compile(
+            r"\bsystemsetup\s+-set(?:remotelogin|remoteappleevents|"
+            r"wakeonnetworkaccess|wakeonmodem|computersleep|"
+            r"displaysleep|harddisksleep|restartfreeze|restartpoweron|"
+            r"allowpowerbuttontosleepcomputer|startupdisk|"
+            r"disableloginchime)\b"
+        ),
+        "remote_access",
+    ),
+    # FileVault disk-encryption mutation.  ``fdesetup enable|disable|
+    # add|remove|changerecovery|sync|authrestart``.  Read verbs
+    # (``status``, ``list``, ``haspersonalrecoverykey``,
+    # ``hasinstitutionalrecoverykey``, ``isactive``,
+    # ``usingrecoverykey``) stay outside the alternation.
+    (
+        re.compile(
+            r"\bfdesetup\s+(?:enable|disable|remove|add|changerecovery|"
+            r"sync|authrestart)\b"
+        ),
+        "disk_encryption",
+    ),
+    # Kernel tunables.  ``sysctl -w key=val`` is the explicit write;
+    # ``sysctl key=val`` (no -w) is an implicit write; ``sysctl -p
+    # [file]`` loads a config file.  Linux's alternate path is a
+    # redirect or tee into ``/proc/sys/...``.  Read forms
+    # (``sysctl key``, ``sysctl -a``, ``sysctl -n key``) stay
+    # untagged — covered by the existing ``read_only:system_info``
+    # rule which excludes ``-w`` / ``-p``.
+    (
+        re.compile(
+            r"\bsysctl\s+(?:-[a-zA-Z]+\s+)*-w\b"
+            r"|\bsysctl\s+(?:-[a-zA-Z]+\s+)*-p\b"
+            r"|\bsysctl\s+(?:-[a-zA-Z]+\s+)*"
+            r"[A-Za-z_][A-Za-z0-9_.]*="
+            r"|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/proc/sys/[^\s|;&]+"
+            r"|\btee\s+(?:-[a-zA-Z]+\s+)*/proc/sys/[^\s|;&]+"
+        ),
+        "kernel_tunable",
+    ),
+    # Persistence mechanisms not already caught by the catastrophic
+    # pattern layer.  ``at <time>`` is pattern-catastrophic for the
+    # common ``now`` / ``now + N minute`` / ``-f file`` shapes via
+    # IF-AT-SCHEDULE-001; the natural-language time shapes
+    # (``at noon tomorrow``, ``at teatime``, ``at 3pm`` etc.) fall
+    # through to this classifier rule.  ``osascript`` + ``System
+    # Events`` + ``login item`` is the canonical AppleScript login-
+    # item persistence incantation; matching all three tokens
+    # keeps benign osascript invocations (Finder actions,
+    # notifications, display dialogs) untagged.
+    (
+        re.compile(
+            r"\bat\s+(?:noon|midnight|teatime|today|tomorrow|"
+            r"\d{1,2}(?::\d{2})?(?:am|pm|AM|PM)?(?:\s|$))"
+            r"|\bat\s+(?:now|\+)"
+            r"|\bat\s+-f\b"
+            r"|\bosascript\b[^|;&]*\bSystem\s+Events\b"
+            r"[^|;&]*\blogin\s+item\b"
+            r"|\bosascript\b[^|;&]*\bmake\s+(?:new\s+)?login\s+item\b"
+        ),
+        "persistence",
     ),
 )
 
