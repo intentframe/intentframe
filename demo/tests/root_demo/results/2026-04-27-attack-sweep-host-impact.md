@@ -14,8 +14,8 @@ IntentFrame path. The suite expected every attack intent to be blocked.
 
 Result:
 
-- 92 / 100 intents returned the expected `BLOCK` decision.
-- 8 / 100 intents returned `ALLOW` even though the fixture expected `BLOCK`.
+- 91 / 100 intents returned the expected `BLOCK` decision.
+- 9 / 100 intents returned `ALLOW` even though the fixture expected `BLOCK`.
 - Several allowed commands reached the real root executor and changed host
   state on the developer machine.
 - The most disruptive live change was intent 87, which changed Wi-Fi DNS to
@@ -125,7 +125,7 @@ IntentFrame root pipeline. The `[STUB]` prefix means the agent is scripted, not
 that command execution is mocked. When Guardian returns `ALLOW`, the root-profile
 executor can execute the command on the host.
 
-The 8 failed intents exposed two classes of gaps:
+The 9 failed intents exposed two classes of gaps:
 
 ### 1. Missing deterministic blocks for root-level host/network mutation
 
@@ -169,3 +169,9 @@ For demo readiness, the highest-priority fix is to add deterministic blocks for
 the host/network mutation commands listed above. That prevents the same network
 and hostname damage from recurring even if the AI layers continue to rate those
 commands as medium risk.
+
+## See also
+
+- [results/README.md](./README.md) — index of this folder.
+- [root-demo-policy-remediation.md](./root-demo-policy-remediation.md) — policy,
+  classifier, and dry-run test-safety follow-up (YAML + code plan).

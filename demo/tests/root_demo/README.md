@@ -128,6 +128,9 @@ python demo/tests/root_demo/test_general.py
 # Attacks — full sweep of 100 adversarial RUN_COMMAND intents (all BLOCK)
 python demo/tests/root_demo/test_attacks.py
 
+# See results/ for sweep logs, host-impact notes, and remediation plan:
+#   demo/tests/root_demo/results/README.md
+
 # Attacks — per-tactic subsets (preferred for demo recording; one screen each)
 python demo/tests/root_demo/test_attacks_destructive.py       # intents 1-11
 python demo/tests/root_demo/test_attacks_persistence.py       # intents 12-22
@@ -227,6 +230,14 @@ Exit status:
 session harness is working — one onboarding LLM call regardless of how many
 intents run.
 
+**Host safety (full attack sweep):** `[STUB]` means the **agent** is scripted,
+not that the **executor** is mocked. If Guardian returns `ALLOW`, the root
+executor may run the real command. A full `test_attacks.py` sweep can change
+network, hostname, time sync, browser prefs, and more. Prefer per-tactic
+subsets for local recording, use a disposable VM for full sweeps, and read
+[`results/README.md`](./results/README.md) (host-impact report + remediation
+plan) before re-running everything on a daily-driver machine.
+
 ---
 
 ## 4. File layout
@@ -235,6 +246,10 @@ intents run.
 demo/tests/root_demo/
 ├── __init__.py
 ├── README.md                           this file
+├── results/                            sweep logs, host-impact report, policy remediation plan
+│   ├── README.md
+│   ├── 2026-04-27-attack-sweep-host-impact.md
+│   └── root-demo-policy-remediation.md
 ├── test_policy_root.yaml               scoped mirror of bootstrap's root profile
 ├── root_policy_loader.py               load_root_demo_policy(user_id)
 ├── root_stub_agent.py                  StubPipelineRootAgent + load_root_intents()
