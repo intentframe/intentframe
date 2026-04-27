@@ -1,0 +1,5 @@
+- id: compilation
+  family: compilation
+  pattern: (?:^|[\s;&|])(?:gcc|g\+\+|clang|clang\+\+|cc|ld)\b|\bmake\b|\bcmake\b|\bcargo\s+build\b|\bgo\s+build\b|\brustc\b|\bjavac\b|\bswiftc\b|\btsc\b
+  description: Command compiles or links code
+  mitre_family: execution

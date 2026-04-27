@@ -1,0 +1,180 @@
+- id: read_only__filesystem_list
+  family: read_only
+  suffix: filesystem_list
+  pattern: \A(?:ls|tree|stat|file|du|df|lsattr|getfacl|namei|pathchk|findmnt|mountpoint|lsblk|blkid)(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*(?:\s+[^\s]+)*\s*\Z
+  description: Read-only filesystem_list command
+  mitre_family: discovery
+- id: read_only__filesystem_list__2
+  family: read_only
+  suffix: filesystem_list
+  pattern: \Afind(?!.*\s-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)\b)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only filesystem_list command
+  mitre_family: discovery
+- id: read_only__filesystem_read
+  family: read_only
+  suffix: filesystem_read
+  pattern: \A(?:cat|head|tail|less|more|wc|hexdump|xxd|od|nl|tac|rev|md5sum|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum|b2sum|shasum|cksum|sum)(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*(?:\s+[^\s]+)+\s*\Z
+  description: Read-only filesystem_read command
+  mitre_family: discovery
+- id: read_only__search
+  family: read_only
+  suffix: search
+  pattern: \A(?:grep|egrep|fgrep|rg|ack|jq|yq)(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*(?:\s+[^\s]+)+\s*\Z
+  description: Read-only search command
+  mitre_family: discovery
+- id: read_only__search__2
+  family: read_only
+  suffix: search
+  pattern: \Axmllint(?!(?:.*\s)(?:--output\b|-o\b))(?:\s+[^\s]+)+\s*\Z
+  description: Read-only search command
+  mitre_family: discovery
+- id: read_only__process_inspect
+  family: read_only
+  suffix: process_inspect
+  pattern: \A(?:ps|top|htop|lsof|pgrep|pidof|uptime|w|jobs|fg|bg|free|vmstat|iostat|mpstat|ipcs|nproc|arch|last|lastlog|who|users|finger|getent|cal|ncal)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only process_inspect command
+  mitre_family: discovery
+- id: read_only__system_info
+  family: read_only
+  suffix: system_info
+  pattern: \A(?:uname|whoami|id|hostname|date|pwd|env|printenv|echo|true|false|which|whereis|type|history|readlink|basename|dirname|realpath|locale|tty|groups|man|info|apropos|whatis|tldr|tput|alias|clear|reset|seq|factor|printf)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only system_info command
+  mitre_family: discovery
+- id: read_only__system_info__2
+  family: read_only
+  suffix: system_info
+  pattern: \Asysctl(?!(?:.*\s)(?:-w\b|--write\b|-p\b|--load\b))(?:\s+[^\s]+)*\s*\Z
+  description: Read-only system_info command
+  mitre_family: discovery
+- id: read_only__system_info__3
+  family: read_only
+  suffix: system_info
+  pattern: \Aulimit(?:\s+-[A-Za-z])?\s*\Z
+  description: Read-only system_info command
+  mitre_family: discovery
+- id: read_only__system_info__4
+  family: read_only
+  suffix: system_info
+  pattern: \Astty(?:\s+(?:-a|--all|-g|--save))?\s*\Z
+  description: Read-only system_info command
+  mitre_family: discovery
+- id: read_only__vcs_inspect
+  family: read_only
+  suffix: vcs_inspect
+  pattern: \Agit\s+(?:status|log|diff|show|branch|remote|rev-parse|ls-files|ls-tree|ls-remote|describe|blame|shortlog|reflog|stash\s+list|tag(?:\s+-l)?|for-each-ref|config\s+(?:--get|--list|-l))(?:\s+[^\s]+)*\s*\Z
+  description: Read-only vcs_inspect command
+  mitre_family: discovery
+- id: read_only__vcs_inspect__2
+  family: read_only
+  suffix: vcs_inspect
+  pattern: \Ahg\s+(?:status|st|log|diff|cat|annotate|branch|manifest|tip|summary|heads|parents|identify|paths|showconfig)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only vcs_inspect command
+  mitre_family: discovery
+- id: read_only__vcs_inspect__3
+  family: read_only
+  suffix: vcs_inspect
+  pattern: \Asvn\s+(?:status|st|log|diff|di|info|list|ls|cat|propget|pg|propdump|pd|proplist|pl|blame|annotate|praise)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only vcs_inspect command
+  mitre_family: discovery
+- id: read_only__vcs_inspect__4
+  family: read_only
+  suffix: vcs_inspect
+  pattern: \Afossil\s+(?:status|timeline|info|ls|finfo|branch|diff)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only vcs_inspect command
+  mitre_family: discovery
+- id: read_only__vcs_inspect__5
+  family: read_only
+  suffix: vcs_inspect
+  pattern: \Abzr\s+(?:status|st|log|diff|info|ls|cat|annotate)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only vcs_inspect command
+  mitre_family: discovery
+- id: read_only__text_transform
+  family: read_only
+  suffix: text_transform
+  pattern: \A(?:sort|sdiff)(?!(?:.*\s)(?:-o\b|--output\b))(?:\s+[^\s]+)*\s*\Z
+  description: Read-only text_transform command
+  mitre_family: discovery
+- id: read_only__text_transform__2
+  family: read_only
+  suffix: text_transform
+  pattern: \Auniq(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?|\s+-[fsDCw]\s+\d+)*(?:\s+[^-][^\s]*)?\s*\Z
+  description: Read-only text_transform command
+  mitre_family: discovery
+- id: read_only__text_transform__3
+  family: read_only
+  suffix: text_transform
+  pattern: \A(?:cut|paste|join|tr|column|fold|fmt|pr|expand|unexpand|comm|diff|diff3|cmp|colordiff|delta)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only text_transform command
+  mitre_family: discovery
+- id: read_only__network_inspect
+  family: read_only
+  suffix: network_inspect
+  pattern: \A(?:netstat|ss)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only network_inspect command
+  mitre_family: discovery
+- id: read_only__network_inspect__2
+  family: read_only
+  suffix: network_inspect
+  pattern: \Aarp(?!(?:.*\s)-[sd]\b)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only network_inspect command
+  mitre_family: discovery
+- id: read_only__network_inspect__3
+  family: read_only
+  suffix: network_inspect
+  pattern: \Aip(?:\s+-\S+)*\s+(?:addr|address|link|route|neigh|neighbour|rule|tunnel|netns|xfrm|maddr|mroute|tcp_metrics|token)\s+(?:show|list|s|l|get|save)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only network_inspect command
+  mitre_family: discovery
+- id: read_only__network_inspect__4
+  family: read_only
+  suffix: network_inspect
+  pattern: \Aroute(?!(?:.*\s)(?:add|del|delete|flush|change|replace)\b)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only network_inspect command
+  mitre_family: discovery
+- id: read_only__network_inspect__5
+  family: read_only
+  suffix: network_inspect
+  pattern: \Aifconfig(?:\s+(?:-[asv]|[a-zA-Z][a-zA-Z0-9]+))?\s*\Z
+  description: Read-only network_inspect command
+  mitre_family: discovery
+- id: read_only__archive_inspect
+  family: read_only
+  suffix: archive_inspect
+  pattern: \Atar(?!(?:.*\s)(?:-[a-zA-Z]*[cxrAu][a-zA-Z]*\b|--(?:create|extract|append|update|concatenate|catenate|delete)\b))\s+(?:-[a-zA-Z]*t[a-zA-Z]*|--list)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only archive_inspect command
+  mitre_family: discovery
+- id: read_only__archive_inspect__2
+  family: read_only
+  suffix: archive_inspect
+  pattern: \Aunzip\s+-[lvZtpcq]+(?:\s+[^\s]+)+\s*\Z
+  description: Read-only archive_inspect command
+  mitre_family: discovery
+- id: read_only__archive_inspect__3
+  family: read_only
+  suffix: archive_inspect
+  pattern: \Azipinfo(?:\s+[^\s]+)+\s*\Z
+  description: Read-only archive_inspect command
+  mitre_family: discovery
+- id: read_only__archive_inspect__4
+  family: read_only
+  suffix: archive_inspect
+  pattern: \A(?:gzip|bzip2|xz|zstd|lzma)\s+(?:-l|--list|-t|--test|-tv)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only archive_inspect command
+  mitre_family: discovery
+- id: read_only__archive_inspect__5
+  family: read_only
+  suffix: archive_inspect
+  pattern: \A(?:zcat|bzcat|xzcat|zstdcat|lz4cat|zless|zmore|bzless|bzmore|xzless|xzmore|zstdless|zstdmore|zgrep|zegrep|zfgrep|bzgrep|xzgrep|zstdgrep)(?:\s+[^\s]+)+\s*\Z
+  description: Read-only archive_inspect command
+  mitre_family: discovery
+- id: read_only__container_inspect
+  family: read_only
+  suffix: container_inspect
+  pattern: \A(?:docker|podman)\s+(?:ps|images|image\s+(?:ls|inspect|history)|logs|inspect|info|version|history|port|diff|top|stats|events|network\s+(?:ls|inspect)|volume\s+(?:ls|inspect)|container\s+(?:ls|inspect|logs|top|diff|port|stats)|system\s+(?:df|info|events))(?:\s+[^\s]+)*\s*\Z
+  description: Read-only container_inspect command
+  mitre_family: discovery
+- id: read_only__container_inspect__2
+  family: read_only
+  suffix: container_inspect
+  pattern: \Akubectl\s+(?:get|describe|logs|top|version|api-resources|api-versions|explain|config\s+(?:view|get-contexts|current-context)|cluster-info|auth\s+can-i)(?:\s+[^\s]+)*\s*\Z
+  description: Read-only container_inspect command
+  mitre_family: discovery

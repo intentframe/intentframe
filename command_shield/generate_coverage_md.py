@@ -28,19 +28,22 @@ HEADER = """# Command Shield — Classifier Coverage Map
 > `command_shield/generate_coverage_md.py`.  Do not hand-edit — update the
 > YAML and regenerate.**
 
-The classifier's sensitive-surface capability families are annotated
-with MITRE ATT&CK (Enterprise) tactics.  Each row is a rule in the
-YAML corpus; the `capability` column is the literal ID the classifier
-emits.  Rows marked `sensitive: true` are included in
-`CORPUS.sensitive_capability_ids()`, which callers may use when
-building their own policy or reporting surfaces.
+Command Shield's YAML-backed capability rules are annotated with
+MITRE ATT&CK (Enterprise) tactics where the mapping is useful.  Each
+row is a rule in the YAML corpus; the `capability` column is the
+literal ID the classifier emits.  MITRE data is documentation
+metadata only: it does not change runtime matching and does not create
+policy aliases.
 
-When every MITRE tactic a shell-and-python operator can reasonably
-reach has at least one row, the classifier is **done** for that
-tactic — further additions require either a newly published MITRE
-technique or a production miss found via the telemetry hook in
-`command_shield.telemetry`.  Speculative additions are out of scope;
-write the evidence down before opening a PR.
+Rows marked `sensitive: true` are included in
+`CORPUS.sensitive_capability_ids()`.  When the reachable shell /
+Python tactics have coverage and the telemetry hook in
+`command_shield.telemetry` stops surfacing untagged high-verdict
+misses, the classifier is **done enough** for this layer.  Further
+additions require either a newly published relevant MITRE technique,
+a concrete production miss, or a rule split that makes an existing
+tag more precise.  Speculative additions are out of scope; write the
+evidence down before opening a PR.
 
 Tactics not currently mapped (intentional out-of-scope for a
 shell+python operator — listed here so reviewers know the gap is
@@ -137,8 +140,12 @@ TACTIC_BLURB: dict[str, str] = {
 
 def main() -> None:
     by_tactic: dict[str, list] = defaultdict(list)
+    unmapped: list = []
     for rule in CORPUS.rules:
-        by_tactic[rule.mitre_family].append(rule)
+        if rule.mitre_family is None:
+            unmapped.append(rule)
+        else:
+            by_tactic[rule.mitre_family].append(rule)
 
     lines: list[str] = [HEADER]
 
@@ -153,9 +160,28 @@ def main() -> None:
         lines.append("|---|---|---|---|")
         for rule in sorted(rules, key=lambda r: (r.family, r.suffix, r.id)):
             techniques = ", ".join(rule.mitre_techniques) or "_(none)_"
-            cap = f"`capability:{rule.family}:{rule.suffix}`"
+            cap = f"`{rule.capability_tag()}`"
             lines.append(
                 f"| `{rule.id}` | {cap} | {techniques} | "
+                f"`command_shield/capabilities/{rule.family}.yaml` |"
+            )
+        lines.append("")
+
+    if unmapped:
+        lines.append("## Unmapped (no MITRE tactic declared)\n")
+        lines.append(
+            "Non-sensitive rules whose YAML row does not declare a "
+            "`mitre_family`.  They still produce a `capability:*` tag "
+            "and are listed here so every rule remains traceable, but "
+            "they do not roll up into a tactic bucket.\n"
+        )
+        lines.append("")
+        lines.append("| Rule ID | Capability tag | Source YAML |")
+        lines.append("|---|---|---|")
+        for rule in sorted(unmapped, key=lambda r: (r.family, r.suffix, r.id)):
+            cap = f"`{rule.capability_tag()}`"
+            lines.append(
+                f"| `{rule.id}` | {cap} | "
                 f"`command_shield/capabilities/{rule.family}.yaml` |"
             )
         lines.append("")
@@ -163,15 +189,17 @@ def main() -> None:
     lines.append("---\n")
     lines.append("## Summary")
     lines.append("")
-    lines.append(f"- **Total sensitive-surface rules:** {len(CORPUS.rules)}")
+    lines.append(f"- **Total rules:** {len(CORPUS.rules)}")
     lines.append(
-        f"- **Distinct capability tags:** "
+        f"- **Sensitive-surface capability tags:** "
         f"{len(CORPUS.sensitive_capability_ids())}"
     )
     lines.append(f"- **Tactics covered:** {len(by_tactic)}")
+    if unmapped:
+        lines.append(f"- **Unmapped (no MITRE tactic):** {len(unmapped)}")
     lines.append("")
     lines.append(
-        "Per-tactic counts (unique `capability:<family>:<suffix>` pairs; "
+        "Per-tactic counts (unique `capability:<family>[:<suffix>]` pairs; "
         "a suffix split across multiple regex rows — e.g. "
         "`data_read:cloud_tokens` file-shape and verb-shape — counts once):"
     )
@@ -187,7 +215,8 @@ def main() -> None:
 
     out = Path("command_shield/COVERAGE.md")
     out.write_text("\n".join(lines), encoding="utf-8")
-    print(f"wrote {out} ({sum(len(v) for v in by_tactic.values())} rules)")
+    mapped = sum(len(v) for v in by_tactic.values())
+    print(f"wrote {out} ({mapped} mapped rules, {len(unmapped)} unmapped)")
 
 
 if __name__ == "__main__":

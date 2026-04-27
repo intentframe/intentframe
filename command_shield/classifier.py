@@ -588,119 +588,30 @@ CAPABILITY_NETWORK_EXFIL = "capability:network_exfil"
 # negatives are preferable to false positives, since the verdict comes
 # from step 3 patterns and these signals are advisory.
 
-# Refined rules: one per manager so policy can allow/deny at tool grain.
-# Order matters only within a capability family (first match wins per tag
-# in `seen`); across capabilities all independent rules are evaluated.
-_PACKAGE_INSTALL_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(?:pip3?|pipx|uv|poetry|conda|mamba)\s+install\b"), "pip"),
-    (re.compile(r"\b(?:npm|pnpm)\s+(?:i|install|add)\b|\byarn\s+(?:add|install)\b"), "npm"),
-    (re.compile(r"\bbrew\s+(?:install|reinstall|upgrade)\b"), "brew"),
-    (re.compile(r"\bapt(?:-get)?\s+(?:install|upgrade)\b"), "apt"),
-    (re.compile(r"\byum\s+(?:install|update)\b"), "yum"),
-    (re.compile(r"\bdnf\s+(?:install|upgrade)\b"), "dnf"),
-    (re.compile(r"\bpacman\s+-S\b"), "pacman"),
-    (re.compile(r"\bapk\s+add\b"), "apk"),
-    (re.compile(r"\bgem\s+install\b"), "gem"),
-    (re.compile(r"\bcargo\s+install\b"), "cargo"),
-    (re.compile(r"\bgo\s+install\b"), "go"),
-    (re.compile(r"\bcomposer\s+(?:install|require)\b"), "composer"),
+# Refined rules for package install / stdin exec / script execution are
+# loaded from ``command_shield/capabilities/*.yaml`` via the corpus.
+# Only rules that carry a suffix participate as refined (per-interpreter
+# or per-manager) tags; the bare umbrella rule for stdin_exec lives in
+# the same YAML but is emitted separately from the ``_RULES`` tuple
+# below.  Order matters only within a capability family (first match
+# wins per tag in ``seen``); across capabilities all independent rules
+# are evaluated.
+_PACKAGE_INSTALL_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("package_install")
+    if r.suffix
 )
 
-# Refined rules: one per interpreter.
-#
-# File-form rules require an explicit script file (or `-jar` / `run`
-# verb) as proof the command is execution-shaped rather than help/
-# version/REPL.  Inline-form rules (`-e`, `-r`, `--eval`) are
-# enumerated for every interpreter EXCEPT python/shell, which the
-# python+shell-only profile is meant to allow.  Adding a python
-# inline tag here would force every `_safe_for_read_only` consumer
-# to deal with `python -c` showing up as a script_execution
-# capability — out of scope for this change.
-# Stdin-piped execution into an interpreter, refined by interpreter family.
-# Mirror the per-interpreter shape of ``_SCRIPT_EXECUTION_RULES`` so policy
-# layers can deny ``capability:stdin_exec:node`` while still allowing
-# ``capability:stdin_exec:python`` (e.g. python+shell-only profiles).
-#
-# These rules are emitted IN ADDITION to the binary ``CAPABILITY_STDIN_EXEC``
-# tag below; ``_READ_ONLY_INCOMPATIBLE_CAPS`` keys off the binary tag, so
-# read-only fast-path semantics are preserved unchanged.  Suffixes mirror
-# ``_SCRIPT_EXECUTION_RULES`` (``shell`` collapses bash/sh/zsh/dash/ksh/ash
-# the same way).
-#
-# The lookahead ``(?=\s|$|\||;|&)`` after the optional ``-`` prevents
-# false matches against tokens that merely *start* with an interpreter
-# name (``| nodejs-utility``, ``| sharp``).  ``python3?|python2`` is
-# split into its own rule because the suffix is uniformly ``python``.
-_STDIN_EXEC_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\|\s*python(?:3|2)?(?:\s+-)?(?=\s|$|\||;|&)"), "python"),
-    (re.compile(r"\|\s*node(?:js)?(?:\s+-)?(?=\s|$|\||;|&)"), "node"),
-    (re.compile(r"\|\s*ruby(?:\s+-)?(?=\s|$|\||;|&)"), "ruby"),
-    (re.compile(r"\|\s*perl(?:\s+-)?(?=\s|$|\||;|&)"), "perl"),
-    # `php` reads from stdin in CLI mode (`cat foo.php | php`); the
-    # ``-r`` and ``-f -`` shapes are also covered structurally because
-    # the optional ``\s+-`` accepts ``php -``.
-    (re.compile(r"\|\s*php(?:\s+-)?(?=\s|$|\||;|&)"), "php"),
-    (
-        re.compile(r"\|\s*(?:bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)"),
-        "shell",
-    ),
+_STDIN_EXEC_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("stdin_exec")
+    if r.suffix
 )
 
-
-_SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\bpython3?\s+[^|;&]*\.py\b"), "python"),
-    (re.compile(r"\bnode\s+[^|;&]*\.(?:js|mjs|cjs|ts)\b"), "node"),
-    (re.compile(r"\bruby\s+[^|;&]*\.rb\b"), "ruby"),
-    (re.compile(r"\bperl\s+[^|;&]*\.pl\b"), "perl"),
-    (re.compile(r"\b(?:bash|sh|zsh|ksh|dash)\s+[^|;&]*\.(?:sh|bash|zsh)\b"), "shell"),
-    (re.compile(r"(?:^|[\s;&|])\./[\w.][\w./-]*"), "local_binary"),
-    # ── long-tail interpreters: file-form ───────────────────────────
-    # `java -jar foo.jar` / `java -cp ... Main` / `java Foo.class`.
-    # The `-jar` flag is the canonical run form; `Foo.class` direct
-    # exec is rare but covered by the second alternative.
-    (re.compile(r"\bjava\s+(?:[^|;&]*\s)?-jar\b"), "java"),
-    (re.compile(r"\bjava\s+[^|;&]*\.(?:class|jar)\b"), "java"),
-    # `go run main.go` — distinct from `go build` (compilation) and
-    # `go install` (package_install).
-    (re.compile(r"\bgo\s+run\b"), "go"),
-    # `dotnet foo.dll` — the .NET host running a managed assembly.
-    (re.compile(r"\bdotnet\s+[^|;&]*\.dll\b"), "dotnet"),
-    # `php foo.php` — file-mode interpretation.
-    (re.compile(r"\bphp\s+[^|;&]*\.php\b"), "php"),
-    # `lua foo.lua`.
-    (re.compile(r"\blua\s+[^|;&]*\.lua\b"), "lua"),
-    # `Rscript foo.R` / `.r`.
-    (re.compile(r"\bRscript\s+[^|;&]*\.[Rr]\b"), "r"),
-    # `julia foo.jl`.
-    (re.compile(r"\bjulia\s+[^|;&]*\.jl\b"), "julia"),
-    # `swift run` (package mode) or `swift script.swift`.
-    (re.compile(r"\bswift\s+(?:run\b|[^|;&]*\.swift\b)"), "swift"),
-    # Deno / Bun share a single suffix; both are JS/TS runtimes whose
-    # `run`/`test` verbs execute a script.
-    (re.compile(r"\b(?:deno|bun)\s+(?:run|test)\b"), "deno_bun"),
-    # ── long-tail interpreters: inline-eval form ─────────────────────
-    # These mirror file-form rules above.  Each catches an inline
-    # body so policies that deny `script_execution:<lang>` reject
-    # both `node app.js` and `node -e '...'`.
-    (re.compile(r"\bnode\s+(?:-e|--eval)\b"), "node"),
-    (re.compile(r"\bruby\s+-e\b"), "ruby"),
-    (re.compile(r"\bperl\s+-e\b"), "perl"),
-    (re.compile(r"\bphp\s+-r\b"), "php"),
-    # `awk 'BEGIN{...}'` / `awk -f script.awk` — both shapes are
-    # AWK-language execution.  The classifier's haystack is the
-    # shlex-normalised command (quotes already stripped), so we
-    # cannot anchor on `'`.  Instead we accept any awk invocation
-    # that has a non-flag positional argument; `awk --version` /
-    # `awk -h` (no positional) stay untagged.  `gawk` / `mawk` get
-    # the same suffix so policy can deny the family with one tag.
-    (
-        re.compile(
-            r"\b(?:awk|gawk|mawk)\b"
-            r"(?:\s+-[a-zA-Z][^\s]*)*"
-            r"\s+(?!--?(?:help|version|h|V)\b)\S",
-        ),
-        "awk",
-    ),
+_SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("script_execution")
+    if r.suffix
 )
 
 
@@ -754,6 +665,24 @@ def _expand_refined(
     return tuple(
         (rx, f"{base}:{suffix}", desc_template.format(suffix=suffix))
         for rx, suffix in rules
+    )
+
+
+def _family_bare(family: str) -> tuple[tuple[re.Pattern[str], str, str], ...]:
+    """Return ``(pattern, tag, description)`` rows for bare-family rules.
+
+    "Bare" here means the YAML rule has no ``suffix``, so the emitted
+    tag is ``capability:<family>`` with no trailing ``:<sub>``.  Used
+    by :data:`_RULES` to expand single-tag capability families
+    (``compilation``, ``network_bind``, ``background_exec``,
+    ``download_and_exec``, ``binary_download``, ``process_signal``,
+    ``spawns_process``, ``filesystem_write``, and the ``stdin_exec``
+    umbrella rule) loaded from YAML.
+    """
+    return tuple(
+        (r.pattern, r.capability_tag(), r.description)
+        for r in _CAPABILITY_CORPUS.by_family(family)
+        if not r.suffix
     )
 
 
@@ -811,131 +740,22 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         CAPABILITY_NETWORK_EXFIL,
         "Command moves local data outbound via {suffix}",
     ),
-    # Compilation / build — compilers and build drivers.
-    (
-        re.compile(
-            r"(?:^|[\s;&|])(?:gcc|g\+\+|clang|clang\+\+|cc|ld)\b"
-            r"|\bmake\b"
-            r"|\bcmake\b"
-            r"|\bcargo\s+build\b"
-            r"|\bgo\s+build\b"
-            r"|\brustc\b"
-            r"|\bjavac\b"
-            r"|\bswiftc\b"
-            r"|\btsc\b"
-        ),
-        CAPABILITY_COMPILATION,
-        "Command compiles or links code",
-    ),
-    # Network bind — opening a listener on a local port.  Accepts
-    # both the short `-l` (possibly inside a combined flag bundle like
-    # `-lk`) and the long `--listen` form.
-    (
-        re.compile(
-            r"\bnc\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))"
-            r"|\bncat\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))"
-            r"|\bsocat\b[^|]*\bLISTEN\b"
-            r"|\bpython3?\s+-m\s+http\.server\b"
-            r"|\bpython3?\s+-m\s+SimpleHTTPServer\b"
-            r"|\bphp\s+-S\b"
-            r"|\bruby\s+-run\s+-e\s+httpd\b"
-        ),
-        CAPABILITY_NETWORK_BIND,
-        "Command binds a local network listener",
-    ),
-    # Background execution — persists beyond the current shell.
-    (
-        re.compile(
-            r"\bnohup\b"
-            r"|\bdisown\b"
-            r"|\bsetsid\b"
-            r"|\bscreen\s+-d(?:m)?\b"
-            r"|\btmux\s+new-session\s+-d\b"
-            r"|[^&|]&\s*(?:$|[;\n])"
-        ),
-        CAPABILITY_BACKGROUND_EXEC,
-        "Command runs a process in the background",
-    ),
-    # Download-and-execute — fetch remote payload piped into a shell.
-    # (Note: catastrophic subset of this is already caught by step 3.
-    # Here we tag the capability for any remote-fetch-then-execute shape.)
-    (
-        re.compile(
-            r"\b(?:curl|wget|fetch|aria2c)\b[^|]*\|\s*"
-            r"(?:sh|bash|zsh|dash|python3?|perl|ruby|node)\b"
-        ),
-        CAPABILITY_DOWNLOAD_AND_EXEC,
-        "Command downloads a remote payload and pipes it to an interpreter",
-    ),
-    # Binary download — fetches a remote payload to disk without piping
-    # it straight to a shell.  The pipe-to-shell variant is already tagged
-    # as download_and_exec above; both may fire together for
-    # `curl -O url | sh` shapes, which is intentional.
-    (
-        re.compile(
-            r"\bcurl\b[^|]*\s-[OoLJ]\b"
-            r"|\bwget\b(?![^|]*\|\s*(?:sh|bash|zsh|dash|python3?|perl|ruby|node))"
-            r"|\baria2c\b"
-        ),
-        CAPABILITY_BINARY_DOWNLOAD,
-        "Command downloads a remote payload to disk",
-    ),
-    # Stdin-piped interpreter execution — `… | python -`, `… | bash`.
-    # Distinct from download_and_exec (no network fetch component) and
-    # from script_execution (no literal file path).  Treated as a
-    # capability rather than a verdict-bearing pattern because benign
-    # uses exist (`echo 'print(1)' | python`), but the edge body is
-    # unresolvable so policy layers may want to deny it outright.
-    (
-        re.compile(
-            r"\|\s*(?:python3?|python2|node|nodejs|ruby|perl|php|"
-            r"bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)"
-        ),
-        CAPABILITY_STDIN_EXEC,
-        "Command pipes input into an interpreter (stdin exec)",
-    ),
-    # Process signaling — kill/pkill/killall family.
-    (
-        re.compile(
-            r"\bkill\s+-\w*\b"
-            r"|\bkill\s+-?\d+\b"
-            r"|\bkillall\b"
-            r"|\bpkill\b"
-            r"|\bskill\b"
-        ),
-        CAPABILITY_PROCESS_SIGNAL,
-        "Command sends signals to processes",
-    ),
-    # Generic spawn — shells out via common indirection verbs.
-    (
-        re.compile(
-            r"\bxargs\b"
-            r"|\bfind\b[^|]*-exec\b"
-            r"|\bsudo\b"
-            r"|\bsu\b(?=\s+-)"
-            r"|\bssh\b"
-            r"|\bdocker\s+(?:run|exec)\b"
-            r"|\bkubectl\s+exec\b"
-        ),
-        CAPABILITY_SPAWNS_PROCESS,
-        "Command spawns or delegates to another process",
-    ),
-    # Filesystem write via shell redirection or `tee`.  The leading
-    # boundary `(?:^|[\s;&|])` ensures a literal `>` in a quoted arg
-    # (e.g. `grep "a>b" f`) does NOT match after shlex has stripped
-    # the quotes — the `>` would be preceded by a word character.
-    # Writes to `/dev/null`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/*`
-    # are excluded as benign sinks; writes to other `/dev/*` paths are
-    # already caught by catastrophic patterns.
-    (
-        re.compile(
-            r"(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*"
-            r"(?!/dev/(?:null|stdout|stderr|fd/\d+)(?:\s|$))\S"
-            r"|\|\s*tee\b"
-        ),
-        CAPABILITY_FILESYSTEM_WRITE,
-        "Command writes to a file via shell redirection or tee",
-    ),
+    # Bare single-tag capability families — loaded from
+    # ``command_shield/capabilities/*.yaml``.  Each rule emits a single
+    # ``capability:<family>`` tag with no ``:<sub>`` suffix.  The
+    # ``stdin_exec`` umbrella rule lives in the same YAML as the per-
+    # interpreter refined rules above; ``_family_bare`` selects only
+    # suffix-less rows so the umbrella fires in addition to the refined
+    # per-interpreter tags.
+    *_family_bare("compilation"),
+    *_family_bare("network_bind"),
+    *_family_bare("background_exec"),
+    *_family_bare("download_and_exec"),
+    *_family_bare("binary_download"),
+    *_family_bare("stdin_exec"),
+    *_family_bare("process_signal"),
+    *_family_bare("spawns_process"),
+    *_family_bare("filesystem_write"),
 )
 
 
@@ -954,346 +774,9 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
 # -exec`, `sed -i`) are excluded via negative lookahead so those
 # commands never receive a read-only tag.
 
-_READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    # ── filesystem_list ──────────────────────────────────────────────
-    # `ls` / `tree` / `stat` / `file` / `du` / `df` plus metadata tools:
-    # `lsattr` (ext-attrs), `getfacl` (ACLs), `namei` (path resolution),
-    # `pathchk` (portable-name check), `findmnt` / `mountpoint` (mount
-    # inspection), `lsblk` / `blkid` (block-device inspection).
-    (
-        re.compile(
-            r"\A(?:ls|tree|stat|file|du|df|lsattr|getfacl|namei|pathchk"
-            r"|findmnt|mountpoint|lsblk|blkid)"
-            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "filesystem_list",
-    ),
-    # `find` — excluded when any write/exec flag is present.
-    (
-        re.compile(
-            r"\Afind"
-            r"(?!.*\s-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)\b)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "filesystem_list",
-    ),
-
-    # ── filesystem_read ──────────────────────────────────────────────
-    # File readers.  `sed` and `awk` are intentionally NOT included —
-    # both support in-place write modes (`sed -i`, `awk -i inplace`).
-    # Hashers (`md5sum`, `sha*sum`, `b2sum`, `shasum`, `cksum`, `sum`)
-    # are read-only computations over file contents.
-    (
-        re.compile(
-            r"\A(?:cat|head|tail|less|more|wc|hexdump|xxd|od|nl|tac|rev"
-            r"|md5sum|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum"
-            r"|b2sum|shasum|cksum|sum)"
-            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "filesystem_read",
-    ),
-
-    # ── search ───────────────────────────────────────────────────────
-    # Content search.  `grep -P` with `(?{...})` perl-embed requires
-    # `use re 'eval'` which grep does not enable, so it is safe as a
-    # read-only operation from grep's side.  Structured-data queries
-    # (`jq`, `yq`) have no in-place write mode; `xmllint` DOES have
-    # `--output` so its write form is excluded via negative lookahead.
-    (
-        re.compile(
-            r"\A(?:grep|egrep|fgrep|rg|ack|jq|yq)"
-            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "search",
-    ),
-    # `xmllint` — excluded when `--output` / `-o` is present.
-    (
-        re.compile(
-            r"\Axmllint"
-            r"(?!(?:.*\s)(?:--output\b|-o\b))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "search",
-    ),
-
-    # ── process_inspect ──────────────────────────────────────────────
-    # Process / runtime / host-activity inspection.  `dmesg` typically
-    # requires root on Linux and is intentionally omitted to keep the
-    # tag trustworthy for non-privileged agents.
-    (
-        re.compile(
-            r"\A(?:ps|top|htop|lsof|pgrep|pidof|uptime|w|jobs|fg|bg"
-            r"|free|vmstat|iostat|mpstat|ipcs|nproc|arch"
-            r"|last|lastlog|who|users|finger|getent|cal|ncal)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "process_inspect",
-    ),
-
-    # ── system_info ──────────────────────────────────────────────────
-    # Identity / environment / docs / terminal-query tools.  Several
-    # binaries here share a name with writers (`sysctl`, `stty`,
-    # `ulimit`); those get separate rules below that positively match
-    # only the read forms.
-    (
-        re.compile(
-            r"\A(?:uname|whoami|id|hostname|date|pwd|env|printenv|echo"
-            r"|true|false|which|whereis|type|history|readlink|basename"
-            r"|dirname|realpath|locale|tty|groups"
-            r"|man|info|apropos|whatis|tldr|tput"
-            r"|alias|clear|reset"
-            r"|seq|factor|printf)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "system_info",
-    ),
-    # `sysctl` — read forms only.  Excludes `-w|--write` (set value)
-    # and `-p|--load` (load values from file).
-    (
-        re.compile(
-            r"\Asysctl"
-            r"(?!(?:.*\s)(?:-w\b|--write\b|-p\b|--load\b))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "system_info",
-    ),
-    # `ulimit` — bare invocation or a single inspection flag (no
-    # trailing value).  `ulimit -n 4096` (value-bearing) is rejected.
-    (
-        re.compile(r"\Aulimit(?:\s+-[A-Za-z])?\s*\Z"),
-        "system_info",
-    ),
-    # `stty` — bare / `-a` / `-g` (dump settings in restoreable form).
-    # Any other form mutates terminal attributes.
-    (
-        re.compile(r"\Astty(?:\s+(?:-a|--all|-g|--save))?\s*\Z"),
-        "system_info",
-    ),
-
-    # ── vcs_inspect ──────────────────────────────────────────────────
-    # Git read-only sub-commands.  `git config --get` / `--list` only;
-    # `git config key value` (write) is rejected.
-    (
-        re.compile(
-            r"\Agit\s+(?:status|log|diff|show|branch|remote|rev-parse"
-            r"|ls-files|ls-tree|ls-remote|describe|blame|shortlog"
-            r"|reflog|stash\s+list|tag(?:\s+-l)?|for-each-ref"
-            r"|config\s+(?:--get|--list|-l))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Mercurial read-only sub-commands.
-    (
-        re.compile(
-            r"\Ahg\s+(?:status|st|log|diff|cat|annotate|branch|manifest"
-            r"|tip|summary|heads|parents|identify|paths|showconfig)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Subversion read-only sub-commands.
-    (
-        re.compile(
-            r"\Asvn\s+(?:status|st|log|diff|di|info|list|ls|cat"
-            r"|propget|pg|propdump|pd|proplist|pl|blame|annotate|praise)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Fossil read-only sub-commands.
-    (
-        re.compile(
-            r"\Afossil\s+(?:status|timeline|info|ls|finfo|branch|diff)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Bazaar read-only sub-commands.
-    (
-        re.compile(
-            r"\Abzr\s+(?:status|st|log|diff|info|ls|cat|annotate)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-
-    # ── text_transform ───────────────────────────────────────────────
-    # Pure stdin/file → stdout processors.  `sed` / `awk` / general-
-    # purpose interpreters are deliberately excluded because their
-    # argument body can do anything.
-    #
-    # `sort` / `sdiff` have `-o outfile` write modes; excluded via
-    # negative lookahead.  `uniq` has a two-positional write form
-    # (`uniq input output`); handled with its own stricter rule.
-    (
-        re.compile(
-            r"\A(?:sort|sdiff)"
-            r"(?!(?:.*\s)(?:-o\b|--output\b))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "text_transform",
-    ),
-    (
-        re.compile(
-            r"\Auniq"
-            # Any number of flags (with optional attached or numeric
-            # argument for -f/-s/-w/-D/-C).
-            r"(?:"
-            r"\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?"
-            r"|\s+-[fsDCw]\s+\d+"
-            r")*"
-            # At most ONE positional (the input file); forbidding a
-            # second positional rejects `uniq input output`.
-            r"(?:\s+[^-][^\s]*)?\s*\Z",
-        ),
-        "text_transform",
-    ),
-    (
-        re.compile(
-            r"\A(?:cut|paste|join|tr|column|fold|fmt|pr|expand|unexpand"
-            r"|comm|diff|diff3|cmp|colordiff|delta)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "text_transform",
-    ),
-
-    # ── network_inspect ──────────────────────────────────────────────
-    # Local network-state inspection with no outbound traffic.  Tools
-    # that actively probe remote hosts (`ping`, `traceroute`, `dig`,
-    # `nmap`, `curl`, `wget`) are deliberately NOT tagged here — they
-    # belong to a separate `network_probe` family if/when desired.
-    (
-        re.compile(
-            r"\A(?:netstat|ss)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `arp` — excluded on `-s` (add entry) / `-d` (delete entry).
-    (
-        re.compile(
-            r"\Aarp"
-            r"(?!(?:.*\s)-[sd]\b)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `ip <obj> show|list|get`.  Explicit verb-discrimination rejects
-    # `ip addr add`, `ip route del`, etc.
-    (
-        re.compile(
-            r"\Aip(?:\s+-\S+)*"
-            r"\s+(?:addr|address|link|route|neigh|neighbour|rule"
-            r"|tunnel|netns|xfrm|maddr|mroute|tcp_metrics|token)"
-            r"\s+(?:show|list|s|l|get|save)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `route` — excluded on `add|del|delete|flush|change|replace`.
-    (
-        re.compile(
-            r"\Aroute"
-            r"(?!(?:.*\s)(?:add|del|delete|flush|change|replace)\b)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `ifconfig` — safe forms: bare, `-a|-s|-v`, or a single interface
-    # name.  Any trailing modification verb (`up|down|<ip>|mtu|...`)
-    # takes a second token and fails the end-anchor.
-    (
-        re.compile(
-            r"\Aifconfig(?:\s+(?:-[asv]|[a-zA-Z][a-zA-Z0-9]+))?\s*\Z",
-        ),
-        "network_inspect",
-    ),
-
-    # ── archive_inspect ──────────────────────────────────────────────
-    # List contents of an archive without extracting.
-    #
-    # `tar` mode letters are exclusive; the negative lookahead rejects
-    # any bundle containing `c|x|r|A|u` or the long-form write verbs.
-    # `f?` allows the rare stdin-driven `tar -t` form.
-    (
-        re.compile(
-            r"\Atar"
-            r"(?!(?:.*\s)(?:-[a-zA-Z]*[cxrAu][a-zA-Z]*\b"
-            r"|--(?:create|extract|append|update|concatenate|catenate|delete)\b))"
-            r"\s+(?:-[a-zA-Z]*t[a-zA-Z]*|--list)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-    # `unzip` with a safe mode flag (list/verbose/zipinfo/test/stream).
-    # Bundle may combine only letters from `[lvZtpcq]`, rejecting
-    # extraction modifiers (`-o|-n|-d|-j`).
-    (
-        re.compile(
-            r"\Aunzip\s+-[lvZtpcq]+"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-    (
-        re.compile(r"\Azipinfo(?:\s+[^\s]+)+\s*\Z"),
-        "archive_inspect",
-    ),
-    # Compression list / test modes.
-    (
-        re.compile(
-            r"\A(?:gzip|bzip2|xz|zstd|lzma)"
-            r"\s+(?:-l|--list|-t|--test|-tv)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-    # Streaming decompressors that write to stdout (cat/less/more/grep
-    # on compressed archives).  None of these write back to disk.
-    (
-        re.compile(
-            r"\A(?:zcat|bzcat|xzcat|zstdcat|lz4cat"
-            r"|zless|zmore|bzless|bzmore|xzless|xzmore|zstdless|zstdmore"
-            r"|zgrep|zegrep|zfgrep|bzgrep|xzgrep|zstdgrep)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-
-    # ── container_inspect ────────────────────────────────────────────
-    # Read-only container-runtime and cluster queries.  `docker run` /
-    # `docker exec` / `kubectl apply` / `kubectl exec` / `kubectl
-    # delete` etc. are NOT in the subcommand list and therefore do not
-    # match; `docker exec` / `kubectl exec` also get tagged as
-    # `capability:spawns_process` which the gate rejects separately.
-    (
-        re.compile(
-            r"\A(?:docker|podman)\s+"
-            r"(?:ps|images|image\s+(?:ls|inspect|history)"
-            r"|logs|inspect|info|version|history|port|diff|top|stats"
-            r"|events|network\s+(?:ls|inspect)"
-            r"|volume\s+(?:ls|inspect)"
-            r"|container\s+(?:ls|inspect|logs|top|diff|port|stats)"
-            r"|system\s+(?:df|info|events))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "container_inspect",
-    ),
-    (
-        re.compile(
-            r"\Akubectl\s+"
-            r"(?:get|describe|logs|top|version"
-            r"|api-resources|api-versions|explain"
-            r"|config\s+(?:view|get-contexts|current-context)"
-            r"|cluster-info|auth\s+can-i)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "container_inspect",
-    ),
+_READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family('read_only')
 )
 
 
@@ -1314,238 +797,9 @@ _READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 # `http_download` is checked before `http_get` so `curl -o` writes
 # don't masquerade as idempotent reads.
 
-_NETWORK_PROBE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    # ── icmp ────────────────────────────────────────────────────────
-    # `ping` / `ping6` — ICMP echo.  Requires at least one arg (the
-    # host); bare `ping` is interactive and rare.
-    (
-        re.compile(r"\Aping6?(?:\s+[^\s]+)+\s*\Z"),
-        "icmp",
-    ),
-
-    # ── trace ───────────────────────────────────────────────────────
-    # Hop-by-hop route discovery.
-    (
-        re.compile(
-            r"\A(?:traceroute6?|tracepath6?|mtr)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "trace",
-    ),
-
-    # ── dns ─────────────────────────────────────────────────────────
-    # DNS query tools.  Idempotent at the DNS layer; no side effects
-    # beyond a resolver cache hit.
-    (
-        re.compile(
-            r"\A(?:dig|nslookup|host|drill|kdig)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "dns",
-    ),
-
-    # ── whois ───────────────────────────────────────────────────────
-    (
-        re.compile(r"\Awhois(?:\s+[^\s]+)+\s*\Z"),
-        "whois",
-    ),
-
-    # ── http_mutate ─────────────────────────────────────────────────
-    # Checked BEFORE http_get / http_download so that a POST-ish curl
-    # is never downgraded to a read tag.  Triggers: explicit non-safe
-    # `-X` / `--request`, or any body/upload flag.
-    (
-        re.compile(
-            r"\A(?:curl|xh)\b"
-            r"(?=(?:.*\s)(?:"
-            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
-            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
-            r"|--data-urlencode\b|--data-ascii\b|--json\b"
-            r"|-F\b|--form\b|--form-string\b"
-            r"|-T\b|--upload-file\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_mutate",
-    ),
-    # HTTPie / xh with an explicit non-safe HTTP verb positional
-    # (`http POST example.com`) OR any body-field / form-upload token.
-    # HTTPie request-item grammar reminders:
-    #   name=value    JSON string body field  (mutate)
-    #   name:=value   JSON non-string field   (mutate)
-    #   name==value   query parameter         (NOT mutate)
-    #   name:value    HTTP header             (NOT mutate)
-    #   name@path     file upload (legacy)    (mutate)
-    #   name=@path    file upload (modern)    (mutate)
-    (
-        re.compile(
-            r"\A(?:http|https|xh)\b"
-            r"(?=.*(?:"
-            r"\s(?:POST|PUT|DELETE|PATCH)\b"
-            r"|=@"
-            r"|:="
-            r"|\s(?:-f|--form)\b"
-            r"|\s[A-Za-z_][\w.-]*=[^=\s]"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_mutate",
-    ),
-    # wget writing a body.
-    (
-        re.compile(
-            r"\Awget\b"
-            r"(?=(?:.*\s)(?:"
-            r"--post-data\b|--post-file\b"
-            r"|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|--body-data\b|--body-file\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_mutate",
-    ),
-
-    # ── http_download ───────────────────────────────────────────────
-    # `curl -o|-O|--output|--remote-name` persists response to disk.
-    # Checked before `http_get` so disk writes aren't hidden.
-    (
-        re.compile(
-            r"\Acurl\b"
-            r"(?!(?:.*\s)(?:"
-            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
-            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
-            r"|--data-urlencode\b|--data-ascii\b|--json\b"
-            r"|-F\b|--form\b|--form-string\b"
-            r"|-T\b|--upload-file\b"
-            r"))"
-            r"(?=(?:.*\s)(?:-o\b|-O\b|--output\b|--remote-name\b))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_download",
-    ),
-    # wget default mode writes to disk (only `-O -` streams to stdout).
-    (
-        re.compile(
-            r"\Awget\b"
-            r"(?!(?:.*\s)(?:"
-            r"-O\s+-"                        # stdout-stream form
-            r"|--post-data\b|--post-file\b"  # or mutating body
-            r"|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|--body-data\b|--body-file\b"
-            r"|--help\b|-h\b|--version\b|-V\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_download",
-    ),
-
-    # ── http_get ────────────────────────────────────────────────────
-    # Idempotent HTTP with response to stdout.  Must survive all the
-    # mutate / download lookaheads.  Also excludes `--help` / `-V`
-    # so flag-only invocations aren't mis-tagged as probes.
-    (
-        re.compile(
-            r"\Acurl\b"
-            r"(?!(?:.*\s)(?:"
-            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
-            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
-            r"|--data-urlencode\b|--data-ascii\b|--json\b"
-            r"|-F\b|--form\b|--form-string\b"
-            r"|-T\b|--upload-file\b"
-            r"|-o\b|-O\b|--output\b|--remote-name\b"
-            r"|--help\b|-h\b|--version\b|-V\b|--manual\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_get",
-    ),
-    # wget stdout-stream form only.
-    (
-        re.compile(
-            r"\Awget\s+-O\s+-"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_get",
-    ),
-    # HTTPie / xh without mutation tokens.  Mirror-image of the
-    # http_mutate rule: same lookahead body, inverted to a negative
-    # assertion, plus exclusions for help / version flags.
-    (
-        re.compile(
-            r"\A(?:http|https|xh)\b"
-            r"(?!.*(?:"
-            r"\s(?:POST|PUT|DELETE|PATCH)\b"
-            r"|=@"
-            r"|:="
-            r"|\s(?:-f|--form)\b"
-            r"|\s[A-Za-z_][\w.-]*=[^=\s]"
-            r"|\s(?:--help|-h|--version)\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_get",
-    ),
-
-    # ── port_scan ───────────────────────────────────────────────────
-    # TCP/UDP connect-mode scanning.  `nc -l` / `ncat -l` already get
-    # tagged `capability:network_bind`; the lookahead prevents double-
-    # tagging as port_scan.
-    (
-        re.compile(
-            r"\A(?:nmap|masscan|zmap)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "port_scan",
-    ),
-    (
-        re.compile(
-            r"\A(?:nc|ncat|netcat)"
-            # Reject listen-mode forms: `-l` standalone, `-l` anywhere
-            # inside a combined flag bundle (e.g. `-lk`, `-lnv`), or
-            # the long `--listen` form.
-            r"(?!(?:.*\s)(?:-[a-zA-Z]*l[a-zA-Z]*\b|--listen\b))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "port_scan",
-    ),
-
-    # ── file_transfer ───────────────────────────────────────────────
-    # Bulk file movement over the network.
-    (
-        re.compile(
-            r"\A(?:scp|sftp)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "file_transfer",
-    ),
-    # `rsync` — tagged only when a `[user@]host:` endpoint appears.
-    # Local-only rsync (`rsync -av src/ dst/`) emits no network traffic
-    # and is intentionally NOT tagged.
-    (
-        re.compile(
-            r"\Arsync\b"
-            r"(?=.*(?:\s|=)(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "file_transfer",
-    ),
-    # `rclone` — narrow allowlist of sub-commands that touch remote
-    # backends.  Purely-local rclone commands (`rclone config`,
-    # `rclone version`, `rclone help`) are not tagged.
-    (
-        re.compile(
-            r"\Arclone\s+"
-            r"(?:copy|sync|move|copyto|moveto|copyurl|mount|serve"
-            r"|cat|rcat|lsjson|ls|lsl|lsd|lsf|tree|size|md5sum|sha1sum"
-            r"|check|cryptcheck|hashsum|ncdu|dedupe|cleanup|purge"
-            r"|delete|deletefile|rmdir|rmdirs|touch)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "file_transfer",
-    ),
+_NETWORK_PROBE_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family('network_probe')
 )
 
 

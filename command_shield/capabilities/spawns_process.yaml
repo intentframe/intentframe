@@ -1,0 +1,5 @@
+- id: spawns_process
+  family: spawns_process
+  pattern: \bxargs\b|\bfind\b[^|]*-exec\b|\bsudo\b|\bsu\b(?=\s+-)|\bssh\b|\bdocker\s+(?:run|exec)\b|\bkubectl\s+exec\b
+  description: Command spawns or delegates to another process
+  mitre_family: execution

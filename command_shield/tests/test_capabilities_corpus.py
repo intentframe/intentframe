@@ -2,11 +2,14 @@
 
 Locks invariants the data migration is supposed to preserve:
 
-- Every rule row has every required field with valid types.
-- ``mitre_family`` is drawn from the fixed MITRE ATT&CK allowlist.
+- Every rule row has every required field with valid types and every
+  ``family`` value is one currently backed by a YAML file on disk.
+- When ``sensitive: true`` the rule must declare a ``mitre_family``
+  drawn from the MITRE ATT&CK allowlist.  Non-sensitive rules may
+  omit ``mitre_family`` (treated as ``None`` / unmapped).
 - Sensitive capability IDs are derived from the YAML rows themselves.
-- MITRE alias helpers resolve canonical classifier tags to the
-  right ``capability:<mitre_tactic>:<suffix>`` presentation tag.
+- MITRE mapping helpers resolve canonical classifier tags to the
+  documented ``capability:<mitre_tactic>[:<suffix>]`` metadata tag.
 - ``COVERAGE.md`` mentions every rule.
 """
 
@@ -19,6 +22,26 @@ import pytest
 
 from command_shield.capabilities import CORPUS, CapabilityRule
 
+_ALLOWED_MITRE_FAMILIES = frozenset({
+    "credential_access",
+    "persistence",
+    "defense_evasion",
+    "collection",
+    "exfiltration",
+    "privilege_escalation",
+    "impact",
+    "discovery",
+    "execution",
+    "lateral_movement",
+    "command_and_control",
+})
+
+# Families that currently have a YAML file on disk.  Regenerated
+# automatically if a new family YAML is added.
+_KNOWN_FAMILIES = frozenset(
+    p.stem for p in (Path(__file__).parent.parent / "capabilities").glob("*.yaml")
+)
+
 
 def test_corpus_loaded_and_non_empty() -> None:
     assert len(CORPUS.rules) >= 1
@@ -28,11 +51,16 @@ def test_corpus_loaded_and_non_empty() -> None:
 
 def test_every_rule_has_required_fields() -> None:
     for r in CORPUS.rules:
-        assert r.id and "__" in r.id
-        assert r.family in {"data_read", "system_mutate", "network_exfil"}
-        assert r.suffix
+        # id is always present and non-empty
+        assert r.id
+        # family must match an on-disk YAML file
+        assert r.family in _KNOWN_FAMILIES, r
+        # pattern must compile to something non-empty
         assert r.pattern.pattern
-        assert r.mitre_family
+        # if the rule is sensitive, it must carry a MITRE family; the
+        # loader already enforces this, test makes the contract explicit
+        if r.sensitive:
+            assert r.mitre_family in _ALLOWED_MITRE_FAMILIES, r
 
 
 def test_rule_ids_are_globally_unique() -> None:
@@ -42,34 +70,28 @@ def test_rule_ids_are_globally_unique() -> None:
 
 def test_rule_suffix_matches_id() -> None:
     for r in CORPUS.rules:
-        expected_stem = f"{r.family}__{r.suffix}"
-        assert r.id == expected_stem or r.id.startswith(f"{expected_stem}__")
+        if r.suffix:
+            expected_stem = f"{r.family}__{r.suffix}"
+            assert r.id == expected_stem or r.id.startswith(f"{expected_stem}__"), r
+        else:
+            # Suffix-less (single-rule) families encode the family name
+            # directly as the rule id.
+            assert r.id == r.family or r.id.startswith(f"{r.family}__"), r
 
 
 def test_mitre_family_is_whitelisted() -> None:
-    allowed = {
-        "credential_access",
-        "persistence",
-        "defense_evasion",
-        "collection",
-        "exfiltration",
-        "privilege_escalation",
-        "impact",
-        "discovery",
-        "execution",
-        "lateral_movement",
-        "command_and_control",
-    }
     for r in CORPUS.rules:
-        assert r.mitre_family in allowed, r
+        if r.mitre_family is None:
+            # Non-sensitive rules may legitimately omit mitre_family.
+            assert not r.sensitive, r
+            continue
+        assert r.mitre_family in _ALLOWED_MITRE_FAMILIES, r
 
 
 def test_sensitive_capability_ids_derive_from_yaml() -> None:
     derived = CORPUS.sensitive_capability_ids()
     expected = frozenset(
-        f"capability:{r.family}:{r.suffix}"
-        for r in CORPUS.rules
-        if r.sensitive
+        r.capability_tag() for r in CORPUS.rules if r.sensitive
     )
     assert derived == expected
     assert derived
@@ -78,14 +100,21 @@ def test_sensitive_capability_ids_derive_from_yaml() -> None:
 def test_mitre_alias_map_exposes_presentation_tags() -> None:
     alias_map = CORPUS.mitre_alias_map()
     for rule in CORPUS.rules:
-        legacy = f"capability:{rule.family}:{rule.suffix}"
-        mitre = f"capability:{rule.mitre_family}:{rule.suffix}"
-        assert alias_map[legacy] == mitre
+        if rule.mitre_family is None:
+            # Only rules that declare a mitre_family show up in the
+            # alias map.
+            continue
+        legacy = rule.capability_tag()
+        if rule.suffix:
+            mitre = f"capability:{rule.mitre_family}:{rule.suffix}"
+        else:
+            mitre = f"capability:{rule.mitre_family}"
+        assert alias_map[legacy] == mitre, rule
 
 
 def test_mitre_family_names_are_from_corpus() -> None:
     assert CORPUS.mitre_family_names() == frozenset(
-        r.mitre_family for r in CORPUS.rules
+        r.mitre_family for r in CORPUS.rules if r.mitre_family
     )
 
 

@@ -1,0 +1,72 @@
+- id: package_install__pip
+  family: package_install
+  suffix: pip
+  pattern: \b(?:pip3?|pipx|uv|poetry|conda|mamba)\s+install\b
+  description: Command installs packages via pip
+  mitre_family: execution
+- id: package_install__npm
+  family: package_install
+  suffix: npm
+  pattern: \b(?:npm|pnpm)\s+(?:i|install|add)\b|\byarn\s+(?:add|install)\b
+  description: Command installs packages via npm
+  mitre_family: execution
+- id: package_install__brew
+  family: package_install
+  suffix: brew
+  pattern: \bbrew\s+(?:install|reinstall|upgrade)\b
+  description: Command installs packages via brew
+  mitre_family: execution
+- id: package_install__apt
+  family: package_install
+  suffix: apt
+  pattern: \bapt(?:-get)?\s+(?:install|upgrade)\b
+  description: Command installs packages via apt
+  mitre_family: execution
+- id: package_install__yum
+  family: package_install
+  suffix: yum
+  pattern: \byum\s+(?:install|update)\b
+  description: Command installs packages via yum
+  mitre_family: execution
+- id: package_install__dnf
+  family: package_install
+  suffix: dnf
+  pattern: \bdnf\s+(?:install|upgrade)\b
+  description: Command installs packages via dnf
+  mitre_family: execution
+- id: package_install__pacman
+  family: package_install
+  suffix: pacman
+  pattern: \bpacman\s+-S\b
+  description: Command installs packages via pacman
+  mitre_family: execution
+- id: package_install__apk
+  family: package_install
+  suffix: apk
+  pattern: \bapk\s+add\b
+  description: Command installs packages via apk
+  mitre_family: execution
+- id: package_install__gem
+  family: package_install
+  suffix: gem
+  pattern: \bgem\s+install\b
+  description: Command installs packages via gem
+  mitre_family: execution
+- id: package_install__cargo
+  family: package_install
+  suffix: cargo
+  pattern: \bcargo\s+install\b
+  description: Command installs packages via cargo
+  mitre_family: execution
+- id: package_install__go
+  family: package_install
+  suffix: go
+  pattern: \bgo\s+install\b
+  description: Command installs packages via go
+  mitre_family: execution
+- id: package_install__composer
+  family: package_install
+  suffix: composer
+  pattern: \bcomposer\s+(?:install|require)\b
+  description: Command installs packages via composer
+  mitre_family: execution
