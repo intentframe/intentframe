@@ -1,16 +1,14 @@
 """Tests for the ``capability:data_read:*``,
 ``capability:system_mutate:*``, and ``capability:network_exfil:*``
-families, and their Option-A suppression of
+families, and their suppression of
 ``capability:read_only:*`` on the same command.
 
-The corpus is anchored in the 9 realistic-tier attack intents that
-slipped ALLOW in the root-demo sweep (see
-``demo/tests/root_demo/results/2026-04-27-attack-sweep-host-impact.md``).
-Each failing intent is pinned as a positive match on the corresponding
-refined tag, plus a negative assertion that no ``read_only:*`` tag is
-emitted alongside it — the contract that lets policy deny these
-surfaces without accidentally licensing a consumer-side read-only
-fast-path.
+The corpus covers representative sensitive data reads, host mutations,
+and exfiltration-shaped network actions. Each surface is pinned as a
+positive match on the corresponding refined tag, plus a negative
+assertion that no ``read_only:*`` tag is emitted alongside it — the
+contract that lets policy deny these surfaces without accidentally
+licensing a read-only fast-path.
 
 Benign commands touching the same tool heads (``arp -a``, ``route -n
 get``, ``hostname``, ``systemsetup -getnetworktimeserver``, plain
@@ -35,6 +33,18 @@ The expanded taxonomy (Streams A / B / C, 2026-04-28) adds:
   ``print_config``, ``radio_power``.
 * ``network_exfil:*`` — an entirely new family: ``http_upload``,
   ``file_transfer_outbound``, ``ssh_tunnel``, ``cloud_upload``.
+
+Layering note. Many sensitive shapes are caught by command_shield's
+catastrophic pattern layer (step 3) before the capability classifier
+(step 7) runs. TestDataReadCredentialMaterial (above) already documents
+this convention for security dump-keychain / sqlite3 TCC.db. The
+expanded-taxonomy classes below follow the same split: pipeline-reachable
+shapes exercise ``inspect_command()`` end-to-end; pattern-catastrophic
+shapes are pinned via ``_direct_capabilities()`` (which calls
+``classify_capabilities()`` directly) so a future weakening of the pattern
+layer can't silently strand the capability tag. The presence of a
+direct-regex test means "this rule is still the load-bearing hook if the
+pattern layer ever lets the command through".
 """
 
 from __future__ import annotations
@@ -95,7 +105,7 @@ class TestDataReadBrowserCookies:
             f"{cmd!r} did not emit data_read:browser_cookies; "
             f"got {r.capabilities}"
         )
-        # Option-A: read_only:* must not co-occur.
+        # Sensitive tags must not co-occur with read_only:*.
         assert not any(
             c.startswith("capability:read_only:") for c in r.capabilities
         ), (
@@ -480,18 +490,18 @@ class TestSystemMutateBrowserSecurityPref:
         )
 
 
-# ── Option-A gate: read_only suppression when sensitive tags fire ───
+# ── Sensitive tag gate: read_only suppression when sensitive tags fire
 
 
-class TestOptionAReadOnlySuppression:
+class TestSensitiveTagReadOnlySuppression:
     """Sensitive tags must suppress ``read_only:*`` on the same command.
 
-    All commands below would, in the absence of Option A, potentially
+    All commands below would, without this suppression rule, potentially
     receive a ``read_only:*`` tag from their structural head family
     (``cat`` → filesystem_read, ``defaults write`` would never be
     read_only to begin with, but the bucket-covering intent is to
-    assert the contract uniformly).  With Option A, none of them
-    should emit a ``read_only:*`` tag.
+    assert the contract uniformly). None of them should emit a
+    ``read_only:*`` tag.
     """
 
     @pytest.mark.parametrize(
@@ -515,7 +525,8 @@ class TestOptionAReadOnlySuppression:
         assert not any(
             c.startswith("capability:read_only:") for c in r.capabilities
         ), (
-            f"{cmd!r} also emitted a read_only:* tag, which Option A "
+            f"{cmd!r} also emitted a read_only:* tag, which the "
+            f"sensitive-tag suppression rule "
             f"must suppress; got {r.capabilities}"
         )
         assert r.verdict is Verdict.SAFE
@@ -572,7 +583,7 @@ class TestVerdictInvariant:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Extended taxonomy — follow-up beyond the 9 failing root-demo intents.
+# Extended taxonomy — broader sensitive-surface coverage.
 # Each new suffix has its own positive-match class and a shared negative-
 # controls class at the bottom, plus cross-layer assertions where the
 # pattern-catastrophic layer catches a sibling shape.
@@ -613,7 +624,7 @@ class TestDataReadShellHistory:
             f"{cmd!r} did not emit data_read:shell_history; "
             f"got {r.capabilities}"
         )
-        # Option A: no read_only:* alongside.
+        # Sensitive tags suppress read_only:* alongside.
         assert not any(
             c.startswith("capability:read_only:") for c in r.capabilities
         )
@@ -1506,15 +1517,15 @@ class TestPersistenceCatastrophicOverlap:
         )
 
 
-# ── Option-A coverage for the new tags ───────────────────────────────
+# ── Read-only suppression coverage for the new tags ──────────────────
 
 
-class TestOptionASuppressionExtendedTaxonomy:
-    """Re-assert the Option-A contract across the new suffixes: any
+class TestReadOnlySuppressionExtendedTaxonomy:
+    """Re-assert read-only suppression across the new suffixes: any
     command that emits a ``data_read:*`` or ``system_mutate:*`` tag
     must NOT emit any ``read_only:*`` tag on the same command.  This
-    is what keeps the consumer-side read-only fast-path from silently
-    licensing sensitive reads / host mutations."""
+    keeps sensitive reads / host mutations out of any downstream
+    read-only fast-path."""
 
     @pytest.mark.parametrize(
         "cmd",
@@ -1557,7 +1568,8 @@ class TestOptionASuppressionExtendedTaxonomy:
         assert not any(
             c.startswith("capability:read_only:") for c in caps
         ), (
-            f"{cmd!r} emitted a read_only:* tag; Option A must suppress. "
+            f"{cmd!r} emitted a read_only:* tag; sensitive-tag "
+            f"suppression must remove it. "
             f"got {caps}"
         )
         assert r.verdict is Verdict.SAFE
@@ -2771,8 +2783,8 @@ class TestNetworkExfilCloudUpload:
         ), f"{cmd!r} unexpectedly emitted cloud_upload; got {r.capabilities}"
 
 
-class TestOptionASuppressionNetworkExfil:
-    """Option-A contract for the new ``network_exfil:*`` family: any
+class TestReadOnlySuppressionNetworkExfil:
+    """Suppression contract for the ``network_exfil:*`` family: any
     command tagged with a ``network_exfil:*`` suffix must NOT also
     emit a ``read_only:*`` tag."""
 
@@ -2793,6 +2805,7 @@ class TestOptionASuppressionNetworkExfil:
         assert not any(
             c.startswith("capability:read_only:") for c in r.capabilities
         ), (
-            f"{cmd!r} emitted a read_only:* tag; Option-A must suppress. "
+            f"{cmd!r} emitted a read_only:* tag; network-exfil "
+            f"suppression must remove it. "
             f"got {r.capabilities}"
         )

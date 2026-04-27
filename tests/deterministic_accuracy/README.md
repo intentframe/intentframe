@@ -95,7 +95,7 @@ covered in `tests/test_terminal_blocklist.py`.
 | `developer` | Typical dev loop — pip/npm/git allowed, no listeners | `deny_capabilities = {network_bind, network_bind:*}` |
 | `data_analyst` | Notebook user — no installs, no listeners | `deny_capabilities = {package_install, package_install:*, network_bind, network_bind:*}` |
 | `locked_down` | Observation only — every cap must be `read_only:*` | `allow_capabilities = {capability:read_only:*}` |
-| `python_shell_only` | Jarvis gateway profile — use bash/shell commands, POSIX utilities, and Python only | Pulls `DEFAULT_TERMINAL_DENY_CAPABILITIES` from bootstrap: denies non-python/non-shell runtimes, compilation, non-python package ecosystems, stdin-exec into non-shell runtimes, and production sensitive surfaces (`data_read:*`, `system_mutate:*`, `network_exfil:*`); keeps POSIX tools such as `awk` available |
+| `python_shell_only` | Python/shell command profile — use bash/shell commands, POSIX utilities, and Python only | Pulls `DEFAULT_TERMINAL_DENY_CAPABILITIES` from bootstrap: denies non-python/non-shell runtimes, compilation, non-python package ecosystems, stdin-exec into non-shell runtimes, and sensitive surfaces (`data_read:*`, `system_mutate:*`, `network_exfil:*`); keeps POSIX tools such as `awk` available |
 | `no_run_command` | RUN_COMMAND not allowed at all | empty `allowed_actions` |
 
 **On the `{bare, :*}` pairing in deny sets.** The classifier currently
@@ -301,9 +301,10 @@ radio mutations; HTTP / file-transfer / ssh-tunnel / cloud-upload exfil).
 
 For sensitive surfaces, each pin asserts both sides of the contract:
 the classifier emits the exact sensitive tag and does **not** emit
-`capability:read_only:*`. That protects the Option A behavior directly:
-a sensitive read or mutation must never ride DG's read-only fast-path.
-A failure narrows blame to `command_shield` immediately.
+`capability:read_only:*`. That protects the read-only suppression
+contract directly: a sensitive read or mutation must never ride DG's
+read-only fast-path. A failure narrows blame to `command_shield`
+immediately.
 
 ---
 

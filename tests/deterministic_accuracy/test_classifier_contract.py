@@ -239,7 +239,7 @@ _TAGGED: list[Pin] = [
 #      set in ``python_shell_only`` (and any future profile that
 #      wants to deny the family) actually fires.
 #   2. The classifier does NOT emit ``capability:read_only:*`` \u2014
-#      that's the "Option A" invariant.  A command that is
+#      that's the read-only suppression invariant.  A command that is
 #      structurally read-only (``cat``, ``plutil -p``, ``sqlite3 ...
 #      select``) but touches a sensitive surface must never ride
 #      DG's read-only fast-path.  If a regression reintroduces the
@@ -330,8 +330,12 @@ _SENSITIVE_SURFACE: list[Pin] = [
 
 # ── Expanded taxonomy (2026-04-28): data_read / system_mutate / ──────
 # network_exfil pins.  One representative pipeline-reachable pin per
-# new sub-tag, following the same Option-A invariant: the sensitive
+# new sub-tag, following the same suppression invariant: the sensitive
 # tag must fire and no ``read_only:*`` tag may ride along.
+# Pipeline-reachable representatives only. Commands whose only shapes are pattern-catastrophic
+# (bless --setBoot, kextload, crontab -e, etc.) are covered by the direct-regex tier in
+# command_shield/tests/test_classifier_sensitive_capabilities.py and deliberately not pinned
+# here, since build_shield_view would surface verdict=CATASTROPHIC, capabilities=().
 _EXPANDED_SENSITIVE_SURFACE: list[Pin] = [
     # data_read:*
     Pin(
@@ -340,7 +344,7 @@ _EXPANDED_SENSITIVE_SURFACE: list[Pin] = [
         must_have_caps=frozenset({"capability:data_read:dotfile_secrets"}),
         forbid_cap_prefix=frozenset({"capability:read_only:"}),
         has_edge_signals=False,
-        note="dotenv exfil via cp \u2014 Option A must suppress read_only",
+        note="dotenv exfil via cp \u2014 must suppress read_only",
     ),
     Pin(
         command="gcloud auth print-access-token",

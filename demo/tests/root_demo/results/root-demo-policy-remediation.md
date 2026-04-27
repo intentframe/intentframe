@@ -159,8 +159,8 @@ comprehensive-gap assessment (linux firewall in addition to `pfctl`,
 module docstring; the positive / negative / cross-layer matrix is pinned by
 `command_shield/tests/test_classifier_sensitive_capabilities.py` (~450 tests).
 
-An **Option A** suppression rule keeps the new tags from accidentally riding
-the read-only fast-path: if a command emits *any* `data_read:*` or
+A read-only suppression rule keeps the new tags from accidentally riding the
+read-only fast-path: if a command emits *any* `data_read:*` or
 `system_mutate:*` tag, the classifier does not emit any `read_only:*` tag for
 the same command (including `read_only:composition`).  This means
 `cat ~/.bash_history | tail -50` now routes through Guardian as a sensitive
@@ -230,8 +230,8 @@ These shapes are covered end-to-end by the DG accuracy matrix under neutral
 - `tests/deterministic_accuracy/test_classifier_contract.py::_SENSITIVE_SURFACE`
   pins each command's exact capability tag and asserts the classifier
   does **not** emit `capability:read_only:*` on any sensitive surface.
-  That's the Option A contract: a sensitive read/mutation must never ride
-  DG's read-only fast-path under any profile.
+  That's the suppression contract: a sensitive read/mutation must never
+  ride DG's read-only fast-path under any profile.
 
 A classifier regression (wrong tag, or a sensitive surface silently regaining
 `read_only:*`) surfaces in `test_classifier_contract.py` first; a gate

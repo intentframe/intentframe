@@ -87,10 +87,9 @@ class TestCatastrophicPatterns:
 class TestPrivilegeEscalationPrimitives:
     """Non-sudo privilege-escalation verbs beyond IF-SUDO-001.
 
-    These patterns guarantee that when the gateway is running as root
-    (the Jarvis root-profile demo) the agent cannot reach for alternate
-    escalation primitives to jump to a different identity or into
-    another security domain.
+    These patterns guarantee that the classifier names alternate
+    escalation primitives before any downstream policy or execution
+    layer can evaluate the command.
     """
 
     @pytest.mark.parametrize("cmd", [
@@ -590,8 +589,8 @@ class TestPatternDataIntegrity:
 
 # ── Known false-positive surface (pinned via xfail) ─────────────────
 #
-# The privilege-escalation / macOS-admin / persistence patterns added
-# for the root-profile demo all use `\b…\b` word-boundary anchors.
+# The privilege-escalation / macOS-admin / persistence patterns use
+# `\b…\b` word-boundary anchors.
 # That prevents substring matches (`pkexec` inside `my_pkexec_log`) but
 # it does NOT distinguish "the command `pkexec`" from "the word
 # `pkexec` quoted inside an `echo` / `git commit -m` / docstring".

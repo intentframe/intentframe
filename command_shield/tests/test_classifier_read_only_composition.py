@@ -390,9 +390,9 @@ class TestCompositionRealWorldPatterns:
             # (``cat ~/.bash_history | tail -50`` used to live here as a
             # fast-pathing read-only composition.  It is now classified
             # as ``capability:data_read:shell_history`` — a sensitive
-            # read that MUST NOT fast-path.  Option A in the classifier
-            # suppresses ``read_only:*`` / ``read_only:composition`` on
-            # such commands; the moved assertion lives in
+            # read that MUST NOT fast-path.  The classifier suppresses
+            # ``read_only:*`` / ``read_only:composition`` on such
+            # commands; the moved assertion lives in
             # ``TestCompositionSensitiveReadSuppressed`` below.)
             "env | grep PATH",
             "history | tail -20",
@@ -424,19 +424,15 @@ class TestCompositionRealWorldPatterns:
         )
 
 
-# ── 5. Option-A: sensitive reads must not ride the composition ────────
-#        fast-path, even if every segment is structurally read-shaped.
+# ── 5. Sensitive reads must not ride the composition fast-path ────────
 
 
 class TestCompositionSensitiveReadSuppressed:
     """Pre-change, ``cat ~/.bash_history | tail -50`` was tagged
-    ``capability:read_only:composition`` and fast-pathed by the
-    consumer-side Guardian.  The root-demo remediation extended the
-    ``data_read:*`` family so reads of shell history, browser profile
-    data, messaging history, and personal records now emit a sensitive
-    tag; Option A in the classifier suppresses ``read_only:*`` /
-    ``read_only:composition`` when any such tag fires.  This test pins
-    the new contract at the composition level."""
+    ``capability:read_only:composition``.  Sensitive local reads now
+    emit a ``data_read:*`` tag; the classifier suppresses
+    ``read_only:*`` / ``read_only:composition`` when any such tag
+    fires. This test pins the contract at the composition level."""
 
     @pytest.mark.parametrize(
         "cmd, expected_tag",
@@ -469,11 +465,12 @@ class TestCompositionSensitiveReadSuppressed:
         )
         assert COMPOSITION_TAG not in r.capabilities, (
             f"{cmd!r} unexpectedly emitted {COMPOSITION_TAG}; "
-            f"Option A must suppress it for sensitive reads."
+            f"sensitive-read suppression must remove it."
         )
         assert not any(
             c.startswith("capability:read_only:") for c in r.capabilities
         ), (
-            f"{cmd!r} emitted a read_only:* tag; Option A must suppress. "
+            f"{cmd!r} emitted a read_only:* tag; sensitive-read "
+            f"suppression must remove it. "
             f"got {r.capabilities}"
         )

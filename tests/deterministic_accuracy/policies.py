@@ -103,17 +103,13 @@ def locked_down() -> UserContext:
 
 
 def python_shell_only() -> UserContext:
-    """Mirror of the production gateway profile (user / root) — python and
-    shell only, plus the sensitive-surface clamp.
+    """Python/shell command profile plus the sensitive-surface clamp.
 
     Pulls the canonical deny set from
     :data:`intentframe_gateway.bootstrap.DEFAULT_TERMINAL_DENY_CAPABILITIES`
     (union of :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` and
     :data:`SENSITIVE_SURFACE_DENY_CAPABILITIES`) so the accuracy corpus
-    automatically tracks any future change to the production seed.
-    This is the profile most consumers actually run under, so failing
-    accuracy here represents real-world breakage rather than fixture
-    drift.
+    automatically tracks future changes to the default deny set.
     """
     return _user(
         TerminalConstraints(

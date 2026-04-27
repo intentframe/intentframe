@@ -1080,8 +1080,8 @@ _SYSTEM_MUTATE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
         "hostname",
     ),
     # Time sync / NTP.  ``systemsetup -setusingnetworktime`` is the
-    # failing-intent shape (root-demo intent 91); sibling surfaces are
-    # included so policy can deny the whole family with one tag.
+    # representative NTP mutation shape; sibling surfaces are included
+    # so policy can deny the whole family with one tag.
     # Alternation order (``timezone`` before ``time``) ensures the
     # longer match wins via backtracking on the trailing ``\b``.
     (
@@ -2835,11 +2835,9 @@ def _safe_for_read_only(
     ``process_signal``, ``compilation``, or any refined
     ``package_install:*`` / ``script_execution:*`` / ``data_read:*``
     / ``system_mutate:*`` / ``network_exfil:*`` tag disqualifies the
-    command from receiving any ``read_only:*`` tag.  The
-    ``data_read:*`` / ``system_mutate:*`` / ``network_exfil:*``
-    suppression is the classifier-side Option-A gate that prevents a
-    sensitive-surface command from also being blessed as a cheap
-    read-only fast-path candidate downstream.
+    command from receiving any ``read_only:*`` tag. The sensitive-tag
+    suppression rule prevents a sensitive-surface command from also
+    being blessed as a cheap read-only fast-path candidate downstream.
     """
     if not _structurally_bare(
         command,

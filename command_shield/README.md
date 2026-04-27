@@ -55,10 +55,9 @@ Those questions belong to the higher layers in IntentFrame:
 - Guardian applies policy and authorization,
 - the executor only runs what survives the earlier gates.
 
-That division is intentional.  The root-profile demo is specifically
-about showing that even when the executor is highly privileged,
-IntentFrame's deterministic gate still refuses known catastrophic
-primitives *before* semantic reasoning or execution happens.
+That division is intentional: deterministic inspection should surface
+known catastrophic primitives *before* semantic reasoning or execution,
+regardless of which runtime or policy layer consumes the report.
 
 ## Why It Exists
 
@@ -170,9 +169,18 @@ The regex pack lives at `command_shield/patterns/*.json` and is loaded at import
 
 Every pattern either produces a `CATASTROPHIC` or a `NEEDS_REVIEW` verdict; `SAFE` is the default when nothing matches.  Patterns never look at user policy, privilege level, or session state — they encode fixed-system facts only.
 
-#### Why these families exist (root-demo relevance)
+#### Why these families exist
 
-When the executor runs as root (the Jarvis root-profile demo), the kernel-level sandbox floor is intentionally minimal so the demo can showcase `RUN_COMMAND` with broad capability.  `command_shield` is the deterministic pre-gate that holds the line *regardless* of executor privilege.  The privilege-escalation pack in `catastrophic.json` (pkexec, doas, runuser, machinectl shell, sandbox-exec) and the macOS system-security pack in `macos.json` (SIP toggle, NVRAM writes, kext load/unload, `bless`, AppleScript admin prompt, dscl account control) exist specifically so that an agent with maximum executor privilege still cannot reach for a new security domain, a firmware / boot-path mutation, or a persistent local-account backdoor.  They have zero effect on benign legitimate commands — each regex targets a narrow, well-known system primitive.
+`command_shield` is the deterministic pre-gate for command strings, so
+high-impact primitives should be named before execution privilege,
+runtime policy, or semantic user intent enters the decision. The
+privilege-escalation pack in `catastrophic.json` (pkexec, doas,
+runuser, machinectl shell, sandbox-exec) and the macOS system-security
+pack in `macos.json` (SIP toggle, NVRAM writes, kext load/unload,
+`bless`, AppleScript admin prompt, dscl account control) exist so a
+command cannot quietly reach for a new security domain, a firmware /
+boot-path mutation, or a persistent local-account backdoor. Each regex
+targets a narrow, well-known system primitive.
 
 #### Known false-positive surface
 
@@ -213,24 +221,25 @@ upstream in the AI layers, not in the deterministic regex gate.
    (`sudo`, `reboot`, `mkfs`, `dd`, `chmod 777`, `diskutil eraseDisk`,
    `tccutil reset`, `launchctl load /Library/LaunchDaemons/…`, …) do
    **not** carry echo-guards either — an `echo "sudo reboot"` fires
-   `IF-SUDO-001` today.  The new root-demo patterns follow the same
+   `IF-SUDO-001` today.  These high-impact patterns follow the same
    convention so the pack stays uniform.
 2. **CATASTROPHIC surfaces the block, doesn't hide it.**  A false
    positive returns a hard rejection with a named pattern ID that the
-   caller sees.  A false *negative* on one of these verbs when the
-   executor runs as root is the actual security failure.  The
-   asymmetry favors over-blocking for the demo narrative.
+   caller sees.  A false *negative* on one of these verbs can hand a
+   high-impact primitive to downstream layers without a deterministic
+   warning. The asymmetry favors over-blocking for these fixed-system
+   primitives.
 3. **Echo-of-verb is already a weak signal.**  A plausibly benign
    command that quotes a privileged verb is uncommon in real agent
    usage; an attacker who wants to smuggle a privileged verb into a
    command string has easier paths (interpreter indirection, base64
    decoding, process substitution) that the pipeline's *structural*
    layer catches independently of these regexes.
-4. **Downgrading would mask the demo point.**  Moving these to
-   `NEEDS_REVIEW` would defer the decision to Guardian / AE on every
-   hit, including the real attempts the demo is meant to block.  The
-   point of the root-profile demo is that `command_shield` *alone*
-   refuses these verbs, regardless of how generous the executor is.
+4. **Downgrading would weaken the deterministic contract.**  Moving
+   these to `NEEDS_REVIEW` would defer every hit to downstream semantic
+   review, including real attempts to invoke these fixed-system
+   primitives. The point of the hardstop pattern layer is that
+   `command_shield` alone names and refuses those verbs.
 
 **What could be done when the FP cost becomes real.**
 
@@ -252,10 +261,10 @@ Listed in increasing order of effort / risk:
    `printf`, `git commit -m`, `cat <<EOF … EOF`).  Most surgical, but
    changes a shared preprocessing step that every pattern consumes.
 4. **Downgrade prose-heavy patterns to `NEEDS_REVIEW`** and let the
-   downstream Guardian / AE disambiguate invocation vs quoting.  Only
+   downstream semantic layers disambiguate invocation vs quoting. Only
    worth it for patterns that are pure English phrases
-   (`IF-OSASCRIPT-ADMIN-001` is the lone candidate today).  Costs an
-   AI round-trip per hit.
+   (`IF-OSASCRIPT-ADMIN-001` is the lone candidate today). Costs a
+   downstream review step per hit.
 5. **Two-pass: match → verify head.**  After a pattern hits, confirm
    the matched span starts a shell *simple command* head (via
    `bashlex`).  Most expensive, highest precision, biggest contract
@@ -390,10 +399,10 @@ Current capability families:
 Callers can match exact tags or prefixes like `capability:package_install:*`
 or `capability:read_only:*`.
 
-The gateway's default Jarvis command policy uses these tags to keep the
-runtime command surface to bash/shell commands, POSIX utilities, and
-Python while also denying the profile-independent sensitive surfaces
-above. It denies non-python, non-shell language runtimes (Node, Ruby,
+Downstream command policies can use these tags to keep a runtime command
+surface to bash/shell commands, POSIX utilities, and Python while also
+denying the sensitive surfaces above. For example, a Python/shell-only
+policy can deny non-python, non-shell language runtimes (Node, Ruby,
 Perl, PHP, Java, Go, Lua, R, Julia, Swift, Deno/Bun, local binaries,
 compilers, and non-python package ecosystems) while keeping POSIX tools
 such as `awk`, `sed`, `grep`, `cut`, `sort`, `find`, `tr`, `head`,
@@ -511,9 +520,8 @@ check keeps the fast-path honest if any of these families expands.
 #### Sensitive-surface capability families
 
 `capability:data_read:*` and `capability:system_mutate:*` are
-policy-grippable facts added after the 2026-04-27 root-profile attack
-sweep exposed commands that were syntactically ordinary but security
-sensitive in context. Examples:
+policy-grippable facts for commands that are syntactically ordinary but
+security sensitive in context. Examples:
 
 ```
 cat ~/.zsh_history
@@ -531,12 +539,12 @@ still return `SAFE` from the fixed-pattern layer, because `SAFE` means
 allowed". The policy layer decides whether to block by matching
 capabilities.
 
-The read-only family has an explicit **Option A** interaction with these
+The read-only family has an explicit suppression rule for these
 families: if a command emits any `capability:data_read:*` or
 `capability:system_mutate:*` tag, no `capability:read_only:*` tag is
 emitted for the same command. This prevents a command like
-`cat ~/.bash_history | tail -50` from looking like a passive
-read-only composition to the deterministic Guardian fast-path.
+`cat ~/.bash_history | tail -50` from looking like a passive read-only
+composition to policy consumers.
 
 #### The network-probe family
 
@@ -579,9 +587,10 @@ strictest applicable tag wins.  A POST `curl` is never downgraded to
 
 #### Known taxonomy gaps
 
-The capability taxonomy is deliberately incremental. It now covers the
-root-demo leak surfaces and their immediate siblings, but it is not a
-complete sensitive-surface ontology. Known missing or partial areas:
+The capability taxonomy is deliberately incremental. It covers known
+high-value sensitive surfaces and their immediate siblings, but it is
+not a complete sensitive-surface ontology. Known missing or partial
+areas:
 
 - **Sensitive reads:** dotfile secrets (`.env`, `.envrc`, `.npmrc`,
   `.pypirc`, language package-manager configs), cloud token stores
