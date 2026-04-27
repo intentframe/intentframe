@@ -79,6 +79,7 @@ Reads that yield credentials (tokens, keys, password-manager vaults, keychain ma
 | `data_read__dotfile_secrets` | `capability:data_read:dotfile_secrets` | T1552.001 | `command_shield/capabilities/data_read.yaml` |
 | `data_read__password_manager_export` | `capability:data_read:password_manager_export` | T1555.005 | `command_shield/capabilities/data_read.yaml` |
 | `data_read__process_env` | `capability:data_read:process_env` | T1552.001 | `command_shield/capabilities/data_read.yaml` |
+| `data_read__process_memory` | `capability:data_read:process_memory` | T1003, T1057 | `command_shield/capabilities/data_read.yaml` |
 | `data_read__ssh_known_hosts` | `capability:data_read:ssh_known_hosts` | T1018, T1083 | `command_shield/capabilities/data_read.yaml` |
 
 ## `defense_evasion`
@@ -92,8 +93,10 @@ Shapes that disable, degrade, or tamper with host telemetry and trust surfaces (
 | `system_mutate__backup` | `capability:system_mutate:backup` | T1490 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__boot_policy` | `capability:system_mutate:boot_policy` | T1542 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__browser_security_pref` | `capability:system_mutate:browser_security_pref` | T1562.001 | `command_shield/capabilities/system_mutate.yaml` |
+| `system_mutate__ca_trust` | `capability:system_mutate:ca_trust` | T1553.004 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__disk_encryption` | `capability:system_mutate:disk_encryption` | T1486, T1490 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__firewall` | `capability:system_mutate:firewall` | T1562.004 | `command_shield/capabilities/system_mutate.yaml` |
+| `system_mutate__history_tamper` | `capability:system_mutate:history_tamper` | T1070.003 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__host_network_config` | `capability:system_mutate:host_network_config` | T1562.004 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__hostname` | `capability:system_mutate:hostname` | T1036 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__hosts_file` | `capability:system_mutate:hosts_file` | T1565.001 | `command_shield/capabilities/system_mutate.yaml` |
@@ -249,6 +252,7 @@ Shapes that plant long-lived execution or config (scheduled tasks, launchd, syst
 | `system_mutate__mdm_profile` | `capability:system_mutate:mdm_profile` | T1556 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__persistence` | `capability:system_mutate:persistence` | T1547, T1037 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__service_mgmt` | `capability:system_mutate:service_mgmt` | T1543.002 | `command_shield/capabilities/system_mutate.yaml` |
+| `system_mutate__shell_init` | `capability:system_mutate:shell_init` | T1546.004 | `command_shield/capabilities/system_mutate.yaml` |
 | `system_mutate__user_account` | `capability:system_mutate:user_account` | T1136 | `command_shield/capabilities/system_mutate.yaml` |
 
 ## `privilege_escalation`
@@ -273,18 +277,18 @@ Non-sensitive rules whose YAML row does not declare a `mitre_family`.  They stil
 
 ## Summary
 
-- **Total rules:** 143
-- **Sensitive-surface capability tags:** 46
+- **Total rules:** 147
+- **Sensitive-surface capability tags:** 50
 - **Tactics covered:** 10
 - **Unmapped (no MITRE tactic):** 1
 
 Per-tactic counts (unique `capability:<family>[:<suffix>]` pairs; a suffix split across multiple regex rows — e.g. `data_read:cloud_tokens` file-shape and verb-shape — counts once):
 
 - `execution`: **38**
+- `defense_evasion`: **19**
 - `discovery`: **19**
-- `defense_evasion`: **17**
-- `persistence`: **10**
-- `credential_access`: **8**
+- `persistence`: **11**
+- `credential_access`: **9**
 - `collection`: **7**
 - `exfiltration`: **4**
 - `command_and_control`: **2**

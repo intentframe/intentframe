@@ -190,6 +190,21 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                   Mail's Library/Mail/V* is
                                                   already covered by
                                                   ``personal_records``)
+    capability:data_read:process_memory        — debugger attach-by-pid
+                                                  (lldb / gdb / frida /
+                                                  frida-trace / dtrace
+                                                  -p), lldb / gdb
+                                                  attach-by-name,
+                                                  gdb ``attach <pid>``
+                                                  subcommand,
+                                                  /proc/<pid>/mem reads,
+                                                  ``gcore <pid>`` core
+                                                  dumps.  ``strace -p`` /
+                                                  ``lsof -p`` are
+                                                  deliberately NOT tagged
+                                                  — they observe system
+                                                  calls without reading
+                                                  memory.
 
     capability:system_mutate:host_network_config   — networksetup -set*/
                                                       -create*/-delete*/-add*/
@@ -389,6 +404,109 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
                                                       --disassociate /
                                                       --associate; blueutil
                                                       -p / --power
+    capability:system_mutate:ca_trust               — rogue root-CA install
+                                                      / trust-anchor
+                                                      mutation:
+                                                      ``security
+                                                      add-trusted-cert /
+                                                      remove-trusted-cert /
+                                                      add-certificates``,
+                                                      ``update-ca-certificates``,
+                                                      ``update-ca-trust``,
+                                                      ``trust anchor``,
+                                                      ``certutil
+                                                      -A|-M|-D``, and
+                                                      direct writes /
+                                                      copies into
+                                                      /etc/ssl/certs,
+                                                      /etc/pki/ca-trust/
+                                                      source/anchors,
+                                                      /etc/ca-certificates/
+                                                      trust-source/
+                                                      anchors, or
+                                                      /usr/local/share/
+                                                      ca-certificates.
+                                                      One command turns
+                                                      the session into a
+                                                      silent TLS MITM
+                                                      platform.
+    capability:system_mutate:shell_init             — shell-init-file
+                                                      persistence via
+                                                      redirect / tee /
+                                                      cp / mv / install
+                                                      / ln / sed -i
+                                                      targeting
+                                                      ~/.bashrc,
+                                                      ~/.zshrc,
+                                                      ~/.zshenv,
+                                                      ~/.zprofile,
+                                                      ~/.profile,
+                                                      ~/.bash_profile,
+                                                      ~/.bash_login,
+                                                      ~/.kshrc,
+                                                      ~/.inputrc, and
+                                                      similar siblings;
+                                                      ~/.config/fish/
+                                                      config.fish; and
+                                                      the system-wide
+                                                      /etc/profile,
+                                                      /etc/profile.d/,
+                                                      /etc/bash.bashrc,
+                                                      /etc/zshrc,
+                                                      /etc/zshenv,
+                                                      /etc/paths(.d/),
+                                                      /etc/fish/
+                                                      config.fish
+                                                      surfaces.  Bare
+                                                      reads of the same
+                                                      files are NOT
+                                                      tagged — only
+                                                      write / edit
+                                                      verbs.
+    capability:system_mutate:history_tamper         — shell-history
+                                                      anti-forensics:
+                                                      ``history -c``,
+                                                      ``history -d
+                                                      <n>``, ``history
+                                                      -w /dev/null``,
+                                                      ``history -r
+                                                      /dev/null``;
+                                                      ``unset
+                                                      HISTFILE``,
+                                                      ``HISTFILE=/dev/
+                                                      null`` (with or
+                                                      without
+                                                      ``export``);
+                                                      ``HISTSIZE=0``,
+                                                      ``HISTFILESIZE=0``;
+                                                      ``set +o
+                                                      history``;
+                                                      ``rm``/``shred``/
+                                                      ``truncate`` of
+                                                      ``.bash_history``
+                                                      / ``.zsh_history``
+                                                      / ``.fish_history``
+                                                      / ``.ksh_history``
+                                                      / ``.sh_history``;
+                                                      redirect-truncate
+                                                      (``> ~/.bash_
+                                                      history``); append
+                                                      via ``>>`` or
+                                                      ``tee`` (fake-
+                                                      entry injection);
+                                                      ``cp``/``mv`` that
+                                                      overwrite a shell
+                                                      history file.
+                                                      Legitimate
+                                                      inspection shapes
+                                                      (``history``,
+                                                      ``history N``,
+                                                      ``history | …``,
+                                                      ``set -o
+                                                      history``,
+                                                      ``HISTFILE=~/my
+                                                      custom.hist``)
+                                                      stay untagged.
 
     capability:network_exfil:http_upload           — curl/wget/http/xh requests
                                                       that reference a LOCAL
@@ -524,8 +642,10 @@ CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 #     password-manager export files and app containers
 #     (``password_manager_export``), process-environment dumps
 #     (``process_env``), ~/.ssh/known_hosts / config / authorized_keys
-#     (``ssh_known_hosts``), and non-Apple mail stores
-#     (``mail_store``).  Structurally these commands are read-shaped,
+#     (``ssh_known_hosts``), non-Apple mail stores (``mail_store``),
+#     and debugger-attach / ``/proc/<pid>/mem`` / ``gcore`` reads of
+#     live process memory (``process_memory``).  Structurally these
+#     commands are read-shaped,
 #     so this family is treated as read-only-incompatible in the
 #     classifier gate (``_safe_for_read_only``): emitting
 #     ``data_read:*`` suppresses ``read_only:*`` on the same command so
@@ -559,8 +679,11 @@ CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 #     /etc/cron.* writes (``cron_mutation``), browser extension-install
 #     policy writes (``browser_extension``), ARD ``kickstart``
 #     (``screen_sharing``), CUPS printer daemon mutation
-#     (``print_config``), and Wi-Fi / Bluetooth radio power
-#     (``radio_power``).  Structurally these are mutating and so would
+#     (``print_config``), Wi-Fi / Bluetooth radio power
+#     (``radio_power``), rogue-CA / trust-anchor installs
+#     (``ca_trust``), shell-init-file persistence
+#     (``shell_init``), and shell-history anti-forensics
+#     (``history_tamper``).  Structurally these are mutating and so would
 #     not qualify for ``read_only:*`` on their own; the read-only-
 #     incompatible membership is belt-and-braces against an
 #     unanticipated co-occurrence.

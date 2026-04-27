@@ -215,3 +215,27 @@
   sensitive: true
   mitre_family: defense_evasion
   mitre_techniques: []
+- id: system_mutate__ca_trust
+  family: system_mutate
+  suffix: ca_trust
+  pattern: \bsecurity\s+(?:add-trusted-cert|remove-trusted-cert|add-certificates)\b|\b(?:update-ca-certificates|update-ca-trust)\b|\btrust\s+anchor\b|\bcertutil\b[^|;&]*\s-[AMD]\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?:/etc/(?:ssl/certs|pki/ca-trust/source/anchors|ca-certificates/trust-source/anchors)|/usr/local/share/ca-certificates)/[^\s|;&]+|\btee\s+(?:-[a-zA-Z]+\s+)*(?:/etc/(?:ssl/certs|pki/ca-trust/source/anchors|ca-certificates/trust-source/anchors)|/usr/local/share/ca-certificates)/[^\s|;&]+|\b(?:cp|mv|install|ln)\b[^|;&]*\s+(?:/etc/(?:ssl/certs|pki/ca-trust/source/anchors|ca-certificates/trust-source/anchors)|/usr/local/share/ca-certificates)/[^\s|;&]+
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1553.004
+- id: system_mutate__shell_init
+  family: system_mutate
+  suffix: shell_init
+  pattern: (?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bash(?:rc|_profile|_login|_logout|_aliases|_env)|zshrc|zshenv|zprofile|zlogin|zlogout|profile|kshrc|cshrc|tcshrc|inputrc)\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|\btee\s+(?:-[a-zA-Z]+\s+)*(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bash(?:rc|_profile|_login|_logout|_aliases|_env)|zshrc|zshenv|zprofile|zlogin|zlogout|profile|kshrc|cshrc|tcshrc|inputrc)\b|\btee\s+(?:-[a-zA-Z]+\s+)*(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bashrc|bash_profile|bash_login|zshrc|zshenv|zprofile|zlogin|profile|kshrc|inputrc)\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|\bsed\b[^|;&]*-i\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bashrc|bash_profile|zshrc|zshenv|zprofile|profile|kshrc)\b|\bsed\b[^|;&]*-i\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b|\bsed\b[^|;&]*-i\b[^|;&]*\s+/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1546.004
+- id: system_mutate__history_tamper
+  family: system_mutate
+  suffix: history_tamper
+  pattern: \bhistory\s+-c\b|\bhistory\s+-d\b|\bhistory\s+-[wr]\s+/dev/null\b|(?:^|[\s;&|])unset\s+HISTFILE\b|(?:^|[\s;&|])(?:export\s+)?HISTFILE\s*=\s*/dev/null\b|(?:^|[\s;&|])(?:export\s+)?HIST(?:SIZE|FILESIZE)\s*=\s*0\b|(?:^|[\s;&|])set\s+\+o\s+history\b|\b(?:rm|shred|truncate)\b[^|;&]*\s(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|\b(?:cp|mv)\b[^|;&]*\s+(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|\btee\s+(?:-[a-zA-Z]+\s+)*(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|(?:^|[\s;&|])(?:>|>>|&>|2>>?)\s*(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|(?:^|[\s;&|]):\s+>\s*(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1070.003

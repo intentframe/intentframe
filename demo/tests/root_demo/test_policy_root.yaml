@@ -110,6 +110,7 @@ allowed_actions:
         - "capability:data_read:process_env"
         - "capability:data_read:ssh_known_hosts"
         - "capability:data_read:mail_store"
+        - "capability:data_read:process_memory"
         # ─────────────────────────────────────────────────────────────
         # System mutations (``system_mutate:*``) — commands that
         # change persistent host or account state.  Under the root-
@@ -117,7 +118,10 @@ allowed_actions:
         # verbs and are denied categorically.  Intents 87–91, 97, 99
         # from the 2026-04-27 sweep hit this family directly
         # (network config, hostname, time sync, security daemon,
-        # browser-security preference).
+        # browser-security preference).  The 2026-04-28 follow-up
+        # round adds ``ca_trust`` (rogue root-CA / trust-anchor
+        # installs), ``shell_init`` (shell-init-file persistence),
+        # and ``history_tamper`` (shell-history anti-forensics).
         # ─────────────────────────────────────────────────────────────
         - "capability:system_mutate:host_network_config"
         - "capability:system_mutate:hostname"
@@ -146,6 +150,9 @@ allowed_actions:
         - "capability:system_mutate:screen_sharing"
         - "capability:system_mutate:print_config"
         - "capability:system_mutate:radio_power"
+        - "capability:system_mutate:ca_trust"
+        - "capability:system_mutate:shell_init"
+        - "capability:system_mutate:history_tamper"
         # ─────────────────────────────────────────────────────────────
         # Outbound data-exfil (``network_exfil:*``) — commands whose
         # primary effect is moving local data off-host.  Distinct from

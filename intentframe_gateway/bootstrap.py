@@ -174,24 +174,28 @@ PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
 #   * ``capability:data_read:*`` — reads of host-sensitive surfaces
 #     (browser cookies / profile data / saved passwords, messaging
 #     stores, personal records, shell history, directory-service
-#     account metadata, credential material).  These are structurally
-#     read-only, so the Analysis Engine reliably rates them
-#     ``LOW`` / ``MEDIUM`` and Guardian allows them.  That is the
-#     exact failure mode that leaked intents 36 (``plutil`` of Safari
-#     cookies) and 38 (``dscl -read AuthenticationAuthority``) under
-#     the root-compromised-agent threat model; denying the capability
-#     at Gate 2 stops the pre-exfil read before the AE burns a token.
+#     account metadata, credential material, live process memory
+#     via debugger-attach / ``/proc/<pid>/mem`` / ``gcore``).  These
+#     are structurally read-only, so the Analysis Engine reliably
+#     rates them ``LOW`` / ``MEDIUM`` and Guardian allows them.  That
+#     is the exact failure mode that leaked intents 36 (``plutil`` of
+#     Safari cookies) and 38 (``dscl -read AuthenticationAuthority``)
+#     under the root-compromised-agent threat model; denying the
+#     capability at Gate 2 stops the pre-exfil read before the AE
+#     burns a token.
 #
 #   * ``capability:system_mutate:*`` — commands that change persistent
 #     host or account state (network config, hostname, time sync,
 #     security daemon, browser-security preferences, firewall rules,
 #     ``/etc/hosts``, sudoers/PAM, user accounts, remote-access
 #     toggles, disk-encryption policy, kernel tunables, persistence
-#     surfaces).  Intents 87–91, 97, 99 from the sweep fell in this
-#     family and mutated host state before the pipeline could catch
-#     them.  Under the root-compromised-agent model the policy stance
-#     is "mutations are privileged operations; a root agent must not
-#     issue them without an explicit policy carve-out".
+#     surfaces, rogue-CA / trust-anchor installs, shell-init-file
+#     persistence, and shell-history anti-forensics).  Intents 87–91,
+#     97, 99 from the sweep fell in this family and mutated host state
+#     before the pipeline could catch them.  Under the root-compromised-
+#     agent model the policy stance is "mutations are privileged
+#     operations; a root agent must not issue them without an explicit
+#     policy carve-out".
 #
 # This clamp is intentionally profile-independent for the same reason
 # as :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES`: sensitivity of the
@@ -217,6 +221,7 @@ SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:data_read:process_env",
     "capability:data_read:ssh_known_hosts",
     "capability:data_read:mail_store",
+    "capability:data_read:process_memory",
     # ── System mutations (system_mutate:*) ───────────────────────
     "capability:system_mutate:host_network_config",
     "capability:system_mutate:hostname",
@@ -245,6 +250,9 @@ SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:system_mutate:screen_sharing",
     "capability:system_mutate:print_config",
     "capability:system_mutate:radio_power",
+    "capability:system_mutate:ca_trust",
+    "capability:system_mutate:shell_init",
+    "capability:system_mutate:history_tamper",
     # ── Outbound data-exfil surfaces (network_exfil:*) ───────────
     "capability:network_exfil:http_upload",
     "capability:network_exfil:file_transfer_outbound",

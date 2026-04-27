@@ -568,6 +568,66 @@ _EXPANDED_SENSITIVE_SURFACE: list[Pin] = [
         has_edge_signals=False,
         note="aws s3 cp \u2014 cloud-bucket exfil",
     ),
+    # ── Round 5 (2026-04-28): process_memory / ca_trust / ────────
+    # shell_init / history_tamper.  Each pin is a pipeline-reachable
+    # representative of its suffix; the broader positive/negative
+    # matrix lives in
+    # ``command_shield/tests/test_classifier_sensitive_capabilities
+    # .py`` (TestDataReadProcessMemory, TestSystemMutateCaTrust,
+    # TestSystemMutateShellInit, TestSystemMutateHistoryTamper).
+    # ``cat /proc/<pid>/mem`` and ``history -c`` double as regression
+    # guards for the fixed silent-allowance bugs (both used to ride
+    # ``read_only:filesystem_read`` / ``read_only:system_info``).
+    Pin(
+        command="cat /proc/1234/mem",
+        verdict="SAFE",
+        must_have_caps=frozenset(
+            {"capability:data_read:process_memory"}
+        ),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note=(
+            "/proc/<pid>/mem read \u2014 silent-allowance regression "
+            "guard: used to ride read_only:filesystem_read"
+        ),
+    ),
+    Pin(
+        command="update-ca-certificates",
+        verdict="SAFE",
+        must_have_caps=frozenset(
+            {"capability:system_mutate:ca_trust"}
+        ),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="rogue root-CA install \u2014 silent MITM enabler",
+    ),
+    Pin(
+        # Use a neutral payload — the ``curl | sh`` / ``wget | sh``
+        # shapes are pattern-catastrophic at an earlier tier and
+        # short-circuit the classifier; this pin only proves that
+        # ``shell_init`` is pipeline-reachable for an rc-file append.
+        command="echo 'alias evil=rm' >> ~/.bashrc",
+        verdict="SAFE",
+        must_have_caps=frozenset(
+            {"capability:system_mutate:shell_init"}
+        ),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note="shell-init-file persistence via rc append",
+    ),
+    Pin(
+        command="history -c",
+        verdict="SAFE",
+        must_have_caps=frozenset(
+            {"capability:system_mutate:history_tamper"}
+        ),
+        forbid_cap_prefix=frozenset({"capability:read_only:"}),
+        has_edge_signals=False,
+        note=(
+            "history wipe \u2014 silent-allowance regression guard: "
+            "used to ride read_only:system_info"
+        ),
+    ),
 ]
 
 

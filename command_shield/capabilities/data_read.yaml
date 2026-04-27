@@ -138,3 +138,12 @@
   mitre_family: collection
   mitre_techniques:
   - T1114.001
+- id: data_read__process_memory
+  family: data_read
+  suffix: process_memory
+  pattern: \blldb\b[^|;&]*(?:\s-p\s*\d|\s--attach-pid\b|\s-n\s+\S|\s--attach-name\b)|\bgdb\b[^|;&]*(?:\s-p\s*\d|\s--pid(?:=|\s+\d)|\sattach\s+\d)|\bfrida(?:-trace)?\b[^|;&]*(?:\s-p\s*\d|\s--attach-(?:pid|name)(?:=|\s+))|\bdtrace\b[^|;&]*\s-p\s*\d|(?<![\w.])/proc/(?:\d+|self)/mem\b|\bgcore\b[^|;&]*\s\d+\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1003
+  - T1057
