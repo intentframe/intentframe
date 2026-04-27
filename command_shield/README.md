@@ -397,7 +397,45 @@ Current capability families:
     `capability:stdin_exec:perl`, and `capability:stdin_exec:php`
 
 Callers can match exact tags or prefixes like `capability:package_install:*`
-or `capability:read_only:*`.
+or `capability:read_only:*`.  Policy patterns can also bind to the
+MITRE ATT&CK tactic a rule rolls up to — e.g.
+`capability:credential_access:*` transparently matches every tag
+whose `mitre_family` is `credential_access` in the YAML corpus
+(`capability:data_read:browser_cookies`,
+`capability:data_read:dotfile_secrets`, …).  The aliasing is
+metadata-only: the classifier still emits the legacy ID, so adding a
+new sub-tag under an already-covered tactic requires zero policy
+edits.  See [`COVERAGE.md`](COVERAGE.md) for the full tactic →
+rule table.
+
+### Source of truth
+
+The three refined sensitive-surface families (`data_read:*`,
+`system_mutate:*`, `network_exfil:*`) live in
+[`command_shield/capabilities/*.yaml`](capabilities/) — the
+classifier loads them at import time and compiles the regex column
+in place.  Adding a new sub-tag is now a two-file change:
+
+1. Append a row to the relevant YAML with `id`, `family`, `suffix`,
+   `pattern`, `sensitive: true`, `mitre_family`, and
+   `mitre_techniques`.
+2. Regenerate the coverage table with
+   `.venv/bin/python scripts/generate_coverage_md.py`.
+
+`SENSITIVE_SURFACE_DENY_CAPABILITIES` in both
+`intentframe_gateway/bootstrap.py` and `jarvis_pa/seed_policies.py`
+auto-derives from the YAML's `sensitive: true` column — there is no
+longer a parallel frozen-set to keep in sync.  A contract test
+(`command_shield/tests/test_capabilities_corpus.py`) locks the
+parity.
+
+### Coverage telemetry
+
+`command_shield/telemetry.py` exposes a coverage-gap log line, fired
+only when the pipeline produces `NEEDS_REVIEW` / `BLOCK` on a
+command that carries no sensitive-family tag.  Silent in production
+(level=DEBUG); turn the logger up in staging to get evidence-driven
+inputs for the next rule addition.
 
 Downstream command policies can use these tags to keep a runtime command
 surface to bash/shell commands, POSIX utilities, and Python while also

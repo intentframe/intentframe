@@ -1,0 +1,34 @@
+- id: network_exfil__http_upload
+  family: network_exfil
+  suffix: http_upload
+  pattern: \bcurl\b[^|;&]*(?:\s-T\b|\s--upload-file\b|\s-F\s+[^\s]*=@|\s--form\s+[^\s]*=@|\s-d\s+@|\s--data(?:-(?:ascii|binary|urlencode))?\s+@)|\bwget\b[^|;&]*\s--(?:post-file|body-file)\b|\b(?:http|https|xh)\b[^|;&]*\s[A-Za-z_][\w.-]*=?@[^@\s|;&]
+  sensitive: true
+  mitre_family: exfiltration
+  mitre_techniques:
+  - T1041
+  - T1567.002
+- id: network_exfil__file_transfer_outbound
+  family: network_exfil
+  suffix: file_transfer_outbound
+  pattern: \b(?:scp|rsync)\b[^|;&]*\s(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:[^\s|;&]*(?=\s*(?:\||;|&|$))|\bsftp\b[^|;&]*\s-b\b
+  sensitive: true
+  mitre_family: exfiltration
+  mitre_techniques:
+  - T1048
+- id: network_exfil__ssh_tunnel
+  family: network_exfil
+  suffix: ssh_tunnel
+  pattern: \bssh\b[^|;&]*\s-[RLD]\s*\S
+  sensitive: true
+  mitre_family: exfiltration
+  mitre_techniques:
+  - T1572
+  - T1021.004
+- id: network_exfil__cloud_upload
+  family: network_exfil
+  suffix: cloud_upload
+  pattern: \baws\s+s3\s+(?:cp|sync|mv|mb|rb)\b|\baws\s+s3api\s+(?:put-object|upload-part(?:-copy)?|create-multipart-upload)\b|\bgsutil\s+(?:cp|mv|rsync)\b|\bgcloud\s+storage\s+(?:cp|mv|rsync)\b|\baz\s+storage\s+(?:blob|file)\s+upload(?:-batch)?\b|\bmc\s+(?:cp|mv|mirror)\b|\bb2\s+upload-(?:file|unbound-stream)\b
+  sensitive: true
+  mitre_family: exfiltration
+  mitre_techniques:
+  - T1567.002
