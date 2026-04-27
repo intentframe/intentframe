@@ -1,0 +1,149 @@
+- id: data_read__browser_cookies
+  family: data_read
+  suffix: browser_cookies
+  pattern: (?:^|[^A-Za-z0-9_])(?:/)?Library/Cookies/|\bCookies\.binarycookies\b|\bApplication\s+Support/(?:Google/Chrome|Chromium|BraveSoftware|Vivaldi|Arc|Microsoft\s+Edge)[^\s|;&]*/Cookies\b|\bFirefox/Profiles/[^\s/|;&]+/cookies\.sqlite\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1539
+  - T1555.003
+- id: data_read__auth_authority
+  family: data_read
+  suffix: auth_authority
+  pattern: \bdscl\b[^|;&]*\b(?:AuthenticationAuthority|ShadowHashData|KerberosKeys|Password|SMBPasswordServerList)\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1003.008
+- id: data_read__credential_material
+  family: data_read
+  suffix: credential_material
+  pattern: \bsecurity\s+dump-keychain\b|\bsecurity\s+find-(?:generic|internet)-password\b[^|;&]*\s-[wg]\b|\bsqlite3\b[^|;&]*\bTCC\.db\b|\bcp\b[^|;&]*\bTCC\.db\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques: &id001
+  - T1552.001
+  - T1555
+- id: data_read__credential_material__2
+  family: data_read
+  suffix: credential_material
+  pattern: \bgpg\s+[^|;&]*--export-secret-(?:keys?|subkeys?)\b|\bgpg\s+--export-ownertrust\b|(?<![\w.])\.gnupg/private-keys-v1\.d\b|\b[^\s|;&]*\.kdbx\b|\b[^\s|;&]*\.agilekeychain\b|\b[^\s|;&]*\.opvault\b|\bLibrary/Group\s+Containers/group\.com\.bitwarden\b|\b(?:cp|mv|rsync|scp)\b[^|;&]*\s~?/?\.ssh/(?:id_[A-Za-z0-9_]+|identity)\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques: *id001
+- id: data_read__shell_history
+  family: data_read
+  suffix: shell_history
+  pattern: (?<![\w.])\.(?:bash|zsh|fish|ksh|sh)_history\b|(?<![\w.])\.history\b|(?<![\w.])\.psql_history\b|(?<![\w.])\.mysql_history\b|(?<![\w.])\.node_repl_history\b|(?<![\w.])\.python_history\b|(?<![\w.])\.sqlite_history\b|(?<![\w.])\.rediscli_history\b|(?<![\w.])\.lesshst\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1552.003
+- id: data_read__browser_profile_data
+  family: data_read
+  suffix: browser_profile_data
+  pattern: /(?:Google/Chrome|Chromium|BraveSoftware|Microsoft\s+Edge|Vivaldi|Arc)[^|;&]*?/(?:Login\s+Data|History|Web\s+Data|Bookmarks|Top\s+Sites|Visited\s+Links|Network\s+Action\s+Predictor|Shortcuts)\b|/Firefox/Profiles/[^\s/|;&]+/(?:places\.sqlite|formhistory\.sqlite|logins\.json|key\d*\.db|signons\.sqlite|permissions\.sqlite)\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1217
+- id: data_read__messaging_history
+  family: data_read
+  suffix: messaging_history
+  pattern: \bLibrary/Messages/(?:chat\.db|Attachments)\b|\bLibrary/Group\s+Containers/group\.net\.whatsapp\b|\bLibrary/Group\s+Containers/group\.com\.apple\.Messages\b|\bLibrary/Application\s+Support/Telegram\s+Desktop\b|\bLibrary/Application\s+Support/Signal\b|\bLibrary/Application\s+Support/Slack/storage\b|\bLibrary/Application\s+Support/discord\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1005
+- id: data_read__personal_records
+  family: data_read
+  suffix: personal_records
+  pattern: \bLibrary/Application\s+Support/AddressBook\b|\bAddressBook[^\s|;&]*\.abcddb\b|\bLibrary/Group\s+Containers/group\.com\.apple\.notes\b|\bNoteStore\.sqlite\b|\bLibrary/Mail/V\d+\b|\bLibrary/Group\s+Containers/group\.com\.apple\.mail\b|\bLibrary/Application\s+Support/MobileSync/Backup\b|\.photoslibrary\b|\bLibrary/Calendars/[^\s|;&]*\.calendar\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1005
+  - T1114
+- id: data_read__dotfile_secrets
+  family: data_read
+  suffix: dotfile_secrets
+  pattern: (?<![\w.])\.env(?:\.[A-Za-z0-9][\w.-]*)?\b|(?<![\w.])\.envrc\b|(?<![\w.])\.npmrc\b|(?<![\w.])\.pypirc\b|(?<![\w.])\.netrc\b|(?<![\w.])\.gemrc\b|(?<![\w.])\.pgpass\b|(?<![\w.])\.my\.cnf\b|(?<![\w.])\.pip/pip\.conf\b|(?<![\w.])\.docker/config\.json\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1552.001
+- id: data_read__cloud_tokens
+  family: data_read
+  suffix: cloud_tokens
+  pattern: (?<![\w.])\.aws/(?:credentials|config)\b|(?<![\w.])\.kube/config\b|(?<![\w.])\.config/gcloud/(?:credentials\.db|legacy_credentials|application_default_credentials\.json|access_tokens\.db)\b|(?<![\w.])\.azure/(?:accessTokens\.json|azureProfile\.json|msal_token_cache\.json|service_principal_entries\.json|clouds\.config)\b|(?<![\w.])\.terraform\.d/credentials\.tfrc\.json\b|(?<![\w.])\.vault-token\b|(?<![\w.])\.hcp/(?:creds-cache\.json|config\.json)\b|(?<![\w.])/var/run/secrets/kubernetes\.io/serviceaccount/token\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques: &id002
+  - T1552.001
+  - T1552.004
+- id: data_read__cloud_tokens__2
+  family: data_read
+  suffix: cloud_tokens
+  pattern: \baws\s+sts\s+get-(?:session|federation)-token\b|\bgcloud\s+auth\s+(?:print-access-token|print-identity-token|application-default\s+print-access-token)\b|\baz\s+account\s+get-access-token\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques: *id002
+- id: data_read__db_client_history
+  family: data_read
+  suffix: db_client_history
+  pattern: (?<![\w.])\.mongorc\.js\b|(?<![\w.])\.mongoshrc(?:\.js)?\b|(?<![\w.])\.dbshell\b|(?<![\w.])\.snowsql/(?:history|config)\b|(?<![\w.])\.duckdbrc\b|(?<![\w.])\.cqlshrc\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1552.003
+- id: data_read__browser_session_data
+  family: data_read
+  suffix: browser_session_data
+  pattern: /(?:Google/Chrome|Chromium|BraveSoftware|Microsoft\s+Edge|Vivaldi|Arc)[^|;&]*?/(?:Local\s+Storage|Session\s+Storage|IndexedDB|Service\s+Worker|Cache|Current\s+(?:Session|Tabs)|Last\s+(?:Session|Tabs))\b|/Firefox/Profiles/[^\s/|;&]+/(?:sessionstore\.(?:js|jsonlz4)|sessionstore-backups|storage/default|cache2/entries)\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1539
+  - T1217
+- id: data_read__password_manager_export
+  family: data_read
+  suffix: password_manager_export
+  pattern: \b[^\s|;&]*\.1pif\b|\b[^\s|;&]*(?:bitwarden|lastpass|dashlane|keepass|enpass|roboform)[^\s|;&]*_export\.(?:csv|json|xml|zip|1pif)\b|\bLibrary/Application\s+Support/1Password\b|\bLibrary/Application\s+Support/(?:Bitwarden|Dashlane|LastPass|Enpass|Roboform)\b|\bLibrary/Group\s+Containers/[^\s|;&]*1[Pp]assword\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1555.005
+- id: data_read__process_env
+  family: data_read
+  suffix: process_env
+  pattern: (?<![\w.])/proc/(?:\d+|self)/environ\b|(?:^|[\s;&|])ps\s+(?!-)[^\s|;&]*e[^\s|;&]*(?=\s|$|\||;|&)|\blaunchctl\s+print\b|(?:^|[\s;&|])procinfo(?=\s|$|\||;|&)
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1552.001
+- id: data_read__ssh_known_hosts
+  family: data_read
+  suffix: ssh_known_hosts
+  pattern: (?<![\w.])\.ssh/known_hosts(?:\.old|\.new)?\b|(?<![\w.])\.ssh/config(?:\.d/[^\s|;&]*)?\b|(?<![\w.])\.ssh/authorized_keys2?\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1018
+  - T1083
+- id: data_read__mail_store
+  family: data_read
+  suffix: mail_store
+  pattern: \bLibrary/Thunderbird/Profiles/[^\s/|;&]+/(?:ImapMail|Mail|Messages)\b|\bLibrary/Application\s+Support/(?:Microsoft/Outlook|com\.microsoft\.Outlook|Airmail|Readdle/Spark)\b|\bLibrary/Group\s+Containers/UBF8T346G9\.(?:Office|OfficeOsfWebHost|msoutlook)\b|\b[^\s|;&]+\.mbox(?:/[^\s|;&]*)?\b
+  sensitive: true
+  mitre_family: collection
+  mitre_techniques:
+  - T1114.001
+- id: data_read__process_memory
+  family: data_read
+  suffix: process_memory
+  pattern: \blldb\b[^|;&]*(?:\s-p\s*\d|\s--attach-pid\b|\s-n\s+\S|\s--attach-name\b)|\bgdb\b[^|;&]*(?:\s-p\s*\d|\s--pid(?:=|\s+\d)|\sattach\s+\d)|\bfrida(?:-trace)?\b[^|;&]*(?:\s-p\s*\d|\s--attach-(?:pid|name)(?:=|\s+))|\bdtrace\b[^|;&]*\s-p\s*\d|(?<![\w.])/proc/(?:\d+|self)/mem\b|\bgcore\b[^|;&]*\s\d+\b
+  sensitive: true
+  mitre_family: credential_access
+  mitre_techniques:
+  - T1003
+  - T1057

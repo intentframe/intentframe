@@ -1,0 +1,126 @@
+- id: script_execution__python
+  family: script_execution
+  suffix: python
+  pattern: \bpython3?\s+[^|;&]*\.py\b
+  description: Command executes a python script or local binary
+  mitre_family: execution
+- id: script_execution__node
+  family: script_execution
+  suffix: node
+  pattern: \bnode\s+[^|;&]*\.(?:js|mjs|cjs|ts)\b
+  description: Command executes a node script or local binary
+  mitre_family: execution
+- id: script_execution__ruby
+  family: script_execution
+  suffix: ruby
+  pattern: \bruby\s+[^|;&]*\.rb\b
+  description: Command executes a ruby script or local binary
+  mitre_family: execution
+- id: script_execution__perl
+  family: script_execution
+  suffix: perl
+  pattern: \bperl\s+[^|;&]*\.pl\b
+  description: Command executes a perl script or local binary
+  mitre_family: execution
+- id: script_execution__shell
+  family: script_execution
+  suffix: shell
+  pattern: \b(?:bash|sh|zsh|ksh|dash)\s+[^|;&]*\.(?:sh|bash|zsh)\b
+  description: Command executes a shell script or local binary
+  mitre_family: execution
+- id: script_execution__local_binary
+  family: script_execution
+  suffix: local_binary
+  pattern: (?:^|[\s;&|])\./[\w.][\w./-]*
+  description: Command executes a local_binary script or local binary
+  mitre_family: execution
+- id: script_execution__java
+  family: script_execution
+  suffix: java
+  pattern: \bjava\s+(?:[^|;&]*\s)?-jar\b
+  description: Command executes a java script or local binary
+  mitre_family: execution
+- id: script_execution__java__2
+  family: script_execution
+  suffix: java
+  pattern: \bjava\s+[^|;&]*\.(?:class|jar)\b
+  description: Command executes a java script or local binary
+  mitre_family: execution
+- id: script_execution__go
+  family: script_execution
+  suffix: go
+  pattern: \bgo\s+run\b
+  description: Command executes a go script or local binary
+  mitre_family: execution
+- id: script_execution__dotnet
+  family: script_execution
+  suffix: dotnet
+  pattern: \bdotnet\s+[^|;&]*\.dll\b
+  description: Command executes a dotnet script or local binary
+  mitre_family: execution
+- id: script_execution__php
+  family: script_execution
+  suffix: php
+  pattern: \bphp\s+[^|;&]*\.php\b
+  description: Command executes a php script or local binary
+  mitre_family: execution
+- id: script_execution__lua
+  family: script_execution
+  suffix: lua
+  pattern: \blua\s+[^|;&]*\.lua\b
+  description: Command executes a lua script or local binary
+  mitre_family: execution
+- id: script_execution__r
+  family: script_execution
+  suffix: r
+  pattern: \bRscript\s+[^|;&]*\.[Rr]\b
+  description: Command executes a r script or local binary
+  mitre_family: execution
+- id: script_execution__julia
+  family: script_execution
+  suffix: julia
+  pattern: \bjulia\s+[^|;&]*\.jl\b
+  description: Command executes a julia script or local binary
+  mitre_family: execution
+- id: script_execution__swift
+  family: script_execution
+  suffix: swift
+  pattern: \bswift\s+(?:run\b|[^|;&]*\.swift\b)
+  description: Command executes a swift script or local binary
+  mitre_family: execution
+- id: script_execution__deno_bun
+  family: script_execution
+  suffix: deno_bun
+  pattern: \b(?:deno|bun)\s+(?:run|test)\b
+  description: Command executes a deno_bun script or local binary
+  mitre_family: execution
+- id: script_execution__node__2
+  family: script_execution
+  suffix: node
+  pattern: \bnode\s+(?:-e|--eval)\b
+  description: Command executes a node script or local binary
+  mitre_family: execution
+- id: script_execution__ruby__2
+  family: script_execution
+  suffix: ruby
+  pattern: \bruby\s+-e\b
+  description: Command executes a ruby script or local binary
+  mitre_family: execution
+- id: script_execution__perl__2
+  family: script_execution
+  suffix: perl
+  pattern: \bperl\s+-e\b
+  description: Command executes a perl script or local binary
+  mitre_family: execution
+- id: script_execution__php__2
+  family: script_execution
+  suffix: php
+  pattern: \bphp\s+-r\b
+  description: Command executes a php script or local binary
+  mitre_family: execution
+- id: script_execution__awk
+  family: script_execution
+  suffix: awk
+  pattern: \b(?:awk|gawk|mawk)\b(?:\s+-[a-zA-Z][^\s]*)*\s+(?!--?(?:help|version|h|V)\b)\S
+  description: Command executes a awk script or local binary
+  mitre_family: execution

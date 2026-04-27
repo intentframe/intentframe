@@ -1,0 +1,5 @@
+- id: download_and_exec
+  family: download_and_exec
+  pattern: \b(?:curl|wget|fetch|aria2c)\b[^|]*\|\s*(?:sh|bash|zsh|dash|python3?|perl|ruby|node)\b
+  description: Command downloads a remote payload and pipes it to an interpreter
+  mitre_family: execution

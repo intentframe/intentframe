@@ -1,0 +1,5 @@
+- id: background_exec
+  family: background_exec
+  pattern: \bnohup\b|\bdisown\b|\bsetsid\b|\bscreen\s+-d(?:m)?\b|\btmux\s+new-session\s+-d\b|[^&|]&\s*(?:$|[;\n])
+  description: Command runs a process in the background
+  mitre_family: persistence

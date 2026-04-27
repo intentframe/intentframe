@@ -1,0 +1,4 @@
+- id: filesystem_write
+  family: filesystem_write
+  pattern: (?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?!/dev/(?:null|stdout|stderr|fd/\d+)(?:\s|$))\S|\|\s*tee\b
+  description: Command writes to a file via shell redirection or tee

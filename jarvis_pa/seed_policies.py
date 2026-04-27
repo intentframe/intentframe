@@ -258,6 +258,7 @@ SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:data_read:process_env",
     "capability:data_read:ssh_known_hosts",
     "capability:data_read:mail_store",
+    "capability:data_read:process_memory",
     # System mutations (``system_mutate:*``).
     "capability:system_mutate:host_network_config",
     "capability:system_mutate:hostname",
@@ -286,6 +287,9 @@ SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
     "capability:system_mutate:screen_sharing",
     "capability:system_mutate:print_config",
     "capability:system_mutate:radio_power",
+    "capability:system_mutate:ca_trust",
+    "capability:system_mutate:shell_init",
+    "capability:system_mutate:history_tamper",
     # Outbound data-exfil surfaces (``network_exfil:*``).
     "capability:network_exfil:http_upload",
     "capability:network_exfil:file_transfer_outbound",

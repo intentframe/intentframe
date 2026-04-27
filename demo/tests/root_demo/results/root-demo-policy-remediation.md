@@ -148,8 +148,9 @@ tags, one command-surface per deny-set entry:
 
 | Family | Suffixes emitted today |
 | --- | --- |
-| `capability:data_read:*` | `browser_cookies`, `browser_profile_data`, `auth_authority`, `credential_material`, `shell_history`, `messaging_history`, `personal_records` |
-| `capability:system_mutate:*` | `host_network_config`, `hostname`, `time_sync`, `security_daemon`, `browser_security_pref`, `firewall`, `hosts_file`, `privilege_config`, `user_account`, `remote_access`, `disk_encryption`, `kernel_tunable`, `persistence` |
+| `capability:data_read:*` | `browser_cookies`, `browser_profile_data`, `browser_session_data`, `auth_authority`, `credential_material`, `shell_history`, `db_client_history`, `messaging_history`, `personal_records`, `dotfile_secrets`, `cloud_tokens`, `password_manager_export`, `process_env`, `ssh_known_hosts`, `mail_store`, `process_memory` |
+| `capability:system_mutate:*` | `host_network_config`, `hostname`, `time_sync`, `security_daemon`, `browser_security_pref`, `firewall`, `hosts_file`, `privilege_config`, `user_account`, `remote_access`, `disk_encryption`, `kernel_tunable`, `persistence`, `mdm_profile`, `boot_policy`, `audit_log`, `tcc_privacy`, `backup`, `installer_pkg`, `kernel_extension`, `service_mgmt`, `launchd_mutation`, `cron_mutation`, `browser_extension`, `screen_sharing`, `print_config`, `radio_power`, `ca_trust`, `shell_init`, `history_tamper` |
+| `capability:network_exfil:*` | `http_upload`, `file_transfer_outbound`, `ssh_tunnel`, `cloud_upload` |
 
 Each suffix is driven by an explicit regex rule and covers the failing-intent
 surfaces from §2 **plus** the immediate-sibling surfaces called out in the

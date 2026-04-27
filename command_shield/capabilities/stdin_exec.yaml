@@ -1,0 +1,42 @@
+- id: stdin_exec__python
+  family: stdin_exec
+  suffix: python
+  pattern: \|\s*python(?:3|2)?(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into a python interpreter (stdin exec)
+  mitre_family: execution
+- id: stdin_exec__node
+  family: stdin_exec
+  suffix: node
+  pattern: \|\s*node(?:js)?(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into a node interpreter (stdin exec)
+  mitre_family: execution
+- id: stdin_exec__ruby
+  family: stdin_exec
+  suffix: ruby
+  pattern: \|\s*ruby(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into a ruby interpreter (stdin exec)
+  mitre_family: execution
+- id: stdin_exec__perl
+  family: stdin_exec
+  suffix: perl
+  pattern: \|\s*perl(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into a perl interpreter (stdin exec)
+  mitre_family: execution
+- id: stdin_exec__php
+  family: stdin_exec
+  suffix: php
+  pattern: \|\s*php(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into a php interpreter (stdin exec)
+  mitre_family: execution
+- id: stdin_exec__shell
+  family: stdin_exec
+  suffix: shell
+  pattern: \|\s*(?:bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into a shell interpreter (stdin exec)
+  mitre_family: execution
+- id: stdin_exec__any
+  family: stdin_exec
+  suffix: ''
+  pattern: \|\s*(?:python3?|python2|node|nodejs|ruby|perl|php|bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)
+  description: Command pipes input into an interpreter (stdin exec)
+  mitre_family: execution

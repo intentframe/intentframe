@@ -999,6 +999,19 @@ _SENSITIVE_DATA_READ: list[Case] = [
         },
     ),
     Case(
+        command="cat /proc/1234/mem",
+        category="sensitive_data_read",
+        note="live process memory read - data_read:process_memory",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
         command="cat ~/.ssh/known_hosts",
         category="sensitive_data_read",
         note="ssh target discovery \u2014 data_read:ssh_known_hosts",
@@ -1357,6 +1370,45 @@ _SENSITIVE_SYSTEM_MUTATE: list[Case] = [
             "Wi-Fi radio off \u2014 system_mutate:radio_power "
             "(co-emits host_network_config)"
         ),
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="update-ca-certificates",
+        category="sensitive_system_mutate",
+        note="root CA trust store update - system_mutate:ca_trust",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="echo 'alias evil=rm' >> ~/.bashrc",
+        category="sensitive_system_mutate",
+        note="shell init persistence via rc append - system_mutate:shell_init",
+        expected={
+            "permissive": UNDECIDED,
+            "developer": UNDECIDED,
+            "data_analyst": UNDECIDED,
+            "locked_down": BLOCK,
+            "python_shell_only": BLOCK,
+            "no_run_command": BLOCK,
+        },
+    ),
+    Case(
+        command="history -c",
+        category="sensitive_system_mutate",
+        note="shell history wipe - system_mutate:history_tamper",
         expected={
             "permissive": UNDECIDED,
             "developer": UNDECIDED,

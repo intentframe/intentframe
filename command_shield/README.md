@@ -287,6 +287,11 @@ matching xfail(s), and leave the broader remediation for later.
 
 Step 7 emits deterministic capability tags describing what the command can do, not whether it is allowed.
 
+Regex-backed capability rules live in `command_shield/capabilities/*.yaml`.
+The classifier loads that corpus at import time and keeps only the structural
+gates in Python (for example, the read-only and network-probe checks that
+must prove a command is a bare safe shape before emitting a positive tag).
+
 Current capability families:
 
 - package install:
@@ -397,19 +402,55 @@ Current capability families:
     `capability:stdin_exec:perl`, and `capability:stdin_exec:php`
 
 Callers can match exact tags or prefixes like `capability:package_install:*`
-or `capability:read_only:*`.
+or `capability:read_only:*`.  The YAML corpus also records the MITRE
+ATT&CK tactic each rule rolls up to, but that mapping is documentation
+metadata: the classifier still emits Command Shield's native IDs, such
+as `capability:data_read:browser_cookies`.  See
+[`COVERAGE.md`](COVERAGE.md) for the full tactic → rule table.
 
-Downstream command policies can use these tags to keep a runtime command
-surface to bash/shell commands, POSIX utilities, and Python while also
-denying the sensitive surfaces above. For example, a Python/shell-only
-policy can deny non-python, non-shell language runtimes (Node, Ruby,
-Perl, PHP, Java, Go, Lua, R, Julia, Swift, Deno/Bun, local binaries,
-compilers, and non-python package ecosystems) while keeping POSIX tools
-such as `awk`, `sed`, `grep`, `cut`, `sort`, `find`, `tr`, `head`,
-`tail`, and `wc` available. Separately, it denies
-`capability:data_read:*` and `capability:system_mutate:*` tags so a
-normally read-only tool like `cat`, `sqlite3`, `plutil`, or `dscl` does
-not fast-path when it targets sensitive local state.
+### Source of truth
+
+All pure regex capability tables live in
+[`command_shield/capabilities/*.yaml`](capabilities/).  This includes
+the sensitive-surface families (`data_read:*`, `system_mutate:*`,
+`network_exfil:*`), execution families (`script_execution:*`,
+`stdin_exec[:*]`, `package_install:*`, `compilation`), positive
+families (`read_only:*`, `network_probe:*`), and small single-tag
+families such as `network_bind`, `filesystem_write`,
+`download_and_exec`, and `spawns_process`.
+
+Adding or refining a regex capability is now a Command Shield-local
+data change:
+
+1. Append a row to the relevant YAML with `id`, `family`, `pattern`,
+   and, when needed, `suffix`, `description`, `sensitive`,
+   `mitre_family`, and `mitre_techniques`.
+2. If `sensitive: true`, include a `mitre_family`; the loader rejects
+   sensitive rules without one.
+3. Add or update a fixture that proves the command shape emits the
+   expected tag.
+4. Regenerate the coverage table with
+   `.venv/bin/python command_shield/generate_coverage_md.py`.
+
+The YAML changes what Command Shield itself loads and documents; it
+does not create any dependency on IntentFrame policy modules.  The
+classifier still emits native `capability:*` tags such as
+`capability:data_read:browser_cookies` and `capability:network_bind`.
+The MITRE fields are coverage metadata for `COVERAGE.md`, not a
+runtime alias layer.
+
+### Coverage telemetry
+
+`command_shield/telemetry.py` exposes a coverage-gap log line, fired
+only when the pipeline produces `NEEDS_REVIEW` / `BLOCK` on a
+command that carries no sensitive-family tag.  Silent in production
+(level=DEBUG); turn the logger up in staging to get evidence-driven
+inputs for the next rule addition.
+
+The telemetry hook does not block commands and does not call any
+external service.  It only records "high verdict, no sensitive tag"
+events so new rules can be driven by observed misses instead of
+one-off anecdotes.
 
 #### The read-only fast-path family
 
@@ -585,47 +626,23 @@ table is ordered `http_mutate` → `http_download` → `http_get` so the
 strictest applicable tag wins.  A POST `curl` is never downgraded to
 `http_get` and a `curl -o file` is never masqueraded as idempotent.
 
-#### Known taxonomy gaps
+#### Coverage boundaries
 
-The capability taxonomy is deliberately incremental. It covers known
-high-value sensitive surfaces and their immediate siblings, but it is
-not a complete sensitive-surface ontology. Known missing or partial
-areas:
+The capability taxonomy is deliberately finite and evidence-driven,
+not an open-ended ontology.  The current YAML corpus names the command
+shapes Command Shield can identify with deterministic regexes and
+structural gates.  `COVERAGE.md` shows how those rules map to MITRE
+ATT&CK tactics and highlights any rule that intentionally has no
+MITRE tactic.
 
-- **Sensitive reads:** dotfile secrets (`.env`, `.envrc`, `.npmrc`,
-  `.pypirc`, language package-manager configs), cloud token stores
-  beyond the currently catastrophic AWS/Kube examples, database client
-  histories (`.mysql_history`, `.sqlite_history`, `.rediscli_history`,
-  Mongo shell history), browser `Local Storage` / `Session Storage` /
-  `IndexedDB`, more password-manager export and vault formats, process
-  environment dumps (`/proc/<pid>/environ`, `ps eww`,
-  `launchctl print`), and SSH/config reconnaissance surfaces.
-- **System mutations:** MDM/profile installs, boot-policy and firmware
-  settings (`bless`, `nvram`, `bputil`, `csrutil`), audit/log tampering,
-  Time Machine / backup tampering, TCC/privacy database writes, browser
-  extension install-policy paths, `installer -pkg`, system extension /
-  kext management, CUPS/printer administration, Bluetooth/Wi-Fi/screen
-  sharing toggles, and Linux service management (`systemctl`, `service`,
-  `chkconfig`, `update-rc.d`).
-- **Network exfiltration / C2:** obvious reverse shells,
-  download-and-exec shapes, and some credential exfiltration commands
-  are already caught by `patterns/exfiltration.json` or existing
-  network/file-transfer tags. They are not yet represented as a clean
-  policy family such as `capability:network_exfil:http_post_data`,
-  `capability:network_exfil:file_transfer_outbound`,
-  `capability:network_exfil:reverse_shell`,
-  `capability:network_exfil:ssh_tunnel`,
-  `capability:network_exfil:dns_exfil`, or
-  `capability:network_exfil:cloud_upload`.
-
-The existing infrastructure can emit all of these without changing the
-public `CommandReport` contract: add refined classifier rules for new
-capability tags, add pattern-pack entries for verdict-bearing hard
-stops, or surface structural signals when the command is too dynamic to
-classify safely. Policy consumers should treat the current list as
-coverage for known high-value surfaces, not as a promise that every
-sensitive read, host mutation, or exfiltration technique has a named
-capability today.
+New capability tags should be added only when there is a concrete
+command shape to match: a newly discovered production miss, a newly
+published technique that applies to shell / Python pre-execution
+inspection, or a rule split that makes an existing tag more precise.
+If the behavior is a hard-stop primitive rather than a capability
+fact, it belongs in `command_shield/patterns/*.json`.  If it requires
+semantic context, user intent, session history, or repository-wide
+understanding, it belongs outside Command Shield.
 
 ### 4. Containment-edge extraction and walk
 

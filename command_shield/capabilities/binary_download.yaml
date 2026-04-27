@@ -1,0 +1,5 @@
+- id: binary_download
+  family: binary_download
+  pattern: \bcurl\b[^|]*\s-[OoLJ]\b|\bwget\b(?![^|]*\|\s*(?:sh|bash|zsh|dash|python3?|perl|ruby|node))|\baria2c\b
+  description: Command downloads a remote payload to disk
+  mitre_family: command_and_control
