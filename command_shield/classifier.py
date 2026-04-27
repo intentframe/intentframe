@@ -87,6 +87,44 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
     capability:spawns_process    — shells out / spawns a child process
     capability:stdin_exec        — pipes data into an interpreter (`… | python -`)
 
+    capability:data_read:browser_cookies       — plutil / cat / cp / sqlite3 on
+                                                  Safari / Chrome / Chromium /
+                                                  Brave / Edge / Firefox / Vivaldi
+                                                  / Arc cookie stores
+    capability:data_read:auth_authority        — dscl reads of account
+                                                  AuthenticationAuthority /
+                                                  ShadowHashData / KerberosKeys /
+                                                  Password / SMBPasswordServerList
+    capability:data_read:credential_material   — security dump-keychain,
+                                                  security find-*-password -w/-g,
+                                                  sqlite3 / cp on TCC.db
+
+    capability:system_mutate:host_network_config   — networksetup -set*/
+                                                      -create*/-delete*/-add*/
+                                                      -remove*/-switchtolocation;
+                                                      arp -s|-d; route add|del|
+                                                      change|replace|flush;
+                                                      ip <obj> add|del|...;
+                                                      ifconfig <if> up|down|mtu|ip
+    capability:system_mutate:hostname              — scutil --set HostName /
+                                                      LocalHostName / ComputerName;
+                                                      hostname <new>
+    capability:system_mutate:time_sync             — systemsetup -setusingnetwork
+                                                      time / -setnetworktimeserver
+                                                      / -settimezone / -settime /
+                                                      -setdate; sntp -S
+    capability:system_mutate:security_daemon       — launchctl unload|bootout|
+                                                      disable|remove|stop|
+                                                      kickstart -k targeting
+                                                      EDR / TCC / Santa / osquery
+                                                      / Jamf / Kandji;
+                                                      spctl --master-disable;
+                                                      csrutil disable
+    capability:system_mutate:browser_security_pref — defaults write on
+                                                      com.apple.Safari /
+                                                      com.google.Chrome /
+                                                      org.mozilla.firefox
+
 Each hit produces a Signal with check="capability" and signal_id set to
 the capability tag.  Multiple capabilities per command are expected;
 they are not mutually exclusive.  Policy can match exact tags or use
@@ -162,6 +200,30 @@ CAPABILITY_STDIN_EXEC = "capability:stdin_exec"
 CAPABILITY_FILESYSTEM_WRITE = "capability:filesystem_write"
 CAPABILITY_READ_ONLY = "capability:read_only"
 CAPABILITY_NETWORK_PROBE = "capability:network_probe"
+# ── Sensitive surface families (refined-only) ────────────────────────
+# Both are emitted only as ``<base>:<suffix>`` refined tags — the bare
+# base form is never seen on a command.  Consumers MUST prefix-match
+# these families (literal equality against ``capability:data_read`` /
+# ``capability:system_mutate`` will never fire).
+#
+#   * ``capability:data_read:*`` — reads that yield information an
+#     agent must not exfiltrate under the root-compromised-agent threat
+#     model (browser cookies, account authentication material,
+#     keychain / TCC.db contents).  Structurally these commands are
+#     read-shaped, so this family is treated as read-only-incompatible
+#     in the classifier gate (``_safe_for_read_only``) — emitting
+#     ``data_read:*`` suppresses ``read_only:*`` on the same command so
+#     the consumer fast-path license is not accidentally available for
+#     a sensitive read.
+#
+#   * ``capability:system_mutate:*`` — commands that change host /
+#     network / identity / trust-surface state (DNS, routing, hostname,
+#     NTP, EDR launchd jobs, browser security preferences).  Structurally
+#     these are mutating and so would not qualify for ``read_only:*`` on
+#     their own; the read-only-incompatible membership is belt-and-braces
+#     against an unanticipated co-occurrence.
+CAPABILITY_DATA_READ = "capability:data_read"
+CAPABILITY_SYSTEM_MUTATE = "capability:system_mutate"
 
 
 # ── Detection rules ─────────────────────────────────────────────────
@@ -288,6 +350,154 @@ _SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+# Sensitive-data-read refined rules — one per data class.  Emission is
+# driven purely by the main ``_RULES`` loop (no structural-bareness gate),
+# since the point of the family is to tag the command regardless of shape;
+# a policy that denies ``capability:data_read:browser_cookies`` wants the
+# deny to fire whether the command is bare, composed, or hidden behind
+# an indirection.  Suffixes correspond 1:1 to the failing-intent buckets
+# in the root-demo remediation plan; credential_material is a narrow
+# bucket today (keychain / TCC.db) extended one rule at a time.
+_DATA_READ_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    # Browser cookies on macOS — Safari on-disk store + Chromium-family
+    # profile cookies + Firefox SQLite cookie store.  shlex normalisation
+    # collapses `Application\ Support` to `Application Support`, so we
+    # accept `\s+` between the two words.  Path segments are bounded by
+    # `[^\s|;&]+` to keep the match inside a single shlex token and out
+    # of shell metacharacters.
+    (
+        re.compile(
+            r"(?:^|[^A-Za-z0-9_])(?:/)?Library/Cookies/"
+            r"|\bCookies\.binarycookies\b"
+            r"|\bApplication\s+Support/"
+            r"(?:Google/Chrome|Chromium|BraveSoftware|Vivaldi|Arc|"
+            r"Microsoft\s+Edge)[^\s|;&]*/Cookies\b"
+            r"|\bFirefox/Profiles/[^\s/|;&]+/cookies\.sqlite\b"
+        ),
+        "browser_cookies",
+    ),
+    # Directory-Services account records — the macOS local-identity
+    # plumbing.  ``AuthenticationAuthority``, ``ShadowHashData``,
+    # ``KerberosKeys`` are the credential-bearing fields; ``Password``
+    # is included because dscl exposes the field name literally and
+    # ``\bPassword\b`` will not match substrings like ``Passwordless``
+    # (both chars are word chars so there's no boundary).
+    (
+        re.compile(
+            r"\bdscl\b[^|;&]*\b(?:AuthenticationAuthority|ShadowHashData"
+            r"|KerberosKeys|Password|SMBPasswordServerList)\b"
+        ),
+        "auth_authority",
+    ),
+    # Credential-material reads — narrow bucket for keychain dumps and
+    # TCC.db contents.  Keep each rule a positive match on the mutation
+    # verb + secret-bearing flag so bare ``security`` / ``sqlite3``
+    # invocations on unrelated files do not fire.
+    (
+        re.compile(
+            r"\bsecurity\s+dump-keychain\b"
+            r"|\bsecurity\s+find-(?:generic|internet)-password\b"
+            r"[^|;&]*\s-[wg]\b"
+            r"|\bsqlite3\b[^|;&]*\bTCC\.db\b"
+            r"|\bcp\b[^|;&]*\bTCC\.db\b"
+        ),
+        "credential_material",
+    ),
+)
+
+
+# System-mutation refined rules — one per surface.  Each regex matches
+# only the mutating verbs/flags; the existing read-only ``arp`` /
+# ``route`` / ``ip`` rules (which explicitly exclude ``-s|-d`` and
+# ``add|del|change|replace|flush``) stay intact, so the same tool can
+# still be tagged ``read_only:network_inspect`` in its inspection form
+# and ``system_mutate:host_network_config`` in its mutation form.
+_SYSTEM_MUTATE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    # Host network configuration — macOS ``networksetup`` + the POSIX
+    # ``arp`` / ``route`` / ``ip`` / ``ifconfig`` mutation verbs.
+    # ``networksetup -get*`` / ``-list*`` stay untagged (read forms).
+    # ``route`` accepts intervening short flags (``route -n flush``,
+    # ``route -T 254 add …``) before the verb.  ``ip <obj> set`` is
+    # iproute2's mutation verb for ``ip link set <dev> up|down`` — no
+    # ``set`` sub-verb exists on ``ip route`` / ``ip neigh`` but it's
+    # harmless to accept it uniformly since ``ip route set`` is not a
+    # real command.  ``ifconfig <iface> <ip>`` matches on a dotted-quad
+    # second token; bare ``ifconfig`` / ``ifconfig en0`` stay at
+    # ``read_only:network_inspect``.
+    (
+        re.compile(
+            r"\bnetworksetup\s+-(?:set[A-Za-z]+|create[A-Za-z]+"
+            r"|delete[A-Za-z]+|add[A-Za-z]+|remove[A-Za-z]+"
+            r"|switchtolocation)\b"
+            r"|\barp\s+(?:[^|;&]*\s)?-[sd]\b"
+            r"|\broute\s+(?:-[A-Za-z]+(?:\s+\S+)?\s+)*"
+            r"(?:add|del|delete|change|replace|flush)\b"
+            r"|\bip\s+(?:addr|address|link|route|neigh|neighbour|rule"
+            r"|tunnel|netns|xfrm)\s+(?:add|del|delete|change|replace"
+            r"|flush|set)\b"
+            r"|\bifconfig\s+\S+\s+(?:up|down|mtu|\d+\.\d+\.\d+\.\d+)\b"
+        ),
+        "host_network_config",
+    ),
+    # Host identity — the three scutil hostname slots and the
+    # ``hostname <new>`` shell builtin.  ``hostname`` bare / with flags
+    # stays at ``read_only:system_info``; the non-dash positional
+    # alternative catches the mutation shape.
+    (
+        re.compile(
+            r"\bscutil\s+--set\s+(?:HostName|LocalHostName|ComputerName)\b"
+            r"|\bhostname\s+[A-Za-z0-9][^\s]*"
+        ),
+        "hostname",
+    ),
+    # Time sync / NTP.  ``systemsetup -setusingnetworktime`` is the
+    # failing-intent shape (root-demo intent 91); sibling surfaces are
+    # included so policy can deny the whole family with one tag.
+    # Alternation order (``timezone`` before ``time``) ensures the
+    # longer match wins via backtracking on the trailing ``\b``.
+    (
+        re.compile(
+            r"\bsystemsetup\s+-set(?:usingnetworktime|networktimeserver"
+            r"|timezone|time|date)\b"
+            r"|\bsntp\s+-S\b"
+        ),
+        "time_sync",
+    ),
+    # Security daemons / trust surfaces.  Matches the mutation verb +
+    # a known security-product name (EDR, TCC, Santa, osquery, Jamf,
+    # Kandji) for launchctl; plus the two macOS trust-disable shapes
+    # (``spctl --master-disable`` / ``csrutil disable``) that any
+    # sibling deny surface would ride with.
+    (
+        re.compile(
+            r"\blaunchctl\s+(?:unload|bootout|disable|remove|stop"
+            r"|kickstart\s+-k)\b[^|;&]*\b"
+            r"(?:crowdstrike|falcond|sentinelone|sophos|mcafee|defender"
+            r"|tccd|santa|osquery|jamf|kandji|com\.apple\.tcc"
+            r"|com\.apple\.sandboxd)\b"
+            r"|\bspctl\s+--master-disable\b"
+            r"|\bcsrutil\s+disable\b"
+        ),
+        "security_daemon",
+    ),
+    # Browser security preferences.  ``defaults write`` to the three
+    # major browser bundle ids.  Broad on purpose — any write to a
+    # browser bundle's preferences is policy-relevant; narrowing to
+    # specific preference keys would force the classifier to track
+    # every rename Apple / Google / Mozilla ships.
+    (
+        re.compile(
+            r"\bdefaults\s+write\s+"
+            r"(?:com\.apple\.Safari(?:TechnologyPreview)?"
+            r"|com\.google\.Chrome"
+            r"|org\.mozilla\.firefox)"
+            r"\b"
+        ),
+        "browser_security_pref",
+    ),
+)
+
+
 def _expand_refined(
     rules: tuple[tuple[re.Pattern[str], str], ...],
     base: str,
@@ -321,6 +531,27 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         _STDIN_EXEC_RULES,
         CAPABILITY_STDIN_EXEC,
         "Command pipes input into a {suffix} interpreter (stdin exec)",
+    ),
+    # Refined: sensitive data-read surfaces (one rule per data class).
+    # No base ``capability:data_read`` tag is emitted; consumers prefix-
+    # match on ``capability:data_read:*`` — see module docstring and
+    # ``_safe_for_read_only`` / ``_composition_is_all_read_only`` for
+    # the classifier-side suppression of ``read_only:*`` when any
+    # ``data_read:*`` tag fires on the same command.
+    *_expand_refined(
+        _DATA_READ_RULES,
+        CAPABILITY_DATA_READ,
+        "Command reads sensitive {suffix} material",
+    ),
+    # Refined: system-mutation surfaces (one rule per surface).
+    # No base ``capability:system_mutate`` tag is emitted; consumers
+    # prefix-match on ``capability:system_mutate:*``.  The rules are
+    # positive-mutation matches only — read forms of the same tools
+    # stay tagged under the read-only family.
+    *_expand_refined(
+        _SYSTEM_MUTATE_RULES,
+        CAPABILITY_SYSTEM_MUTATE,
+        "Command mutates host {suffix} state",
     ),
     # Compilation / build — compilers and build drivers.
     (
@@ -1440,8 +1671,12 @@ def _safe_for_read_only(
     ``filesystem_write``, ``spawns_process``, ``network_bind``,
     ``background_exec``, ``download_and_exec``, ``binary_download``,
     ``process_signal``, ``compilation``, or any refined
-    ``package_install:*`` / ``script_execution:*`` tag disqualifies
-    the command from receiving any ``read_only:*`` tag.
+    ``package_install:*`` / ``script_execution:*`` / ``data_read:*``
+    / ``system_mutate:*`` tag disqualifies the command from receiving
+    any ``read_only:*`` tag.  The ``data_read:*`` / ``system_mutate:*``
+    suppression is the classifier-side Option-A gate that prevents a
+    sensitive-surface command from also being blessed as a cheap
+    read-only fast-path candidate downstream.
     """
     if not _structurally_bare(
         command,
@@ -1457,6 +1692,10 @@ def _safe_for_read_only(
         if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_DATA_READ}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_SYSTEM_MUTATE}:"):
             return False
 
     return True
@@ -1482,14 +1721,17 @@ def _composition_is_all_read_only(
        process-substitution, variable-expansion, parse/shlex failure,
        interpreter indirection).
     4. No already-emitted capability in the read-only-incompatible
-       set or the refined package_install / script_execution
-       families.  This is the single broadest safety gate: any
-       sub-segment that emits ``filesystem_write`` (redirects,
-       ``tee``), ``spawns_process`` (``xargs``, ``sudo``, ``ssh``,
-       ``docker run``, …), ``stdin_exec`` (``| sh``, ``| python -``),
+       set or the refined package_install / script_execution /
+       data_read / system_mutate families.  This is the single
+       broadest safety gate: any sub-segment that emits
+       ``filesystem_write`` (redirects, ``tee``), ``spawns_process``
+       (``xargs``, ``sudo``, ``ssh``, ``docker run``, …),
+       ``stdin_exec`` (``| sh``, ``| python -``),
        ``download_and_exec`` (``curl … | sh``), ``background_exec``
-       (trailing ``&``), ``network_bind``, etc. disqualifies the
-       whole composition automatically.
+       (trailing ``&``), ``network_bind``, ``data_read:*``
+       (sensitive data reads), ``system_mutate:*`` (host-state
+       mutations), etc. disqualifies the whole composition
+       automatically.
     5. Every bare shell token in the re-tokenised command that lies
        in ``_SHELL_COMPOSITION_TOKENS`` must also lie in
        ``_READ_ONLY_COMPOSITION_JOINERS`` — i.e. only ``|``, ``||``,
@@ -1515,6 +1757,10 @@ def _composition_is_all_read_only(
         if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_DATA_READ}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_SYSTEM_MUTATE}:"):
             return False
 
     try:
