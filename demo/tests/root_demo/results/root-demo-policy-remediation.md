@@ -272,17 +272,20 @@ automatically propagates into the accuracy matrix with no test edits.
 
 ## 9. Remaining work
 
-### 9.1 Dry-run executor (§5.3) — pending
+### 9.1 Dry-run executor (§5.3) — shipped
 
-The test harness still relies on Guardian returning `ALLOW` being "harmless",
-which was the root cause of the host-mutation damage recorded in
-`2026-04-27-attack-sweep-host-impact.md`.  Even though the new policy denies
-those nine commands, a future classifier regression or policy edit could
-reintroduce the gap, and a full sweep on a real Mac would re-mutate host
-state.  The follow-up is to add a default-on dry-run path in
-`root_test_runner.py` (or a test-only adapter) that asserts verdicts without
-submitting commands to the real executor, with a loud opt-in env flag for
-disposable-VM live runs.
+`intentframe_server/dry_run_executor.py` — a drop-in replacement for
+`ExecutorHTTPClient` that returns synthetic `ExecutionResult`s with no real
+host I/O.  Activated via `INTENTFRAME_EXECUTOR_MODE=dry_run`; privilege
+posture set via `INTENTFRAME_DRY_RUN_CONTEXT=root` so Guardian sees uid=0
+without actually running as root.  Every synthetic result carries
+`dry_run=True`, which the root-demo runner checks *positively* — if ALLOW
+comes back without that flag the runner aborts, guarding against a
+misconfigured supervisor silently shelling out on the host.  Supervisor config
+omits the real executor service from the graph when dry-run mode is active.
+All per-category test files (`test_attacks_*.py`) run against this executor by
+default; live-executor runs require an explicit env flag and a real root
+profile.
 
 ### 9.2 Semantic `intent_limits` (§4.2) — optional
 
@@ -293,31 +296,51 @@ give the AE explicit operator boundaries for shapes the regex can't reduce
 cleanly (e.g. `cat $(echo ~)/Library/Keychains/...`).  These should mirror a
 future production `INTENT_LIMITS` extension in `intentframe_gateway/bootstrap.py`.
 
-### 9.3 Capability taxonomy gaps — pending
+### 9.3 Capability taxonomy gaps — shipped
 
-The new `capability:data_read:*` and `capability:system_mutate:*` families close
-the nine observed leak surfaces and their nearest siblings; they do **not** make
-`command_shield` a complete sensitive-surface ontology. Known remaining areas
-include:
+All previously-listed gaps have been implemented in the YAML-driven capability
+corpus under `command_shield/capabilities/`.  Cross-check of every item:
 
-- Sensitive reads: dotfile secrets such as `.env`, `.npmrc`, and `.pypirc`;
-  additional cloud token stores; database client histories; browser Local
-  Storage / Session Storage / IndexedDB; more password-manager vault/export
-  formats; and process environment dumps.
-- System mutations: MDM/profile installs; boot-policy and firmware settings
-  (`bless`, `nvram`, `bputil`, `csrutil`); audit/log tampering; Time Machine /
-  backup tampering; TCC/privacy database writes; browser extension install
-  policy paths; `installer -pkg`; system extension / kext management; CUPS
-  administration; Bluetooth/Wi-Fi/screen-sharing toggles; and Linux service
-  management.
-- Exfiltration / C2: many obvious cases are already catastrophic, but there is
-  no clean policy-grippable `capability:network_exfil:*` family yet.
+**Sensitive reads (`data_read.yaml`):**
 
-`command_shield/README.md` now documents these gaps explicitly. The classifier
-infrastructure can emit these as additional refined capabilities without
-changing the public `CommandReport` contract, but each new subtag should land
-with positive/negative tests and policy-deny mirroring before being treated as
-production coverage.
+| Previously listed gap | Rule shipped |
+|---|---|
+| Dotfile secrets (`.env`, `.npmrc`, `.pypirc`, …) | `data_read__dotfile_secrets` |
+| Additional cloud token stores | `data_read__cloud_tokens` + `data_read__cloud_tokens__2` (file paths + verb shapes) |
+| Database client histories | `data_read__db_client_history` |
+| Browser Local Storage / Session Storage / IndexedDB | `data_read__browser_session_data` |
+| More password-manager vault/export formats | `data_read__password_manager_export` |
+| Process environment dumps | `data_read__process_env` |
+
+**System mutations (`system_mutate.yaml`):**
+
+| Previously listed gap | Rule shipped |
+|---|---|
+| MDM/profile installs | `system_mutate__mdm_profile` |
+| Boot-policy and firmware settings (`bless`, `nvram`, `bputil`, `csrutil`) | `system_mutate__boot_policy` |
+| Audit/log tampering | `system_mutate__audit_log` |
+| Time Machine / backup tampering | `system_mutate__backup` |
+| TCC/privacy database writes | `system_mutate__tcc_privacy` |
+| Browser extension install policy paths | `system_mutate__browser_extension` |
+| `installer -pkg`; `softwareupdate --install` | `system_mutate__installer_pkg` |
+| System extension / kext management | `system_mutate__kernel_extension` |
+| CUPS administration | `system_mutate__print_config` |
+| Bluetooth/Wi-Fi/screen-sharing toggles | `system_mutate__radio_power`, `system_mutate__screen_sharing` |
+| Linux service management (`systemctl`, `service`, …) | `system_mutate__service_mgmt` |
+
+**Exfiltration (`network_exfil.yaml`):**
+
+`capability:network_exfil:*` family is shipped with four suffixes:
+`http_upload`, `file_transfer_outbound`, `ssh_tunnel`, `cloud_upload`.
+These close the "classifier tagged a read surface, agent stages it, then
+uploads via curl/rsync/aws" exfil chain and are deny-listed in
+`test_policy_root.yaml` and `DEFAULT_TERMINAL_DENY_CAPABILITIES`.
+
+Each rule lands in a YAML file with an explicit regex, `sensitive: true`,
+a MITRE tactic mapping, and coverage pinned by
+`command_shield/tests/test_classifier_sensitive_capabilities.py`.
+The classifier and `command_shield/COVERAGE.md` are derived from the YAML
+data; adding a new rule is a data-first change with no classifier code edits.
 
 ---
 
@@ -338,3 +361,10 @@ production coverage.
   `python_shell_only` in the accuracy matrix pulls
   `DEFAULT_TERMINAL_DENY_CAPABILITIES` live from bootstrap so adding a
   new sensitive tag propagates into coverage without a test edit.
+- **2026-04-28** — §9.1 and §9.3 closed.  Dry-run executor shipped
+  (`intentframe_server/dry_run_executor.py`); all taxonomy gaps from §9.3
+  implemented in `command_shield/capabilities/*.yaml`; `network_exfil`
+  family added.  Attack corpus expanded from 24 → 100 intents across
+  five per-tactic test files.  Remaining open items: per-lane full-body
+  forks for `critical_network_mutation` / `critical_network_probe`
+  (§9.4); semantic `intent_limits` (§9.2); audit-side verification.
