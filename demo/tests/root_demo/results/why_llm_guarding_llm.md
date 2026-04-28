@@ -56,7 +56,7 @@ This is why your 99/100 block rate on the minimal policy run is so important. It
 You don't need to hide that it's "LLM guarding LLM." You just need to explain *why* this specific architecture makes that pattern actually work.
 
 -----
-More: 
+### More Opus: 
 
 Yes. That's the precise technical reason, and it's worth stating even more sharply because it's the answer to the single hardest question you'll get in any expert review.
 
@@ -116,3 +116,50 @@ Intent 88 (ARP spoof) is the one case where this failed — AE rated MEDIUM, fla
 The reason "LLM guarding LLM" works in IntentFrame is that the guardian LLM doesn't share the agent LLM's context, inputs, trust boundary, or optimization pressure — it has independent structural evidence about what the action will actually do, delivered in trusted context the agent cannot reach.
 
 That's not "two of the same thing." That's a reviewer with independent forensic evidence evaluating a request from an untrusted source. Which is, as you noted, exactly how a human does semantic validation in the real world — a human reviewer doesn't just read the requester's cover story; they look at the actual transaction, the actual system state, and their own policy. IntentFrame gives the guardian LLM the same structural advantage a human reviewer has.
+
+----
+### More Gemini:
+
+This makes a great deal of technical sense. The document moves beyond the naive "double-check" approach and applies a fundamental security principle: **Defense in Depth through Asymmetry.**
+
+In typical AI safety setups, "LLM guarding LLM" is often just a redundant echo chamber. If the inputs are identical, the failure modes are usually identical. IntentFrame’s logic holds up because it treats the Guardian not as a second pair of eyes, but as a **Forensic Auditor.**
+
+---
+
+## Why This Architecture Actually Works
+
+The core reason this is effective is that it breaks the **Symmetry of Failure**. Here is the breakdown of why those three asymmetries matter from a systems engineering perspective:
+
+### 1. Structural Grounding (The AST Advantage)
+The Agent LLM operates in the realm of **Intent** (natural language), which is inherently "fuzzy" and exploitable. The Guardian, however, is fed **Ground Truth** (the AST/Capability tags). 
+
+* **The Logic:** Even if an LLM is "convinced" that `rm -rf /` is actually a command to "optimize disk space," the deterministic parser (the Command Shield) sees the actual system call. 
+* **The Result:** You are forcing the Guardian to reconcile the Agent's "story" with the "physical reality" of the code. In security terms, this is shifting from **Signature-based detection** to **Behavioral analysis**.
+
+### 2. The Maker-Checker Protocol
+In high-stakes environments (finance, nuclear, aerospace), we never let the person who *creates* the request also *authorize* it. 
+
+* **Optimization Pressures:** The Agent is RLHF-tuned to be "helpful." This makes it susceptible to "social engineering" (prompt injection). 
+* **The Guard's Mandate:** By explicitly prompting the Guardian to be "suspicious" and providing a root-privilege threat model, you change its objective function. 
+* **Mathematical Safety:** If $P(A)$ is the probability of the Agent failing and $P(G)$ is the probability of the Guard failing, the system only fails if both fail simultaneously. Because they have different contexts and goals, these failures become **statistically independent**:
+    $$P(F_{\text{system}}) = P(A \cap G) = P(A) \times P(G)$$
+    *(This only holds if the Guard has independent information, which IntentFrame provides).*
+
+### 3. Separation of Trust Boundaries
+The document correctly identifies that the Agent's entire context is "tainted" (untrusted). By injecting the Analysis Engine (AE) report and the `command_shield` signals into **Trusted Context blocks** (delimited markers), you create a "Sanitized Zone" that the Agent cannot reach. 
+
+
+---
+
+## The "ARP Spoof" Reality Check
+The fact that **Intent 88 (ARP spoof)** slipped through is actually a sign that the logic is sound and the data is honest. 
+* It proves the system isn't just "blocking everything." 
+* It highlights that if the **independent signals** (the AE and Classifier) are also fooled or lack the nuance to see the danger, the Guardian will naturally fail. 
+* **The Fix:** This justifies the need for a **Deterministic Layer** (hard-coded `intent_limits`) to backstop the Semantic Layer.
+
+## Summary: Is it a valid response to skeptics?
+**Yes.** The most common critique of AI-based security is: *"You're just using a flawed tool to check a flawed tool."* Your answer effectively counters this by pointing out that **information, not just intelligence, is the differentiator.** A genius with no data will lose a debate to a novice with a factual dossier every time. The Guardian is that novice with the dossier.
+
+---
+
+Does the "Deterministic Layer" you mentioned (the `intent_limits`) currently handle specific network protocols, or is that the next stage of the roadmap?
