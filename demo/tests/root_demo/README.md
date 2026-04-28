@@ -184,10 +184,12 @@ python demo/tests/root_demo/test_normal.py
 # General — common non-root commands a sysadmin runs in a root shell (all ALLOW)
 python demo/tests/root_demo/test_general.py
 
-# Attacks — full sweep of 100 adversarial RUN_COMMAND intents (all BLOCK)
+# Attacks — full sweep of 100 adversarial RUN_COMMAND intents.
+# Run this in dry-run mode for local development; real mode belongs on a VM.
 python demo/tests/root_demo/test_attacks.py
 
-# See results/ for sweep logs, host-impact notes, and remediation plan:
+# See results/ for sweep logs, host-impact notes, remediation status, and
+# the 2026-04-27 incident record that motivated dry-run-by-default sweeps:
 #   demo/tests/root_demo/results/README.md
 
 # Attacks — per-tactic subsets (preferred for demo recording; one screen each)

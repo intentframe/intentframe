@@ -240,8 +240,10 @@ regression (wrong `TerminalChecker` decision for a correctly-tagged command)
 surfaces in `test_profile_matrix.py`.  Both narrow blame without chasing
 through the rest of the pipeline.
 
-A live `test_attacks.py` rerun on a disposable VM is still the acceptance step
-referenced in §6, but is blocked on the dry-run executor work in §9.
+A targeted dry-run rerun on 2026-04-28 confirmed all nine formerly-ALLOW
+intents now block through the deterministic constraint gate. A full
+`test_attacks.py` dry-run sweep remains the publishable acceptance proof for
+§6.
 
 ### 8.5 Regression-test placement
 
@@ -287,14 +289,27 @@ All per-category test files (`test_attacks_*.py`) run against this executor by
 default; live-executor runs require an explicit env flag and a real root
 profile.
 
-### 9.2 Semantic `intent_limits` (§4.2) — optional
+### 9.2 Semantic `intent_limits` (§4.2) — planned
 
 The deterministic capability clamp is enough to close the nine known gaps, but
-a short `intent_limits` list for the root-demo YAML ("no reading credential
-material", "no mutating host network without explicit authorization") would
-give the AE explicit operator boundaries for shapes the regex can't reduce
-cleanly (e.g. `cat $(echo ~)/Library/Keychains/...`).  These should mirror a
-future production `INTENT_LIMITS` extension in `intentframe_gateway/bootstrap.py`.
+the root-demo policy should still carry operator-voiced semantic boundaries.
+`intent_limits` are first-class policy for rules that require a semantic
+reader, not second-class hints and not substitutes for deterministic tags.
+
+The planned root-demo limits should cover:
+
+- no reading credential, session, browser-cookie, keychain, cloud-token, or
+  account-authentication material
+- no mutating host network, hostname, routing, DNS, ARP, Wi-Fi, or time-sync
+  settings without explicit operator intent
+- no weakening security posture by disabling EDR, Gatekeeper, XProtect, SIP,
+  FileVault, TCC, audit, MDM, or security-sensitive browser defaults
+- no persistence installation, privilege escalation, unauthorized egress, or
+  large scope mismatch between stated reason and actual command effect
+
+These limits should mirror a future production `INTENT_LIMITS` extension in
+`intentframe_gateway/bootstrap.py` so Jarvis and the root-demo test policy do
+not diverge.
 
 ### 9.3 Capability taxonomy gaps — shipped
 
@@ -368,3 +383,10 @@ data; adding a new rule is a data-first change with no classifier code edits.
   five per-tactic test files.  Remaining open items: per-lane full-body
   forks for `critical_network_mutation` / `critical_network_probe`
   (§9.4); semantic `intent_limits` (§9.2); audit-side verification.
+- **2026-04-28** — Live dry-run verification confirmed all nine formerly-ALLOW
+  intents (36, 38, 87, 88, 89, 90, 91, 97, 99) now BLOCK via
+  `deterministic_guardian` / `matched_gate=constraint` with matching
+  sensitive-surface capability tags.  Preflight verified
+  `data["dry_run"] == True`, so no host commands executed.  Remaining:
+  full 100-intent dry-run sweep, semantic `intent_limits`, and audit-side
+  verification.

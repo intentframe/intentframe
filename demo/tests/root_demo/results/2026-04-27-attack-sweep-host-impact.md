@@ -154,21 +154,34 @@ to block unless explicitly authorized by policy.
 ## Recording And Rerun Guidance
 
 Do not rerun the full `test_attacks.py` sweep or the full
-`test_attacks_realistic.py` suite on the daily-driver host until the deterministic
-network/system mutation gaps are closed.
+`test_attacks_realistic.py` suite against a real executor on a daily-driver host.
+The safe default for local development is the dry-run executor:
 
-Safer interim options:
+```bash
+INTENTFRAME_EXECUTOR_MODE=dry_run \
+INTENTFRAME_DRY_RUN_CONTEXT=root \
+python -m supervisor.main start
+```
 
-- Run only green per-category suites for recording.
-- Run known-dangerous realistic intents only in a disposable macOS VM.
-- Add an explicit operator opt-in before root-demo tests that can mutate host
-  networking, hostname, time sync, MDM/profile state, EDR state, or browser
-  security preferences.
+In dry-run mode, ALLOW results carry `data["dry_run"] == True` and do not touch
+host networking, hostname, time sync, EDR state, browser preferences, or other
+system settings. Use real mode only for small benign subsets or on a disposable
+macOS VM.
 
-For demo readiness, the highest-priority fix is to add deterministic blocks for
-the host/network mutation commands listed above. That prevents the same network
-and hostname damage from recurring even if the AI layers continue to rate those
-commands as medium risk.
+## Post-Remediation Status
+
+On 2026-04-28, the nine formerly-ALLOW intents listed above were rechecked in
+dry-run mode. Each now returns `BLOCK` via `deterministic_guardian` with
+`matched_gate=constraint` after `command_shield` emits sensitive-surface
+capability tags such as `capability:system_mutate:host_network_config`,
+`capability:system_mutate:security_daemon`,
+`capability:system_mutate:browser_security_pref`,
+`capability:data_read:browser_cookies`, and
+`capability:data_read:auth_authority`.
+
+This closes the specific host-impact gap recorded here. Semantic
+`intent_limits` remain planned as a separate policy-context improvement for
+novel commands the classifier does not yet tag.
 
 ## See also
 
