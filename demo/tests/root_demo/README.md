@@ -13,10 +13,14 @@ execution, does the IntentFrame pipeline still hold?* Each test sends an intent
 through the full pipeline, reads back the `ExecutionResult`, and asserts the
 decision (ALLOW / BLOCK) matches the intent's `expected_decision`. Black-box —
 the tests make no claim about which gate inside IntentFrame produces the
-decision; they only pin the end-to-end behavior. Three top-level suites ship
-today (`normal`, `general`, `attacks`), and the `attacks` suite is split into
-per-tactic files for persistence, egress, interpreter indirection, realistic
-macOS host mutation, and related attacker objectives.
+decision; they only pin the end-to-end behavior. By default the runner loads
+[`test_policy_root_determinstic_only.yaml`](test_policy_root_determinstic_only.yaml);
+pass `--policy` to run the same fixtures against another policy, such as
+[`test_policy_root_semantic_only.yaml`](test_policy_root_semantic_only.yaml).
+Three top-level suites ship today (`normal`, `general`, `attacks`), and the
+`attacks` suite is split into per-tactic files for persistence, egress,
+interpreter indirection, realistic macOS host mutation, and related attacker
+objectives.
 
 The suite is not a live LLM or model-refusal benchmark. It deliberately removes
 the agent model from the measurement and tests IntentFrame's resilience boundary:
@@ -194,6 +198,10 @@ python demo/tests/root_demo/test_general.py
 # Run this in dry-run mode for local development; real mode belongs on a VM.
 python demo/tests/root_demo/test_attacks.py
 
+# Alternate policy run — same fixtures, semantic-only policy file.
+python demo/tests/root_demo/test_attacks.py \
+  --policy demo/tests/root_demo/test_policy_root_semantic_only.yaml
+
 # See results/ for sweep logs, host-impact notes, remediation status, and
 # the 2026-04-27 incident record that motivated dry-run-by-default sweeps:
 #   demo/tests/root_demo/results/README.md
@@ -215,6 +223,8 @@ python demo/tests/root_demo/test_attacks_realistic.py         # intents 85-100 (
 python demo/tests/root_demo/test_normal.py 1
 python demo/tests/root_demo/test_attacks.py 1 3
 python demo/tests/root_demo/test_attacks_reason_lies.py 80 84
+python demo/tests/root_demo/test_attacks_privilege.py \
+  --policy demo/tests/root_demo/test_policy_root_semantic_only.yaml 23 26 28
 ```
 
 Expected output shape — verdict shows expected vs actual decision sourced
@@ -223,6 +233,9 @@ purely from `ExecutionResult` (no audit-log peek):
 ```
 ===============================================================================
   IntentFrame ROOT-DEMO NORMAL INTENT SUITE
+===============================================================================
+  Policy:  test_policy_root_determinstic_only.yaml
+  Running intents: [1, 6] (single Actor session)
 ===============================================================================
     [STUB] Handshake OK — user='root_demo_tester', allowed_actions=1
 
@@ -260,7 +273,7 @@ purely from `ExecutionResult` (no audit-log peek):
         Reason: Command blocked — matched pattern: sudo
 
 ===============================================================================
-  NORMAL INTENT TEST SUMMARY [mode=DRY-RUN] (expected_decision vs actual from ExecutionResult)
+  NORMAL INTENT TEST SUMMARY [mode=DRY-RUN  policy=test_policy_root_determinstic_only.yaml] (expected_decision vs actual from ExecutionResult)
 ===============================================================================
 
   --- RUN_COMMAND ---
@@ -296,7 +309,8 @@ Exit status:
 - `0` means the preflight passed and every selected intent matched its
   `expected_decision`.
 - `1` means the preflight failed or at least one selected intent failed.
-- `2` means the command line named an invalid or unknown intent number.
+- `2` means the command line named an invalid or unknown intent number, or
+  `--policy` pointed at a missing YAML file.
 
 **One `Handshake OK` line per test run, not per intent.** That's the proof the
 session harness is working — one onboarding LLM call regardless of how many
@@ -344,8 +358,11 @@ demo/tests/root_demo/
 │   ├── real_run_intentframe_logs.txt
 │   ├── 2026-04-27-attack-sweep-host-impact.md
 │   └── root-demo-policy-remediation.md
-├── test_policy_root.yaml               scoped mirror of bootstrap's root profile
-├── root_policy_loader.py               load_root_demo_policy(user_id)
+├── test_policy_root_determinstic_only.yaml
+│                                        default deterministic root-demo policy
+├── test_policy_root_semantic_only.yaml  alternate semantic-layer experiment policy
+├── test_policy_root.yaml               legacy/root-profile policy snapshot
+├── root_policy_loader.py               load_root_demo_policy(user_id, policy_path)
 ├── root_stub_agent.py                  StubPipelineRootAgent + load_root_intents()
 ├── root_intent_pipeline.py             setup helpers (policy/workspace seed)
 ├── root_test_runner.py                 RootIntentSuite — shared exec/eval/print
@@ -439,7 +456,7 @@ callbacks, no hooks, no batches:
 ```python
 async def _run(self, intent_nums):
     # 1. Seed per-test policy and workspace (once)
-    ensure_root_user_policy(policy_client)
+    ensure_root_user_policy(policy_client, self._policy_path)
     register_root_workspace(resource_client)
 
     # 2. Open the stub agent — one handshake, one onboarding LLM call
@@ -558,12 +575,33 @@ they all share `CATEGORY = "attacks"` and read from `intents/attacks/`.
 
 ---
 
-## 9. The scoped test policy
+## 9. Root-demo policy files
 
-[`test_policy_root.yaml`](test_policy_root.yaml) is a **hand-authored scoped
-mirror** of the gateway's root profile defined in
-[`intentframe_gateway/bootstrap.py::_build_policy("root")`](../../../intentframe_gateway/bootstrap.py).
-Two intentional differences from the gateway seed:
+The runner seeds a per-test user policy before opening the Actor session.
+[`root_policy_loader.py`](root_policy_loader.py) defaults to
+[`test_policy_root_determinstic_only.yaml`](test_policy_root_determinstic_only.yaml);
+every suite also accepts `--policy YAML` so the same intents can be measured
+against alternate policy files without changing fixtures.
+
+[`test_policy_root_determinstic_only.yaml`](test_policy_root_determinstic_only.yaml)
+is the default containment policy. It is scoped to `RUN_COMMAND` only and
+keeps the deterministic constraint set: `blocked_patterns` plus
+`deny_capabilities`. Use this file for the primary root-demo proof track and
+for comparisons against the gateway's root profile.
+
+[`test_policy_root_semantic_only.yaml`](test_policy_root_semantic_only.yaml)
+is the alternate semantic-layer experiment policy. It keeps the same
+`RUN_COMMAND` action surface but removes the capability deny-list. Populate
+and iterate plain-English `intent_limits` there, then run the same corpus to
+measure how much containment comes from policy language / Guardian reasoning
+instead of Gate-2 capability tags. Run it with:
+
+```bash
+python demo/tests/root_demo/test_attacks.py \
+  --policy demo/tests/root_demo/test_policy_root_semantic_only.yaml
+```
+
+Both policies intentionally narrow the broader gateway root profile:
 
 1. **Scoped to `RUN_COMMAND` only.** Root operations on a real computer
    are shell operations — `cat /etc/sudoers`, `tee /var/root/...`,
@@ -575,18 +613,22 @@ Two intentional differences from the gateway seed:
    the test harness narrows to the action that the demo actually exercises
    under root. See [`docs/root_demo/executor-root-mode.md`](../../../docs/root_demo/executor-root-mode.md)
    — "Why this shape exists".
-2. **Empty `intent_limits`** — spend / deletion limits are irrelevant here.
+2. **Policy-file controlled proof tracks.** The default file demonstrates the
+   deterministic clamp; `--policy test_policy_root_semantic_only.yaml`
+   exercises the same corpus against the semantic proof track.
 
-Values that **must stay in sync with `bootstrap.py`** if it changes:
+Values in the deterministic policy that **must stay in sync with
+`bootstrap.py`** if it changes:
 
 - `terminal_constraint.blocked_patterns` (including `sudo`, `rm -rf /`, …)
+- `terminal_constraint.deny_capabilities`
 - `safe` / `unsafe` classification per action (matches `SAFE_ACTIONS` /
   `UNSAFE_ACTIONS` in `bootstrap.py`)
 
-The YAML's header comment names the exact source-of-truth lines. There is
-currently **no CI drift check** — reviewers need to spot mismatches manually.
-If the gateway's root profile evolves in a way this YAML doesn't track, the
-test may pass with stale semantics.
+The YAML headers name the intended source-of-truth lines. There is currently
+**no CI drift check** — reviewers need to spot mismatches manually. If the
+gateway's root profile evolves in a way the deterministic YAML doesn't track,
+the default test may pass with stale semantics.
 
 
 ---
