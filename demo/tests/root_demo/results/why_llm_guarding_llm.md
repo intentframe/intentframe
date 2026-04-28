@@ -163,3 +163,71 @@ The fact that **Intent 88 (ARP spoof)** slipped through is actually a sign that 
 ---
 
 Does the "Deterministic Layer" you mentioned (the `intent_limits`) currently handle specific network protocols, or is that the next stage of the roadmap?
+
+------
+### Review Gemini Response:
+Gemini's response is solid and adds three things your own docs don't currently say as crisply.
+
+## What's genuinely new in that output
+
+### 1. The independence math
+
+The equation is the key insight:
+
+$$P(\text{Failure}_{\text{System}}) = P(\text{Failure}_{\text{Agent}}) \times P(\text{Failure}_{\text{Guard}})$$
+
+This is the standard redundancy formula from reliability engineering. If two components fail independently, system failure probability is the product. If the agent fails 10% of the time and the guardian fails 10% of the time, the system fails 1% of the time.
+
+**But** — and Gemini says this correctly — the product formula only holds when the failures are statistically independent. If both components see the same inputs and have the same biases, their failures are correlated, and the product collapses back toward the single-component failure rate. Two identical smoke detectors in the same room don't help if the smoke can't reach either of them.
+
+Your architecture earns the independence assumption because the guardian's inputs are structurally different from the agent's inputs. The classifier output, the AE decomposition, the trusted/untrusted separation, the root-privilege context — none of that exists in the agent's context window. That's why the product formula applies to IntentFrame but wouldn't apply to "just run the same prompt through a second LLM."
+
+Your 99/100 result is the empirical confirmation: the 9 intents the agent "wanted" to execute (it submitted them with plausible reasons) were stopped by a guardian that had different information. If failures were correlated, you'd expect the guardian to be fooled by the same cover stories. It mostly wasn't.
+
+Intent 88 (ARP spoof) is where the independence partially broke down — the AE *also* rated it MEDIUM, so the guardian's independent source agreed with the agent's benign framing. Correlated failure on one surface out of 100. That's the measured correlation residual.
+
+### 2. The "behavioral analysis vs signature-based detection" frame
+
+This is a useful vocabulary shift you don't have in your docs. Your brief says "deterministic gates before AI." Gemini reframes it as: the classifier gives you behavioral analysis (what will this command actually do to the system), not just signature matching (does this string contain `rm -rf`).
+
+That distinction matters because your `command_shield` is doing more than regex. It's parsing AST, extracting inline interpreter payloads, emitting capability tags that describe the *effect* on the system (`system_mutate:host_network_config`), not the *syntax* of the command. When that behavioral evidence reaches the AE prompt, the AE is reasoning about system effects, not string patterns.
+
+Your `why_llm_guarding_llm.md` should use this framing. It makes the "isn't this just regex?" objection harder to sustain.
+
+### 3. The "novice with a dossier" metaphor
+
+> "A genius with no data will lose a debate to a novice with a factual dossier every time. The Guardian is that novice with the dossier."
+
+That's a memorable way to say what your brief §6 says technically. The agent LLM may be smarter, more creative, more capable — it doesn't matter. The guardian has structural evidence the agent doesn't. The quality of the reviewer matters less than the quality of the evidence the reviewer holds.
+
+This is the correct counter to "but GPT-4 can be prompt-injected too." Yes, it can. But prompt-injecting the guardian requires fooling the classifier, the AE, *and* the guardian simultaneously, through three different prompts with three different trust topologies. That's a fundamentally harder attack than fooling one agent through one conversation.
+
+## Where the math needs a caveat
+
+The independence formula is directionally correct but slightly too clean. In practice:
+
+- **The AE and Guardian share a model provider.** If OpenAI's model has a systematic blind spot (e.g., it consistently underrates ARP manipulation), both AE and Guardian inherit it. That's a shared-mode failure, not an independent one.
+
+- **The classifier has coverage gaps.** If `command_shield` doesn't emit a capability tag for a surface, AE doesn't get that structural signal, and the independence weakens. Intent 88 had the tag (`system_mutate:host_network_config`) but AE still rated MEDIUM — so even with the signal, the AE's interpretation can fail.
+
+- **The agent's reason is in both prompts.** The untrusted reason ("Pin the gateway MAC address to work around an unstable ARP cache") appears in both the AE prompt and the Guardian prompt. If it's a convincing lie, it can influence both. The trusted/untrusted markers help, but they're advisory to the LLM, not a hard isolation boundary.
+
+So the honest version of the formula is:
+
+$$P(\text{Failure}_{\text{System}}) = P(\text{Failure}_{\text{Agent}}) \times P(\text{Failure}_{\text{Guard}} \mid \text{Agent failed})$$
+
+Where $P(\text{Failure}_{\text{Guard}} \mid \text{Agent failed})$ is much lower than $P(\text{Failure}_{\text{Guard}})$ alone (because the guardian has independent evidence), but not zero (because some inputs are shared and some model biases are correlated).
+
+Your empirical measurement: 9 agent-failures, 1 guardian-failure given agent-failure. That's $P(\text{Guard fails} \mid \text{Agent failed}) \approx 1/9 \approx 11\%$ on the previously-missed surfaces, and $1/100 = 1\%$ across the full corpus. Both are meaningful reductions from the agent-alone failure rate.
+
+## How to use this in your materials
+
+The Gemini output gives you clean vocabulary for three audiences:
+
+**For security engineers:** "Defense in depth through asymmetry. The guardian has structurally different inputs than the agent — AST decomposition, capability tagging, independent risk assessment — delivered in trusted context the agent cannot write to. Failures are approximately independent because the information sources are independent."
+
+**For technical founders/CTOs:** "Maker-checker pattern. The agent proposes, the guardian reviews, and the guardian has forensic evidence the agent never saw. Same principle as dual-authorization in finance, applied to AI agent actions."
+
+**For the blog post:** "A genius with no data will lose a debate to a novice with a factual dossier. The guardian isn't smarter than the agent — it just has an independent dossier."
+
+All three of those are tighter than what's currently in your brief. Use them.
