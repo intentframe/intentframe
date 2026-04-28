@@ -145,6 +145,11 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - Do NOT list concrete email addresses in guardrails
 - Phrase email rules conceptually (for example: "only send/reply/forward emails to the user's contacts")
 
+### Custom User Rules
+- The user has provided these specific custom rules as raw text.
+- Translate each rule into a strict, actionable guardrail.
+- Preserve the user's core intent and wording; do not mention internal policy names or IDs.
+
 ## General Rules
 - Be specific and actionable (not vague)
 - Reference actual constraints from user context
@@ -214,6 +219,15 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 
         return (
             f"deny_capabilities: {'; '.join(parts)}"
+        )
+
+    @staticmethod
+    def _summarize_intent_limits(intent_limits) -> str:
+        if not intent_limits:
+            return "  None"
+        return "\n".join(
+            f"  - {limit.raw}"
+            for limit in intent_limits
         )
 
     @staticmethod
@@ -316,6 +330,7 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
                 )
 
         constraint_str = "\n".join(constraint_summary_lines) if constraint_summary_lines else "  None"
+        intent_limit_str = self._summarize_intent_limits(user_context.intent_limits)
 
         prompt = f"""Generate context and guardrails for this agent:
 
@@ -337,6 +352,9 @@ Safe (fast-path) Actions: {', '.join(sorted(safe_list)) if safe_list else 'None'
 
 Constraints:
 {constraint_str}
+
+Custom User Rules:
+{intent_limit_str}
 """
 
         if user_context.metadata:

@@ -1,5 +1,5 @@
-"""Unit coverage for `AIOnboardingEngine._summarize_constraints` and
-`_summarize_deny_capabilities`.
+"""Unit coverage for `AIOnboardingEngine._summarize_constraints`,
+`_summarize_deny_capabilities`, and `_summarize_intent_limits`.
 
 The summarizer is the seam through which the live `deny_capabilities`
 deny set surfaces to the onboarding LLM.  Before this seam was wired,
@@ -9,6 +9,12 @@ that didn't reflect the python+shell-only restriction.  The downstream
 effect was: runtime enforcement held, but the LLM kept attempting
 `node`/`ruby`/etc., wasting tokens and surfacing noisy "blocked" events
 instead of polite "outside policy" responses.
+
+`_summarize_intent_limits` is the seam through which user-authored plain-
+English rules surface to the onboarding LLM under the "Custom User Rules"
+section.  The contract: only `raw` (the user's own wording) is passed
+through; internal fields (limit_id, domain, effect, scope) are never
+exposed to the meta-LLM.
 
 The summarizer's contract has two halves, intentionally separated:
 
@@ -46,6 +52,7 @@ import pytest
 
 from intentframe_components.onboarding.engine import AIOnboardingEngine
 from policy_registry.constraints.terminal import TerminalConstraints
+from policy_registry.models import SemanticIntentLimit
 
 
 PYTHON_SHELL_ONLY_DENY = frozenset({
@@ -313,3 +320,85 @@ class TestBuildInstructionsMetaPromptContract:
             "meta-prompt must tie the python+shell guardrail to the "
             "`script_execution:<lang>` family so the trigger is concrete"
         )
+
+
+# ── _summarize_intent_limits ─────────────────────────────────────────
+
+
+_SPEND_LIMIT = SemanticIntentLimit(
+    limit_id="max-spend-per-txn",
+    domain="spending",
+    description="Maximum $500 per transaction",
+    raw="Don't spend more than $500 on a single thing without asking me",
+    threshold=500.0,
+    effect="block",
+    scope="per_action",
+)
+
+_DELETE_LIMIT = SemanticIntentLimit(
+    limit_id="confirm-before-delete",
+    domain="deletion",
+    description="Always confirm before deleting",
+    raw="Ask me before deleting anything I can't get back",
+    effect="require_confirmation",
+    scope="per_action",
+)
+
+
+class TestSummarizeIntentLimitsContract:
+    """Pins the INPUT contract for `_summarize_intent_limits`.
+
+    Only ``raw`` (the user's own wording) should appear in the rendered
+    output.  Internal fields — limit_id, domain, effect, scope,
+    threshold — must NOT be present so the onboarding meta-LLM sees
+    plain-English rules, not policy internals.
+    """
+
+    def test_empty_returns_none_string(self) -> None:
+        assert AIOnboardingEngine._summarize_intent_limits([]) == "  None"
+
+    def test_raw_text_is_present(self) -> None:
+        result = AIOnboardingEngine._summarize_intent_limits([_SPEND_LIMIT])
+        assert _SPEND_LIMIT.raw in result
+
+    def test_multiple_limits_all_appear(self) -> None:
+        result = AIOnboardingEngine._summarize_intent_limits([_SPEND_LIMIT, _DELETE_LIMIT])
+        assert _SPEND_LIMIT.raw in result
+        assert _DELETE_LIMIT.raw in result
+
+    def test_internal_fields_not_exposed(self) -> None:
+        """limit_id, domain, effect, scope must not leak into the
+        onboarding prompt — they are internal policy internals the
+        onboarding meta-LLM should never see.
+        """
+        result = AIOnboardingEngine._summarize_intent_limits([_SPEND_LIMIT, _DELETE_LIMIT])
+        for internal in ("limit_id", "max-spend-per-txn", "confirm-before-delete",
+                         "spending", "deletion", "block", "require_confirmation",
+                         "per_action", "threshold"):
+            assert internal not in result, (
+                f"internal field {internal!r} must not appear in the "
+                "Custom User Rules brief"
+            )
+
+
+class TestBuildOnboardingPromptCustomUserRules:
+    """Pins the prompt-level contract: the 'Custom User Rules' section
+    appears (and is absent) at the right times.
+    """
+
+    def _instructions(self) -> str:
+        return AIOnboardingEngine._build_instructions(
+            AIOnboardingEngine.__new__(AIOnboardingEngine)
+        )
+
+    def test_instructions_contain_custom_user_rules_heading(self) -> None:
+        assert "Custom User Rules" in self._instructions()
+
+    def test_instructions_do_not_mention_internal_term(self) -> None:
+        """The instructions must not use 'intent_limits' or
+        'SemanticIntentLimit' — those are code internals, not
+        onboarding concepts.
+        """
+        text = self._instructions()
+        assert "intent_limits" not in text
+        assert "SemanticIntentLimit" not in text
