@@ -46,16 +46,48 @@ _runtime: IntentFrameRuntime | None = None
 
 
 def _create_runtime() -> IntentFrameRuntime:
-    """Wire up the Runtime with AI engines and HTTP executor client."""
-    from executor_client.http_client import ExecutorHTTPClient
+    """Wire up the Runtime with AI engines and an executor client.
 
-    executor_socket = os.environ.get(
-        "INTENTFRAME_EXECUTOR_SOCKET",
-        "~/.intentframe/run/executor.sock",
-    )
+    Executor selection is controlled by ``INTENTFRAME_EXECUTOR_MODE``:
+
+      * ``real`` (default) — talks to the executor service over UDS via
+        :class:`ExecutorHTTPClient`; normal production path.
+      * ``dry_run``        — uses :class:`DryRunExecutor`, which returns
+        synthetic success results without touching the host.  Intended
+        for tests (root-demo in particular) that must exercise the real
+        Analysis Engine + Guardian but must not run commands on the
+        host.  Never enable in production.
+
+    Unknown values raise so accidental typos never silently fall back
+    to a less-safe mode.  Default is ``real``; omitting the var keeps
+    existing deployments unchanged.
+    """
+    executor_mode = os.environ.get("INTENTFRAME_EXECUTOR_MODE", "real").strip().lower()
     verbose = os.environ.get("INTENTFRAME_VERBOSE", "1") == "1"
 
-    executor = ExecutorHTTPClient(socket_path=executor_socket)
+    if executor_mode == "real":
+        from executor_client.http_client import ExecutorHTTPClient
+
+        executor_socket = os.environ.get(
+            "INTENTFRAME_EXECUTOR_SOCKET",
+            "~/.intentframe/run/executor.sock",
+        )
+        executor = ExecutorHTTPClient(socket_path=executor_socket)
+        logger.info("Executor mode: real (socket=%s)", executor_socket)
+    elif executor_mode == "dry_run":
+        from intentframe_server.dry_run_executor import DryRunExecutor
+
+        executor = DryRunExecutor()
+        logger.warning(
+            "Executor mode: DRY_RUN — no real I/O. This runtime will NOT "
+            "execute actions; intended for tests only. Never run in "
+            "production with this flag set."
+        )
+    else:
+        raise RuntimeError(
+            f"Unknown INTENTFRAME_EXECUTOR_MODE: {executor_mode!r}. "
+            "Expected 'real' or 'dry_run'."
+        )
 
     executor_health = executor.health()
     execution_context = ExecutionContext(

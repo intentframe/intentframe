@@ -18,7 +18,16 @@ layers that are hardened and tested against prompt-injection-style inputs.
 
 The current model is **not** "run the whole stack with `sudo`".
 
-Instead, IntentFrame ships a small privilege-separation path:
+There are now two supported root-demo execution modes:
+
+- **Dry-run decision mode** (recommended for local development and corpus sweeps):
+  the runtime uses `DryRunExecutor`, so Analysis Engine and Guardian see a
+  root-capable execution context but no command is ever shelled out on the host.
+- **Real root executor mode** (operator demo / end-to-end validation):
+  IntentFrame uses the Jarvis root profile and per-command `sudo -n sandbox-exec`
+  wrapping for allowed `RUN_COMMAND` actions.
+
+The real executor path is a small privilege-separation path:
 
 1. The CLI can start the gateway with `--profile root`.
 2. The root profile uses `jarvis_pa/executor_root.yaml`.
@@ -69,6 +78,29 @@ So root is not the normal product value proposition. It is mainly useful as:
 ---
 
 ## Operator flow
+
+### 0. Recommended local test mode: dry-run
+
+For most root-demo development, start the supervisor with a synthetic executor:
+
+```bash
+INTENTFRAME_EXECUTOR_MODE=dry_run \
+INTENTFRAME_DRY_RUN_CONTEXT=root \
+python -m supervisor.main start
+```
+
+This does **not** require `sudo bash intentframe_setup_root_demo.sh`, does not
+load `jarvis_pa/executor_root.yaml`, and does not require
+`INTENTFRAME_ESCALATION_ARMED`. The server wires `DryRunExecutor` into
+`IntentFrameRuntime`; every allowed execution returns an `ExecutionResult` with
+`data["dry_run"] == True`.
+
+The root-demo test runner confirms this during preflight and then fails closed
+if any later ALLOW result is missing the dry-run tag. This keeps the policy /
+Guardian test surface real while preventing accidental host mutation.
+
+Use real root executor mode only when you explicitly need to validate the final
+executor/sandbox/sudo path.
 
 ### 1. Install the root-demo capability once
 
@@ -165,16 +197,20 @@ tests: each fixture submits an intent, receives an `ExecutionResult`, and
 asserts the observed decision matches the fixture's `expected_decision`.
 They do not assert which internal gate made the decision.
 
-Every suite now starts with a hard preflight before evaluating fixtures:
+Every suite starts with a preflight before evaluating fixtures:
 
 ```text
 RUN_COMMAND whoami
 ```
 
 That preflight goes through the same Actor → IntentFrame → executor path as
-the fixtures and must return `root`. If it does not, the suite exits non-zero
-instead of letting root-only commands fail later with misleading permission
-errors.
+the fixtures. It accepts one of two outcomes:
+
+- dry-run mode: `ExecutionResult.data["dry_run"] == True`
+- real mode: command output is exactly `root`
+
+If neither is true, the suite exits non-zero instead of letting root-only
+commands fail later with misleading permission errors.
 
 ```bash
 python demo/tests/root_demo/test_normal.py
@@ -212,7 +248,28 @@ That removes both the sudoers fragment and the marker file. The next gateway lau
 
 ## Runtime truth model
 
-Three different values matter here:
+Five different values matter here:
+
+### `INTENTFRAME_EXECUTOR_MODE`
+
+This is read by `intentframe_server/server.py` at runtime startup:
+
+- unset / `"real"`: the runtime uses `ExecutorHTTPClient` and talks to the
+  executor service over UDS (normal production path)
+- `"dry_run"`: the runtime uses `DryRunExecutor`; no real I/O is performed
+
+Unknown values raise at startup. This is deliberate: typos must never silently
+fall back to a less-safe mode.
+
+### `INTENTFRAME_DRY_RUN_CONTEXT`
+
+Only meaningful when `INTENTFRAME_EXECUTOR_MODE=dry_run`.
+
+- `"user"` (default): reports the current process uid/euid
+- `"root"`: reports `uid=0`, `euid=0`, `running_as_root=True`
+
+The root-demo suite uses `root` so Guardian evaluates the same privilege
+posture it would see from the real root executor, without executing commands.
 
 ### `sandbox.escalate`
 
@@ -311,7 +368,12 @@ The design stayed intentionally small: one installer, one marker, one gateway de
 
 The IntentFrame runtime still treats executor privilege as a real risk signal.
 
-At startup, the pipeline probes executor health and freezes that into `ExecutionContext`. When `executor_running_as_root` is true, the analysis / policy layers can inject higher-scrutiny privilege-aware guardrails into their prompts and runtime reasoning.
+At startup, the pipeline probes executor health and freezes that into
+`ExecutionContext`. In real mode the probe comes from the executor service. In
+dry-run mode it comes from `DryRunExecutor.health()`. When
+`executor_running_as_root` is true, the analysis / policy layers can inject
+higher-scrutiny privilege-aware guardrails into their prompts and runtime
+reasoning.
 
 For tests, `ExecutionContext` can still be constructed directly rather than probed.
 
@@ -319,6 +381,8 @@ For tests, `ExecutionContext` can still be constructed directly rather than prob
 
 ## Files to know
 
+- `intentframe_server/server.py` — selects real vs dry-run executor mode
+- `intentframe_server/dry_run_executor.py` — synthetic executor for safe root-demo testing
 - `jarvis_pa/executor_root.yaml` — root demo executor profile
 - `executor/config/schema.py` — `sandbox.escalate`
 - `executor/sandbox/planner.py` — threads `sandbox_escalate` into `ExecutionPlan`
@@ -329,7 +393,7 @@ For tests, `ExecutionContext` can still be constructed directly rather than prob
 - `intentframe_gateway/routes/system.py` — exposes `root_demo` in `/system/health`
 - `intentframe_cli/main.py` — `--profile root` pre-flight warning
 - `intentframe_cli/ui.py` — profile banner and uninstall hint
-- `demo/tests/root_demo/root_test_runner.py` — black-box root-demo suite runner, root preflight, and exit-code contract
+- `demo/tests/root_demo/root_test_runner.py` — black-box root-demo suite runner, dry-run/real preflight, safety tag checks, and exit-code contract
 - `demo/tests/root_demo/README.md` — fixture categories and local test workflow
 - `intentframe_setup_root_demo.sh` — installer
 - `intentframe_uninstall_root_demo.sh` — uninstaller

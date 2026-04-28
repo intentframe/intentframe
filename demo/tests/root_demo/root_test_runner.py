@@ -19,11 +19,27 @@ Decision is derived from ``result.data["decision"]``: pipeline.py BLOCK
 paths populate ``data["decision"] == "BLOCK"`` with ``reason`` / ``layer``
 / optional ``matched_gate``.  Anything else is treated as ALLOW (success
 or adapter-side failure with adapter data).
+
+Execution modes (safety-critical):
+
+  - DRY-RUN (recommended default for local dev): supervisor is started
+    with ``INTENTFRAME_EXECUTOR_MODE=dry_run`` and optionally
+    ``INTENTFRAME_DRY_RUN_CONTEXT=root`` so Guardian sees a root
+    privilege posture.  The runner auto-detects dry-run from the
+    preflight response's ``data["dry_run"] == True`` and refuses to
+    continue if ALLOW results ever come back without that flag — a
+    defense-in-depth check against a misconfigured supervisor
+    silently shelling commands out on the host.
+  - REAL: supervisor is started with the root executor profile
+    (``intentframe-gateway-cli --profile root`` or the direct
+    ``supervisor.main`` dev loop).  Preflight requires ``whoami``
+    to return ``root``; ALLOW fixtures actually run on the host.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import time
 from pathlib import Path
@@ -56,23 +72,47 @@ _OUTPUT_CAP_CHARS = 600  # Modest cap: full output for short commands
 
 
 def _print_executor_alert() -> None:
+    """Print startup banner.
+
+    If the shell env hints at dry-run we advertise the dry-run launch
+    recipe; otherwise we advertise the real-execution recipe.  The
+    actual mode is confirmed against the server's preflight response,
+    so this banner is purely informational.
+    """
+    mode_hint = os.environ.get("INTENTFRAME_EXECUTOR_MODE", "").strip().lower()
     print()
     print("#" * 79)
-    print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ROOT EXECUTOR PROFILE")
-    print("#")
-    print("#  ONE-TIME SETUP:")
-    print("#    sudo bash intentframe_setup_root_demo.sh")
-    print("#")
-    print("#  REQUIRED (CHOOSE ONE):")
-    print("#    intentframe-gateway-cli --profile root")
-    print("#")
-    print("#  OR (DEV LOOP, BYPASSES GATEWAY):")
-    print("#    INTENTFRAME_PROFILE=root \\")
-    print("#    EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \\")
-    print("#    INTENTFRAME_ESCALATION_ARMED=1 \\")
-    print("#    python -m supervisor.main start")
-    print("#")
-    print("#  WRONG CONFIG -> ROOT-ONLY COMMANDS FAIL WITH \"PERMISSION DENIED\"")
+    if mode_hint == "dry_run":
+        print("#  MODE HINT: DRY-RUN (shell env INTENTFRAME_EXECUTOR_MODE=dry_run)")
+        print("#")
+        print("#  Supervisor must have been started with:")
+        print("#    INTENTFRAME_EXECUTOR_MODE=dry_run \\")
+        print("#    INTENTFRAME_DRY_RUN_CONTEXT=root \\")
+        print("#    python -m supervisor.main start")
+        print("#")
+        print("#  ALLOW results must carry data['dry_run']=True or the runner will")
+        print("#  fail closed — it will NOT let real commands pretend to be dry-run.")
+    else:
+        print("#  ALERT: SUPERVISOR MUST BE RUNNING WITH THE ROOT EXECUTOR PROFILE")
+        print("#")
+        print("#  ONE-TIME SETUP:")
+        print("#    sudo bash intentframe_setup_root_demo.sh")
+        print("#")
+        print("#  REQUIRED (CHOOSE ONE):")
+        print("#    intentframe-gateway-cli --profile root")
+        print("#")
+        print("#  OR (DEV LOOP, BYPASSES GATEWAY):")
+        print("#    INTENTFRAME_PROFILE=root \\")
+        print("#    EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \\")
+        print("#    INTENTFRAME_ESCALATION_ARMED=1 \\")
+        print("#    python -m supervisor.main start")
+        print("#")
+        print("#  SAFER ALTERNATIVE — DRY-RUN (no host I/O):")
+        print("#    INTENTFRAME_EXECUTOR_MODE=dry_run \\")
+        print("#    INTENTFRAME_DRY_RUN_CONTEXT=root \\")
+        print("#    python -m supervisor.main start")
+        print("#")
+        print("#  WRONG CONFIG -> ROOT-ONLY COMMANDS FAIL WITH \"PERMISSION DENIED\"")
     print("#" * 79)
 
 
@@ -82,6 +122,12 @@ def _result_decision(r: Dict[str, Any]) -> str:
     if isinstance(data, dict) and data.get("decision") == "BLOCK":
         return "BLOCK"
     return "ALLOW"
+
+
+def _result_is_dry_run(r: Dict[str, Any]) -> bool:
+    """Return True iff this ExecutionResult-shaped dict was produced by DryRunExecutor."""
+    data = r.get("data")
+    return isinstance(data, dict) and data.get("dry_run") is True
 
 
 def _print_adapter_output(data: Dict[str, Any]) -> None:
@@ -125,6 +171,10 @@ class RootIntentSuite:
         self.category = category
         self.intents = intents
         self.suite_title = suite_title
+        # Set by the preflight from the server's actual response so
+        # evaluation never trusts the client's env alone.  ``True`` only
+        # when the executor returned ``data["dry_run"] is True``.
+        self._dry_run_mode: bool = False
 
     # ── Public entry point ───────────────────────────────────────────
 
@@ -179,9 +229,32 @@ class RootIntentSuite:
             passed = actual == "ALLOW" and successes == total
         else:  # BLOCK
             passed = actual == "BLOCK"
+
+        # Dry-run safety contract: once preflight identified the server
+        # as dry-run, every subsequent ALLOW result MUST also be tagged
+        # ``dry_run=True``.  If the server silently switched back to a
+        # real executor mid-run we fail closed rather than let a
+        # "passing" green result mask real host execution.
+        suffix = ""
+        if self._dry_run_mode:
+            untagged = [
+                i for i, r in enumerate(entry["results"])
+                if _result_decision(r) == "ALLOW" and not _result_is_dry_run(r)
+            ]
+            if untagged:
+                passed = False
+                suffix = (
+                    f"  [SAFETY] ALLOW result(s) {untagged} missing dry_run flag — "
+                    "refusing to treat real execution as dry-run"
+                )
+
         icon = "✅" if passed else "❌"
         label = "PASS" if passed else "FAIL"
-        return passed, actual, f"{icon} {label}  expected={expected}  actual={actual}"
+        return (
+            passed,
+            actual,
+            f"{icon} {label}  expected={expected}  actual={actual}{suffix}",
+        )
 
     def _print_intent_verdict(self, entry: Dict[str, Any]) -> None:
         n = entry["intent_num"]
@@ -228,6 +301,19 @@ class RootIntentSuite:
         agent: StubPipelineRootAgent,
         server_client: IntentFrameClient,
     ) -> bool:
+        """Probe the server with ``whoami`` and classify the execution mode.
+
+        Two healthy outcomes:
+
+          * ``data["dry_run"] is True``  → dry-run mode; we set
+            ``self._dry_run_mode = True`` and skip the real root check.
+            Evaluation will later enforce that *every* ALLOW result
+            also carries ``dry_run=True`` (defense-in-depth against a
+            misconfigured supervisor silently running commands).
+          * ``stdout == "root"``         → real mode; proceed.
+
+        Anything else fails the run.
+        """
         print()
         print("#" * 79)
         print("#  PREFLIGHT: VERIFY RUN_COMMAND ESCALATION")
@@ -239,32 +325,51 @@ class RootIntentSuite:
                 "data": {"command": "whoami"},
                 "reason": (
                     "Preflight check: verify root-demo RUN_COMMAND execution "
-                    "is actually running as UID 0 before evaluating fixtures."
+                    "is actually running as UID 0 before evaluating fixtures "
+                    "(or confirm dry-run mode and skip host execution)."
                 ),
             }
         )
 
         data = result.data if isinstance(result.data, dict) else {}
         output = str(data.get("content") or data.get("stdout") or "").strip()
-        if result.success and output == "root":
-            print("    ✅ PASS  whoami returned 'root'")
+
+        # Dry-run branch: the server is talking to DryRunExecutor.  We
+        # trust the server's ``dry_run`` flag rather than the client's
+        # env because only the server actually knows which executor is
+        # wired into its runtime.
+        if result.success and data.get("dry_run") is True:
+            self._dry_run_mode = True
+            print("    ✅ PASS  dry-run executor active (data['dry_run']=True)")
+            print(f"        synthetic output: {output!r}")
+            print("        NOTE: no commands will actually execute on the host.")
             return True
 
-        print("    ❌ FAIL  root-demo escalation is not active")
+        # Real-execution branch: require uid=0 observable via whoami.
+        if result.success and output == "root":
+            self._dry_run_mode = False
+            print("    ✅ PASS  whoami returned 'root' (real executor, running as root)")
+            return True
+
+        print("    ❌ FAIL  root-demo preflight did not confirm a supported mode")
         if output:
             print(f"        whoami output: {output!r}")
         if result.error:
             print(f"        error: {result.error}")
-        print("        Start the supervisor with the root executor profile before rerunning.")
+        print("        Start the supervisor with either:")
+        print("          • the root executor profile (real execution), OR")
+        print("          • INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root")
         return False
 
     # ── Summary ──────────────────────────────────────────────────────
 
     def _print_summary(self, per_intent: List[Dict[str, Any]]) -> None:
+        mode_tag = "DRY-RUN" if self._dry_run_mode else "REAL"
         print("\n")
         print("=" * 79)
         print(
             f"  {self.category.upper()} INTENT TEST SUMMARY "
+            f"[mode={mode_tag}] "
             "(expected_decision vs actual from ExecutionResult)"
         )
         print("=" * 79)
