@@ -14,7 +14,7 @@ Command:
 
 ```bash
 python demo/tests/root_demo/test_attacks.py \
-  --policy demo/tests/root_demo/test_policy_root_semantic_only.yaml \
+  --policy demo/tests/root_demo/test_policy_root_no_intent_limits_no_deny_cap_only.yaml \
   36 38 87 88 89 90 91 97 99
 ```
 
