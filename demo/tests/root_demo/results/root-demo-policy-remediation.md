@@ -285,9 +285,10 @@ without actually running as root.  Every synthetic result carries
 comes back without that flag the runner aborts, guarding against a
 misconfigured supervisor silently shelling out on the host.  Supervisor config
 omits the real executor service from the graph when dry-run mode is active.
-All per-category test files (`test_attacks_*.py`) run against this executor by
-default; live-executor runs require an explicit env flag and a real root
-profile.
+All per-category test files (`test_attacks_*.py`) can run against this executor
+by starting the supervisor with the dry-run env. Live-executor runs require a
+real root profile and should be reserved for final validation or disposable
+hosts.
 
 ### 9.2 Semantic `intent_limits` (§4.2) — planned
 
@@ -311,7 +312,22 @@ These limits should mirror a future production `INTENT_LIMITS` extension in
 `intentframe_gateway/bootstrap.py` so Jarvis and the root-demo test policy do
 not diverge.
 
-### 9.3 Capability taxonomy gaps — shipped
+### 9.3 Full post-remediation sweeps — shipped
+
+Two full 100-intent sweeps now exist:
+
+- `dry_run.txt`: dry-run executor, preflight confirms
+  `data["dry_run"] == True`, all 100 attack intents return expected `BLOCK`.
+- `real_run.txt`: real root-capable executor path, preflight confirms
+  `whoami == root`, all 100 attack intents return expected `BLOCK`.
+
+The real path still does not run the executor service process as UID 0. It
+validates the per-command escalation path installed by
+`intentframe_setup_root_demo.sh`: allowed `RUN_COMMAND` children can be wrapped
+with `sudo -n sandbox-exec`, while blocked intents never reach that executor
+edge.
+
+### 9.4 Capability taxonomy gaps — shipped
 
 All previously-listed gaps have been implemented in the YAML-driven capability
 corpus under `command_shield/capabilities/`.  Cross-check of every item:
@@ -376,8 +392,8 @@ data; adding a new rule is a data-first change with no classifier code edits.
   `python_shell_only` in the accuracy matrix pulls
   `DEFAULT_TERMINAL_DENY_CAPABILITIES` live from bootstrap so adding a
   new sensitive tag propagates into coverage without a test edit.
-- **2026-04-28** — §9.1 and §9.3 closed.  Dry-run executor shipped
-  (`intentframe_server/dry_run_executor.py`); all taxonomy gaps from §9.3
+- **2026-04-28** — §9.1 and §9.4 closed.  Dry-run executor shipped
+  (`intentframe_server/dry_run_executor.py`); all taxonomy gaps from §9.4
   implemented in `command_shield/capabilities/*.yaml`; `network_exfil`
   family added.  Attack corpus expanded from 24 → 100 intents across the
   `test_attacks.py` aggregator plus 11 per-tactic files.  Remaining open items: per-lane full-body
@@ -390,3 +406,9 @@ data; adding a new rule is a data-first change with no classifier code edits.
   `data["dry_run"] == True`, so no host commands executed.  Remaining:
   full 100-intent dry-run sweep, semantic `intent_limits`, and audit-side
   verification.
+- **2026-04-28** — Full post-remediation sweeps landed. `dry_run.txt` records
+  100/100 expected `BLOCK` in dry-run mode. `real_run.txt` records 100/100
+  expected `BLOCK` against the real root-capable executor path with preflight
+  `whoami == root`. This validates the actual `sudo -n sandbox-exec` child
+  command path without implying the executor service process itself runs as
+  UID 0. Remaining: semantic `intent_limits` and audit-side verification.

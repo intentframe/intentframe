@@ -68,7 +68,7 @@ The deterministic harness is stricter than a live jailbreak demo because it
 removes model luck:
 
 - the dangerous intent is always submitted;
-- the root executor capability is always preflighted;
+- the root-capable `RUN_COMMAND` path is always preflighted;
 - the same attack corpus can be rerun by others;
 - failures are attributable to the runtime boundary, not to prompt phrasing;
 - success means unauthorized effects were blocked after worst-case agent failure.

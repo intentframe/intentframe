@@ -16,14 +16,17 @@ layers that are hardened and tested against prompt-injection-style inputs.
 
 ## What shipped
 
-The current model is **not** "run the whole stack with `sudo`".
+The current model is **not** "run the whole stack with `sudo`". In the normal
+root-demo path, the executor service process is still a normal-user process; the
+root transition happens only for the child `sandbox-exec` argv that actually
+runs an allowed `RUN_COMMAND`.
 
 There are now two supported root-demo execution modes:
 
 - **Dry-run decision mode** (recommended for local development and corpus sweeps):
   the runtime uses `DryRunExecutor`, so Analysis Engine and Guardian see a
   root-capable execution context but no command is ever shelled out on the host.
-- **Real root executor mode** (operator demo / end-to-end validation):
+- **Real root-capable executor mode** (operator demo / end-to-end validation):
   IntentFrame uses the Jarvis root profile and per-command `sudo -n sandbox-exec`
   wrapping for allowed `RUN_COMMAND` actions.
 
@@ -100,7 +103,7 @@ The root-demo test runner confirms this during preflight and then fails closed
 if any later ALLOW result is missing the dry-run tag. This keeps the policy /
 Guardian test surface real while preventing accidental host mutation.
 
-Use real root executor mode only when you explicitly need to validate the final
+Use real root-capable executor mode only when you explicitly need to validate the final
 executor/sandbox/sudo path.
 
 ### 1. Install the root-demo capability once
@@ -219,6 +222,13 @@ python demo/tests/root_demo/test_general.py
 python demo/tests/root_demo/test_attacks.py
 ```
 
+Current full-sweep proof artifacts:
+
+- `demo/tests/root_demo/results/dry_run.txt` — 100 / 100 attack intents blocked
+  in dry-run mode.
+- `demo/tests/root_demo/results/real_run.txt` — 100 / 100 attack intents blocked
+  against the real root-capable executor path, with preflight `whoami == root`.
+
 Exit status is part of the contract:
 
 - `0`: preflight passed and every selected intent matched `expected_decision`
@@ -232,6 +242,13 @@ The gateway's `/system/health` response now includes a `root_demo` block. The CL
 ```text
 Profile: root   Escalation: ARMED   Executor running_as_root: yes
 ```
+
+The final field is intentionally a capability signal, not a literal statement
+that the executor service process has `euid == 0`. In the supported root-demo
+path, `/health` will usually report a normal-user `uid` / `euid` while
+`running_as_root` is true because `INTENTFRAME_ESCALATION_ARMED=1` tells the
+executor that its internal `RUN_COMMAND` sandbox path can wrap with
+`sudo -n sandbox-exec`.
 
 If `--profile root` is requested but the installer has not been run yet, the CLI warns before startup and shows the install command.
 
@@ -272,7 +289,8 @@ Only meaningful when `INTENTFRAME_EXECUTOR_MODE=dry_run`.
 - `"root"`: reports `uid=0`, `euid=0`, `running_as_root=True`
 
 The root-demo suite uses `root` so Guardian evaluates the same privilege
-posture it would see from the real root executor, without executing commands.
+posture it would see from the real root-capable executor path, without
+executing commands.
 
 ### `sandbox.escalate`
 
@@ -308,7 +326,12 @@ The executor's `/health` endpoint reports:
 - the executor process really is running as UID 0
 - `INTENTFRAME_ESCALATION_ARMED=1`
 
-That means the health field communicates **effective root capability for `RUN_COMMAND`**, not just the process's own UID.
+In normal root-demo operation the second case is the important one. The
+executor's process `uid` / `euid` remain the invoking user, but allowed
+`RUN_COMMAND` children can be launched through the root-capable
+`sudo -n sandbox-exec` path. That means the health field communicates
+**effective root capability for `RUN_COMMAND`**, not the executor process's own
+UID.
 
 This was deliberate: the health signal should describe what the machine can do, while the YAML decides whether a given session chooses to use it.
 

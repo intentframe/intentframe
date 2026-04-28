@@ -34,6 +34,12 @@ When root-demo is installed, the CLI shows a profile banner from gateway health 
 Profile: root   Escalation: ARMED   Executor running_as_root: yes
 ```
 
+Here `running_as_root` is a capability flag for `RUN_COMMAND`, not a claim that
+the executor service process has UID 0. In the supported root-demo flow the
+executor process remains a normal-user process; only the child `sandbox-exec`
+wrapper for an allowed command requests root through the installer-created
+sudoers entry.
+
 If `--profile root` is requested before installation, the CLI warns but still starts normally; commands simply run unprivileged.
 
 When you quit the CLI, it prints an uninstall reminder if root-demo is still installed:

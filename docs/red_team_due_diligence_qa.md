@@ -559,7 +559,8 @@ FROM AVAILABLE CONTEXT`.
 
 No. Per `docs/root_demo/executor-root-mode.md` (chat-cited):
 
-> Only the executor's `RUN_COMMAND` sandbox subprocess can request root, and
+> The executor service process is normally still a normal-user process. Only
+> the executor's `RUN_COMMAND` sandbox child subprocess can request root, and
 > escalation happens through `sudo -n sandbox-exec`. The rest of the stack —
 > gateway, policy services, Jarvis agent — runs as the normal user.
 

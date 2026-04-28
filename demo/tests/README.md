@@ -79,7 +79,7 @@ Each suite expects a specific supervisor executor config. Start the supervisor *
 | Test file(s) | Required supervisor command |
 |---|---|
 | `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start` |
-| `root_demo/test_normal.py` and other `root_demo/*` suites | `INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root python -m supervisor.main start` for safe dry-run; `intentframe-gateway-cli --profile root` only for real root executor validation — see [`root_demo/README.md`](root_demo/README.md) |
+| `root_demo/test_normal.py` and other `root_demo/*` suites | `INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root python -m supervisor.main start` for safe dry-run; `intentframe-gateway-cli --profile root` only for real root-capable executor validation — see [`root_demo/README.md`](root_demo/README.md) |
 
 ```bash
 # For the 24 attack suites:

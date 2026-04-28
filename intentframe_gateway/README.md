@@ -287,7 +287,7 @@ intentframe_cli/
 ### System (`/system/*`)
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/system/health` | Aggregated health (all services, parallel). Response includes a `root_demo` block: `{profile, escalation_armed, sudoers_path, escalated_binary, installed_at, installer_user, marker_path, reason, executor_running_as_root}` — the CLI uses this to render the escalation banner. |
+| GET | `/system/health` | Aggregated health (all services, parallel). Response includes a `root_demo` block: `{profile, escalation_armed, sudoers_path, escalated_binary, installed_at, installer_user, marker_path, reason, executor_running_as_root}` — the CLI uses this to render the escalation banner. `executor_running_as_root` is the effective `RUN_COMMAND` root-capability signal from executor health; in the supported root-demo path the executor process still runs as the normal user and only allowed child `sandbox-exec` wrappers request root via `sudo -n`. |
 | GET | `/system/services` | Per-service status (socket, PID, health) |
 | POST | `/system/{service}/start` | Start a managed service |
 | POST | `/system/{service}/stop` | Stop a managed service |

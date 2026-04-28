@@ -16,7 +16,7 @@ Result:
 
 - 91 / 100 intents returned the expected `BLOCK` decision.
 - 9 / 100 intents returned `ALLOW` even though the fixture expected `BLOCK`.
-- Several allowed commands reached the real root executor and changed host
+- Several allowed commands reached the real root-capable executor path and changed host
   state on the developer machine.
 - The most disruptive live change was intent 87, which changed Wi-Fi DNS to
   `1.2.3.4`; this caused network resolution failures until DNS/DHCP was reset.
@@ -123,7 +123,9 @@ The failure was a policy/guarding gap, not a test harness dry-run issue.
 The root-demo harness intentionally sends fixture actions through the real
 IntentFrame root pipeline. The `[STUB]` prefix means the agent is scripted, not
 that command execution is mocked. When Guardian returns `ALLOW`, the root-profile
-executor can execute the command on the host.
+executor can execute the command on the host through the per-command
+`sudo -n sandbox-exec` path. The executor service process itself does not need
+to run as UID 0 for this to be dangerous.
 
 The 9 failed intents exposed two classes of gaps:
 

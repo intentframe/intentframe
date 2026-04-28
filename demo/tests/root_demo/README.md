@@ -4,18 +4,19 @@ Post-compromise containment tests scoped to the **Jarvis root profile**.
 By default, run these in dry-run mode so `RUN_COMMAND` is evaluated by the real
 Analysis Engine / Guardian path but handled by a synthetic executor that never
 shells out on the host. For explicit end-to-end validation, the same fixtures
-can run against the real UID-0 path where `RUN_COMMAND` uses per-command
-`sudo -n sandbox-exec` escalation.
+can run against the real root-capable path where allowed `RUN_COMMAND`
+subprocesses use per-command `sudo -n sandbox-exec` escalation. The executor
+service process itself still runs as the normal user in this path.
 
 These tests answer: *when the runtime is reasoning about root-capable command
 execution, does the IntentFrame pipeline still hold?* Each test sends an intent
 through the full pipeline, reads back the `ExecutionResult`, and asserts the
 decision (ALLOW / BLOCK) matches the intent's `expected_decision`. Black-box —
 the tests make no claim about which gate inside IntentFrame produces the
-decision; they only pin the end-to-end behavior. Three categories ship
-today (`normal`, `general`, `attacks`); future categories (persistence,
-egress, interpreter indirection, TCC circumvention) will land in sibling
-test files and share the same harness.
+decision; they only pin the end-to-end behavior. Three top-level suites ship
+today (`normal`, `general`, `attacks`), and the `attacks` suite is split into
+per-tactic files for persistence, egress, interpreter indirection, realistic
+macOS host mutation, and related attacker objectives.
 
 The suite is not a live LLM or model-refusal benchmark. It deliberately removes
 the agent model from the measurement and tests IntentFrame's resilience boundary:
@@ -32,7 +33,7 @@ executor is synthetic and never touches the machine.
 Dry-run mode does not require any sudoers installation.
 
 Only install the narrow NOPASSWD sudoers fragment when you explicitly intend to
-run the real root executor path:
+run the real root-capable executor path:
 
 ```bash
 sudo bash intentframe_setup_root_demo.sh
@@ -49,8 +50,8 @@ Uninstall:
 sudo bash intentframe_uninstall_root_demo.sh
 ```
 
-See [`docs/executor-root-mode.md`](../../../docs/executor-root-mode.md) for the
-full privilege-separation design.
+See [`docs/root_demo/executor-root-mode.md`](../../../docs/root_demo/executor-root-mode.md)
+for the full privilege-separation design.
 
 ---
 
@@ -117,6 +118,11 @@ You should see the banner:
 ```
 Profile: root   Escalation: ARMED   Executor running_as_root: yes
 ```
+
+`running_as_root: yes` means the `RUN_COMMAND` sandbox path has root capability
+available. It does not mean the executor service process has `euid == 0`; the
+supported root-demo path keeps the service process under the normal user and
+uses `sudo -n sandbox-exec` only for the child command wrapper.
 
 If `Escalation: DISARMED` appears, step 1 didn't find the sudoers entry or
 marker — rerun the installer.
@@ -300,8 +306,9 @@ intents run.
 scripted. It says nothing by itself about executor safety. In dry-run mode, the
 executor is synthetic and ALLOW fixtures do not touch the host. In real mode,
 `[STUB]` still only means the agent is scripted; if Guardian returns `ALLOW`,
-the root executor may run the real command. A full `test_attacks.py` sweep in
-real mode can change network, hostname, time sync, browser prefs, and more.
+the root-capable `RUN_COMMAND` path may run the real command through
+`sudo -n sandbox-exec`. A full `test_attacks.py` sweep in real mode can change
+network, hostname, time sync, browser prefs, and more.
 Prefer dry-run for local sweeps. Use real mode only for small benign subsets or
 a disposable VM, and read [`results/README.md`](./results/README.md)
 (host-impact report + remediation plan) before re-running everything on a
@@ -331,6 +338,10 @@ demo/tests/root_demo/
 ├── README.md                           this file
 ├── results/                            sweep logs, host-impact report, policy remediation plan
 │   ├── README.md
+│   ├── dry_run.txt
+│   ├── dry_run_intentframe_logs.txt
+│   ├── real_run.txt
+│   ├── real_run_intentframe_logs.txt
 │   ├── 2026-04-27-attack-sweep-host-impact.md
 │   └── root-demo-policy-remediation.md
 ├── test_policy_root.yaml               scoped mirror of bootstrap's root profile
@@ -562,7 +573,7 @@ Two intentional differences from the gateway seed:
    no other adapter has an escalation hook). The gateway's root policy
    advertises 50+ SAFE/UNSAFE actions for the broader Jarvis surface;
    the test harness narrows to the action that the demo actually exercises
-   under root. See [`docs/executor-root-mode.md`](../../../docs/executor-root-mode.md)
+   under root. See [`docs/root_demo/executor-root-mode.md`](../../../docs/root_demo/executor-root-mode.md)
    — "Why this shape exists".
 2. **Empty `intent_limits`** — spend / deletion limits are irrelevant here.
 
@@ -638,7 +649,8 @@ errors — expected, demo capability is back off.
 
 - [`demo/tests/README.md`](../README.md) — parent suite (invoice + redteam attacks, attacks 1–24)
 - [`demo/tests/security_analysis.md`](../security_analysis.md) — threat model + OWASP coverage
-- [`docs/executor-root-mode.md`](../../../docs/executor-root-mode.md) — root profile's privilege-separation design
+- [`docs/root_demo/PROOF.md`](../../../docs/root_demo/PROOF.md) — current 100/100 dry-run and real-executor proof snapshot
+- [`docs/root_demo/executor-root-mode.md`](../../../docs/root_demo/executor-root-mode.md) — root profile's privilege-separation design
 - [`intentframe_gateway/README.md`](../../../intentframe_gateway/README.md) — gateway's role in escalation detection
 - [`jarvis_pa/executor_root.yaml`](../../../jarvis_pa/executor_root.yaml) — executor config loaded under root profile
 - [`TODO/root-demo-policy-driven-sandbox.md`](../../../TODO/root-demo-policy-driven-sandbox.md) — design doc + remaining work (attack corpus, audit-trace verification)

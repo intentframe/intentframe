@@ -134,6 +134,12 @@ Show the gateway starting in root profile:
 Profile: root   Escalation: ARMED   Executor running_as_root: yes
 ```
 
+Explain the banner precisely: `running_as_root` means the `RUN_COMMAND`
+sandbox path has root capability available. It does **not** mean the executor
+service process itself is running with `euid == 0`. In the supported demo path,
+the executor remains a normal-user process and only the child
+`sudo -n sandbox-exec ...` wrapper for an allowed command crosses into root.
+
 Then run benign commands that prove capability:
 
 ```sh
@@ -147,13 +153,16 @@ ps -eo user,pid,ppid,command -U root
 
 Expected message:
 
-IntentFrame is not a fake safety layer around a toy executor. The command path can really reach privileged local state.
+IntentFrame is not a fake safety layer around a toy executor. The command path
+can really reach privileged local state, while the agent and service stack
+remain normal-user processes.
 
 Also state the privilege boundary:
 
-> The LLM/agent process is not running as root. Only the executor's
-> `RUN_COMMAND` sandbox path can request root, and IntentFrame stands before
-> that execution boundary.
+> The LLM/agent process is not running as root. The executor service is not
+> normally running as root either. Only the executor's `RUN_COMMAND` sandbox
+> child process can request root through `sudo -n sandbox-exec`, and IntentFrame
+> stands before that execution boundary.
 
 ### Act 2: Show Useful Terminal Work
 
@@ -285,7 +294,7 @@ Blocked or routed through review and rejected before execution. This is a
 required credibility beat because technical viewers will immediately ask whether
 Python is an escape hatch around shell-pattern blocking.
 
-### Act 7: Connect To The 24-Attack Suite
+### Act 7: Connect To The 100-Attack Suite
 
 After the root demo, show the broader post-compromise suite:
 
@@ -301,9 +310,14 @@ After the root demo, show the broader post-compromise suite:
 - Exfiltration through write fields.
 - Schema injection.
 - Metadata spoofing.
+- macOS host/network/security mutation.
 - Known gap: salami slicing.
 
-The root demo proves containment under high local privilege. The 24-attack suite proves the same architecture applies beyond shell commands.
+The root demo proves containment under high local privilege. The current
+root-demo attack sweep contains 100 adversarial `RUN_COMMAND` intents across
+destruction, persistence, privilege escalation, credential access, defense
+evasion, exfiltration, impact, obfuscation, interpreter indirection,
+reason/target mismatch, and realistic macOS host mutation.
 
 ### Act 8: Separate Test Proof From Product Feel
 
@@ -379,6 +393,9 @@ Minimum visible proof:
 - Block reason and matched gate.
 - Audit log entry showing `executed=false`.
 - Summary: allowed useful work, blocked dangerous work.
+- Final proof artifacts: `demo/tests/root_demo/results/dry_run.txt` and
+  `demo/tests/root_demo/results/real_run.txt`, both showing 100/100 attack
+  intents blocked after remediation.
 
 Best visual moment:
 
@@ -401,6 +418,8 @@ The demo is successful if a technical viewer believes:
 - The system produced understandable reasons.
 - The result was enforced outside the model, not merely suggested by a prompt.
 - The same attack corpus can be rerun without depending on model behavior drift.
+- The live real-executor sweep returns 100/100 BLOCK while preflight confirms
+  `whoami == root` through the same Actor -> IntentFrame -> executor path.
 
 ## Risks Before Publishing
 
@@ -435,6 +454,8 @@ IntentFrame is a runtime control plane between agent intent and real-world effec
 
 ## Supporting Docs
 
+- [`PROOF.md`](./PROOF.md) summarizes the current dry-run and real-executor
+  100/100 attack-sweep evidence and the exact root privilege model.
 - [`stub_agent_crash_test_rationale.md`](./stub_agent_crash_test_rationale.md) explains why the primary proof uses a deterministic compromised-agent harness instead of depending on a live LLM jailbreak.
 - [`skeptical_security_questions.md`](./skeptical_security_questions.md) captures the questions a technical security reviewer will ask and the answers the demo must provide.
 - [`executor-root-mode.md`](./executor-root-mode.md) explains the root-demo privilege separation and operator flow.

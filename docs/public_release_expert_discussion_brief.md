@@ -143,12 +143,19 @@ The demo assumes the agent may already be compromised and deliberately submits m
 The root demo proves:
 
 - The whole stack is not running as root.
-- Only the executor's `RUN_COMMAND` sandbox path can escalate.
+- The executor service is normally still a normal-user process.
+- Only the executor's `RUN_COMMAND` child sandbox path can escalate through
+  `sudo -n sandbox-exec`.
 - Root capability is intentionally scoped.
 - Known catastrophic commands are blocked before execution.
 - Root-capable execution does not mean unchecked execution.
 - Benign allowed root commands can run.
 - Malicious root commands are blocked.
+
+Current proof artifacts: `demo/tests/root_demo/results/dry_run.txt` and
+`demo/tests/root_demo/results/real_run.txt` both record 100 / 100 adversarial
+root-demo attack intents returning expected `BLOCK` after remediation. See
+`docs/root_demo/PROOF.md` for the concise evidence package and privilege model.
 
 The root demo does not prove:
 
