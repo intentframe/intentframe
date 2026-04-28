@@ -29,16 +29,6 @@
 # the demo claim is "executor already runs as root, agents must not attempt
 # escalation", which only holds if ``sudo`` is rejected upstream.
 #
-# ``deny_capabilities`` mirrors the language clamp every gateway profile
-# seeds in ``intentframe_gateway/bootstrap.py``: ``RUN_COMMAND`` is
-# constrained to a python + shell language surface regardless of whether
-# the executor runs as user or root.  Every other scripting interpreter,
-# build/link toolchain, and non-pip/non-shell package install is denied
-# at Gate 2 before any LLM runs.  Tag suffixes mirror what
-# ``command_shield.classifier._SCRIPT_EXECUTION_RULES`` emits; the
-# contract is pinned by
-# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
-# ═══════════════════════════════════════════════════════════════════════════════
 
 allowed_actions:
   RUN_COMMAND:
