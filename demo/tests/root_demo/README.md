@@ -75,7 +75,32 @@ The root-demo runner detects this via the preflight response
 (`data["dry_run"] == True`) and fails closed if any later ALLOW result lacks the
 same tag.
 
-### 2b. Real root via the CLI (operator demo)
+Dry-run deliberately does **not** validate the terminal adapter,
+`sandbox-exec`, `sudo -n` wrapping, OS permissions, or real command
+stdout/stderr. Use real mode for that final end-to-end proof.
+
+### 2b. Mode model
+
+The supervisor startup command chooses the mode. The tests do **not** switch
+mode themselves; by the time a test submits its first intent, the runtime has
+already wired either `DryRunExecutor` or the real executor client.
+
+| Question | Dry-run mode | Real root mode |
+|---|---|---|
+| How selected? | `INTENTFRAME_EXECUTOR_MODE=dry_run` before supervisor startup | `intentframe-gateway-cli --profile root` or direct root supervisor env |
+| Executor service started? | No | Yes |
+| `executor.sock` exists? | No | Yes |
+| Pipeline executor object | `DryRunExecutor` in-process | `ExecutorHTTPClient` over UDS |
+| Preflight accepts | `data["dry_run"] == True` | `whoami` output exactly `root` |
+| ALLOW output | Synthetic `[dry-run] would run: ...` | Real stdout/stderr from the host command |
+| BLOCK output | Guardian/block reason; executor is not reached | Guardian/block reason; executor is not reached |
+| Validates | Policy, deterministic gates, Analysis Engine, Guardian, Actor/server path | Everything dry-run validates plus executor service, terminal adapter, sandbox wrapping, sudo path, and real host behavior |
+
+Switching modes requires stopping and restarting the supervisor. Changing
+`INTENTFRAME_EXECUTOR_MODE` in your shell after the supervisor is already
+running does not rewire the existing runtime.
+
+### 2c. Real root via the CLI (operator demo)
 
 ```bash
 intentframe-gateway-cli --profile root
@@ -96,7 +121,7 @@ Profile: root   Escalation: ARMED   Executor running_as_root: yes
 If `Escalation: DISARMED` appears, step 1 didn't find the sudoers entry or
 marker — rerun the installer.
 
-### 2c. Real root direct supervisor launch (fast dev loop)
+### 2d. Real root direct supervisor launch (fast dev loop)
 
 Skip the gateway, boot the supervisor directly. **Only do this if root-demo
 is already installed** — otherwise the env var is a lie and `sudo -n` will
@@ -113,7 +138,10 @@ The gateway's README notes that `INTENTFRAME_ESCALATION_ARMED` should never be
 set manually in production. Setting it here is safe for the dev loop because
 the escalation capability has already been installed via step 1.
 
-### Verifying escalation actually reached the executor
+### Verifying escalation actually reached the executor (real mode only)
+
+This check does not apply to dry-run mode because the supervisor intentionally
+does not start the executor service there.
 
 ```bash
 ps ewwp $(pgrep -f "uvicorn executor.server") | tr ' ' '\n' | grep INTENTFRAME
@@ -247,6 +275,14 @@ success and failure. They do not forward the adapter's `command` or
 `0` while an earlier stage wrote diagnostics to stderr, so stderr is the
 operator-visible signal the tests and agents consume.
 
+Result semantics by mode:
+
+| Fixture outcome | Dry-run mode output | Real mode output |
+|---|---|---|
+| `ALLOW` | `success=True`, `data["dry_run"] == True`, synthetic `content` such as `[dry-run] would run: ls -la /var/root` | `success=True`, real `content` / `stderr` from the terminal adapter |
+| `BLOCK` | `success=False`, `data["decision"] == "BLOCK"`, `reason` / `layer` / `matched_gate` when provided | Same; executor is not reached |
+| Dry-run safety failure | Any ALLOW result missing `dry_run=True` fails with `[SAFETY]` | Not applicable |
+
 Exit status:
 
 - `0` means the preflight passed and every selected intent matched its
@@ -258,13 +294,30 @@ Exit status:
 session harness is working — one onboarding LLM call regardless of how many
 intents run.
 
-**Host safety (full attack sweep):** `[STUB]` means the **agent** is scripted,
-not that the **executor** is mocked. If Guardian returns `ALLOW`, the root
-executor may run the real command. A full `test_attacks.py` sweep can change
-network, hostname, time sync, browser prefs, and more. Prefer per-tactic
-subsets for local recording, use a disposable VM for full sweeps, and read
-[`results/README.md`](./results/README.md) (host-impact report + remediation
-plan) before re-running everything on a daily-driver machine.
+**Host safety (full attack sweep):** `[STUB]` always means the **agent** is
+scripted. It says nothing by itself about executor safety. In dry-run mode, the
+executor is synthetic and ALLOW fixtures do not touch the host. In real mode,
+`[STUB]` still only means the agent is scripted; if Guardian returns `ALLOW`,
+the root executor may run the real command. A full `test_attacks.py` sweep in
+real mode can change network, hostname, time sync, browser prefs, and more.
+Prefer dry-run for local sweeps. Use real mode only for small benign subsets or
+a disposable VM, and read [`results/README.md`](./results/README.md)
+(host-impact report + remediation plan) before re-running everything on a
+daily-driver machine.
+
+Troubleshooting:
+
+- Preflight says `dry-run executor active`: expected in safe local mode.
+- Preflight says `whoami returned 'root'`: real executor mode is active.
+- Preflight fails with permission errors: you are in real mode but the root
+  capability is not armed or the supervisor started with the wrong env.
+- `[SAFETY] ... missing dry_run flag`: the runner expected dry-run after
+  preflight, but a later ALLOW result did not carry `data["dry_run"] == True`;
+  stop and inspect supervisor startup.
+- `executor.sock` missing in dry-run: expected. The supervisor does not start
+  the executor service in dry-run mode.
+- `Unknown INTENTFRAME_EXECUTOR_MODE`: fix the env var; valid values are
+  `real` and `dry_run`.
 
 ---
 
@@ -380,19 +433,27 @@ async def _run(self, intent_nums):
     agent = StubPipelineRootAgent()
     await agent.open(ROOT_USER_ID, DEFAULT_INTENTFRAME_SOCKET)
     try:
+        # 3. Preflight: submit RUN_COMMAND whoami through the same path as
+        #    fixtures.  Accept dry-run if data["dry_run"] is True; otherwise
+        #    require real output == "root".
+        if not await self._run_root_preflight(agent, server_client):
+            return False
+
         for action, nums in self._group_by_action(intent_nums):
             self._print_group_banner(action, nums)
             for n in nums:
-                # 3. Per-intent header, audit clear, load fixture, submit
+                # 4. Per-intent header, audit clear, load fixture, submit
                 self._print_intent_header(n)
                 server_client.clear_audit_log()
                 submissions = load_root_intents(self.category, n)
                 results = [await agent.submit(req) for req in submissions]
-                # 4. Build entry from ExecutionResult only (no audit peek)
-                #    + print verdict (expected vs actual + adapter output)
+                # 5. Build entry from ExecutionResult only (no audit peek)
+                #    + print verdict (expected vs actual + adapter output).
+                #    In dry-run mode, every ALLOW result must carry
+                #    data["dry_run"] == True or the verdict fails closed.
                 ...
     finally:
-        # 5. Close the Actor at the end
+        # 6. Close the Actor at the end
         await agent.close()
 ```
 
