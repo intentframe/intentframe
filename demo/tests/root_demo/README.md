@@ -62,7 +62,8 @@ Tests assume the supervisor is already running. Three paths are supported:
 
 This is the safest default for local test runs and attack sweeps. It keeps the
 real policy / Guardian path but replaces only the final executor with
-`DryRunExecutor`.
+`DryRunExecutor`. In this mode the supervisor does not start the real executor
+service, so there is no `executor.sock` that can accidentally run commands.
 
 ```bash
 INTENTFRAME_EXECUTOR_MODE=dry_run \

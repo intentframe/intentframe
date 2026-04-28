@@ -11,6 +11,11 @@ Activation (server-side):
 
     INTENTFRAME_EXECUTOR_MODE=dry_run python -m supervisor.main start
 
+In this mode ``supervisor.config`` omits the standalone executor service from
+the service graph, and ``intentframe_server.server`` wires this class directly
+into ``IntentFrameRuntime``. There is no real ``executor.sock`` in the dry-run
+path.
+
 Privilege posture (controls what Guardian sees in ``ExecutionContext``):
 
     INTENTFRAME_DRY_RUN_CONTEXT=user   # default, reports current user's uid/euid

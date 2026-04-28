@@ -18,6 +18,9 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+_VALID_EXECUTOR_MODES = {"real", "dry_run"}
+_EXECUTOR_SERVICE_NAME = "executor"
+
 
 def _default_run_dir() -> Path:
     return Path(os.path.expanduser("~/.intentframe/run"))
@@ -79,6 +82,48 @@ class SupervisorConfig(BaseModel):
         raise KeyError(f"Unknown service: {service_name}")
 
 
+def _executor_mode_from_env() -> str:
+    mode = os.environ.get("INTENTFRAME_EXECUTOR_MODE", "real").strip().lower()
+    if mode not in _VALID_EXECUTOR_MODES:
+        expected = ", ".join(sorted(_VALID_EXECUTOR_MODES))
+        raise ValueError(
+            f"Unknown INTENTFRAME_EXECUTOR_MODE: {mode!r}. Expected one of: {expected}."
+        )
+    return mode
+
+
+def _apply_executor_mode(config: SupervisorConfig, mode: str) -> None:
+    """Adjust the service graph for the selected runtime executor mode.
+
+    ``real`` keeps the standard four-service graph.  ``dry_run`` makes
+    intentframe-core use DryRunExecutor in-process, so the standalone
+    executor service would be unused and is deliberately not started;
+    we also strip ``executor`` from *every* service's ``depends_on`` so
+    startup ordering stays valid and no future service silently waits
+    on a dependency that was never started.
+    """
+    if mode == "real":
+        return
+
+    config.services = [
+        svc for svc in config.services
+        if svc.name != _EXECUTOR_SERVICE_NAME
+    ]
+    config.services = [
+        svc.model_copy(
+            update={
+                "depends_on": [
+                    dep for dep in svc.depends_on
+                    if dep != _EXECUTOR_SERVICE_NAME
+                ],
+            }
+        )
+        if _EXECUTOR_SERVICE_NAME in svc.depends_on
+        else svc
+        for svc in config.services
+    ]
+
+
 def load_supervisor_config() -> SupervisorConfig:
     """Load config from file / env / defaults."""
     config = SupervisorConfig()
@@ -90,5 +135,7 @@ def load_supervisor_config() -> SupervisorConfig:
     log_dir = os.environ.get("INTENTFRAME_LOG_DIR")
     if log_dir:
         config.log_dir = Path(log_dir)
+
+    _apply_executor_mode(config, _executor_mode_from_env())
 
     return config

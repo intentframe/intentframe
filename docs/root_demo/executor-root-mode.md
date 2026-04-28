@@ -91,7 +91,8 @@ python -m supervisor.main start
 
 This does **not** require `sudo bash intentframe_setup_root_demo.sh`, does not
 load `jarvis_pa/executor_root.yaml`, and does not require
-`INTENTFRAME_ESCALATION_ARMED`. The server wires `DryRunExecutor` into
+`INTENTFRAME_ESCALATION_ARMED`. The supervisor omits the real executor service
+from its service graph, and the server wires `DryRunExecutor` into
 `IntentFrameRuntime`; every allowed execution returns an `ExecutionResult` with
 `data["dry_run"] == True`.
 
@@ -258,8 +259,10 @@ This is read by `intentframe_server/server.py` at runtime startup:
   executor service over UDS (normal production path)
 - `"dry_run"`: the runtime uses `DryRunExecutor`; no real I/O is performed
 
-Unknown values raise at startup. This is deliberate: typos must never silently
-fall back to a less-safe mode.
+The supervisor also reads this value. In dry-run mode it does not start the
+standalone executor service and removes `executor` from
+`intentframe-core.depends_on`. Unknown values raise at startup. This is
+deliberate: typos must never silently fall back to a less-safe mode.
 
 ### `INTENTFRAME_DRY_RUN_CONTEXT`
 
