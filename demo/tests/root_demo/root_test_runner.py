@@ -38,6 +38,7 @@ Execution modes (safety-critical):
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import os
 import sys
@@ -63,6 +64,7 @@ from root_intent_pipeline import (
     ensure_root_user_policy,
     register_root_workspace,
 )
+from root_policy_loader import DEFAULT_ROOT_POLICY_PATH
 from root_stub_agent import StubPipelineRootAgent, load_root_intents
 
 
@@ -175,18 +177,59 @@ class RootIntentSuite:
         # evaluation never trusts the client's env alone.  ``True`` only
         # when the executor returned ``data["dry_run"] is True``.
         self._dry_run_mode: bool = False
+        # Resolved at main() from --policy arg; None means default policy.
+        self._policy_path: Path | None = None
+
+    @property
+    def _policy_label(self) -> str:
+        if self._policy_path is None:
+            return DEFAULT_ROOT_POLICY_PATH.name
+        return self._policy_path.name
 
     # ── Public entry point ───────────────────────────────────────────
 
     def main(self) -> None:
-        invalid_args = [a for a in sys.argv[1:] if not a.isdigit()]
-        if invalid_args:
-            print(f"Invalid intent argument(s): {invalid_args}")
-            sys.exit(2)
+        parser = argparse.ArgumentParser(
+            description=self.suite_title,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=(
+                "Example — semantic-only policy:\n"
+                "  python test_attacks_privilege.py --policy test_policy_root_semantic.yaml\n"
+                "\n"
+                "Example — specific intents with a custom policy:\n"
+                "  python test_attacks_privilege.py --policy /path/to/policy.yaml 23 26 28"
+            ),
+        )
+        parser.add_argument(
+            "--policy",
+            metavar="YAML",
+            default=None,
+            help=(
+                "Path to the policy YAML to load for this run. "
+                f"Absolute or relative to cwd. "
+                f"Default: {DEFAULT_ROOT_POLICY_PATH.name}"
+            ),
+        )
+        parser.add_argument(
+            "intent_nums",
+            nargs="*",
+            type=int,
+            metavar="INTENT",
+            help="Intent number(s) to run (default: all in this suite)",
+        )
+        args = parser.parse_args()
 
-        intent_nums = [int(a) for a in sys.argv[1:]]
-        if not intent_nums:
-            intent_nums = list(self.intents.keys())
+        if args.policy is not None:
+            policy_path = Path(args.policy)
+            if not policy_path.is_absolute():
+                policy_path = Path.cwd() / policy_path
+            policy_path = policy_path.resolve()
+            if not policy_path.exists():
+                print(f"Policy file not found: {policy_path}")
+                sys.exit(2)
+            self._policy_path = policy_path
+
+        intent_nums = args.intent_nums or list(self.intents.keys())
 
         unknown = [n for n in intent_nums if n not in self.intents]
         if unknown:
@@ -198,6 +241,7 @@ class RootIntentSuite:
         print("\n" + "=" * 79)
         print(f"  {self.suite_title}")
         print("=" * 79)
+        print(f"  Policy:  {self._policy_label}")
         print(f"  Running intents: {intent_nums} (single Actor session)")
         print("=" * 79)
 
@@ -369,7 +413,7 @@ class RootIntentSuite:
         print("=" * 79)
         print(
             f"  {self.category.upper()} INTENT TEST SUMMARY "
-            f"[mode={mode_tag}] "
+            f"[mode={mode_tag}  policy={self._policy_label}] "
             "(expected_decision vs actual from ExecutionResult)"
         )
         print("=" * 79)
@@ -398,7 +442,7 @@ class RootIntentSuite:
         server_client = IntentFrameClient(socket_path=DEFAULT_INTENTFRAME_SOCKET)
 
         try:
-            ensure_root_user_policy(policy_client)
+            ensure_root_user_policy(policy_client, self._policy_path)
             register_root_workspace(resource_client)
 
             agent = StubPipelineRootAgent()

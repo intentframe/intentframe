@@ -18,6 +18,8 @@ This module does not start or reconfigure the supervisor itself.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from policy_registry.client import PolicyRegistryClient
 from resource_registry.client import ResourceRegistryClient
 from resource_registry.models import ResourceMount
@@ -29,8 +31,11 @@ DEFAULT_INTENTFRAME_SOCKET = "~/.intentframe/run/intentframe.sock"
 ROOT_USER_ID = "root_demo_tester"
 
 
-def ensure_root_user_policy(policy_client: PolicyRegistryClient) -> None:
-    policy_client.set_user_policy(load_root_demo_policy(ROOT_USER_ID))
+def ensure_root_user_policy(
+    policy_client: PolicyRegistryClient,
+    policy_path: Path | None = None,
+) -> None:
+    policy_client.set_user_policy(load_root_demo_policy(ROOT_USER_ID, policy_path))
 
 
 def register_root_workspace(resource_client: ResourceRegistryClient) -> None:
