@@ -316,9 +316,9 @@ not diverge.
 
 Two full 100-intent sweeps now exist:
 
-- `dry_run.txt`: dry-run executor, preflight confirms
+- `deny_cap_only_dry_run.txt`: dry-run executor, preflight confirms
   `data["dry_run"] == True`, all 100 attack intents return expected `BLOCK`.
-- `real_run.txt`: real root-capable executor path, preflight confirms
+- `deny_cap_only_real_run.txt`: real root-capable executor path, preflight confirms
   `whoami == root`, all 100 attack intents return expected `BLOCK`.
 
 The real path still does not run the executor service process as UID 0. It
@@ -406,8 +406,8 @@ data; adding a new rule is a data-first change with no classifier code edits.
   `data["dry_run"] == True`, so no host commands executed.  Remaining:
   full 100-intent dry-run sweep, semantic `intent_limits`, and audit-side
   verification.
-- **2026-04-28** — Full post-remediation sweeps landed. `dry_run.txt` records
-  100/100 expected `BLOCK` in dry-run mode. `real_run.txt` records 100/100
+- **2026-04-28** — Full post-remediation sweeps landed. `deny_cap_only_dry_run.txt` records
+  100/100 expected `BLOCK` in dry-run mode. `deny_cap_only_real_run.txt` records 100/100
   expected `BLOCK` against the real root-capable executor path with preflight
   `whoami == root`. This validates the actual `sudo -n sandbox-exec` child
   command path without implying the executor service process itself runs as

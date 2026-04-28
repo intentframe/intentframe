@@ -352,10 +352,10 @@ demo/tests/root_demo/
 ├── README.md                           this file
 ├── results/                            sweep logs, host-impact report, policy remediation plan
 │   ├── README.md
-│   ├── dry_run.txt
-│   ├── dry_run_intentframe_logs.txt
-│   ├── real_run.txt
-│   ├── real_run_intentframe_logs.txt
+│   ├── deny_cap_only_dry_run.txt
+│   ├── deny_cap_only_dry_run_intentframe_logs.txt
+│   ├── deny_cap_only_real_run.txt
+│   ├── deny_cap_only_real_run_intentframe_logs.txt
 │   ├── 2026-04-27-attack-sweep-host-impact.md
 │   └── root-demo-policy-remediation.md
 ├── test_policy_root_determinstic_only.yaml

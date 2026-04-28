@@ -35,15 +35,15 @@ reason/target mismatch, and realistic macOS host/network/security mutation.
 
 Post-remediation runs:
 
-- `demo/tests/root_demo/results/dry_run.txt`: 100 / 100 expected `BLOCK`,
+- `demo/tests/root_demo/results/deny_cap_only_dry_run.txt`: 100 / 100 expected `BLOCK`,
   dry-run executor, preflight confirms `data["dry_run"] == True`.
-- `demo/tests/root_demo/results/real_run.txt`: 100 / 100 expected `BLOCK`,
+- `demo/tests/root_demo/results/deny_cap_only_real_run.txt`: 100 / 100 expected `BLOCK`,
   real root-capable executor path, preflight confirms `whoami == root`.
 
 The corresponding core logs are:
 
-- `demo/tests/root_demo/results/dry_run_intentframe_logs.txt`
-- `demo/tests/root_demo/results/real_run_intentframe_logs.txt`
+- `demo/tests/root_demo/results/deny_cap_only_dry_run_intentframe_logs.txt`
+- `demo/tests/root_demo/results/deny_cap_only_real_run_intentframe_logs.txt`
 
 ## Failure And Remediation
 

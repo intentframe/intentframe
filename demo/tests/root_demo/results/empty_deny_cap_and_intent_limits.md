@@ -241,7 +241,7 @@ You effectively now have three empirical data points, measured on the exact same
 
 | Policy | Blocked | How |
 |---|---|---|
-| Layered (full `deny_capabilities` + limits) — `real_run.txt` | 100 / 100 | mostly at `deterministic_guardian` (capability gate) |
+| Layered (full `deny_capabilities` + limits) — `deny_cap_only_real_run.txt` | 100 / 100 | mostly at `deterministic_guardian` (capability gate) |
 | Minimal (6 patterns, no caps, no limits) — this run | 99 / 100 | ~38 command_shield + ~15 pattern + ~46 semantic Guardian |
 | Pure semantic-only (no patterns, caps, or limits) | *not yet measured* | — |
 
@@ -267,7 +267,7 @@ That framing is defensible and hard to poke at.
 
 ## What I'd do next, concretely
 
-1. **Keep this exact run as "Track B: Minimal Policy"**, alongside `real_run.txt` as "Track A: Layered Policy." Two tracks, two YAMLs, two result files, two numbers. These two numbers are the proof package.
+1. **Keep this exact run as "Track B: Minimal Policy"**, alongside `deny_cap_only_real_run.txt` as "Track A: Layered Policy." Two tracks, two YAMLs, two result files, two numbers. These two numbers are the proof package.
 
 2. **Add one more track: "Track C: Plain-English Intent Limits Only."** Start from the minimal YAML, drop the 6 blocked_patterns, add 6-8 plain English `intent_limits` like I sketched before. Rerun the 100. This gives you the "operator-written English alone" number.
 
@@ -286,4 +286,4 @@ You've actually answered the "is the AI doing real work?" question without needi
 
 And the one failure in 100 (intent 88) is precisely the kind of case the `intent_limits` feature exists for — which sets up the v1.1 story cleanly.
 
-This run, combined with `real_run.txt`, is the launch package. Tracks A and B side-by-side. I wouldn't gate launch on Track C (English-only limits); that's a follow-up post.
+This run, combined with `deny_cap_only_real_run.txt`, is the launch package. Tracks A and B side-by-side. I wouldn't gate launch on Track C (English-only limits); that's a follow-up post.

@@ -152,8 +152,8 @@ The root demo proves:
 - Benign allowed root commands can run.
 - Malicious root commands are blocked.
 
-Current proof artifacts: `demo/tests/root_demo/results/dry_run.txt` and
-`demo/tests/root_demo/results/real_run.txt` both record 100 / 100 adversarial
+Current proof artifacts: `demo/tests/root_demo/results/deny_cap_only_dry_run.txt` and
+`demo/tests/root_demo/results/deny_cap_only_real_run.txt` both record 100 / 100 adversarial
 root-demo attack intents returning expected `BLOCK` after remediation. See
 `docs/root_demo/PROOF.md` for the concise evidence package and privilege model.
 

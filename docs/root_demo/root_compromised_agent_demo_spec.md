@@ -393,8 +393,8 @@ Minimum visible proof:
 - Block reason and matched gate.
 - Audit log entry showing `executed=false`.
 - Summary: allowed useful work, blocked dangerous work.
-- Final proof artifacts: `demo/tests/root_demo/results/dry_run.txt` and
-  `demo/tests/root_demo/results/real_run.txt`, both showing 100/100 attack
+- Final proof artifacts: `demo/tests/root_demo/results/deny_cap_only_dry_run.txt` and
+  `demo/tests/root_demo/results/deny_cap_only_real_run.txt`, both showing 100/100 attack
   intents blocked after remediation.
 
 Best visual moment:
