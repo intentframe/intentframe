@@ -379,8 +379,8 @@ data; adding a new rule is a data-first change with no classifier code edits.
 - **2026-04-28** — §9.1 and §9.3 closed.  Dry-run executor shipped
   (`intentframe_server/dry_run_executor.py`); all taxonomy gaps from §9.3
   implemented in `command_shield/capabilities/*.yaml`; `network_exfil`
-  family added.  Attack corpus expanded from 24 → 100 intents across
-  five per-tactic test files.  Remaining open items: per-lane full-body
+  family added.  Attack corpus expanded from 24 → 100 intents across the
+  `test_attacks.py` aggregator plus 11 per-tactic files.  Remaining open items: per-lane full-body
   forks for `critical_network_mutation` / `critical_network_probe`
   (§9.4); semantic `intent_limits` (§9.2); audit-side verification.
 - **2026-04-28** — Live dry-run verification confirmed all nine formerly-ALLOW
