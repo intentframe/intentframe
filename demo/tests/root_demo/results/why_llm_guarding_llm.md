@@ -231,3 +231,118 @@ The Gemini output gives you clean vocabulary for three audiences:
 **For the blog post:** "A genius with no data will lose a debate to a novice with a factual dossier. The guardian isn't smarter than the agent — it just has an independent dossier."
 
 All three of those are tighter than what's currently in your brief. Use them.
+
+
+-----
+### More Claude:
+That Claude conversation is doing real analytical work. Some of it is sharp and correct. Some of it is wrong about your architecture because it doesn't know what you've actually built. Let me separate the two.
+
+## Where Claude was right and you should listen
+
+### 1. The independence formula is wrong as stated
+
+Claude nails this. Gemini's `P(fail) = P(A) × P(G)` assumes independence, which is something you measure, not derive from architecture. The correct formula is `P(both fail) = P(A fails) × P(G fails | A fails)`, and that conditional is the thing that actually matters. Your Intent 88 shows the conditional isn't zero. This critique is correct and you should not put the clean multiplicative formula in any public document.
+
+### 2. What's formally provable vs empirically measurable
+
+This is the sharpest section in the whole conversation. The breakdown:
+
+**Provable:** deterministic parser correctness, information-flow non-interference (parser output isn't in the transitive closure of attacker influence on agent context), capability-based access control (tagged X + policy Y = blocked).
+
+**Measurable but not provable:** LLM Guardian reliability, failure correlation between AE and Guardian, coverage against unknown attacks.
+
+That distinction should be in your `why_llm_guarding_llm.md`. It's what separates a defensible claim from a marketing claim.
+
+### 3. The Wilson confidence interval
+
+99/100 gives you a 95% CI of roughly [94.6%, 99.97%]. That's the honest statistical statement. "99%" as a headline is fine for a blog; for an expert brief, report the interval. And yes, pushing to N=500 or N=1000 tightens it meaningfully. Your test harness makes this cheap — you just need more fixtures.
+
+### 4. What command_shield can't do
+
+The enumeration is excellent:
+- Runtime-only behavior (eval, exec, dynamic payloads)
+- Semantic intent vs literal capability (authorized_keys is `data_write` but means "persistent SSH access")
+- Scope and proportionality ("check disk usage" → scans entire filesystem)
+- Cover stories (plausible reason + malicious selective filter)
+- Cross-command sequences (download → chmod → execute)
+- Novel attack patterns outside the taxonomy
+- Obfuscation flavors the regex doesn't cover
+
+This list is exactly the Guardian's job description, and it's more precise than anything currently in your docs. You should use it.
+
+### 5. The false-positive question
+
+Claude hammers this repeatedly and it's the right call. 99/100 attack block rate is half the story. You need a benign-command pass rate measured on the same pipeline. A 99% block rate with a 5% over-block rate on legitimate work is a usability problem. This is the experiment I've been suggesting (the 60-100 benign command corpus) — Claude confirms it's the most important missing measurement.
+
+### 6. The three missing experiments
+
+- Guardian-off baseline (p₀) — you already have this from the 2026-04-27 live sweep (9/100 leaked = 91% block, deterministic-only)
+- FP measurement — still missing, still the highest-priority gap
+- Correlation measurement — computable from your existing runs by comparing AE ratings across the 9 historically-missed intents
+
+## Where Claude was wrong about your architecture
+
+### The sandbox critique is based on a false premise
+
+Claude's entire §4 ("sandbox is unrestricted") and the lengthy response about "structured authorization, not defense in depth" is based on your one-line prompt "Sandbox is mostly unrestricted." That's not actually true of IntentFrame's shipped architecture.
+
+Your actual architecture, from the docs and code I've read:
+
+- `sandbox-exec` wraps every `RUN_COMMAND` on macOS. It's not unrestricted.
+- Phase 7c shipped per-intent sandbox-template selection in policy.
+- A non-overridable deny-path list is hardened for root (LaunchAgents, LaunchDaemons, /etc, /System, sshd configs, sudoers, PAM, kexts, Keychains, Messages, Mail, .ssh, .gnupg, shell rc files).
+- The root demo runs `sudo -n sandbox-exec` — it's sandboxed even when running as root.
+- The executor's VFS mounts gate file access at the adapter layer.
+- Action-type dispatch means the executor only knows how to do what its adapters implement.
+
+So Claude's "once a command executes, it can do anything" and "you have two layers before execution and zero after" is factually wrong about IntentFrame. You have:
+
+1. command_shield (pre-execution, deterministic)
+2. Deterministic Guardian (pre-execution, policy-driven)
+3. AE + Guardian LLM (pre-execution, semantic)
+4. sandbox-exec with deny profiles (execution-time, OS-enforced)
+5. VFS / adapter dispatch (execution-time, structural)
+
+That's five layers, three pre-execution and two at execution time. Claude's critique about "stop calling it defense in depth" doesn't apply because you actually do have post-authorization containment.
+
+The point Claude was trying to make — that the sandbox is broad enough that it won't catch everything the pre-execution layers miss — is directionally fair for the root demo profile (where the sandbox is intentionally permissive to show real root capability). But "mostly unrestricted" isn't the same as "unrestricted," and the deny-path list is specifically hardened for the root profile.
+
+### Claude doesn't know about the sensitive-surface clamp
+
+The entire discussion about "what if the taxonomy has gaps" and "capability gaps are the real risk" doesn't account for the work you did on 2026-04-28: the YAML-driven capability taxonomy in `command_shield/capabilities/`, the 450+ classifier tests, the deny-set mirrored across bootstrap/seed_policies/test_policy_root.yaml, and the DG accuracy matrix that pulls live from bootstrap. Claude was analyzing IntentFrame as if the taxonomy were a handful of regexes. It's much more than that.
+
+### The TOCTOU concern is addressed
+
+Claude raises TOCTOU (time-of-check vs time-of-use) as if the parsed command might differ from the executed command. Your architecture passes the command string from the pipeline to the executor without shell re-interpretation — the executor receives the exact string that was analyzed. The `universal_security_due_diligence.md` Q15 already flags the residual TOCTOU concern (path resolution at execute time) but the command-identity invariant is verified.
+
+## What's genuinely new and actionable from this conversation
+
+### 1. The "provable claim" formulation
+
+Claude's distilled version is the tightest statement I've seen for what IntentFrame can formally claim:
+
+> "IntentFrame guarantees, by construction, that any command tagged X by the deterministic parser cannot execute under policy Y. The Guardian LLM provides an additional semantic layer whose empirical block rate on our test distribution is 95-100% (95% CI) with measured failure correlation r = ___ against the Agent on N = ___ adversarial samples. The combination gives defense in depth: the deterministic layer is a hard floor, the semantic layer extends breadth."
+
+That belongs in your `SECURITY_SCOPE.md` or the expert brief. It separates what's proven from what's measured, which is exactly what a formal-security-trained reviewer wants to see.
+
+### 2. The "what command_shield can't do" list as a design spec
+
+Use that list — runtime behavior, semantic intent, scope/proportionality, cover stories, cross-command sequences, novel patterns, encoding tricks — as the **Guardian's test corpus design guide**. Every category should have at least 5-10 fixtures in the attack suite. Some of these (scope/proportionality, cover stories) are already in your lying-reason intents; others (cross-command sequences) are genuinely missing and would be a strong v1.1 addition.
+
+### 3. The three-number measurement framework
+
+Claude's framework of p₀ (no-guard baseline), p₁ (full pipeline), and FP rate is the right way to quantify the Guardian's value. You partially have this:
+
+- **p₁** = 1/100 (full layered policy) or 1/100 (minimal policy)
+- **p₀** ≈ 9/100 from the 2026-04-27 sweep (before the sensitive-surface clamp), or you could compute it from the minimal-policy run by counting which blocks came from AE+Guardian vs command_shield+patterns
+- **FP rate** = not yet measured — still the highest-priority gap
+
+### 4. The conditional probability as the real metric
+
+Instead of quoting 99/100, the more defensible number is: **of the intents that passed the deterministic layer, what fraction did the Guardian correctly block?** From your minimal-policy run: ~46 intents reached AE+Guardian (the rest were caught by command_shield or blocked_patterns). Of those 46, Guardian blocked 45 and missed 1. That's Guardian-specific effectiveness of ~97.8% on the subset where it's actually doing the work. That's the number that answers "is the LLM earning its keep?"
+
+## The one thing to change in your docs
+
+Your `why_llm_guarding_llm.md` should incorporate Claude's critique honestly. The doc is stronger if it includes the caveat: "The AE is also an LLM, so the 'independent forensic evidence' claim is only fully true for the deterministic component (command_shield). The AE-produced evidence is informationally independent (different prompt, different context) but architecturally similar (same model class, same training distribution), which means correlated blind spots are possible. Intent 88 is the measured instance of that correlation."
+
+Owning that makes the rest of the claim bulletproof. Hiding it makes the whole doc vulnerable to the exact critique Claude raised. 
