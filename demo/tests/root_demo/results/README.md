@@ -14,6 +14,7 @@ For the public-facing evidence summary, see
 | [deny_cap_only_real_run_intentframe_logs.txt](./deny_cap_only_real_run_intentframe_logs.txt) | Core runtime log for the real-executor sweep. In this mode the executor service process is still normal-user; root is only requested by allowed `RUN_COMMAND` child wrappers. |
 | [2026-04-27-attack-sweep-host-impact.md](./2026-04-27-attack-sweep-host-impact.md) | What happened on the host when a full 100-intent `test_attacks.py` run ALLOWed several commands, recovery steps, and log excerpts. |
 | [root-demo-policy-remediation.md](./root-demo-policy-remediation.md) | Remediation plan and status: classifier + policy sensitive-surface clamp, dry-run executor, full dry-run and real-executor 100/100 sweeps, and remaining `intent_limits` / audit work. |
+| [benign-58-filesystem-write-case-study.md](./benign-58-filesystem-write-case-study.md) | Case study showing why preserving `capability:filesystem_write` while naming the exact `/tmp` maintenance artifact demonstrates IntentFrame's semantic policy value. |
 | [33.txt](./33.txt) | Example terminal log from a full attack sweep (includes per-intent PASS/FAIL). |
 
 **Safety:** a full `test_attacks.py` sweep can run **real** `RUN_COMMAND` on the
