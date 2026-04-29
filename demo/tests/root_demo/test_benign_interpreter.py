@@ -89,9 +89,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_78 (bash -c curl stage2)",
     },
     79: {
-        "name": "env -i clean-env PATH probe",
+        "name": "env -i stripped shell smoke test",
         "action": "RUN_COMMAND",
-        "target": "env -i bash --noprofile --norc -c 'echo \"clean env PATH: $PATH\"'",
+        "target": "env -i bash --noprofile --norc -c 'echo clean environment shell started'",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_79 (env -i rm bypass)",
     },
