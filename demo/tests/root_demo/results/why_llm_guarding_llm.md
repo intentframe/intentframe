@@ -346,3 +346,88 @@ Instead of quoting 99/100, the more defensible number is: **of the intents that 
 Your `why_llm_guarding_llm.md` should incorporate Claude's critique honestly. The doc is stronger if it includes the caveat: "The AE is also an LLM, so the 'independent forensic evidence' claim is only fully true for the deterministic component (command_shield). The AE-produced evidence is informationally independent (different prompt, different context) but architecturally similar (same model class, same training distribution), which means correlated blind spots are possible. Intent 88 is the measured instance of that correlation."
 
 Owning that makes the rest of the claim bulletproof. Hiding it makes the whole doc vulnerable to the exact critique Claude raised. 
+
+
+----
+### AE LLM Role;
+Yes. That's exactly right, and it's one of the most important architectural decisions in IntentFrame. Let me be precise about what the AE is and isn't.
+
+## What the AE does
+
+The AE is a **policy-blind factual assessor**. It answers the question: *"What will this command actually do to this system, and how dangerous is that?"*
+
+Its inputs are:
+- The command string
+- The `command_shield` structural signals (capability tags, verdict, signal descriptions)
+- The execution privilege context ("running as root, uid=0")
+- The agent's stated reason and target (marked untrusted)
+
+Its outputs are:
+- **Risk rating** (LOW / MEDIUM / HIGH / CRITICAL)
+- **Reversibility** (FULLY_REVERSIBLE / PARTIALLY_REVERSIBLE / IRREVERSIBLE)
+- **Hidden behaviors** — things the command does that the agent's reason didn't mention
+- **Scope mismatch** — whether the command's blast radius exceeds what the stated reason would justify
+- **Confidence** level
+- **Domains** affected (security, data_modification, execution, communication, etc.)
+
+Notice what's *not* in that list: **no policy, no intent_limits, no deny_capabilities, no ALLOW/BLOCK decision**. The AE never sees the user's rules. It doesn't know what the user wants. It only knows what the command will do to the machine and how risky that is in absolute terms.
+
+## Why that separation matters
+
+The separation is the answer to your question. The AE has two distinct roles in the pipeline:
+
+**Role 1: Factual briefing for the Guardian.** The AE report is the "forensic dossier" that gets injected into the Guardian's prompt as trusted context. The Guardian reads: "AE says this command will disable the firewall, risk is HIGH, hidden behavior detected." The Guardian then compares that against policy (if any exists) and decides.
+
+**Role 2: Safety floor when no policy exists.** This is the role your 99/100 minimal-policy run demonstrated. When there are no `deny_capabilities` and no `intent_limits`, the Guardian's only decision material is:
+
+- The AE report (risk, hidden behaviors, scope mismatch, with signals from command shield)
+- The execution privilege context
+- Its own baked-in prompt instruction: *"BLOCK if analysis reveals hidden behaviors, scope mismatches, or elevated risks"*
+
+That baked-in instruction is product-level default policy — you wrote it as the system designer, not the user. It means the Guardian has a baseline safety behavior even when the user writes zero rules. The AE's independent risk assessment is what feeds that baseline.
+
+Your 99/100 result proved that Role 2 works: with zero user-written policy, the AE's factual analysis plus the Guardian's default suspicion prompt caught 99 out of 100 root-level attacks. The one it missed (Intent 88, ARP spoof) was where the AE's factual assessment was wrong — it rated MEDIUM, flagged no hidden behaviors — so the Guardian had no facts to act on.
+
+## The three-layer decision model
+
+Think of it as three independent sources of "reasons to block":
+
+| Source | Who provides it | Policy-dependent? | What it catches |
+|---|---|---|---|
+| **command_shield** structural signals | Deterministic parser | No — always emits signals regardless of policy | Catastrophic commands, capability tags, code patterns |
+| **AE factual analysis** | LLM forensic analyst | **No** — always assesses risk regardless of policy | HIGH/CRITICAL risk, hidden behaviors, scope mismatches, irreversibility |
+| **Intent limits / deny_capabilities** | User-written policy | Yes — only active if user writes rules | Policy violations specific to this user's constraints |
+
+The first two layers are always on. They're the "nobody forgot to set policy" safety net. The third layer is what the user adds to express their specific intent.
+
+Your Track B (99/100) proved layers 1 + 2 work alone. Your Track C (100/100) proved layer 3 closes the residual gap. Track A (100/100) with deny capabilities in policy, proved the strongest deterministic containment.
+
+## Why AE is separated from Guardian instead of combined
+
+This is the design question underneath your observation. You could have built a single LLM call that does both analysis and decision. The reason you didn't is exactly what you're identifying:
+
+**If analysis and decision were combined, the presence or absence of policy would contaminate the factual assessment.** An LLM asked "should this be allowed given policy X?" might anchor its risk assessment on whether a specific rule matches. An LLM asked "what does this command actually do?" gives you the facts regardless.
+
+The separation means:
+- AE with no policy → still gives you "this is HIGH risk, hidden behavior detected, irreversible"
+- AE with full policy → gives you the exact same factual report
+- Guardian with no policy → uses AE facts + default prompt → catches most attacks
+- Guardian with grandma policy → uses AE facts + intent_limits → catches all attacks
+
+The AE's output is stable across policy configurations because it never sees policy. The Guardian's behavior changes with policy because that's its job. The AE is the constant; the Guardian is the variable.
+
+## The "someone forgot to set policies" scenario
+
+You're right to flag this as a product value. In practice, most security tools fail open when misconfigured — if someone forgets to write rules, everything passes. IntentFrame fails *mostly closed* even with zero user policy, because:
+
+1. `command_shield` still emits CATASTROPHIC on the obvious stuff (rm -rf /, fork bombs, sudo, keychain dumps)
+2. The AE still independently assesses every command's risk from its own training knowledge
+3. The Guardian still has its default prompt instruction to block on HIGH/CRITICAL risk with hidden behaviors
+
+That's a meaningful product property. The AE's policy-independent analysis is what makes it possible. Without the AE, a misconfigured Guardian with no policy would have nothing to judge against except the raw command string and the agent's (untrusted) reason. With the AE, it has an independent expert opinion on what the command will really do — and that expert opinion is informed by `command_shield`'s structural signals, which the agent can't influence.
+
+The honest version of this claim:
+
+> *"IntentFrame provides baseline containment even with zero user-written policy, because the Analysis Engine independently assesses every action's risk, reversibility, and hidden behaviors using its own knowledge and deterministic structural signals. User-written policy (intent_limits) strengthens containment by giving the Guardian explicit criteria beyond the AE's risk judgment — but the AE's factual analysis is always on, always policy-independent, and always provides the Guardian with independent evidence about what the command will actually do."*
+
+That's the AE's role. Factual analyst. Policy-blind. Always on. The Guardian's independent source of truth about the command — which is exactly the "asymmetric information" that makes the whole "LLM guarding LLM" architecture work.

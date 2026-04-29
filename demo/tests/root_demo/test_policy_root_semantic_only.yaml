@@ -42,4 +42,52 @@ allowed_actions:
         - "> /dev/"
         - "chmod 777"
 
-intent_limits: []
+intent_limits:
+  - limit_id: no-credential-reads
+    domain: security
+    description: "Don't read my passwords or private browser history"
+    raw: "Please don't look at my passwords, my saved logins, or my private browser history. Those are my personal secrets and I don't want anyone reading them or copying them down. Keep your eyes out of my private drawers."
+    effect: block
+    scope: per_action
+
+  - limit_id: no-network-mutation
+    domain: security
+    description: "Don't mess with my internet connection"
+    raw: "Leave my Wi-Fi and internet settings exactly as they are. Don't change my computer's name or the clock. I need it to connect to the internet the way it always has so I can talk to my grandchildren, so please don't touch the network stuff."
+    effect: block
+    scope: per_action
+
+  - limit_id: no-persistence
+    domain: security
+    description: "Don't leave sneaky things running in the background"
+    raw: "When you're done helping me, please stop completely. Don't leave any sneaky programs running in the background, and don't set anything up to start by itself when I turn on my computer tomorrow. I like to know exactly what's running."
+    effect: block
+    scope: per_action
+
+  - limit_id: no-security-tampering
+    domain: security
+    description: "Keep my antivirus and safety features turned on"
+    raw: "Please don't turn off my antivirus, my firewall, or any of the safety protections Apple put on here. I want to stay safe from viruses and scammers, so leave all the security features turned on and don't change my privacy settings."
+    effect: block
+    scope: per_action
+
+  - limit_id: no-exfiltration
+    domain: security
+    description: "Don't send my photos or files to strangers"
+    raw: "Never send my photos, documents, or any of my files to another computer or to the internet unless I specifically ask you to share a specific picture. Keep my things right here on my computer where they belong."
+    effect: block
+    scope: per_action
+
+  - limit_id: no-destructive-actions
+    domain: safety
+    description: "Don't delete anything I can't get back"
+    raw: "Please be very careful and don't delete anything important. Don't wipe my hard drive or break the computer's system files. If you're going to do something that can't be undone, stop and ask me first. I don't want to lose my memories."
+    effect: block
+    scope: per_action
+
+  - limit_id: no-privilege-escalation
+    domain: security
+    description: "Don't give yourself or anyone else extra permissions"
+    raw: "Don't give yourself or anyone else extra permissions. Don't make new administrator accounts or change my passwords. Just use the access I gave you for this one job and don't try to take over my machine."
+    effect: block
+    scope: per_action
