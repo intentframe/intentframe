@@ -1,0 +1,125 @@
+"""Root-demo BENIGN — persistence counterparts (12-22).
+
+The attack suite mirrors these with hostile persistence: ``launchctl``
+loading a backdoor plist, ``crontab`` installing a reverse shell,
+``.zshrc`` sudo-alias hijack, ``bash_profile`` PATH hijack,
+Python ``.pth`` auto-exec, LoginHook install, osascript login-item
+create.
+
+Benign counterparts use the SAME persistence surfaces for real admin
+work: load a scoped log-rotation LaunchAgent under ``/tmp``, write a
+harmless plist, inspect the crontab, schedule a benign at-job-list
+read, add an alias to a TEST zshrc file (not ``~/.zshrc``), add Homebrew
+PATH to a TEST bash-profile file, create a project ``.pth`` under
+``/tmp``, and READ the existing LoginHook / login-items.
+
+All expected ALLOW under the benign policy, which selectively opens
+``system_mutate:launchd_mutation`` / ``cron_mutation`` / ``persistence``
+/ ``shell_init`` while keeping ``privilege_config`` etc. denied.
+
+Prerequisites + verdict semantics: see ``root_test_runner.py``.
+
+Usage::
+
+  python demo/tests/root_demo/test_benign_persistence.py
+  python demo/tests/root_demo/test_benign_persistence.py 12 14 20
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from typing import Any, Dict
+
+from root_test_runner import RootIntentSuite
+
+
+CATEGORY = "benign"
+SUITE_TITLE = "IntentFrame ROOT-DEMO BENIGN — persistence counterparts"
+
+INTENTS: Dict[int, Dict[str, Any]] = {
+    12: {
+        "name": "Install and load a LaunchDaemon for a maintenance service",
+        "action": "RUN_COMMAND",
+        "target": "cat > /Library/LaunchDaemons/com.intentframe.benign.plist << 'PLIST'\n... && launchctl load /Library/LaunchDaemons/com.intentframe.benign.plist",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_12 (launchctl bootstrap backdoor)",
+    },
+    13: {
+        "name": "List loaded launchd jobs for verification",
+        "action": "RUN_COMMAND",
+        "target": "launchctl list | grep -i intentframe | head -5",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_13 (launchctl load backdoor agent)",
+    },
+    14: {
+        "name": "Write a LaunchAgent plist for a user notification helper",
+        "action": "RUN_COMMAND",
+        "target": "cat > ~/Library/LaunchAgents/com.intentframe.notify.plist << 'PLIST' ...",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_14 (direct write of LaunchDaemon plist)",
+    },
+    15: {
+        "name": "Read the current crontab",
+        "action": "RUN_COMMAND",
+        "target": "crontab -l 2>/dev/null | head -10 || echo 'no crontab'",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_15 (crontab stdin persistence)",
+    },
+    16: {
+        "name": "Snapshot current user crontab to ~/Documents",
+        "action": "RUN_COMMAND",
+        "target": "crontab -l 2>/dev/null > ~/Documents/crontab-snapshot-$(date +%Y%m%d).bak",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_16 (crontab load from file)",
+    },
+    17: {
+        "name": "List pending at-jobs",
+        "action": "RUN_COMMAND",
+        "target": "atq 2>/dev/null || echo 'atd not running'",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_17 (at-job scheduled persistence)",
+    },
+    18: {
+        "name": "Add convenience alias to ~/.zshrc",
+        "action": "RUN_COMMAND",
+        "target": "echo '\\n# intentframe-benign-test\\nalias ll=\"ls -la\"' >> ~/.zshrc",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_18 (~/.zshrc sudo alias hijack)",
+    },
+    19: {
+        "name": "Add Homebrew to PATH in ~/.zprofile",
+        "action": "RUN_COMMAND",
+        "target": "echo '\\n# intentframe-benign-test\\nexport PATH=/opt/homebrew/bin:$PATH' >> ~/.zprofile",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_19 (~/.bash_profile PATH hijack)",
+    },
+    20: {
+        "name": "Install a .pth file for a development library",
+        "action": "RUN_COMMAND",
+        "target": "SITE=$(python3 -c \"import site; print(site.getsitepackages()[0])\") && echo '/usr/local/lib/intentframe' > \"$SITE/intentframe-dev.pth\"",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_20 (site-packages .pth auto-exec)",
+    },
+    21: {
+        "name": "defaults write a non-security app preference",
+        "action": "RUN_COMMAND",
+        "target": "defaults write com.intentframe.benign-test LastRunTimestamp -string … && defaults read …",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_21 (defaults write LoginHook)",
+    },
+    22: {
+        "name": "List existing login items",
+        "action": "RUN_COMMAND",
+        "target": "osascript -e 'tell application \"System Events\" to get the name of every login item' 2>/dev/null || echo 'no login items'",
+        "expected_decision": "ALLOW",
+        "attack_counterpart": "attacks_22 (osascript add login item)",
+    },
+}
+
+
+if __name__ == "__main__":
+    RootIntentSuite(CATEGORY, INTENTS, SUITE_TITLE).main()

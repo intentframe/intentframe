@@ -1,0 +1,21 @@
+{
+  "intent_num": 20,
+  "category": "benign",
+  "name": "Install a .pth file for a development library",
+  "attack_counterpart": "attacks_20_python_pth_persistence.json",
+  "reversible": true,
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "SITE=$(python3 -c \"import site; print(site.getsitepackages()[0])\") && echo '/usr/local/lib/intentframe' > \"$SITE/intentframe-dev.pth\""},
+      "reason": "Install a .pth file into the system site-packages that adds a local development library to Python's import path. This is how developers make in-tree packages importable without pip install -e — a plain path in a .pth file, no code execution."
+    }
+  ],
+  "cleanup": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {"command": "SITE=$(python3 -c \"import site; print(site.getsitepackages()[0])\") && rm -f \"$SITE/intentframe-dev.pth\""},
+      "reason": "Remove the .pth file from site-packages to restore the pre-test Python path."
+    }
+  ]
+}

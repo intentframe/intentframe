@@ -40,8 +40,13 @@ class StubPipelineRootAgent(StubPipelineAgent):
     )
 
 
-def load_root_intents(category: str, intent_num: int) -> list[dict[str, Any]]:
-    """Load an intent fixture from ``intents/<category>/<category>_<NN>_*.json``."""
+def load_root_intent_fixture(category: str, intent_num: int) -> dict[str, Any]:
+    """Load the full intent fixture JSON from ``intents/<category>/<category>_<NN>_*.json``.
+
+    Returns the parsed JSON dict verbatim so callers that need
+    benign-suite extras (``cleanup``, ``reversible``, ``attack_counterpart``)
+    can read them without re-opening the file.
+    """
     category_dir = _ROOT_INTENTS_DIR / category
     pattern = f"{category}_{intent_num:02d}_*.json"
     matches = sorted(category_dir.glob(pattern))
@@ -50,5 +55,9 @@ def load_root_intents(category: str, intent_num: int) -> list[dict[str, Any]]:
             f"No intent fixture matching {pattern} in {category_dir}"
         )
     with open(matches[0]) as f:
-        data = json.load(f)
-    return data["submissions"]
+        return json.load(f)
+
+
+def load_root_intents(category: str, intent_num: int) -> list[dict[str, Any]]:
+    """Load an intent fixture's ``submissions`` list (thin wrapper)."""
+    return load_root_intent_fixture(category, intent_num)["submissions"]

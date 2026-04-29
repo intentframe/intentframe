@@ -1,0 +1,224 @@
+# ==============================================================================
+# Root-Demo Policy - Root Admin Assistant Profile
+# ==============================================================================
+#
+# This profile describes the root-demo agent as a Jarvis-like personal admin
+# assistant, not as a generic root shell. The balance is preventive first:
+# anything we never want a personal assistant doing automatically is denied at
+# Gate 2 with deny_capabilities. Dual-use admin work stays open and is judged by
+# the semantic intent limits below.
+#
+# Hard-denied surfaces:
+#   * non-python/non-shell runtimes and build/package ecosystems
+#   * credential, private-data, and high-sensitivity local reads
+#   * outbound local-data transfer surfaces
+#   * access creation, privilege changes, and security weakening
+#
+# Semantically judged surfaces:
+#   * service management, launchd/cron, maintenance persistence
+#   * scoped backups, shell config changes, local config edits
+#   * hostname/DNS/time/hosts changes when clearly requested
+#   * cleanup of named logs, caches, temp files, and test artifacts
+#
+# The semantic limits are intentionally written like a human would describe the
+# assistant: what it is for, what normal work looks like, and where it must stop.
+# ==============================================================================
+
+allowed_actions:
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"
+        - mkfs
+        - "dd if="
+        - "> /dev/"
+        - "chmod 777"
+      deny_capabilities:
+        # Language clamp: Jarvis root may use shell, Python, and normal POSIX
+        # utilities. Other language runtimes, local binaries, compilation, and
+        # non-python/non-shell package ecosystems are outside the assistant's
+        # automatic root surface.
+        - "capability:script_execution:node"
+        - "capability:script_execution:ruby"
+        - "capability:script_execution:perl"
+        - "capability:script_execution:java"
+        - "capability:script_execution:go"
+        - "capability:script_execution:dotnet"
+        - "capability:script_execution:php"
+        - "capability:script_execution:lua"
+        - "capability:script_execution:r"
+        - "capability:script_execution:julia"
+        - "capability:script_execution:swift"
+        - "capability:script_execution:deno_bun"
+        - "capability:script_execution:local_binary"
+        - "capability:compilation"
+        - "capability:stdin_exec:node"
+        - "capability:stdin_exec:ruby"
+        - "capability:stdin_exec:perl"
+        - "capability:stdin_exec:php"
+        - "capability:package_install:npm"
+        - "capability:package_install:gem"
+        - "capability:package_install:cargo"
+        - "capability:package_install:go"
+        - "capability:package_install:composer"
+
+        # Sensitive reads: a personal assistant should not automatically inspect
+        # secrets, browser/session data, private account metadata, mail/messages,
+        # shell history, process environments, or process memory. False positives
+        # here are acceptable; the user can handle exceptional cases manually.
+        - "capability:data_read:browser_cookies"
+        - "capability:data_read:browser_profile_data"
+        - "capability:data_read:browser_session_data"
+        - "capability:data_read:auth_authority"
+        - "capability:data_read:credential_material"
+        - "capability:data_read:shell_history"
+        - "capability:data_read:db_client_history"
+        - "capability:data_read:messaging_history"
+        - "capability:data_read:personal_records"
+        - "capability:data_read:dotfile_secrets"
+        - "capability:data_read:cloud_tokens"
+        - "capability:data_read:password_manager_export"
+        - "capability:data_read:process_env"
+        - "capability:data_read:ssh_known_hosts"
+        - "capability:data_read:mail_store"
+        - "capability:data_read:process_memory"
+
+        # Outbound local-data movement: downloads can be normal admin work, but
+        # upload/exfil paths should not be available through unattended root
+        # shell commands.
+        - "capability:network_exfil:http_upload"
+        - "capability:network_exfil:file_transfer_outbound"
+        - "capability:network_exfil:ssh_tunnel"
+        - "capability:network_exfil:cloud_upload"
+
+        # Never-auto mutations: these change trust boundaries, create access,
+        # weaken defenses, or tamper with security records. They are blocked even
+        # if some benign admin task might occasionally want them.
+        - "capability:system_mutate:security_daemon"
+        - "capability:system_mutate:browser_security_pref"
+        - "capability:system_mutate:firewall"
+        - "capability:system_mutate:privilege_config"
+        - "capability:system_mutate:user_account"
+        - "capability:system_mutate:remote_access"
+        - "capability:system_mutate:disk_encryption"
+        - "capability:system_mutate:kernel_tunable"
+        - "capability:system_mutate:mdm_profile"
+        - "capability:system_mutate:boot_policy"
+        - "capability:system_mutate:audit_log"
+        - "capability:system_mutate:tcc_privacy"
+        - "capability:system_mutate:installer_pkg"
+        - "capability:system_mutate:kernel_extension"
+        - "capability:system_mutate:browser_extension"
+        - "capability:system_mutate:screen_sharing"
+        - "capability:system_mutate:radio_power"
+        - "capability:system_mutate:ca_trust"
+        - "capability:system_mutate:history_tamper"
+
+intent_limits:
+  - limit_id: root-admin-assistant-charter
+    domain: scope
+    description: "Who this root agent is"
+    raw: >-
+      You are Jarvis, my personal root maintenance assistant. You are not a
+      generic root shell, red-team tool, persistence agent, credential helper,
+      data exfiltration tool, or privilege-escalation tool.
+
+      Use root only to complete the local admin task I asked for, and
+      preserve my security, privacy, and system integrity while doing it.
+    effect: block
+    scope: session
+
+  - limit_id: expected-root-admin-work
+    domain: scope
+    description: "Normal work this assistant may do"
+    raw: >-
+      Normal expected work includes reading system state, inspecting
+      configuration, creating scoped backups, cleaning named logs or caches,
+      managing clearly named services, setting up maintenance jobs I asked
+      for, editing local config files, running small shell or Python
+      maintenance scripts, and downloading files I requested.
+
+      These actions are acceptable only when the reason names the purpose and
+      the affected path, service, or setting.
+    effect: block
+    scope: per_action
+
+  - limit_id: no-security-downgrade
+    domain: security
+    description: "Do not make the system less secure"
+    raw: >-
+      Do not turn off or weaken my firewall, FileVault, SIP, Gatekeeper,
+      antivirus, EDR, audit protections, browser security, TCC privacy, boot
+      policy, kernel protections, or certificate trust.
+
+      If a change would make the machine less secure than it was before,
+      block it or ask me first.
+    effect: block
+    scope: per_action
+
+  - limit_id: no-credential-or-private-data-access
+    domain: security
+    description: "Do not inspect secrets or private data"
+    raw: >-
+      Do not read, copy, export, upload, or move passwords, private SSH keys,
+      API tokens, cloud credentials, keychain contents, browser cookies,
+      browser sessions, saved logins, password-manager exports, mail stores,
+      message stores, or other private personal records.
+
+      Public keys, certificate metadata, and ordinary non-secret
+      configuration are fine when needed for the task.
+    effect: block
+    scope: per_action
+
+  - limit_id: no-data-exfiltration
+    domain: security
+    description: "Keep my local data on this machine"
+    raw: >-
+      Do not send my local files, credentials, browser data, private
+      records, or system-sensitive data to any external server or another
+      computer. Downloading files I asked for is fine.
+
+      Posting to a server is only fine when I explicitly asked for that exact
+      post and the payload contains no secrets or private local data.
+    effect: block
+    scope: per_action
+
+  - limit_id: no-new-access-paths
+    domain: security
+    description: "Do not create new ways into the machine"
+    raw: >-
+      Do not create users, add anyone to admin groups, modify sudoers or PAM,
+      inject SSH keys into authorized_keys, enable remote login, enable
+      screen sharing, open a persistent remote channel, or otherwise create
+      a new way for you or someone else to access this machine.
+    effect: block
+    scope: per_action
+
+  - limit_id: no-hostile-persistence
+    domain: security
+    description: "Only create maintenance persistence I asked for"
+    raw: >-
+      You may create or manage launchd jobs, cron jobs, shell aliases, PATH
+      entries, and other persistence only when they are clearly named, local,
+      reversible, and directly requested for maintenance, backups, log
+      rotation, or another normal admin task.
+
+      Block anything hidden, disguised, network-beaconing,
+      credential-related, or unrelated to the task.
+    effect: block
+    scope: per_action
+
+  - limit_id: ask-before-irreversible-or-broad-changes
+    domain: safety
+    description: "Ask before broad or irreversible work"
+    raw: >-
+      Ask before deleting personal files, wiping disks, changing security
+      settings, removing profiles, modifying identity/access controls, or
+      making broad filesystem changes.
+
+      Scoped cleanup of named temp files, caches, logs, and test artifacts is
+      fine when the command names the path and purpose.
+    effect: require_confirmation
+    scope: per_action

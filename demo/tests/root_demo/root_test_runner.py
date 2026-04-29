@@ -65,7 +65,11 @@ from root_intent_pipeline import (
     register_root_workspace,
 )
 from root_policy_loader import DEFAULT_ROOT_POLICY_PATH
-from root_stub_agent import StubPipelineRootAgent, load_root_intents
+from root_stub_agent import (
+    StubPipelineRootAgent,
+    load_root_intent_fixture,
+    load_root_intents,
+)
 
 
 _OUTPUT_CAP_CHARS = 600  # Modest cap: full output for short commands
@@ -260,6 +264,9 @@ class RootIntentSuite:
         print(f"  Target:   {meta['target']}")
         print(f"  Expected: {meta['expected_decision']}")
         print(f"  User:     {ROOT_USER_ID}")
+        counterpart = meta.get("attack_counterpart")
+        if counterpart:
+            print(f"  Mirrors:  {counterpart}")
         print("=" * 79)
 
     def _evaluate(self, entry: Dict[str, Any]) -> Tuple[bool, str, str]:
@@ -340,6 +347,138 @@ class RootIntentSuite:
         print(f"#  ACTION GROUP: {action}   —   intents {nums}")
         print("#" * 79)
 
+    async def _run_cleanup_phase(
+        self,
+        agent: StubPipelineRootAgent,
+        cleanup_plan: List[Tuple[int, List[Dict[str, Any]]]],
+    ) -> None:
+        """Re-submit each fixture's ``cleanup`` list through the same agent.
+
+        Runs once after the main assertion loop.  Submissions flow
+        through the full pipeline (not a raw subprocess) so the cleanup
+        command is itself policy-checked — if the benign policy would
+        have blocked a cleanup command, that's a signal the fixture's
+        cleanup shape is wrong.
+
+        In dry-run mode the submissions echo as ``[dry-run] would run: ...``
+        and mutate nothing.  In real mode they undo the fixture's
+        reversible host changes.  Cleanup results never fail the test
+        (cleanup is test-harness state management, not a behavioural
+        assertion).
+        """
+        global_teardown = self._category_teardown()
+        if not cleanup_plan and not global_teardown:
+            return
+        total_items = (
+            sum(len(items) for _, items in cleanup_plan) + len(global_teardown)
+        )
+        mode_tag = "DRY-RUN (no-op)" if self._dry_run_mode else "REAL"
+        print()
+        print("#" * 79)
+        print(
+            f"#  CLEANUP PHASE  —  {total_items} command(s) across "
+            f"{len(cleanup_plan)} intent(s) + {len(global_teardown)} global  "
+            f"[{mode_tag}]"
+        )
+        print("#" * 79)
+        ok = 0
+        blocked = 0
+        failed = 0
+        for intent_num, items in cleanup_plan:
+            print(f"\n  [intent {intent_num}]  {len(items)} cleanup command(s)")
+            for i, req in enumerate(items, start=1):
+                cmd = req.get("data", {}).get("command", "")
+                result = await agent.submit(req)
+                if not result.success:
+                    decision = "BLOCK" if (
+                        isinstance(result.data, dict)
+                        and result.data.get("decision") == "BLOCK"
+                    ) else "FAIL"
+                    if decision == "BLOCK":
+                        blocked += 1
+                        print(f"    [{i}] 🚫 BLOCK   {cmd[:90]}")
+                        reason = (
+                            result.data.get("reason", "")
+                            if isinstance(result.data, dict) else ""
+                        )
+                        if reason:
+                            print(f"        reason: {str(reason)[:110]}")
+                    else:
+                        failed += 1
+                        err = (result.error or "")[:110]
+                        print(f"    [{i}] ❌ ERROR   {cmd[:90]}")
+                        if err:
+                            print(f"        error:  {err}")
+                else:
+                    ok += 1
+                    tag = "[dry-run]" if self._dry_run_mode else "✓"
+                    print(f"    [{i}] {tag}        {cmd[:90]}")
+        if global_teardown:
+            print(f"\n  [global teardown]  {len(global_teardown)} command(s)")
+            for i, req in enumerate(global_teardown, start=1):
+                cmd = req.get("data", {}).get("command", "")
+                result = await agent.submit(req)
+                if not result.success:
+                    decision = "BLOCK" if (
+                        isinstance(result.data, dict)
+                        and result.data.get("decision") == "BLOCK"
+                    ) else "FAIL"
+                    if decision == "BLOCK":
+                        blocked += 1
+                        print(f"    [{i}] 🚫 BLOCK   {cmd[:90]}")
+                    else:
+                        failed += 1
+                        print(f"    [{i}] ❌ ERROR   {cmd[:90]}")
+                else:
+                    ok += 1
+                    tag = "[dry-run]" if self._dry_run_mode else "✓"
+                    print(f"    [{i}] {tag}        {cmd[:90]}")
+        print()
+        print(
+            f"  Cleanup summary: {ok} ok, {blocked} blocked, {failed} errored"
+        )
+
+    async def _run_category_setup(self, agent: StubPipelineRootAgent) -> None:
+        """Submissions the category needs once, *before* the intent loop.
+
+        Mirrors :meth:`_category_teardown` but runs up-front.  The
+        benign suite uses this to create ``/tmp/intentframe-benign/``
+        so each fixture's ``command`` can assume the scoped workspace
+        exists (and individual intents stay short and legible).
+        """
+        submissions = self._category_setup()
+        if not submissions:
+            return
+        print()
+        print("#" * 79)
+        print(f"#  CATEGORY SETUP  —  {len(submissions)} preparation command(s)")
+        print("#" * 79)
+        for i, req in enumerate(submissions, start=1):
+            cmd = req.get("data", {}).get("command", "")
+            result = await agent.submit(req)
+            mark = "✓" if result.success else "✗"
+            tag = "[dry-run]" if self._dry_run_mode else mark
+            print(f"    [{i}] {tag} {cmd[:90]}")
+
+    def _category_setup(self) -> List[Dict[str, Any]]:
+        """Pre-intent submissions keyed by category (stub).
+
+        The benign suite is dry-run only (see :meth:`_run_root_preflight`)
+        — nothing mutates the host, so no scratch directory / staging
+        prefix is needed.  Subclasses or future categories can override
+        to run preparation commands before the intent loop.
+        """
+        return []
+
+    def _category_teardown(self) -> List[Dict[str, Any]]:
+        """Post-cleanup submissions keyed by category (stub).
+
+        The benign suite is dry-run only, so there is nothing to tear
+        down.  Subclasses or future categories can override to run
+        final teardown commands.
+        """
+        return []
+
     async def _run_root_preflight(
         self,
         agent: StubPipelineRootAgent,
@@ -391,6 +530,35 @@ class RootIntentSuite:
 
         # Real-execution branch: require uid=0 observable via whoami.
         if result.success and output == "root":
+            # ── Benign suite is dry-run only ─────────────────────────
+            # The benign corpus measures policy *decisions* (utility
+            # rate / FP rate), not execution outcomes.  Running it
+            # against a live root executor would mutate real admin
+            # surfaces (~/.zshrc, /etc/pam.d/, ~/.ssh/authorized_keys,
+            # /Library/LaunchDaemons/, site-packages) for no
+            # additional measurement benefit.  Refuse and point the
+            # operator at dry-run mode.
+            if self.category == "benign":
+                print(
+                    "    ❌ FAIL  benign suite refuses to run against a live root executor"
+                )
+                print(
+                    "        The benign corpus measures policy decisions (ALLOW/BLOCK),"
+                )
+                print(
+                    "        not execution outcomes.  Dry-run is sufficient and avoids"
+                )
+                print(
+                    "        mutating real admin paths (~/.zshrc, /etc/pam.d, /Library/"
+                )
+                print(
+                    "        LaunchDaemons, ~/.ssh/authorized_keys, site-packages, …)."
+                )
+                print("        Restart the supervisor in dry-run mode:")
+                print("          INTENTFRAME_EXECUTOR_MODE=dry_run \\")
+                print("          INTENTFRAME_DRY_RUN_CONTEXT=root \\")
+                print("          …")
+                return False
             self._dry_run_mode = False
             print("    ✅ PASS  whoami returned 'root' (real executor, running as root)")
             return True
@@ -451,21 +619,27 @@ class RootIntentSuite:
                 if not await self._run_root_preflight(agent, server_client):
                     return False
 
+                await self._run_category_setup(agent)
+
                 t0 = time.monotonic()
                 per_intent: List[Dict[str, Any]] = []
                 all_passed = True
+                cleanup_plan: List[Tuple[int, List[Dict[str, Any]]]] = []
                 for action, nums in self._group_by_action(intent_nums):
                     self._print_group_banner(action, nums)
                     for n in nums:
                         self._print_intent_header(n)
                         server_client.clear_audit_log()
 
-                        submissions = load_root_intents(self.category, n)
+                        fixture = load_root_intent_fixture(self.category, n)
+                        submissions = fixture["submissions"]
                         results = [await agent.submit(req) for req in submissions]
 
                         entry: Dict[str, Any] = {
                             "intent_num": n,
                             "submits": len(submissions),
+                            "reversible": fixture.get("reversible"),
+                            "attack_counterpart": fixture.get("attack_counterpart"),
                             "results": [
                                 {
                                     "success": r.success,
@@ -479,7 +653,29 @@ class RootIntentSuite:
                         passed, _, _ = self._evaluate(entry)
                         all_passed = all_passed and passed
                         self._print_intent_verdict(entry)
+
+                        cleanup_items = fixture.get("cleanup") or []
+                        if cleanup_items:
+                            cleanup_plan.append((n, cleanup_items))
                 duration = time.monotonic() - t0
+
+                # Cleanup phase — runs after every intent's assertion so
+                # the fixtures' reversible mutations are undone through
+                # the same pipeline.  Skipped for categories that are
+                # dry-run-only (nothing mutated, nothing to clean up);
+                # the ``cleanup`` field is retained in fixtures as
+                # documentation of how the mutation would be reversed
+                # if the same command were run outside the test harness.
+                if self.category == "benign":
+                    print()
+                    print("#" * 79)
+                    print(
+                        "#  CLEANUP PHASE  —  SKIPPED "
+                        "(benign suite is dry-run only, no host state mutated)"
+                    )
+                    print("#" * 79)
+                else:
+                    await self._run_cleanup_phase(agent, cleanup_plan)
             finally:
                 await agent.close()
 
