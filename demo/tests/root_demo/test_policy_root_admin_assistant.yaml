@@ -38,7 +38,11 @@ allowed_actions:
         - "rm -rf /"
         - mkfs
         - "dd if="
-        - "> /dev/"
+        - "> /dev/disk"
+        - "> /dev/rdisk"
+        - "> /dev/pf"
+        - "> /dev/kmem"
+        - "> /dev/mem"
         - "chmod 777"
       deny_capabilities:
         # Language clamp: root maintenance may use shell, Python, and normal
