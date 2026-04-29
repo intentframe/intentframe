@@ -47,6 +47,37 @@ should describe what is allowed on the system, not who the agent is supposed to
 be. This also keeps the root demo useful for different agents and future test
 corpora.
 
+## Command Shield And RUN_COMMAND
+
+Most `command_shield` detections and `deny_capabilities` in this root policy are
+device-boundary or authentication-boundary capabilities. They are especially
+important for `RUN_COMMAND`, because shell commands are the broadest and most
+dangerous interface.
+
+They protect against:
+
+- device control: disk erase, raw device writes, boot changes, kernel, MDM, and
+  security daemon changes
+- trust and network mutation: DNS, hosts files, routes, hostnames, firewalls,
+  certificates, browser security, and time sync
+- access creation: users, admin rights, sudoers, SSH keys, remote login, and
+  tunnels
+- authentication power: keychain, cookies, sessions, private keys, cloud tokens,
+  password-manager data, and process environment or memory
+- irreversible damage: `rm -rf /`, broad deletion, formatting, and destructive
+  obfuscation
+- hidden control or execution: launchd or cron persistence, curl-pipe-shell,
+  reverse shells, and encoded payloads
+
+This matters more for `RUN_COMMAND` than for normal app actions because
+`RUN_COMMAND` can express almost any host operation. The policy therefore needs
+strong structural protection before the semantic Guardian reasons about intent.
+
+The key design choice is: hard-deny device, authentication, and control surfaces;
+semantically judge useful local work. That keeps root command execution useful
+for maintenance while preventing the agent from taking over, weakening, or
+leaking the machine.
+
 ## Hard Denies
 
 Hard denies are used for surfaces that should not be available to autonomous
