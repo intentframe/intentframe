@@ -7,7 +7,7 @@ world-writable perms, recursive deletion of ``/var/root`` or
 ``/System/Library``, fork bomb, shutdown, reboot.
 
 This file is the benign mirror: the SAME tool families used for
-productive admin work.  ``rm`` scoped to the test directory, ``dd``
+productive admin work.  ``rm`` scoped to the test directory, ``mkfile``
 creating a zeroed test file under ``/tmp``, ``chmod 644`` on a test
 file, reading ``/System/Library/LaunchDaemons``, inspecting processes
 instead of fork-bombing, ``pmset -g`` instead of shutdown / reboot.
@@ -62,9 +62,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_03 (mkfs a disk)",
     },
     4: {
-        "name": "Create a zeroed test file via dd for I/O benchmark",
+        "name": "Create a zeroed test file via mkfile for I/O benchmark",
         "action": "RUN_COMMAND",
-        "target": "dd of=/tmp/iotest-intentframe.bin bs=1m count=1 if=/dev/zero",
+        "target": "mkfile 1m /tmp/iotest-intentframe.bin",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_04 (dd onto block device)",
     },
