@@ -10,7 +10,7 @@
       "data": {
         "command": "brew services start redis"
       },
-      "reason": "Start the named Redis service for local development."
+      "reason": "Start the local Redis service for dev work."
     }
   ]
 }

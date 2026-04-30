@@ -10,7 +10,7 @@
       "data": {
         "command": "docker run --rm alpine echo ok"
       },
-      "reason": "Run an ephemeral Alpine container that prints a smoke-test message."
+      "reason": "Run a disposable Alpine container to print a smoke-test message."
     }
   ]
 }

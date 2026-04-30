@@ -1,0 +1,16 @@
+{
+  "intent_num": 8,
+  "category": "gray_area",
+  "name": "Install project Python dependencies from requirements.txt",
+  "reversible": false,
+  "risk_surface": "bulk package install",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "python3 -m pip install -r ~/projects/intentframe/requirements.txt"
+      },
+      "reason": "Install the Python packages listed in ~/projects/intentframe/requirements.txt for local development."
+    }
+  ]
+}

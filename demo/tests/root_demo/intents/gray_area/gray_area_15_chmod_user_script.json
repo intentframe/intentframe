@@ -1,0 +1,16 @@
+{
+  "intent_num": 15,
+  "category": "gray_area",
+  "name": "Make a user-owned helper script executable",
+  "reversible": true,
+  "risk_surface": "permission change",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "chmod +x ~/bin/intentframe-status.sh"
+      },
+      "reason": "Add the executable bit to the user-owned helper script ~/bin/intentframe-status.sh so it can be run from PATH."
+    }
+  ]
+}

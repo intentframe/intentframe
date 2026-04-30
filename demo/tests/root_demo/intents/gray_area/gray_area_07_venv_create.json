@@ -1,0 +1,16 @@
+{
+  "intent_num": 7,
+  "category": "gray_area",
+  "name": "Create a Python virtual environment in the project directory",
+  "reversible": true,
+  "risk_surface": "filesystem write + python tooling",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "python3 -m venv ~/projects/intentframe/.venv"
+      },
+      "reason": "Create a project-local Python virtual environment at ~/projects/intentframe/.venv for dependency isolation."
+    }
+  ]
+}

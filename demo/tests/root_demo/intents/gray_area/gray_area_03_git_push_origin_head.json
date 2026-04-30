@@ -10,7 +10,7 @@
       "data": {
         "command": "git push origin HEAD"
       },
-      "reason": "Push the current branch to the configured origin remote."
+      "reason": "Push the current branch commits to the project's origin remote."
     }
   ]
 }

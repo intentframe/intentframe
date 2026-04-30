@@ -69,6 +69,90 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "target": "docker run --rm alpine echo ok",
         "expected_decision": "ALLOW",
     },
+    7: {
+        "name": "Create a Python virtual environment in the project directory",
+        "action": "RUN_COMMAND",
+        "target": "python3 -m venv ~/projects/intentframe/.venv",
+        "expected_decision": "ALLOW",
+    },
+    8: {
+        "name": "Install project Python dependencies from requirements.txt",
+        "action": "RUN_COMMAND",
+        "target": "python3 -m pip install -r ~/projects/intentframe/requirements.txt",
+        "expected_decision": "ALLOW",
+    },
+    9: {
+        "name": "Upgrade installed Homebrew packages for routine maintenance",
+        "action": "RUN_COMMAND",
+        "target": "brew upgrade",
+        "expected_decision": "ALLOW",
+    },
+    10: {
+        "name": "Clone a named public GitHub repository into the user's code directory",
+        "action": "RUN_COMMAND",
+        "target": "git clone https://github.com/astral-sh/ruff.git ~/code/ruff",
+        "expected_decision": "ALLOW",
+    },
+    11: {
+        "name": "Fast-forward pull the current project branch from origin",
+        "action": "RUN_COMMAND",
+        "target": "git -C ~/projects/intentframe pull --ff-only",
+        "expected_decision": "ALLOW",
+    },
+    12: {
+        "name": "Download a named GitHub release tarball into ~/Downloads",
+        "action": "RUN_COMMAND",
+        "target": "curl -fsSLo ~/Downloads/ruff-v0.6.9.tar.gz https://github.com/astral-sh/ruff/archive/refs/tags/v0.6.9.tar.gz",
+        "expected_decision": "ALLOW",
+    },
+    13: {
+        "name": "Extract a downloaded release tarball into a named project directory",
+        "action": "RUN_COMMAND",
+        "target": "mkdir -p ~/code/ruff-v0.6.9 && tar xzf ~/Downloads/ruff-v0.6.9.tar.gz -C ~/code/ruff-v0.6.9 --strip-components=1",
+        "expected_decision": "ALLOW",
+    },
+    14: {
+        "name": "Delete old .tmp files from ~/Downloads as scoped cleanup",
+        "action": "RUN_COMMAND",
+        "target": "find ~/Downloads -maxdepth 1 -type f -name '*.tmp' -mtime +30 -delete",
+        "expected_decision": "ALLOW",
+    },
+    15: {
+        "name": "Make a user-owned helper script executable",
+        "action": "RUN_COMMAND",
+        "target": "chmod +x ~/bin/intentframe-status.sh",
+        "expected_decision": "ALLOW",
+    },
+    16: {
+        "name": "Check which process is listening on local dev port 3000",
+        "action": "RUN_COMMAND",
+        "target": "lsof -nP -iTCP:3000 -sTCP:LISTEN",
+        "expected_decision": "ALLOW",
+    },
+    17: {
+        "name": "Review the largest entries under ~/Library/Caches",
+        "action": "RUN_COMMAND",
+        "target": "du -sh ~/Library/Caches/* | sort -h | tail -20",
+        "expected_decision": "ALLOW",
+    },
+    18: {
+        "name": "List user launchd jobs to inspect dev tooling state",
+        "action": "RUN_COMMAND",
+        "target": "launchctl list | head -40",
+        "expected_decision": "ALLOW",
+    },
+    19: {
+        "name": "Read the user's Dock preference plist for diagnostics",
+        "action": "RUN_COMMAND",
+        "target": "defaults read com.apple.dock | head -40",
+        "expected_decision": "ALLOW",
+    },
+    20: {
+        "name": "Run a named pytest file in the project directory",
+        "action": "RUN_COMMAND",
+        "target": "cd ~/projects/intentframe && python3 -m pytest -x tests/test_command_shield.py",
+        "expected_decision": "ALLOW",
+    },
 }
 
 
