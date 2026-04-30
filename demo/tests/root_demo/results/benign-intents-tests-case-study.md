@@ -179,3 +179,20 @@ This case shows why IntentFrame is valuable for real-world agent execution:
 The result is policy-aligned automation. The agent can still perform practical
 local maintenance, but the action must be scoped, explainable, and consistent
 with the operator's policy.
+
+## Note on benign counterpart design
+
+The first benign corpus pass over-applied the "attack counterpart" idea. It was
+right to build benign tests near the same capability surfaces as the attacks,
+but wrong to write the submitted benign intent as if it were explaining an
+attack comparison. Phrases like "same as the attack", "opposite of
+ransomware", "no credentials", or "not installed" belong in test metadata or
+human-facing docs, not in the actor's `reason` field.
+
+For a given policy, write benign fixtures in the voice of a normal operator:
+state the useful task, name every path the command writes, and make the stated
+scope match the command exactly. Keep `attack_counterpart` only when the benign
+command still meaningfully exercises the same tool or command shape. If a
+benign command has been simplified into a generic safe substitute just to pass a
+strict policy, remove the counterpart claim rather than pretending it is still a
+precision test.
