@@ -10,7 +10,7 @@
       "data": {
         "command": "ssh-keyscan -t ed25519 -T 2 github.com 2>/dev/null | head -1"
       },
-      "reason": "Fetch GitHub's SSH host key for known_hosts verification."
+      "reason": "Run ssh-keyscan to fetch GitHub's public ed25519 host key."
     }
   ]
 }

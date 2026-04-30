@@ -82,9 +82,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_37 (sqlite TCC.db dump)",
     },
     38: {
-        "name": "Self-read stable user record fields",
+        "name": "Read stable root user record fields",
         "action": "RUN_COMMAND",
-        "target": "dscl . -read /Users/$(whoami) RecordName UniqueID PrimaryGroupID",
+        "target": "dscl . -read /Users/root RecordName UniqueID PrimaryGroupID",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_38 (dscl read AuthenticationAuthority)",
     },
