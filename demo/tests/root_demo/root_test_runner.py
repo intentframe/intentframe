@@ -75,6 +75,7 @@ from root_stub_agent import (
 _OUTPUT_CAP_CHARS = 600  # Modest cap: full output for short commands
                          # (ls, pfctl, tee), useful first chunk for verbose
                          # ones (dmesg, lsof, ps).
+_DRY_RUN_ONLY_CATEGORIES = {"benign", "gray_area"}
 
 
 def _print_executor_alert() -> None:
@@ -530,29 +531,28 @@ class RootIntentSuite:
 
         # Real-execution branch: require uid=0 observable via whoami.
         if result.success and output == "root":
-            # ── Benign suite is dry-run only ─────────────────────────
-            # The benign corpus measures policy *decisions* (utility
-            # rate / FP rate), not execution outcomes.  Running it
-            # against a live root executor would mutate real admin
-            # surfaces (~/.zshrc, /etc/pam.d/, ~/.ssh/authorized_keys,
-            # /Library/LaunchDaemons/, site-packages) for no
-            # additional measurement benefit.  Refuse and point the
-            # operator at dry-run mode.
-            if self.category == "benign":
+            # ── Decision-only suites are dry-run only ────────────────
+            # These corpora measure policy decisions, not execution
+            # outcomes. Running them against a live root executor would
+            # mutate real admin/dev surfaces for no additional
+            # measurement benefit. Refuse and point the operator at
+            # dry-run mode.
+            if self.category in _DRY_RUN_ONLY_CATEGORIES:
+                suite_name = self.category.replace("_", " ")
                 print(
-                    "    ❌ FAIL  benign suite refuses to run against a live root executor"
+                    f"    ❌ FAIL  {suite_name} suite refuses to run against a live root executor"
                 )
                 print(
-                    "        The benign corpus measures policy decisions (ALLOW/BLOCK),"
+                    "        This corpus measures policy decisions (ALLOW/BLOCK),"
                 )
                 print(
                     "        not execution outcomes.  Dry-run is sufficient and avoids"
                 )
                 print(
-                    "        mutating real admin paths (~/.zshrc, /etc/pam.d, /Library/"
+                    "        mutating real admin/dev paths (~/.zshrc, /etc/pam.d, /Library/"
                 )
                 print(
-                    "        LaunchDaemons, ~/.ssh/authorized_keys, site-packages, …)."
+                    "        LaunchDaemons, ~/.ssh/authorized_keys, site-packages, git remotes, …)."
                 )
                 print("        Restart the supervisor in dry-run mode:")
                 print("          INTENTFRAME_EXECUTOR_MODE=dry_run \\")
@@ -666,12 +666,12 @@ class RootIntentSuite:
                 # the ``cleanup`` field is retained in fixtures as
                 # documentation of how the mutation would be reversed
                 # if the same command were run outside the test harness.
-                if self.category == "benign":
+                if self.category in _DRY_RUN_ONLY_CATEGORIES:
                     print()
                     print("#" * 79)
                     print(
                         "#  CLEANUP PHASE  —  SKIPPED "
-                        "(benign suite is dry-run only, no host state mutated)"
+                        "(suite is dry-run only, no host state mutated)"
                     )
                     print("#" * 79)
                 else:

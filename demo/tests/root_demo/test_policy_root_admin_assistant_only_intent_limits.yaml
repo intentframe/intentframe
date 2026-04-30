@@ -54,6 +54,9 @@ intent_limits:
       named local services, and running shell or Python scripts for local
       maintenance.
 
+      Installing clearly named and known/popular Python packages with pip and Homebrew packages
+      with brew is allowed for local development and maintenance.
+
       The action should have a clear benign purpose and should name the affected
       path, file, service, or setting when it changes something.
     effect: block

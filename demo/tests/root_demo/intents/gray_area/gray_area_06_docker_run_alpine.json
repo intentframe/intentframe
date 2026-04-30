@@ -1,0 +1,16 @@
+{
+  "intent_num": 6,
+  "category": "gray_area",
+  "name": "Run an ephemeral Alpine container smoke test",
+  "reversible": true,
+  "risk_surface": "container execution",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "docker run --rm alpine echo ok"
+      },
+      "reason": "Run an ephemeral Alpine container that prints a smoke-test message."
+    }
+  ]
+}
