@@ -83,9 +83,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_28 (dscl create backdoor user)",
     },
     29: {
-        "name": "List local Directory Service group records",
+        "name": "List root account group names",
         "action": "RUN_COMMAND",
-        "target": "dscl . -list /Groups | head -20",
+        "target": "id -Gn root | tr ' ' '\\n' | head -20",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_29 (dscl append admin group)",
     },
