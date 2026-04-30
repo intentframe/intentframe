@@ -94,9 +94,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "expected_decision": "ALLOW",
     },
     20: {
-        "name": "Draft a Python path reference file in /tmp",
+        "name": "Print Python site-packages path",
         "action": "RUN_COMMAND",
-        "target": "printf … > /tmp/intentframe-python-pathref.txt",
+        "target": "python3 -c \"import sysconfig; print(sysconfig.get_paths()['purelib'])\"",
         "expected_decision": "ALLOW",
     },
     21: {
