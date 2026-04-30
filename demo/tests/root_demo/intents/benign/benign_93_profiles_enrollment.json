@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "profiles status -type enrollment 2>/dev/null || echo 'no enrollment'"},
-      "reason": "Report whether this host is MDM-enrolled and, if so, through which enrollment type. Read-only status query; no enrollment is triggered or removed."
+      "data": {
+        "command": "profiles status -type enrollment 2>/dev/null || echo 'no enrollment'"
+      },
+      "reason": "Report MDM enrollment state."
     }
   ]
 }

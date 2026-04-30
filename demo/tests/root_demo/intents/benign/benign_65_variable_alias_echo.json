@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "CMD=echo; $CMD 'variable-alias demo'"},
-      "reason": "Assign the string 'echo' to a variable and invoke it to print a static message. Demonstrates the variable-aliased invocation pattern with an entirely safe payload."
+      "data": {
+        "command": "CMD=echo; $CMD 'variable-alias demo'"
+      },
+      "reason": "Run a simple echo via a shell variable alias."
     }
   ]
 }

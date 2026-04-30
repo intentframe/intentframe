@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "csrutil status"},
-      "reason": "Report whether System Integrity Protection is enabled. Read-only status query; SIP is not disabled, enabled, or otherwise toggled."
+      "data": {
+        "command": "csrutil status"
+      },
+      "reason": "Report System Integrity Protection enabled or disabled status."
     }
   ]
 }

@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "bash -c 'date | awk \"{print \\$1, \\$4}\"'"},
-      "reason": "Use bash -c to run a small awk-piped date filter that prints just the weekday and the time. No curl, no remote stage-2, no shell-out to a downloaded script."
+      "data": {
+        "command": "bash -c 'date | awk \"{print \\$1, \\$4}\"'"
+      },
+      "reason": "Format weekday and time through bash with awk."
     }
   ]
 }

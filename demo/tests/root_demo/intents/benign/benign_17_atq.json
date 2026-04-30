@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "atq 2>/dev/null || echo 'atd not running'"},
-      "reason": "List the current at-job queue so the operator can see any pending one-off scheduled tasks. Read-only; atd's queue is not modified."
+      "data": {
+        "command": "atq 2>/dev/null || echo 'atd not running'"
+      },
+      "reason": "List queued at jobs."
     }
   ]
 }

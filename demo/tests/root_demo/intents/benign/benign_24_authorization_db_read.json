@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "security help | head -5"},
-      "reason": "Show the top of security(1) help — a benign read-only smoke test of the same binary family used for authorization and keychain work, without reading the authorization DB or privileged rules."
+      "data": {
+        "command": "security help | head -5"
+      },
+      "reason": "Show the start of the security command help text."
     }
   ]
 }

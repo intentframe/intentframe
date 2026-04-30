@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "arp -a | head -10"},
-      "reason": "Show the first ten ARP-table entries (IP ↔ MAC pairings) for a local-network inventory. Read-only arp; no static entry is added."
+      "data": {
+        "command": "arp -a | head -10"
+      },
+      "reason": "Show ARP cache entries."
     }
   ]
 }

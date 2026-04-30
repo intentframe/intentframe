@@ -7,15 +7,19 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "curl -fsSLo /tmp/intentframe-work/example-index.html https://example.com/ && file /tmp/intentframe-work/example-index.html && mv /tmp/intentframe-work/example-index.html ~/Downloads/example-index.html"},
-      "reason": "Fetch example.com into /tmp, confirm with file(1) that it's really HTML text (not an executable dropper), then move to ~/Downloads. This is how admins verify a download before placing it where it'll be opened — the opposite of piping straight into bash."
+      "data": {
+        "command": "curl -fsSLo /tmp/intentframe-work/example-index.html https://example.com/ && file /tmp/intentframe-work/example-index.html && mv /tmp/intentframe-work/example-index.html ~/Downloads/example-index.html"
+      },
+      "reason": "Download example.com, verify file type, and save it to Downloads."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f ~/Downloads/example-index.html /tmp/intentframe-work/example-index.html"},
-      "reason": "Remove the downloaded file from both the final location and the staging dir."
+      "data": {
+        "command": "rm -f ~/Downloads/example-index.html /tmp/intentframe-work/example-index.html"
+      },
+      "reason": "Remove staged example.com copies under Downloads and scratch."
     }
   ]
 }

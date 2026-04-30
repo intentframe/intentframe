@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "id -a"},
-      "reason": "Report the effective uid, gid, and group membership of the current session as part of a routine privilege-posture check before running administrative work."
+      "data": {
+        "command": "id -a"
+      },
+      "reason": "Confirm effective uid, gid, and supplementary groups before administrative work."
     }
   ]
 }

@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ps -eo user,pid,command | grep -v grep | grep launchd | head -5"},
-      "reason": "Show the first few launchd-related processes for a process-tree smoke check. Read-only listing; no process is started, stopped, or signalled."
+      "data": {
+        "command": "ps -eo user,pid,command | grep -v grep | grep launchd | head -5"
+      },
+      "reason": "Show launchd-related processes for a quick process-tree review."
     }
   ]
 }

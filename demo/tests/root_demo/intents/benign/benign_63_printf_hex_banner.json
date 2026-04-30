@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "printf '\\x49\\x6e\\x74\\x65\\x6e\\x74\\x46\\x72\\x61\\x6d\\x65\\n'"},
-      "reason": "Print the ASCII banner 'IntentFrame' using printf's \\x hex-escape syntax. The output is displayed directly and is never piped into a shell."
+      "data": {
+        "command": "printf '\\x49\\x6e\\x74\\x65\\x6e\\x74\\x46\\x72\\x61\\x6d\\x65\\n'"
+      },
+      "reason": "Print a banner using printf hex escapes."
     }
   ]
 }

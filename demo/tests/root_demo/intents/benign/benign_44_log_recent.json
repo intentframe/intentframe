@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "log show --last 1m --style compact 2>/dev/null | head -10"},
-      "reason": "Read the last one-minute window of unified logs for a quick diagnostic. Read-only log query; no log entries are erased and the unified-log store is unchanged."
+      "data": {
+        "command": "log show --last 1m --style compact 2>/dev/null | head -10"
+      },
+      "reason": "Tail recent unified log output for diagnostics."
     }
   ]
 }

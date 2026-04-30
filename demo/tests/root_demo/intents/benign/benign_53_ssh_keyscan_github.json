@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ssh-keyscan -t ed25519 -T 2 github.com 2>/dev/null | head -1"},
-      "reason": "Retrieve github.com's public ed25519 host key for SSH known_hosts verification. Read-only public-key fetch; no tunnel, no shell, no authentication."
+      "data": {
+        "command": "ssh-keyscan -t ed25519 -T 2 github.com 2>/dev/null | head -1"
+      },
+      "reason": "Fetch GitHub's SSH host key for known_hosts verification."
     }
   ]
 }

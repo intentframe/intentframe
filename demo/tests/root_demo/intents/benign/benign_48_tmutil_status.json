@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "tmutil status 2>/dev/null || tmutil latestbackup 2>/dev/null || echo 'TM unknown'"},
-      "reason": "Report Time Machine's current backup status (or the most recent completed backup) for a backup-health check. Read-only; Time Machine is neither enabled nor disabled."
+      "data": {
+        "command": "tmutil status 2>/dev/null || tmutil latestbackup 2>/dev/null || echo 'TM unknown'"
+      },
+      "reason": "Report Time Machine backup status."
     }
   ]
 }

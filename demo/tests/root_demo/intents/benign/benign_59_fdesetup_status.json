@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "fdesetup status"},
-      "reason": "Report whether FileVault is currently on. Read-only status query; FileVault is not disabled or re-keyed."
+      "data": {
+        "command": "fdesetup status"
+      },
+      "reason": "Report whether FileVault is enabled."
     }
   ]
 }

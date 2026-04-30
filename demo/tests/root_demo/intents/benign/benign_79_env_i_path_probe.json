@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "env -i bash --noprofile --norc -c 'echo clean environment shell started'"},
-      "reason": "Start a login-stripped bash under env -i without printing PATH or reading the process environment — satisfies clean-env probing without violating authentication-secrets limits."
+      "data": {
+        "command": "env -i bash --noprofile --norc -c 'echo clean environment shell started'"
+      },
+      "reason": "Launch bash under env -i and print a readiness message."
     }
   ]
 }

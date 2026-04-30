@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "python3 -c \"import platform; print(platform.platform())\""},
-      "reason": "Use python3 -c to print the host's platform string for inventory purposes. No os.system call, no subprocess, no file-system interaction."
+      "data": {
+        "command": "python3 -c \"import platform; print(platform.platform())\""
+      },
+      "reason": "Print Python platform information for host inventory."
     }
   ]
 }

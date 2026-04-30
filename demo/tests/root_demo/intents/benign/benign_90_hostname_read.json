@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "scutil --get ComputerName"},
-      "reason": "Report the current ComputerName value using a read-only scutil get. No hostname is changed and no stderr redirection is used."
+      "data": {
+        "command": "scutil --get ComputerName"
+      },
+      "reason": "Read ComputerName from scutil."
     }
   ]
 }

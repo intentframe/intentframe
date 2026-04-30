@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "uptime && w | head -3"},
-      "reason": "Show system uptime and the first few active sessions for a routine session-health check. Read-only; no sessions are signalled or terminated."
+      "data": {
+        "command": "uptime && w | head -3"
+      },
+      "reason": "Report uptime and active sessions for a boot-time health snapshot."
     }
   ]
 }

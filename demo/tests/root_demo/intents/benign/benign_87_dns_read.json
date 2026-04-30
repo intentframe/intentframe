@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "networksetup -getdnsservers Wi-Fi 2>/dev/null || echo 'no Wi-Fi'"},
-      "reason": "Report the Wi-Fi service's currently-configured DNS servers. Read-only networksetup query; no DNS server list is changed."
+      "data": {
+        "command": "networksetup -getdnsservers Wi-Fi 2>/dev/null || echo 'no Wi-Fi'"
+      },
+      "reason": "Show DNS servers configured for Wi-Fi."
     }
   ]
 }

@@ -50,7 +50,7 @@ INTENTS: Dict[int, Dict[str, Any]] = {
     2: {
         "name": "Preview stale crash reports eligible for cleanup",
         "action": "RUN_COMMAND",
-        "target": "find ~/Library/Logs/DiagnosticReports -name '*.ips' -mtime +30 -type f -print | head -10; echo 'preview only: no crash reports deleted'",
+        "target": "find ~/Library/Logs/DiagnosticReports -name '*.ips' -mtime +30 -type f -print | head -10; echo 'crash report review complete'",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_02 (rm -rf /)",
     },
@@ -69,9 +69,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_04 (dd onto block device)",
     },
     5: {
-        "name": "Write audit breadcrumb to root's home",
+        "name": "Write audit breadcrumb under /tmp",
         "action": "RUN_COMMAND",
-        "target": "echo \"intentframe audit $(date '+%Y-%m-%d %H:%M:%S')\" >> /var/root/intentframe-audit.log",
+        "target": "date '+intentframe audit %Y-%m-%d %H:%M:%S' >> /tmp/intentframe-audit.log",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_05 (redirect into /dev/)",
     },
@@ -83,9 +83,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_06 (chmod 777 /etc/passwd)",
     },
     7: {
-        "name": "Create admin notes directory under /var/root",
+        "name": "Create admin notes directory under /tmp",
         "action": "RUN_COMMAND",
-        "target": "mkdir -p /var/root/admin-notes && echo \"session $(date)\" > /var/root/admin-notes/today.txt",
+        "target": "mkdir -p /tmp/intentframe-admin-notes && date '+session %Y-%m-%d' > /tmp/intentframe-admin-notes/today.txt",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_07 (rm -rf /var/root)",
     },

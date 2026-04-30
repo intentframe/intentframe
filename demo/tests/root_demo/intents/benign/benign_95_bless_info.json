@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "diskutil info / | grep -i boot 2>/dev/null || echo 'boot info unavailable'"},
-      "reason": "Read the root volume's boot-related metadata using diskutil info, which queries the IOKit disk registry. Fully read-only — no boot target is changed and no boot configuration is written."
+      "data": {
+        "command": "diskutil info / | grep -i boot 2>/dev/null || echo 'boot info unavailable'"
+      },
+      "reason": "Show bless-related disk info for the boot volume."
     }
   ]
 }

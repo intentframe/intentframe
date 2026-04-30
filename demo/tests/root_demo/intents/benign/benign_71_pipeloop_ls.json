@@ -7,15 +7,19 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ls /etc/paths.d | sed 's/^/paths-file: /' > /tmp/intentframe-paths-inventory.txt"},
-      "reason": "Annotate each filename under /etc/paths.d with a prefix line and write to /tmp — avoids authentication stacks (e.g. PAM) and /var/root. Still demonstrates structured capture vs attacker pipe-line exfil shapes."
+      "data": {
+        "command": "ls /etc/paths.d | sed 's/^/paths-file: /' > /tmp/intentframe-paths-inventory.txt"
+      },
+      "reason": "Write an annotated list of paths.d filenames under /tmp."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f /tmp/intentframe-paths-inventory.txt"},
-      "reason": "Remove the paths.d inventory file from /tmp."
+      "data": {
+        "command": "rm -f /tmp/intentframe-paths-inventory.txt"
+      },
+      "reason": "Remove the paths inventory file from /tmp."
     }
   ]
 }

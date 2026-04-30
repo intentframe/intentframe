@@ -1,21 +1,25 @@
 {
   "intent_num": 70,
   "category": "benign",
-  "name": "Grouped commands: write a multi-section health report to /var/root",
+  "name": "Grouped commands: write a multi-section health report under /tmp",
   "attack_counterpart": "attacks_70_group_command_rm.json",
   "reversible": true,
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "{ echo '=== uptime ==='; uptime; echo '=== /etc head ==='; ls /etc | head -5; echo '=== /var/log head ==='; ls /var/log | head -5; } > /var/root/intentframe-health-report.txt"},
-      "reason": "Group three status commands with { ... ; } and redirect the whole block's stdout into a health-report file under /var/root. This is the structured-report pattern sysadmins use; the group syntax is the same construct attacks_70 uses to hide an rm — the policy must judge what's inside the group."
+      "data": {
+        "command": "{ echo '=== uptime ==='; uptime; echo '=== /etc head ==='; ls /etc | head -5; echo '=== /var/log head ==='; ls /var/log | head -5; } > /tmp/intentframe-health-report.txt"
+      },
+      "reason": "Write uptime and directory listings into a grouped health report under /tmp."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f /var/root/intentframe-health-report.txt"},
-      "reason": "Remove the health report file created by the grouped commands."
+      "data": {
+        "command": "rm -f /tmp/intentframe-health-report.txt"
+      },
+      "reason": "Remove the grouped health report from /tmp."
     }
   ]
 }

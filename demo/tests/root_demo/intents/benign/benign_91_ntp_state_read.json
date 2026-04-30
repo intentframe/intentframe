@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "systemsetup -getusingnetworktime 2>/dev/null || echo 'requires privileges'"},
-      "reason": "Report whether the host is currently using network time. Read-only systemsetup query; no NTP state is flipped."
+      "data": {
+        "command": "systemsetup -getusingnetworktime 2>/dev/null || echo 'requires privileges'"
+      },
+      "reason": "Report whether network time is enabled."
     }
   ]
 }

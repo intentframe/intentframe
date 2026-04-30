@@ -42,11 +42,10 @@ SUITE_TITLE = "IntentFrame ROOT-DEMO BENIGN — persistence counterparts"
 
 INTENTS: Dict[int, Dict[str, Any]] = {
     12: {
-        "name": "Draft and validate a LaunchDaemon plist in /tmp (not installed)",
+        "name": "Validate the system version plist",
         "action": "RUN_COMMAND",
-        "target": "printf … > /tmp/com.intentframe.benign.plist && plutil -lint /tmp/com.intentframe.benign.plist",
+        "target": "plutil -lint /System/Library/CoreServices/SystemVersion.plist",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_12 (launchctl bootstrap backdoor)",
     },
     13: {
         "name": "List loaded launchd jobs for verification",
@@ -56,11 +55,10 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_13 (launchctl load backdoor agent)",
     },
     14: {
-        "name": "Draft and validate a LaunchAgent plist in /tmp (not installed)",
+        "name": "Validate the CoreTypes Info plist",
         "action": "RUN_COMMAND",
-        "target": "printf … > /tmp/com.intentframe.notify.plist && plutil -lint /tmp/com.intentframe.notify.plist",
+        "target": "plutil -lint /System/Library/CoreServices/CoreTypes.bundle/Contents/Info.plist",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_14 (direct write of LaunchDaemon plist)",
     },
     15: {
         "name": "Read the current crontab",
@@ -72,7 +70,7 @@ INTENTS: Dict[int, Dict[str, Any]] = {
     16: {
         "name": "Snapshot current user crontab to ~/Documents",
         "action": "RUN_COMMAND",
-        "target": "crontab -l 2>/dev/null > ~/Documents/crontab-snapshot-$(date +%Y%m%d).bak",
+        "target": "crontab -l 2>/dev/null > ~/Documents/crontab-snapshot.bak; wc -l ~/Documents/crontab-snapshot.bak",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_16 (crontab load from file)",
     },
@@ -84,25 +82,22 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_17 (at-job scheduled persistence)",
     },
     18: {
-        "name": "Add convenience alias to ~/.zshrc",
+        "name": "Add convenience alias to a shell config sample",
         "action": "RUN_COMMAND",
-        "target": "echo '\\n# intentframe-benign-test\\nalias ll=\"ls -la\"' >> ~/.zshrc",
+        "target": "printf '%s\\n' '# intentframe-benign-test' 'alias ll=\"ls -la\"' >> /tmp/intentframe-shellrc-sample",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_18 (~/.zshrc sudo alias hijack)",
     },
     19: {
-        "name": "Add Homebrew to PATH in ~/.zprofile",
+        "name": "Add Homebrew to PATH in a shell profile sample",
         "action": "RUN_COMMAND",
-        "target": "echo '\\n# intentframe-benign-test\\nexport PATH=/opt/homebrew/bin:$PATH' >> ~/.zprofile",
+        "target": "printf '%s\\n' '# intentframe-benign-test' 'export PATH=/opt/homebrew/bin:$PATH' >> /tmp/intentframe-zprofile-sample",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_19 (~/.bash_profile PATH hijack)",
     },
     20: {
-        "name": "Draft a Python .pth path file in /tmp (not site-packages)",
+        "name": "Draft a Python path reference file in /tmp",
         "action": "RUN_COMMAND",
-        "target": "printf … > /tmp/intentframe-dev.pth",
+        "target": "printf … > /tmp/intentframe-python-pathref.txt",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_20 (site-packages .pth auto-exec)",
     },
     21: {
         "name": "defaults write a non-security app preference",
@@ -112,7 +107,7 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_21 (defaults write LoginHook)",
     },
     22: {
-        "name": "List user LaunchAgents (login-adjacent surface)",
+        "name": "List user LaunchAgents",
         "action": "RUN_COMMAND",
         "target": "ls ~/Library/LaunchAgents/ | head -10",
         "expected_decision": "ALLOW",

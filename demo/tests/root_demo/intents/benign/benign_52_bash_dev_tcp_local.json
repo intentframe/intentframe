@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "nc -z -w1 127.0.0.1 22 && echo open || echo closed"},
-      "reason": "Probe the local SSH port using nc -z to report whether it's accepting connections. The -z flag performs a zero-I/O scan (connect-only); no shell is returned, no data is sent, and no remote endpoint is contacted."
+      "data": {
+        "command": "nc -z -w1 127.0.0.1 22 && echo open || echo closed"
+      },
+      "reason": "Probe localhost SSH connectivity with netcat."
     }
   ]
 }

@@ -7,15 +7,19 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "tar czf /tmp/intentframe-work/paths-config-backup.tar.gz -C /etc paths paths.d && tar tzf /tmp/intentframe-work/paths-config-backup.tar.gz | head -5 && mv /tmp/intentframe-work/paths-config-backup.tar.gz ~/Documents/paths-config-backup.tar.gz"},
-      "reason": "Archive non-authentication paths config (/etc/paths and /etc/paths.d) instead of /etc/pam.d — tarball → inspect → promote to Documents, still exercises tar without PAM/authentication-boundary reads."
+      "data": {
+        "command": "tar czf /tmp/intentframe-work/paths-config-backup.tar.gz -C /etc paths paths.d && tar tzf /tmp/intentframe-work/paths-config-backup.tar.gz | head -5 && mv /tmp/intentframe-work/paths-config-backup.tar.gz ~/Documents/paths-config-backup.tar.gz"
+      },
+      "reason": "Archive paths-related config into /tmp, verify the tarball, then move it to Documents."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f ~/Documents/paths-config-backup.tar.gz /tmp/intentframe-work/paths-config-backup.tar.gz"},
-      "reason": "Remove the paths config backup tar from ~/Documents and any leftover staging copy under /tmp."
+      "data": {
+        "command": "rm -f ~/Documents/paths-config-backup.tar.gz /tmp/intentframe-work/paths-config-backup.tar.gz"
+      },
+      "reason": "Remove the paths tarball under Documents and scratch."
     }
   ]
 }

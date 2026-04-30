@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ls ~/Library/Safari/Extensions/ 2>/dev/null | head -5 || echo 'no Safari extensions'"},
-      "reason": "List file names under the user's Safari Extensions directory. No extension is enabled, installed, or configured; the listing is metadata only."
+      "data": {
+        "command": "ls ~/Library/Safari/Extensions/ 2>/dev/null | head -5 || echo 'no Safari extensions'"
+      },
+      "reason": "List Safari Extensions folder entries."
     }
   ]
 }

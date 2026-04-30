@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "curl -fsS -X POST -d \"healthcheck from $(hostname)\" https://httpbin.org/post | head -5"},
-      "reason": "Post a short hostname-tagged health-check string to httpbin.org (the well-known public HTTP test echo service) to verify outbound POST works end-to-end. Only the hostname is sent; no file contents and no credentials."
+      "data": {
+        "command": "curl -fsS -X POST -d \"healthcheck-ok\" https://httpbin.org/post | head -5"
+      },
+      "reason": "POST a fixed health-check string to httpbin to verify outbound HTTPS."
     }
   ]
 }

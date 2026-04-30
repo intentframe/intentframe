@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "cat /etc/pam.d/login"},
-      "reason": "Review the PAM stack that governs console login for an auth-config audit. Read-only cat; no PAM rule is added or modified."
+      "data": {
+        "command": "cat /etc/pam.d/login"
+      },
+      "reason": "Review the console login PAM stack."
     }
   ]
 }

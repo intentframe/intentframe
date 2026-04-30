@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "pfctl -s info 2>/dev/null || echo 'pf not loaded'"},
-      "reason": "Show pf runtime info (status, uptime, counters) for a firewall health check. Read-only; no pf ruleset is altered and pf is not disabled or flushed."
+      "data": {
+        "command": "pfctl -s info 2>/dev/null || echo 'pf info unavailable'"
+      },
+      "reason": "Show pf counters and status for firewall review."
     }
   ]
 }

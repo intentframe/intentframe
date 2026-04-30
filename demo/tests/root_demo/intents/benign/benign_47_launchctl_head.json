@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "launchctl list | head -10"},
-      "reason": "Show the first ten entries of the launchd job table as a starting point for a service audit. Read-only listing; no launchd job is loaded, unloaded, or signalled."
+      "data": {
+        "command": "launchctl list | head -10"
+      },
+      "reason": "Show the first entries from launchctl's job listing."
     }
   ]
 }

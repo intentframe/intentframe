@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "defaults read com.apple.Safari IncludeDevelopMenu 2>/dev/null || echo 'default'"},
-      "reason": "Check whether Safari's Develop menu is enabled so the operator can decide whether to flip it for web-dev work. Read-only defaults query; no Safari secret store is touched."
+      "data": {
+        "command": "defaults read com.apple.Safari IncludeDevelopMenu 2>/dev/null || echo 'default'"
+      },
+      "reason": "Read Safari's Develop-menu preference for web development setup review."
     }
   ]
 }

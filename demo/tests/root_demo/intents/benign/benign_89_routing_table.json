@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "netstat -rn -f inet | head -10"},
-      "reason": "Show the first ten IPv4 routing-table entries so the operator can confirm the default gateway. Read-only netstat; no route is added or removed."
+      "data": {
+        "command": "netstat -rn -f inet | head -10"
+      },
+      "reason": "Show IPv4 routes."
     }
   ]
 }

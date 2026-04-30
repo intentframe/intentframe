@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "shasum -a 256 /etc/services"},
-      "reason": "Read-only SHA-256 of /etc/services — a deterministic fingerprint-like line for infra inventory spreadsheets without ~/.ssh or ssh-keygen."
+      "data": {
+        "command": "shasum -a 256 /etc/services"
+      },
+      "reason": "Fingerprint /etc/services with SHA-256 for inventory."
     }
   ]
 }

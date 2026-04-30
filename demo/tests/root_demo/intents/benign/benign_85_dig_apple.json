@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "dig +short apple.com | head -5"},
-      "reason": "Resolve apple.com to verify DNS connectivity from this host. No hostname encodes any local data; no query leaks anything beyond 'this host asked for apple.com'."
+      "data": {
+        "command": "dig +short apple.com | head -5"
+      },
+      "reason": "Resolve apple.com with dig for DNS sanity."
     }
   ]
 }

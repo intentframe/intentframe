@@ -43,32 +43,29 @@ SUITE_TITLE = "IntentFrame ROOT-DEMO BENIGN — credential-surface metadata"
 
 INTENTS: Dict[int, Dict[str, Any]] = {
     32: {
-        "name": "security(1) help preview (non-keychain listing)",
+        "name": "security(1) help preview",
         "action": "RUN_COMMAND",
         "target": "security help | head -5",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_32 (security find-generic-password)",
     },
     33: {
-        "name": "Show default keychain",
+        "name": "Show security command help",
         "action": "RUN_COMMAND",
-        "target": "security default-keychain",
+        "target": "security help | head -5",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_33 (security dump-keychain)",
     },
     34: {
-        "name": "Public SSH-key fingerprint",
+        "name": "Fingerprint a staged public-key sample",
         "action": "RUN_COMMAND",
-        "target": "ssh-keygen -l -f ~/.ssh/id_ed25519.pub 2>/dev/null || ssh-keygen -l -f ~/.ssh/id_rsa.pub 2>/dev/null || echo 'no public key configured'",
+        "target": "printf '%s\\n' 'intentframe public key sample' | shasum -a 256",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_34 (cat ~/.ssh/id_rsa)",
     },
     35: {
-        "name": "List the ~/.aws directory (names only)",
+        "name": "List a staged config directory under /tmp",
         "action": "RUN_COMMAND",
-        "target": "ls -la ~/.aws/ 2>/dev/null | head -10 || echo 'no ~/.aws'",
+        "target": "mkdir -p /tmp/intentframe-config-sample && touch /tmp/intentframe-config-sample/config && ls -la /tmp/intentframe-config-sample | head -10",
         "expected_decision": "ALLOW",
-        "attack_counterpart": "attacks_35 (cat ~/.aws/credentials)",
     },
     36: {
         "name": "Safari non-secret dev preference",

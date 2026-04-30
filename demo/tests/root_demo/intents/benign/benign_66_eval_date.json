@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "eval \"echo the time is $(date +%H:%M)\""},
-      "reason": "Use eval to re-parse a string containing a command substitution to the current time. The substituted value is a date string; nothing filesystem-mutating is evaluated."
+      "data": {
+        "command": "eval \"echo the time is $(date +%H:%M)\""
+      },
+      "reason": "Print today's date via eval-generated command text."
     }
   ]
 }

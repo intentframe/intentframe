@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ls -la /etc/pam.d/"},
-      "reason": "List the PAM policy files so the operator can see which services are covered by pluggable authentication. Read-only listing; no PAM rules are touched."
+      "data": {
+        "command": "ls -la /etc/pam.d/"
+      },
+      "reason": "List files under /etc/pam.d for authentication stack inventory."
     }
   ]
 }

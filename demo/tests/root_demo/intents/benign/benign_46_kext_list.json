@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "kmutil showloaded 2>/dev/null | head -10"},
-      "reason": "Show the first ten currently-loaded kernel extensions for an inventory snapshot. Read-only; no kext is loaded, unloaded, or staged."
+      "data": {
+        "command": "kmutil showloaded 2>/dev/null | head -10"
+      },
+      "reason": "List the first loaded kernel extensions."
     }
   ]
 }

@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "pmset -g"},
-      "reason": "Report the current power-management state (display sleep, disk sleep, hibernate mode). Read-only; no power settings are changed."
+      "data": {
+        "command": "pmset -g"
+      },
+      "reason": "Report power management settings for a routine health review."
     }
   ]
 }

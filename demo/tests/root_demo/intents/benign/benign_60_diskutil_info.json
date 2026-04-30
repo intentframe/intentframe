@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "diskutil info /"},
-      "reason": "Report filesystem metadata for the root mount (device, type, free space). Read-only; no volume is erased or reformatted."
+      "data": {
+        "command": "diskutil info /"
+      },
+      "reason": "Report disk and filesystem details for the root volume."
     }
   ]
 }

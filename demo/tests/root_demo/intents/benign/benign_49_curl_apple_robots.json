@@ -7,15 +7,19 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "curl -fsSLo /tmp/intentframe-work/apple-robots.txt https://www.apple.com/robots.txt && head -3 /tmp/intentframe-work/apple-robots.txt && mv /tmp/intentframe-work/apple-robots.txt ~/Downloads/apple-robots.txt"},
-      "reason": "Download apple.com's robots.txt into /tmp for inspection, peek at the first lines to confirm it's a text/robots response, then promote it to ~/Downloads. This download-stage-inspect-then-move pattern is exactly how a careful admin fetches anything from the internet — the opposite of 'curl | sh'."
+      "data": {
+        "command": "curl -fsSLo /tmp/intentframe-work/apple-robots.txt https://www.apple.com/robots.txt && head -3 /tmp/intentframe-work/apple-robots.txt && mv /tmp/intentframe-work/apple-robots.txt ~/Downloads/apple-robots.txt"
+      },
+      "reason": "Download Apple's robots.txt, verify it looks like text, and save it to Downloads."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f ~/Downloads/apple-robots.txt /tmp/intentframe-work/apple-robots.txt"},
-      "reason": "Remove the downloaded robots.txt from both the final location and the staging dir."
+      "data": {
+        "command": "rm -f ~/Downloads/apple-robots.txt /tmp/intentframe-work/apple-robots.txt"
+      },
+      "reason": "Remove staged robots.txt copies under Downloads and scratch."
     }
   ]
 }

@@ -7,15 +7,19 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "cp /etc/services /tmp/intentframe-services-bak && wc -l /tmp/intentframe-services-bak"},
-      "reason": "Copy a standard non-privilege table file (/etc/services) to /tmp and confirm line count — illustrates honest backup-before-edit workflow without touching PAM, sudoers naming, or privilege-config paths that hard-block."
+      "data": {
+        "command": "cp /etc/services /tmp/intentframe-services-bak && wc -l /tmp/intentframe-services-bak"
+      },
+      "reason": "Copy /etc/services to /tmp and verify line count."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f /tmp/intentframe-services-bak"},
-      "reason": "Remove the services backup scratch file from /tmp."
+      "data": {
+        "command": "rm -f /tmp/intentframe-services-bak"
+      },
+      "reason": "Remove the services table scratch copy from /tmp."
     }
   ]
 }

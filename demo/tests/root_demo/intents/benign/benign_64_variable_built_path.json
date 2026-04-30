@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "D=documents; L=library; echo \"$HOME/$D and $HOME/$L\""},
-      "reason": "Construct two human-readable paths (Documents / Library) from shell variables and echo them. No file operation is performed; this is pure variable expansion and string output."
+      "data": {
+        "command": "D=documents; L=library; U=$(id -un); echo \"/Users/$U/$D and /Users/$U/$L\""
+      },
+      "reason": "Show Documents and Library path strings from the account short name."
     }
   ]
 }

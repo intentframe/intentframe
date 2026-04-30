@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "dscl . -read /Users/root RecordName UniqueID"},
-      "reason": "Read RecordName and UniqueID from a fixed Directory Service path (/Users/root) — no command substitution or dynamic user lookup. Mirrors dscl benign patterns without unintended cross-user reads."
+      "data": {
+        "command": "dscl . -read /Users/root RecordName UniqueID"
+      },
+      "reason": "Read RecordName and UniqueID for the root Directory Service record."
     }
   ]
 }

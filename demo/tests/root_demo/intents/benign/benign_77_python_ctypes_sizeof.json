@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "python3 -c \"import ctypes; print(ctypes.sizeof(ctypes.c_void_p))\""},
-      "reason": "Report the size of a C void pointer to derive the word width of the host arch. Uses ctypes only for type introspection; no CDLL load, no libc.system, no native call."
+      "data": {
+        "command": "python3 -c \"import ctypes; print(ctypes.sizeof(ctypes.c_void_p))\""
+      },
+      "reason": "Report pointer size via ctypes for architecture confirmation."
     }
   ]
 }

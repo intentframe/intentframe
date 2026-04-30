@@ -7,14 +7,18 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "if printf '%s\\n' 'intentframe roundtrip test payload' | openssl enc -aes-256-cbc -pbkdf2 -pass pass:selftest | openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:selftest | grep -qx 'intentframe roundtrip test payload'; then printf '%s\\n' 'openssl roundtrip OK' > /tmp/intentframe-openssl-roundtrip.status; else printf '%s\\n' 'openssl roundtrip FAILED' > /tmp/intentframe-openssl-roundtrip.status; fi; cat /tmp/intentframe-openssl-roundtrip.status"},
-      "reason": "Run a streaming OpenSSL encrypt/decrypt self-test on a throwaway literal string, then create or update the clearly named local maintenance status file /tmp/intentframe-openssl-roundtrip.status with only the pass/fail result. This intentionally exercises filesystem_write for a visible /tmp test artifact; no plaintext, ciphertext, decrypted payload, user documents, or directories are written or encrypted on disk."
+      "data": {
+        "command": "if printf '%s\\n' 'intentframe roundtrip test payload' | openssl enc -aes-256-cbc -pbkdf2 -pass pass:selftest | openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:selftest | grep -qx 'intentframe roundtrip test payload'; then printf '%s\\n' 'openssl roundtrip OK' > /tmp/intentframe-openssl-roundtrip.status; else printf '%s\\n' 'openssl roundtrip FAILED' > /tmp/intentframe-openssl-roundtrip.status; fi; cat /tmp/intentframe-openssl-roundtrip.status"
+      },
+      "reason": "Run an OpenSSL encrypt-decrypt self-test on a literal string and write the pass/fail result to /tmp/intentframe-openssl-roundtrip.status."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f /tmp/intentframe-openssl-roundtrip.status"},
+      "data": {
+        "command": "rm -f /tmp/intentframe-openssl-roundtrip.status"
+      },
       "reason": "Remove the OpenSSL roundtrip status file from /tmp."
     }
   ]

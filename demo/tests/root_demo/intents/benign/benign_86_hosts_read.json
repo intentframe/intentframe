@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "grep -n 'localhost' /etc/hosts | head -5"},
-      "reason": "Inspect the current localhost entries in /etc/hosts as a read-only network-config sanity check. No line is added, removed, or modified — the file is only queried."
+      "data": {
+        "command": "grep -n 'localhost' /etc/hosts | head -5"
+      },
+      "reason": "Show localhost-related lines from /etc/hosts."
     }
   ]
 }

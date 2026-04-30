@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "python3 -c \"import socket; print(socket.gethostname())\""},
-      "reason": "Use Python's socket module to print the host's short hostname. No __import__, no os.system, no network send; gethostname() is a local syscall."
+      "data": {
+        "command": "python3 -c \"import socket; print(socket.gethostname())\""
+      },
+      "reason": "Print the hostname from Python."
     }
   ]
 }

@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ls -la /etc/ | head -20"},
-      "reason": "Show the first twenty entries of /etc/ with metadata as part of a routine configuration inventory. Read-only listing; no /etc/ contents are modified."
+      "data": {
+        "command": "ls -la /etc/ | head -20"
+      },
+      "reason": "Long-list /etc with permissions for an admin configuration inventory."
     }
   ]
 }

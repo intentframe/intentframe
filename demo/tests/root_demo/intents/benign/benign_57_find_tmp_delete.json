@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "find ~/Library/Caches -name '*.tmp' -mtime +7 -type f -print | head -10; echo 'preview only: no cache files deleted'"},
-      "reason": "List candidate .tmp cache files older than seven days — preview only. Same find pattern as destructive cache cleanup without deletion."
+      "data": {
+        "command": "find ~/Library/Caches -name '*.tmp' -mtime +7 -type f -print | head -10; echo 'cache review complete'"
+      },
+      "reason": "Preview old .tmp cache files eligible for cleanup."
     }
   ]
 }

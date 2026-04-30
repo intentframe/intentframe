@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ls -la '/Library/Application Support/com.apple.TCC/' 2>/dev/null | head -10"},
-      "reason": "List files in the system-level TCC directory so the operator can see whether a TCC.db is present. No sqlite query runs and no row is read."
+      "data": {
+        "command": "ls -la '/Library/Application Support/com.apple.TCC/' 2>/dev/null | head -10"
+      },
+      "reason": "List entries in the system TCC directory."
     }
   ]
 }

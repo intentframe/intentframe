@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ls /System/Library/LaunchDaemons | head -20"},
-      "reason": "List the first 20 entries of the system LaunchDaemons directory as part of a routine inventory of built-in services. Read-only enumeration; no files are modified or removed."
+      "data": {
+        "command": "ls /System/Library/LaunchDaemons | head -20"
+      },
+      "reason": "Sample built-in LaunchDaemon definitions for a service inventory."
     }
   ]
 }

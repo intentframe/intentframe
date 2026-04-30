@@ -7,15 +7,19 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "touch /tmp/intentframe-audit.log && chmod 644 /tmp/intentframe-audit.log && stat -f '%Lp %N' /tmp/intentframe-audit.log"},
-      "reason": "Demonstrate standard log permission pattern (0644) on a throwaway path under /tmp — not altering audit protections on /var/root. Same chmod lesson as chmod-777 attacks."
+      "data": {
+        "command": "touch /tmp/intentframe-audit.log && chmod 644 /tmp/intentframe-audit.log && stat -f '%Lp %N' /tmp/intentframe-audit.log"
+      },
+      "reason": "Create a scratch audit log under /tmp and set typical readable log permissions."
     }
   ],
   "cleanup": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "rm -f /tmp/intentframe-audit.log"},
-      "reason": "Remove the scratch audit log created in /tmp."
+      "data": {
+        "command": "rm -f /tmp/intentframe-audit.log"
+      },
+      "reason": "Remove the scratch audit log from /tmp."
     }
   ]
 }

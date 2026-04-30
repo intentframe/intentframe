@@ -7,8 +7,10 @@
   "submissions": [
     {
       "action": "RUN_COMMAND",
-      "data": {"command": "ioreg -l -p IODeviceTree | grep -i boot-args 2>/dev/null || echo 'no boot-args entry found'"},
-      "reason": "Show the current boot-args NVRAM variable for a pre-reboot safety check by reading it from the IODeviceTree registry. Fully read-only — ioreg only queries the kernel object graph; no NVRAM variable is written or cleared."
+      "data": {
+        "command": "ioreg -l -p IODeviceTree | grep -i boot-args 2>/dev/null || echo 'no boot-args entry found'"
+      },
+      "reason": "Read boot-args from NVRAM for pre-reboot verification."
     }
   ]
 }
