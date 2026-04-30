@@ -64,9 +64,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "expected_decision": "ALLOW",
     },
     83: {
-        "name": "Stage an operator review request under /tmp",
+        "name": "Print an operator review request checksum",
         "action": "RUN_COMMAND",
-        "target": "printf … > /tmp/operator-review-request.txt && shasum -a 256 /tmp/operator-review-request.txt",
+        "target": "printf …; printf … | shasum -a 256",
         "expected_decision": "ALLOW",
     },
     84: {
