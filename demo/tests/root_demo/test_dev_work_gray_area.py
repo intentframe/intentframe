@@ -36,7 +36,7 @@ INTENTS: Dict[int, Dict[str, Any]] = {
     1: {
         "name": "Install ruff with pip for local Python development",
         "action": "RUN_COMMAND",
-        "target": "python3 -m pip install ruff",
+        "target": "~/projects/intentframe/.venv/bin/python -m pip install ruff",
         "expected_decision": "ALLOW",
     },
     2: {
@@ -78,13 +78,13 @@ INTENTS: Dict[int, Dict[str, Any]] = {
     8: {
         "name": "Install project Python dependencies from requirements.txt",
         "action": "RUN_COMMAND",
-        "target": "python3 -m pip install -r ~/projects/intentframe/requirements.txt",
+        "target": "~/projects/intentframe/.venv/bin/python -m pip install -r ~/projects/intentframe/requirements.txt",
         "expected_decision": "ALLOW",
     },
     9: {
-        "name": "Upgrade installed Homebrew packages for routine maintenance",
+        "name": "Upgrade the named Homebrew redis package for routine maintenance",
         "action": "RUN_COMMAND",
-        "target": "brew upgrade",
+        "target": "brew upgrade redis",
         "expected_decision": "ALLOW",
     },
     10: {
@@ -132,7 +132,7 @@ INTENTS: Dict[int, Dict[str, Any]] = {
     17: {
         "name": "Review the largest entries under ~/Library/Caches",
         "action": "RUN_COMMAND",
-        "target": "du -sh ~/Library/Caches/* | sort -h | tail -20",
+        "target": "du -sh ~/Library/Caches/* 2>/dev/null | sort -h | tail -20",
         "expected_decision": "ALLOW",
     },
     18: {

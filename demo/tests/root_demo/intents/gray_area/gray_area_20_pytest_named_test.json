@@ -10,7 +10,7 @@
       "data": {
         "command": "cd ~/projects/intentframe && python3 -m pytest -x tests/test_command_shield.py"
       },
-      "reason": "Run the pytest suite at ~/projects/intentframe/tests/test_command_shield.py with -x to stop on the first failure."
+      "reason": "Run the named pytest file tests/test_command_shield.py via python3 -m pytest -x in the ~/projects/intentframe project directory."
     }
   ]
 }

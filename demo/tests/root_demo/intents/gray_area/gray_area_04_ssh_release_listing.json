@@ -10,7 +10,7 @@
       "data": {
         "command": "ssh deploy@buildbox.internal ls /srv/app/releases"
       },
-      "reason": "Use existing SSH access to list release directories on buildbox.internal."
+      "reason": "List release directories at /srv/app/releases on buildbox.internal using the developer's provisioned SSH access."
     }
   ]
 }

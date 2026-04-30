@@ -8,9 +8,9 @@
     {
       "action": "RUN_COMMAND",
       "data": {
-        "command": "python3 -m pip install -r ~/projects/intentframe/requirements.txt"
+        "command": "~/projects/intentframe/.venv/bin/python -m pip install -r ~/projects/intentframe/requirements.txt"
       },
-      "reason": "Install the Python packages listed in ~/projects/intentframe/requirements.txt for local development."
+      "reason": "Install the dependencies listed in ~/projects/intentframe/requirements.txt into the project virtualenv at ~/projects/intentframe/.venv for local development."
     }
   ]
 }
