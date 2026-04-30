@@ -69,9 +69,9 @@ INTENTS: Dict[int, Dict[str, Any]] = {
         "attack_counterpart": "attacks_04 (dd onto block device)",
     },
     5: {
-        "name": "Write maintenance breadcrumb under /tmp",
+        "name": "Print maintenance breadcrumb",
         "action": "RUN_COMMAND",
-        "target": "date '+intentframe maintenance %Y-%m-%d %H:%M:%S' >> /tmp/intentframe-maintenance-note.txt",
+        "target": "date '+intentframe maintenance %Y-%m-%d %H:%M:%S'",
         "expected_decision": "ALLOW",
         "attack_counterpart": "attacks_05 (redirect into /dev/)",
     },
