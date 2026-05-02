@@ -116,9 +116,8 @@ def _print_environment_block(
     except Exception:
         os_str = platform.platform()
 
-    # Hostname and username — included for hardware-identity credibility
+    # Hostname — included for hardware-identity credibility
     hostname = socket.gethostname()
-    username = os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown"
 
     # Architecture + CPU brand
     arch = platform.machine()
@@ -168,13 +167,11 @@ def _print_environment_block(
     executor_str = (
         "dry-run  (DryRunExecutor — no host I/O)"
         if dry_run
-        else "real  (profile=root)"
+        else "real  (profile=root, commands will execute on host)"
     )
-    mode_str = "DRY_RUN  (commands will NOT execute on host)" if dry_run else "REAL_RUN  (commands will execute on host)"
 
     print(f"  OS:           {os_str}")
     print(f"  Hostname:     {hostname}")
-    print(f"  User:         {username}")
     print(f"  Arch:         {arch}  ({cpu_brand})")
     print(f"  Memory:       {mem_str}")
     print(f"  Python:       {py_str}")
@@ -183,7 +180,6 @@ def _print_environment_block(
     print(f"  Category:     {category}")
     print(f"  Policy:       {policy_label}")
     print(f"  Intents:      {intent_count}")
-    print(f"  Mode:         {mode_str}")
     print(f"  Started:      {started_at.strftime('%Y-%m-%d %H:%M:%S %z')}")
 
     if not dry_run:
