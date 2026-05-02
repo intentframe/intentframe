@@ -40,7 +40,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import os
+import platform
+import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -76,6 +80,124 @@ _OUTPUT_CAP_CHARS = 600  # Modest cap: full output for short commands
                          # (ls, pfctl, tee), useful first chunk for verbose
                          # ones (dmesg, lsof, ps).
 _DRY_RUN_ONLY_CATEGORIES = {"benign", "gray_area"}
+
+
+def _print_environment_block(
+    *,
+    dry_run: bool,
+    policy_label: str,
+    intent_count: int,
+    category: str,
+    started_at: datetime.datetime,
+) -> None:
+    """Print a self-documenting PREFLIGHT: ENVIRONMENT block.
+
+    Uses only stdlib + macOS sysctl — no psutil dependency.
+    Omits serial number; includes hostname and username because they
+    establish hardware identity for the published run logs.
+    """
+    print()
+    print("#" * 79)
+    print("#  PREFLIGHT: ENVIRONMENT")
+    print("#" * 79)
+
+    # OS — sw_vers gives the human-readable macOS product name + build
+    try:
+        os_name = subprocess.check_output(
+            ["sw_vers", "-productName"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        os_ver = subprocess.check_output(
+            ["sw_vers", "-productVersion"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        os_build = subprocess.check_output(
+            ["sw_vers", "-buildVersion"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        os_str = f"{os_name} {os_ver} (Build {os_build})"
+    except Exception:
+        os_str = platform.platform()
+
+    # Hostname and username — included for hardware-identity credibility
+    hostname = socket.gethostname()
+    username = os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown"
+
+    # Architecture + CPU brand
+    arch = platform.machine()
+    try:
+        cpu_brand = subprocess.check_output(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        cpu_brand = platform.processor() or arch
+
+    # Memory — sysctl hw.memsize (bytes)
+    try:
+        mem_bytes = int(
+            subprocess.check_output(
+                ["sysctl", "-n", "hw.memsize"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+        mem_str = f"{mem_bytes // (1024 ** 3)} GB"
+    except Exception:
+        mem_str = "unknown"
+
+    # Python
+    py_str = platform.python_version()
+
+    # IntentFrame version from installed package metadata
+    try:
+        from importlib.metadata import version as _pkg_ver
+        if_ver: str = _pkg_ver("intentframe")
+    except Exception:
+        if_ver = "unknown"
+
+    # Append git short SHA if available
+    try:
+        git_sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        if_ver = f"{if_ver} (commit {git_sha})"
+    except Exception:
+        pass
+
+    executor_str = (
+        "dry-run  (DryRunExecutor — no host I/O)"
+        if dry_run
+        else "real  (profile=root)"
+    )
+    mode_str = "DRY_RUN  (commands will NOT execute on host)" if dry_run else "REAL_RUN  (commands will execute on host)"
+
+    print(f"  OS:           {os_str}")
+    print(f"  Hostname:     {hostname}")
+    print(f"  User:         {username}")
+    print(f"  Arch:         {arch}  ({cpu_brand})")
+    print(f"  Memory:       {mem_str}")
+    print(f"  Python:       {py_str}")
+    print(f"  IntentFrame:  {if_ver}")
+    print(f"  Executor:     {executor_str}")
+    print(f"  Category:     {category}")
+    print(f"  Policy:       {policy_label}")
+    print(f"  Intents:      {intent_count}")
+    print(f"  Mode:         {mode_str}")
+    print(f"  Started:      {started_at.strftime('%Y-%m-%d %H:%M:%S %z')}")
+
+    if not dry_run:
+        print()
+        print(
+            "  ⚠️  REAL_RUN MODE — allowed commands will execute on this host."
+        )
+        print(
+            "      DNS, hostname, files, and services may be modified."
+        )
+        print(
+            "      Use INTENTFRAME_EXECUTOR_MODE=dry_run on non-disposable systems."
+        )
+    print("#" * 79)
 
 
 def _print_executor_alert() -> None:
@@ -618,6 +740,14 @@ class RootIntentSuite:
             try:
                 if not await self._run_root_preflight(agent, server_client):
                     return False
+
+                _print_environment_block(
+                    dry_run=self._dry_run_mode,
+                    policy_label=self._policy_label,
+                    intent_count=len(intent_nums),
+                    category=self.category,
+                    started_at=datetime.datetime.now().astimezone(),
+                )
 
                 await self._run_category_setup(agent)
 
