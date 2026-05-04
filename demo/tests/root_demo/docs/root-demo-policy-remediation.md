@@ -139,7 +139,10 @@ After YAML + classifier + (recommended) dry-run:
 ## 8. Implementation status (2026-04-28)
 
 Policy + classifier prongs of this remediation are **implemented and pinned by
-tests**.  The dry-run executor prong is still pending — see §9.
+tests**.  The dry-run executor prong shipped subsequently — see §9.1.
+
+Specific test, file, and constant names below are current as of 2026-04-28.
+Check git for renames before relying on any single path.
 
 ### 8.1 Classifier (§5.1)
 
@@ -380,9 +383,9 @@ data; adding a new rule is a data-first change with no classifier code edits.
 - **2026-04-27** — Initial write after full sweep; nine ALLOW mismatches; host
   impact recorded separately.
 - **2026-04-28** — Classifier + policy prongs landed and pinned by
-  `tests/test_root_demo_policy_remediation.py` and
-  `command_shield/tests/test_classifier_sensitive_capabilities.py`; dry-run
-  executor still pending.
+  `tests/test_root_demo_policy_remediation.py` (later retired — see next
+  entry) and `command_shield/tests/test_classifier_sensitive_capabilities.py`;
+  dry-run executor still pending.
 - **2026-04-28** — Retired `tests/test_root_demo_policy_remediation.py` to
   drop the YAML/bootstrap mirror-assertion maintenance cost.  Replaced its
   coverage with neutral "production sensitive surface" cases in
