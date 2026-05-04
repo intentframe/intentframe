@@ -1,9 +1,10 @@
-No, `curl | python` was **not the only thing** affecting LLM-native
-terminal use. But it was the **only one with a strong product-level
-reason to demote right now**, and that demotion has now been made:
-`RCE-003` is `NEEDS_REVIEW`, not `CATASTROPHIC`.
+This document records the pragmatic decisions made in the recent review
+of LLM-native terminal use in Jarvis. `curl | python` was not the only
+surface affecting that use case, but it was the only one with a strong
+product-level reason to demote, and that demotion has been made:
+`RCE-003` is now `NEEDS_REVIEW`, not `CATASTROPHIC`.
 
-I checked the actual path:
+The current path:
 
 - `command_shield` gives verdicts early from fixed patterns / structural signals before capabilities or code inspection matter.
 - Bootstrap seeds `RUN_COMMAND` with only this policy blocklist: `sudo`, `rm -rf /`, `mkfs`, `dd if=`, `> /dev/`, `chmod 777`.
@@ -19,8 +20,6 @@ Key references:
 ## What Actually Affects Jarvis Today
 
 ### 1. `curl | python` was the real hard contradiction
-
-This was the strongest one.
 
 The bootstrap policy allows `stdin_exec:python`. Before the `RCE-003`
 demotion, shield blocked this before policy could evaluate it:
@@ -50,7 +49,7 @@ python3 -c "import urllib.request,json; ..."
 
 These are not blocked, but they always trigger review because of `interpreter-indirection`.
 
-That’s probably acceptable for current Jarvis. It means cost/latency, not a wall. If you want cautious behavior, keep this.
+This is acceptable for current Jarvis: it imposes cost/latency, not a wall. The cautious posture is intentional.
 
 ### 3. Public web/API fetches are allowed, but not fast-allowed
 
@@ -61,7 +60,7 @@ curl -s https://api.github.com/repos/python/cpython | jq .stargazers_count
 
 These pass shield and policy.
 
-But because `network_probe:*` is deliberately not a read-only fast path, they still go through AE/Guardian. That’s sane for your current release. Jarvis can use network, but network is reviewed.
+But because `network_probe:*` is deliberately not a read-only fast path, they still go through AE/Guardian. This is consistent with the current release: Jarvis can use network, but network is reviewed.
 
 ### 4. Word false positives can block normal research
 
@@ -93,7 +92,7 @@ Blocked by:
 capability:script_execution:local_binary
 ```
 
-This is intentional in your python+shell-only scope. It can affect “run this downloaded CLI” or “run project script,” but that is more developer/power-user territory. I would keep it blocked for now.
+This is intentional in the python+shell-only scope. It can affect “run this downloaded CLI” or “run project script,” but that is more developer/power-user territory. Should remain blocked for now.
 
 ### 6. Non-python runtimes and package managers are blocked
 
@@ -106,11 +105,11 @@ cargo install ...
 
 Blocked by bootstrap `deny_capabilities`.
 
-This is consistent with your current design. No need to unblock until Jarvis becomes more dev-agent-like.
+This is consistent with the current design. Unblocking is deferred until Jarvis takes on more developer-agent scope.
 
-## My Honest Recommendation
+## Outcome
 
-For today’s Jarvis, the only change made now is:
+The only change made in this review is:
 
 1. **Demote `RCE-003` from `CATASTROPHIC` to `NEEDS_REVIEW`.**  
    This directly supports LLM-native terminal data processing while still letting AE/Guardian inspect the command.
@@ -130,4 +129,4 @@ Everything else can stay cautious:
 - destructive git
 - chmod/rm/disk/root patterns
 
-So the short answer after the change: **the only must-fix for your stated product goal has been fixed: `curl | python` now routes to review.** The second-tier issue is keyword false positives in research/search commands. The rest are mostly aligned with your current cautious, non-dev-copilot Jarvis.
+Net result: **the must-fix for the stated product goal has shipped — `curl | python` now routes to review.** The second-tier issue is keyword false positives in research/search commands. The remaining categories are aligned with the cautious, non-dev-copilot Jarvis posture.
