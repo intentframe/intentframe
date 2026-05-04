@@ -1,4 +1,4 @@
-# IntentFrame Public Release Expert Discussion Brief
+# IntentFrame Security Claims and Limits
 
 Purpose: help answer live questions from security engineers, infra leaders, AI safety reviewers, and technically skeptical industry experts during an open discussion.
 
