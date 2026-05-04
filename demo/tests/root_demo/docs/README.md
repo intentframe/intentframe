@@ -17,13 +17,6 @@ For the public evidence summary, see [`docs/root_demo/PROOF.md`](../../../../doc
 | [combined_policy_discussion.md](./combined_policy_discussion.md) | Discussion of stacking deterministic and semantic layers: evaluation order, failure modes, and why both layers are load-bearing. |
 | [why_llm_guarding_llm.md](./why_llm_guarding_llm.md) | Essay on the asymmetric-context argument: why an LLM Guardian with policy, structured output, and constrained scope can validly guard a general-purpose agent. |
 
-## Archival
-
-| File | Purpose |
-| --- | --- |
-| [Claude-Clarifying logical reasoning.md](./Claude-Clarifying%20logical%20reasoning.md) | Exported Claude.ai chat: clarifying questions during Guardian reasoning design. Archival only. |
-| [Claude-Network connection lost after tests.md](./Claude-Network%20connection%20lost%20after%20tests.md) | Exported Claude.ai chat: troubleshooting session after the April 27 sweep. Large file; contains embedded image data. Archival only. |
-
 ## Raw run logs
 
 Logs live under [`results/`](../results/), organized by suite.
