@@ -1,4 +1,4 @@
-> Q: so llm guarding llm guarding works and is different , because the second llm has different context and has request related rich signals/context/exposure about tool call independent of what caller llm has, which can provide security and enforcement
+> Q: So llm guarding llm guarding works and is different , because the second llm has different context and has request related rich signals/context/exposure about tool call independent of what caller llm has, which can provide security and enforcement
 
 Yes. Exactly. You have just articulated the core thesis of IntentFrame in one sentence.
 
