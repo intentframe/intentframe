@@ -15,7 +15,6 @@ For the public evidence summary, see [`docs/root_demo/PROOF.md`](../../../../doc
 | [intent_limits_only.md](./intent_limits_only.md) | Experiment: running the 100-intent attack corpus under semantic-only policy (intent_limits, no deny_capabilities). Shows 100/100 block through the AI layer alone. |
 | [empty_deny_cap_and_intent_limits.md](./empty_deny_cap_and_intent_limits.md) | Experiment: minimal policy (no deny_capabilities, no intent_limits). Baseline for understanding which attacks the deterministic gates catch without policy configuration. |
 | [combined_policy_discussion.md](./combined_policy_discussion.md) | Discussion of stacking deterministic and semantic layers: evaluation order, failure modes, and why both layers are load-bearing. |
-| [why_llm_guarding_llm.md](./why_llm_guarding_llm.md) | Essay on the asymmetric-context argument: why an LLM Guardian with policy, structured output, and constrained scope can validly guard a general-purpose agent. |
 
 ## Raw run logs
 
