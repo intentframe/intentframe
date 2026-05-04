@@ -1,4 +1,6 @@
-The question this doc should answer is:
+# Why Trust IntentFrame's AI Layers?
+
+The question this document answers is:
 
 **“If LLMs are vulnerable, why should anyone trust IntentFrame’s AI layers to guard an AI agent?”**
 
@@ -6,11 +8,11 @@ Or sharper:
 
 **“Isn’t this just AI guarding AI?”**
 
-That is the first thing many technical people will scream. Especially security people. Their mental objection will be:
+That is the first thing many technical people will ask. Their mental objection will be:
 
-> “Your agent can be prompt-injected, so now you put another LLM in front of it? Why would that LLM not be prompt-injected too?”
+> "Your agent can be prompt-injected, so now you put another LLM in front of it. Why would that LLM not be prompt-injected too?"
 
-Your answer should be:
+The answer:
 
 **IntentFrame is not ‘AI guarding AI.’ It is a hybrid control system guarding agent actions. The AI layers help understand ambiguous intent, but they are not the root of trust. The root of trust is policy, deterministic gates, typed actions, constraints, executor boundaries, and auditability.**
 
@@ -32,13 +34,13 @@ Key arguments:
 3. **The AI layers receive structured, bounded inputs.**  
    IntentFrame does not hand them an open-ended chat transcript and hope. Inputs are typed: action, target, reason, data, user policy, analysis report. Prompt hardening separates trusted and untrusted fields.
 
-4. **The final claim is not “LLMs are perfectly safe.”**  
+4. **The final claim is not "LLMs are perfectly safe."**  
    The claim is: even if the agent is compromised, IntentFrame reduces what it can do in the real world.
 
 5. **This mirrors human systems.**  
    Humans supervise humans all the time: maker-checker approval, expense limits, code review, trading limits, court warrants, SOC escalation, bank fraud review. The reviewer is not magically perfect; the system works because the reviewer is constrained by policy, procedure, evidence, limits, and audit trails.
 
-Good Q&A:
+## Q&A
 
 **Q: Isn’t this AI guarding AI?**  
 A: No. It is policy and deterministic enforcement guarding an AI agent, with AI used only where semantic judgment is needed. The LLM is not the root of trust.
@@ -55,18 +57,16 @@ A: It is trusted only within a bounded role. It can influence decisions, but it 
 **Q: What does IntentFrame actually prove?**  
 A: It proves that actions routed through the boundary can be constrained by policy before they touch the user’s world. It does not prove the agent cannot be tricked. It proves tricked agents do not automatically get unchecked execution.
 
-The strongest one-line thesis for the doc:
+## Thesis
 
-> IntentFrame is not “an LLM supervising an LLM”; it is a policy-enforced runtime boundary where deterministic controls make the final authority, and AI is used as a bounded semantic reviewer for cases rules cannot understand alone.
+> IntentFrame is not "an LLM supervising an LLM"; it is a policy-enforced runtime boundary where deterministic controls make the final authority, and AI is used as a bounded semantic reviewer for cases rules cannot understand alone.
 
 
-I verified each claim against the actual code. Here is the honest score, with grounding so you can re-check.
+## Code Grounding
 
-## Overall: all the substantive claims are true
+The one-line thesis, key arguments, and Q&A above are grounded in the current code paths below.
 
-The one-line thesis, the key arguments, and the Q&A are all grounded in real code. Only two small places benefit from slightly more precise phrasing. I'll flag those at the end.
-
-## Statement-by-statement verification
+## Code References
 
 ### Thesis: "hybrid control system guarding agent actions; AI is not the root of trust"
 
@@ -213,7 +213,7 @@ Same pattern for `GUARDIAN_ROLE`. The DAN/developer/debug/reassign wording is li
 
 **True as an analogy.** It is a framing device, not a code claim, so it stands on its own. Reasonable for the doc.
 
-## Q&A verification
+## Q&A References
 
 | Q | Claim | Verdict |
 |---|---|---|
@@ -223,13 +223,11 @@ Same pattern for `GUARDIAN_ROLE`. The DAN/developer/debug/reassign wording is li
 | Is the AI layer trusted? | "Bounded role; can influence decisions but cannot override deterministic policy" | **True with nuance** — see below. |
 | What does IntentFrame prove? | "Does not prove the agent cannot be tricked; proves tricked agents don't automatically get unchecked execution" | **True** — matches the threat model in `security_analysis.md` verbatim. |
 
-## Two small phrasings worth tightening for rigor
-
-These are not "false" — they are slightly imprecise. Fixing them will make the doc bulletproof against a careful reader.
+## Precision Notes
 
 ### 1. "Policy gates still block many dangerous actions" (Q2 answer)
 
-Accurate word is **"many,"** which I used — good. But I want to flag the honest boundary explicitly: deterministic gates do **not** block everything. Under-limit semantic attacks like Attack 2 ($499 decoy under the $5k cap) and Attack 15 ($4,999 with a clean `reason`) rely on the AI layer. If the AI layer were fully bypassed, those would get through.
+The honest boundary is: deterministic gates do **not** block everything. Under-limit semantic attacks like Attack 2 ($499 decoy under the $5k cap) and Attack 15 ($4,999 with a clean `reason`) rely on the AI layer. If the AI layer were fully bypassed, those would get through.
 
 The precise statement is: *deterministic gates block any action that structurally violates policy regardless of what the AI says; semantic judgment is what catches deception that is structurally valid*. Both layers matter; they cover different attack surfaces.
 
