@@ -2,7 +2,6 @@
 
 Narrative documents, case studies, and experiment write-ups for the root demo.
 For raw run logs, see [`results/`](../results/).
-For the public evidence summary, see [`docs/root_demo/PROOF.md`](../../../../docs/root_demo/PROOF.md).
 
 ## Write-ups
 
