@@ -26,6 +26,15 @@ The supported root-demo path does **not** run the whole stack as UID 0.
 - Only an allowed `RUN_COMMAND` child wrapper can request root through
   `sudo -n sandbox-exec`.
 
+## Methodology
+
+The agent submitting attack intents is a deterministic stub harness, not a live
+LLM. It uses the same Actor handshake, policy-bound session, submit path, and
+pipeline as a real LLM-backed agent — it differs only in that it submits fixed
+fixture intents instead of generating them. This is a post-compromise crash
+test: it starts after the agent has already failed and asks whether the runtime
+boundary contains the result. Model jailbreak quality is out of scope.
+
 ## Evidence
 
 The current attack corpus contains 100 adversarial `RUN_COMMAND` intents across
@@ -49,7 +58,7 @@ The corresponding core logs are:
 
 The 2026-04-27 live sweep exposed nine `ALLOW` mismatches that changed host
 state, including DNS and hostname mutation. That incident is preserved in
-`demo/tests/root_demo/results/2026-04-27-attack-sweep-host-impact.md`.
+`demo/tests/root_demo/docs/2026-04-27-attack-sweep-host-impact.md`.
 
 The remediation added sensitive-surface capability tags and deny-capabilities
 for root-level host mutation, credential/session reads, browser/security
@@ -57,7 +66,7 @@ preference mutation, and exfiltration staging. The current dry-run and real
 sweeps show those formerly-ALLOW intents now block at
 `deterministic_guardian` / `matched_gate=constraint`.
 
-See `demo/tests/root_demo/results/root-demo-policy-remediation.md` for the full
+See `demo/tests/root_demo/docs/root-demo-policy-remediation.md` for the full
 timeline and remaining work.
 
 ## What This Does Not Prove

@@ -403,25 +403,3 @@ reasoning.
 
 For tests, `ExecutionContext` can still be constructed directly rather than probed.
 
----
-
-## Files to know
-
-- `intentframe_server/server.py` — selects real vs dry-run executor mode
-- `intentframe_server/dry_run_executor.py` — synthetic executor for safe root-demo testing
-- `jarvis_pa/executor_root.yaml` — root demo executor profile
-- `executor/config/schema.py` — `sandbox.escalate`
-- `executor/sandbox/planner.py` — threads `sandbox_escalate` into `ExecutionPlan`
-- `executor/sandbox/platforms/macos.py` — conditional `sudo -n --preserve-env=... sandbox-exec` wrap
-- `executor/server.py` — `/health.running_as_root`
-- `intentframe_gateway/escalation.py` — shared root-demo detection logic
-- `intentframe_gateway/server.py` — injects `INTENTFRAME_ESCALATION_ARMED`
-- `intentframe_gateway/routes/system.py` — exposes `root_demo` in `/system/health`
-- `intentframe_cli/main.py` — `--profile root` pre-flight warning
-- `intentframe_cli/ui.py` — profile banner and uninstall hint
-- `demo/tests/root_demo/root_test_runner.py` — black-box root-demo suite runner, dry-run/real preflight, safety tag checks, and exit-code contract
-- `demo/tests/root_demo/README.md` — fixture categories and local test workflow
-- `intentframe_setup_root_demo.sh` — installer
-- `intentframe_uninstall_root_demo.sh` — uninstaller
-- `intentframe_gateway/bootstrap.py` — runtime policy/workspace seeder (profile-aware)
-- `jarvis_pa/seed_policies.py` — hand-runnable mirror of bootstrap for manual seeding
