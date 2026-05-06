@@ -1,5 +1,7 @@
 # Current Terminal Policy Rationale
 
+> Part of IntentFrame's terminal security documentation. See also [docs/architecture.md](../architecture.md) for the full pipeline and [docs/threat-model.md](../threat-model.md) for the trust model.
+
 This document captures the current product and security thinking for
 Jarvis terminal use in IntentFrame. It describes how the system behaves
 today, why it behaves that way, and which trade-offs are intentional for

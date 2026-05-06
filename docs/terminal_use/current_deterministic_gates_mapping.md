@@ -1,4 +1,6 @@
-## Current Deterministic Gate Mapping
+# Current Deterministic Gate Mapping
+
+> Part of the [IntentFrame terminal policy](current_terminal_policy_rationale.md) documentation. See also [docs/architecture.md](../architecture.md) for `command_shield` and `DeterministicGuardian` details.
 
 This snapshot reflects the current pragmatic choice: **`curl | python`
 is no longer a hard-stop pattern**. It still emits `RCE-003`, but the

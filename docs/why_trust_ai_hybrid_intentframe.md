@@ -240,3 +240,14 @@ The precise statement is: *deterministic gates block any action that structurall
 - No one — deterministic or AI — can unilaterally override a BLOCK into an ALLOW.
 
 So the AI does have **block authority** in its bounded role. What it lacks is **allow-override authority** over a deterministic block. That's actually a stronger story than "AI can only influence" — it's a classic **conjunctive** (AND-gated) control: ALLOW requires *all* layers to agree, BLOCK requires only one. That's how real-world security gates work too (defense in depth, least privilege).
+
+---
+
+## Related Documents
+
+- [docs/why_llm_guarding_llm_deep_dive.md](why_llm_guarding_llm_deep_dive.md) — the long-form version of this argument with concrete examples, measurements, and `command_shield` analysis
+- [docs/architecture.md](architecture.md) — full architecture and pipeline walkthrough
+- [docs/threat-model.md](threat-model.md) — threat model including prompt injection defense
+- [docs/why-not-injection-shield.md](why-not-injection-shield.md) — decision record on injection detection
+- [docs/faq.md](faq.md) — Q1 and Q2 cover the same questions in compressed form
+- [docs/principles.md](principles.md) — core invariants including "AI is bounded, not sovereign"

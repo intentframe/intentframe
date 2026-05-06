@@ -1,3 +1,7 @@
+# Terminal Use: Current Pragmatic Choice
+
+> Part of the [IntentFrame terminal policy](current_terminal_policy_rationale.md) documentation. See also [docs/architecture.md](../architecture.md) for the full pipeline.
+
 This document records the pragmatic decisions made in the recent review
 of LLM-native terminal use in Jarvis. `curl | python` was not the only
 surface affecting that use case, but it was the only one with a strong
