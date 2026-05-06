@@ -1,5 +1,10 @@
 # Mixed licensing — action checklist
 
+> **Status: DEFERRED.** Repo is currently single-license AGPL-3.0-only, which is a coherent,
+> defensible state. Revisit before any of: SDK published to PyPI/npm, design-partner integration,
+> public launch, or external agent developers building on IntentFrame. Until then, do **not** add
+> Apache-2.0 headers or `intentframe_actor/LICENSE` — a half-done split is worse than no split.
+
 This document tracks the **in-repo mixed-license** plan: **Apache-2.0** for the public Actor SDK surface, **AGPL-3.0** for runtime / Guardian / Analysis Engine and the rest of the monorepo root.
 
 **Strategy:** implement **directory-level licenses + SPDX headers** now (quick path). Before going public (or heavy investor/design-partner exposure), plan a **`packages/`** layout with explicit publish boundaries.
@@ -42,6 +47,7 @@ This document tracks the **in-repo mixed-license** plan: **Apache-2.0** for the 
 - [ ] **`protocol/`** (or `packages/protocol`) with its own **`LICENSE`** (Apache-2.0) and SPDX on schema/proto/OpenAPI files.
 - [ ] Confirm **CI/publish** only ships Apache-2.0 artifacts for SDK and protocol packages.
 - [ ] **Website** (`intentframe.com` or equivalent): short, accurate **licensing** copy aligned with the repo.
+- [ ] Tighten **`CLA.md` clause 4** to explicitly mention possible permissive sub-licenses (Apache-2.0 SDK), so contributor expectations match the broad grant already in clause 2.
 
 ---
 

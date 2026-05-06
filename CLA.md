@@ -20,10 +20,11 @@ other materials ("Contribution") to IntentFrame, you agree to the following:
 3. **You confirm** that you have the legal right to grant this license, and
    that your Contribution does not violate any third-party rights.
 
-4. **You understand** that IntentFrame is dual-licensed: the open source
-   version is available under the AGPL-3.0, and a separate commercial license
-   may be offered to third parties. Your Contribution may be included in
-   either or both.
+4. **You understand** that IntentFrame is dual-licensed and currently
+   distributed under AGPL-3.0 with a separate commercial license available to
+   third parties. Portions of the project (such as client SDKs) may in the
+   future be distributed under permissive open-source licenses such as
+   Apache-2.0. Your Contribution may be included under any of these licenses.
 
 ## Why this CLA exists
 
