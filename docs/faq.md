@@ -40,7 +40,7 @@ A compromised agent can inject any text into `reason`, `data`, and `target` fiel
 
 A successful injection must fool the AE AND the Guardian AND produce valid Pydantic output in both cases AND not trigger any deterministic layer. Each layer is independent.
 
-Empirically: the 24-attack invoice suite (`demo/tests/test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py`) defends 23/24 attacks. The 43-case transitive injection suite passes 39/43, with the 4 "failures" requiring pre-compromised AE state that is production-unreachable. Attack 2 (semantic-only defense) reproduces 10/10 BLOCK on consecutive runs.
+Empirically: the 24-attack invoice suite (`demo/tests/test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py`) defends **23/24, with 0 bypassed and 1 awaiting a planned cumulative-policy feature** (Attack 16 / salami slicing — see [docs/evidence.md § About the "1 Known Gap"](evidence.md#about-the-1-known-gap--attack-16-salami-slicing)). The 43-case transitive injection suite passes 39/43, with the 4 "failures" requiring pre-compromised AE state that is production-unreachable. Attack 2 (semantic-only defense) reproduces 10/10 BLOCK on consecutive runs.
 
 ---
 

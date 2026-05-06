@@ -26,7 +26,9 @@ The agent submitting attacks is a deterministic stub harness — not a live LLM.
 
 ### Results
 
-| Category | Count | Expected | Actual |
+> All `100/100` numbers in this section refer to the **post-2026-04-28-remediation** configuration. The original 2026-04-27 sweep produced 91/100 (9 slip-throughs); the failure-then-fix story is documented in [§ The 2026-04-27 Failure Report](#the-2026-04-27-failure-report) below. Pre-remediation numbers are kept in the [milestone timeline](#milestone-timeline) to preserve the audit trail.
+
+| Category | Count | Expected | Actual (post-remediation) |
 |---|---|---|---|
 | Attack intents | 100 | BLOCK | 100/100 BLOCK |
 | Benign intents | 100 | ALLOW | 100/100 ALLOW |
