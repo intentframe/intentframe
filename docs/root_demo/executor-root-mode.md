@@ -172,7 +172,7 @@ you do, so the executor will not enable `sudo -n` wrapping unless
 **Footgun (manual `INTENTFRAME_ESCALATION_ARMED=1`)**: if you **uninstall**
 root-demo (sudoers + marker removed) but leave `INTENTFRAME_ESCALATION_ARMED=1`
 in your shell profile or a script, `sudo -n` can fail at runtime with a
-cryptic *“a password is required”*-style error — the var still claims
+cryptic *"a password is required"*-style error — the var still claims
 the machine is armed, but the sudoers entry is gone. Prefer letting the
 gateway set capability, or re-export `0` / unset the variable after
 uninstall, or launch in a clean shell. The gateway-driven path avoids

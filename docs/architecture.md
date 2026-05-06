@@ -73,6 +73,41 @@ This is the fundamental design constraint. Every other architectural decision fl
 
 ---
 
+## Layer Reference
+
+The codebase has two compatible ways of numbering "layers". Other docs reference one or the other depending on what's being discussed; this section reconciles them in one place.
+
+### View A — Pipeline-stage numbering (role-based)
+
+This is the L1–L5 numbering used in the diagram above and in [docs/threat-model.md § Trusted and Untrusted Components](threat-model.md#trusted-and-untrusted-components). Layers are grouped by *role*: who does what.
+
+| # | Role | Component | Trust |
+|---|---|---|---|
+| L1 | Thinks | Third-party agent | Untrusted |
+| L2 | Parses | Actor (SDK) | Trusted gateway |
+| L3 | Understands | Analysis Engine | Partially trusted (AI) |
+| L4 | Judges | Guardian | Partially trusted (AI) — but its deterministic step is fully trusted |
+| L5 | Acts | Executor + adapters | Trusted enforcement point |
+
+### View B — Deterministic-vs-AI layers (control-flow-based)
+
+This is the L0–L4 numbering used by the code (`intentframe_components/guardian/deterministic.py`) and referenced in [docs/threat-model.md § What Is Hard-Enforced Without AI](threat-model.md#what-is-hard-enforced-without-ai), [docs/faq.md § Q2](faq.md#q2-what-if-the-guardian-llm-is-prompt-injected), and [docs/why-not-injection-shield.md](why-not-injection-shield.md). Layers are grouped by *what kind of check runs at each step*.
+
+| # | Code label | What it is | Lives inside (View A) |
+|---|---|---|---|
+| L0 | `command_shield` | Terminal command AST + capability tagging | L3 stage's pre-AE deterministic floor |
+| L1 | `policy_registry` floor | System blocked patterns merged into user policy | Loaded into L4 Guardian context |
+| L2 | `analysis_engine` catastrophic path | Hardcoded substring catastrophic recognition inside the AE | L3 Analysis Engine |
+| L3a | `DeterministicGuardian` (pre-AE pass) | Permission, constraint, domain-module checks; passive-read and read-only RUN_COMMAND fast-path; `TerminalChecker` | L4 Guardian |
+| L3b | `AIGuardian` | The semantic AI judgement | L4 Guardian |
+| L4 | `executor/adapter` | `quick_check()` regex floor at the execution boundary | L5 Executor |
+
+### The "five deterministic layers" referenced elsewhere
+
+When other docs say *"five deterministic layers cannot be prompt-injected"*, they mean: L0 (`command_shield`), L1 (Policy Registry floor), L2 (AE catastrophic path), L3a (`DeterministicGuardian`, including `TerminalChecker`), and L4 (adapter `quick_check()`) from View B. L3b (the AIGuardian) is the only AI-decision point in the deterministic stack.
+
+---
+
 ## The Intent Frame
 
 The Intent Frame is the fundamental primitive — a structured declaration of what an agent wants to do and why. It is a proposal, not an action. It must be validated before execution.

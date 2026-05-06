@@ -81,7 +81,7 @@ Results:
 - `sudo` hits both command-shield `IF-SUDO-001` and bootstrap substring blocklist.
 - `reboot` / `shutdown` hit command-shield catastrophic patterns.
 
-This can affect a general Jarvis task like “search my notes/logs for why my Mac rebooted” or “explain what sudo means.” But compared to `curl | python`, it’s less central to LLM terminal operation.
+This can affect a general Jarvis task like "search my notes/logs for why my Mac rebooted" or "explain what sudo means." But compared to `curl | python`, it's less central to LLM terminal operation.
 
 ### 5. Local binaries are blocked by policy
 
@@ -96,7 +96,7 @@ Blocked by:
 capability:script_execution:local_binary
 ```
 
-This is intentional in the python+shell-only scope. It can affect “run this downloaded CLI” or “run project script,” but that is more developer/power-user territory. Should remain blocked for now.
+This is intentional in the python+shell-only scope. It can affect "run this downloaded CLI" or "run project script," but that is more developer/power-user territory. Should remain blocked for now.
 
 ### 6. Non-python runtimes and package managers are blocked
 

@@ -69,18 +69,6 @@ Both configurations produce 100/100 BLOCK:
 
 The 1/100 slip in reduced configurations (ARP spoof) demonstrates why the full policy stack matters — defense-in-depth is real, not theater.
 
-### Other root-demo intent categories
-
-The root-demo fixture set on disk also includes two non-adversarial categories that are not part of the 220-intent attack/benign/gray-area proof package:
-
-| Directory | Count | Purpose |
-|---|---|---|
-| `demo/tests/root_demo/intents/general/` | 6 | Operator/sysadmin convenience commands (e.g. `df -h`, `uptime`, `hostname`) — exercise the read-only fast-path and confirm the pipeline doesn't over-block routine ops |
-| `demo/tests/root_demo/intents/normal/` | 8 | Normal-workflow commands (e.g. `dmesg`) — same purpose, different surface |
-| `demo/tests/root_demo/intents/false-positives/` | 0 | Reserved for future false-positive regression cases discovered in the field |
-
-These are runner conveniences, not part of the headline 220-intent proof. They are documented here so a reader who lists `intents/` and finds them does not have to wonder why they're invisible elsewhere.
-
 ---
 
 ## Suite 2: The Invoice/Payment Attack Suite
@@ -369,7 +357,7 @@ The OWASP Agentic Top 10 (December 2025) is the purpose-built framework for syst
 | **AGA05** | Broken Agent Auth & Authorization | **Yes** | Actor SDK handshake binds `user_id` to `UserPolicy`; deny-by-default |
 | **AGA06** | Unsafe Output Consumption | **Partial** | Pydantic structured outputs + AE field limits + `CredentialScrubber` for credential redaction; full output sanitization not yet implemented |
 | **AGA07** | Inadequate Guardrails & Alignment | **Core mission** | `intent_limits` (semantic) + `domain_constraints` (structural) + `allowed_actions` (action-level) |
-| **AGA08** | Knowledge Poisoning | **Partial** | AE input hardening resists poisoned context; active domains from policy provide trusted ground truth independent of LLM output |
+| **AGA08** | Knowledge Poisoning | **Partial** | In-scope at the AE handoff: AE input hardening + structured output + `AEFieldLimit` bounds resist poisoned context (validated by tests 4 and 5 in `test_transitive_injection_live.py`); `active_domains` from policy provide trusted ground truth independent of LLM output. **Out-of-scope at the agent's own RAG / knowledge base**: if the agent's trusted knowledge source is poisoned *before* it formulates the intent, IntentFrame only sees the resulting intent — it catches the symptom (a dangerous action arriving at the boundary) but not the root cause (poisoned knowledge). Defending the agent's RAG corpus is the developer's responsibility, not IntentFrame's. |
 | **AGA09** | Opaque Decision Chains | **Yes** | Full audit log + SHA-256 hash chain for tamper evidence + `verify_integrity()` |
 | **AGA10** | Cascading Trust Failures | **Yes** | Transitive injection tests stress-test AE→Guardian boundary; deterministic gates hold regardless of AE content |
 

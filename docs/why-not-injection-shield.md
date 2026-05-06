@@ -76,15 +76,17 @@ That hard-blocks a legitimate action. The ML layer was masking this by dampening
 
 ### The structural defense stack is the injection defense
 
-| Layer | What it does | Can be prompt-injected? |
-|---|---|---|
-| No-Self-IO | Agent can only submit IntentFrames, cannot execute anything | N/A — structural impossibility |
-| `command_shield` | Terminal command patterns, normalization, AST decomposition | No — pure regex/AST |
-| Policy Registry floor | System blocked patterns always merged | No — code, not AI |
-| AE catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
-| Guardian TerminalChecker | Blocklist/allowlist matching | No — fnmatch, no AI |
-| Guardian deterministic | Permission check → constraint check → domain modules | No — deterministic code |
-| Adapter `quick_check()` | Last-resort pattern match at execution boundary | No — pure regex |
+The system has one **structural** invariant (No-Self-IO — agents cannot execute anything directly, only submit IntentFrames) and **five canonical deterministic layers**. The same five are referenced in [docs/threat-model.md § What Is Hard-Enforced Without AI](threat-model.md#what-is-hard-enforced-without-ai) and [docs/faq.md § Q2](faq.md#q2-what-if-the-guardian-llm-is-prompt-injected):
+
+| # | Layer | What it does | Can be prompt-injected? |
+|---|---|---|---|
+| 1 | `command_shield` | Terminal command patterns, normalization, AST decomposition | No — pure regex/AST |
+| 2 | `DeterministicGuardian` | Permission check → constraint check → domain modules → `TerminalChecker` blocklist/allowlist | No — deterministic code (fnmatch + set intersection) |
+| 3 | Policy Registry floor | System blocked patterns always merged | No — code, not AI |
+| 4 | AE catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
+| 5 | Adapter `quick_check()` | Last-resort pattern match at execution boundary | No — pure regex |
+
+(No-Self-IO is not counted as a deterministic *layer* because it is a structural property of the architecture, not a check that runs at intent-evaluation time. Without No-Self-IO, the layers above would be filters the agent could route around. With it, they are the *only* path to execution.)
 
 A compromised agent can only attack the AI layers. Every deterministic layer holds regardless.
 

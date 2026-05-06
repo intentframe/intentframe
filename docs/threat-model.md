@@ -1,12 +1,14 @@
 # IntentFrame Threat Model
 
-IntentFrame is a **runtime security control plane for AI-decided actions**. The effect of that control plane is that it automates the human oversight you would otherwise perform manually — reading every action, applying judgment, clicking approve or reject. This document describes the security side of that system: what it defends against and what it does not.
+IntentFrame is a **runtime security control plane for AI-decided actions**. The same control plane that automates human oversight (see [README](../README.md) and [docs/architecture.md](architecture.md)) is, when viewed from the security side, a containment boundary against agent compromise.
 
-It does not claim the agent LLM is safe, unjailbreakable, or aligned. It assumes the agent may already be confused, compromised, prompt-injected, or hallucinating, and asks a narrower question:
+This document describes the security side: what the boundary protects against, what it does not, and what would refute the claim.
+
+The threat model does not claim the agent LLM is safe, unjailbreakable, or aligned. It assumes the agent may already be confused, compromised, prompt-injected, or hallucinating, and asks a narrower question:
 
 > Before this agent action touches the user's world, does it pass policy, deterministic gates, semantic review, and executor constraints?
 
-The system is best understood as **post-compromise containment for agent actions**, not prompt-injection prevention for the agent. The oversight framing is the *effect*; the containment framing is the *mechanism*.
+The system is best understood as post-compromise containment for agent actions, not prompt-injection prevention for the agent. Both framings — "automate oversight" and "post-compromise containment" — describe the same pipeline; the first emphasises what it does for the user, the second emphasises what it withstands from the agent.
 
 ---
 
@@ -172,18 +174,19 @@ Side channels outside registered executors, out-of-band local shell access, or a
 
 ## What Is Hard-Enforced Without AI
 
-These are the strongest parts of the system. If these gates block, the AI does not get to override them:
+These are the strongest parts of the system. If these gates block, the AI does not get to override them. There are **five canonical deterministic layers** — the same five referenced in [docs/faq.md § Q2](faq.md#q2-what-if-the-guardian-llm-is-prompt-injected) and [docs/why-not-injection-shield.md](why-not-injection-shield.md):
 
-| Layer | What it checks | Can it be prompt-injected? |
-|---|---|---|
-| `command_shield` | Terminal command patterns, normalization, AST decomposition, capability tag emission | No — pure regex/AST |
-| `DeterministicGuardian` (pre-AE pass) | Permission check (deny-by-default), per-action constraints, domain module gates, passive-read fast-path, read-only RUN_COMMAND fast-path | No — deterministic rule evaluation |
-| Policy Registry floor | System blocked patterns always merged | No — code, not AI |
-| Analysis Engine catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
-| Guardian `TerminalChecker` | Blocklist/allowlist matching + capability tag policy (`deny_capabilities`, `allow_capabilities`) | No — fnmatch + set intersection |
-| Adapter `quick_check()` | Last-resort pattern match at execution boundary | No — pure regex |
+| # | Layer | What it checks | Can it be prompt-injected? |
+|---|---|---|---|
+| 1 | `command_shield` | Terminal command patterns, normalization, AST decomposition, capability tag emission | No — pure regex/AST |
+| 2 | `DeterministicGuardian` (pre-AE pass) | Permission check (deny-by-default), per-action constraints, domain module gates, `TerminalChecker` blocklist/allowlist, capability tag policy (`deny_capabilities`, `allow_capabilities`), passive-read fast-path, read-only RUN_COMMAND fast-path | No — deterministic rule evaluation (fnmatch + set intersection) |
+| 3 | Policy Registry floor | System blocked patterns always merged | No — code, not AI |
+| 4 | Analysis Engine catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
+| 5 | Adapter `quick_check()` | Last-resort pattern match at execution boundary, after Guardian approval, before invoking the underlying tool | No — pure regex |
 
 A compromised agent can only attack the AI layers. Every deterministic layer holds regardless of what the agent puts in any field.
+
+> The pipeline-stage layer numbering (Agent → Actor → AE → Guardian → Executor as L1–L5) shown in [docs/architecture.md § The Pipeline](architecture.md#the-pipeline) is a different cut of the same system: it groups by *role*, not by *deterministic-vs-AI*. The 5 deterministic layers above all live inside Layers 3, 4, and 5 of that pipeline view. See [docs/architecture.md § Layer Reference](architecture.md#layer-reference) for the full mapping.
 
 ---
 
@@ -344,6 +347,19 @@ See [demo/tests/root_demo/docs/2026-04-27-attack-sweep-host-impact.md](../demo/t
 
 ---
 
+## Shipped Hardening Beyond the Core Pipeline
+
+These are real, in-code defenses that sit alongside the pipeline. They are listed separately from Known Gaps so the distinction between "shipped capability" and "open gap" stays clean.
+
+1. **Tamper-evident audit trail (SHA-256 hash chain).** `executor/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`executor/platforms/macos/audit_logger.py`) stores `prev_hash` and `entry_hash` on every row. `audit_logger.verify_integrity()` walks the chain and detects any modification or insertion. Modifying any historical entry invalidates that entry's hash and every subsequent chain link.
+2. **Kernel-enforced execution sandbox.** Every `RUN_COMMAND` subprocess is wrapped in a per-execution macOS Seatbelt SBPL profile (`executor/sandbox/platforms/macos.py`) launched via `sandbox-exec`, with `(deny default)` and a curated allowlist. Even root-UID subprocesses cannot violate the profile without a kernel exploit.
+3. **Workspace VFS isolation.** `resource_registry/` enforces per-user/per-agent virtual paths; the executor resolves virtual to real paths through the registry, so the real path on disk is never exposed to the agent.
+4. **Credential scrubbing on outputs.** `intentframe_credentials/redaction.py` (re-exported via `executor/services/credential_scrubber.py`) scrubs known credential patterns from executor outputs and audit log entries.
+
+See [docs/evidence.md § Execution Sandboxing](evidence.md#execution-sandboxing) and [§ Tamper-Evident Audit Trail](evidence.md#tamper-evident-audit-trail) for the deep-dives.
+
+---
+
 ## Known Gaps (Owned Publicly)
 
 These are documented limitations, not hidden weaknesses:
@@ -351,7 +367,7 @@ These are documented limitations, not hidden weaknesses:
 1. **Cumulative / stateful policy enforcement** — per-intent evaluation without a session ledger. Salami slicing is the primary known gap.
 2. **Lookalike-domain trust** — requires user-specific allowlists to close.
 3. **Enterprise policy governance** — multi-tenant policy management, RBAC, and delegation are not complete.
-4. **Tamper-evident audit logs** — implemented via SHA-256 hash chain (`executor/services/hash_chain.py`). Every audit row carries `prev_hash` and `entry_hash`; modifying any historical entry invalidates that entry's hash AND every subsequent entry's chain link. `audit_logger.verify_integrity()` walks the rows to detect tampering. **Not yet implemented:** off-host retention, external signing/notarization, or write-once storage media — the hash chain detects tampering after the fact but does not prevent a local root attacker from rewriting the entire chain.
+4. **Off-host audit retention.** The local SHA-256 hash chain (above) detects tampering *after the fact* but does not prevent a local root attacker from rewriting the entire chain, since the genesis entry is local. Off-host log shipping, external signing/notarization, and write-once storage media are not yet shipped.
 5. **External LLM timeout / outage behavior** — fail-stop today (exception, not execution), but not yet wrapped in a controlled BLOCK with proper error reporting.
 6. **First-party tests are not a substitute for third-party audit** — current evidence is first-party tests and code-level validation. Independent audit is a future milestone.
 7. **Direct unmanaged agent I/O** — outside the current boundary.
@@ -370,10 +386,6 @@ The honest public-facing promise:
 > Your device stays in a healthy, running state. Even if the agent hallucinates. Even if it gets prompt-injected. Even if it's compromised externally. IntentFrame catches the catastrophic categories — disk wipes, credential theft, security disabling, persistent backdoors — before execution.
 
 That is a real reduction in risk, not zero risk.
-
-The shorter form for skeptical readers:
-
-> **You don't need to trust the AI model to trust the AI agent.** IntentFrame moves the trust boundary off the agent's reasoning and onto the policy-enforced runtime — deterministic gates that cannot be prompt-injected, a semantic AI layer bounded by structured I/O and field caps, and an executor isolated from policy authority. The agent stays useful; the runtime stays accountable.
 
 ---
 

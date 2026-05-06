@@ -20,10 +20,6 @@ It is closer to maker-checker control in finance: the reviewer is not magically 
 
 Concrete proof: attacks 15 and 17 in `demo/tests/test_redteam_attacks.py` are structurally valid (under amount caps, allowed paths, correct action types) but semantically deceptive. Deterministic gates alone would ALLOW them. Only the AI layer catches them. See [docs/evidence.md § Semantic-Only Catches](evidence.md#the-semantic-only-catches-attacks-15-and-17).
 
-The headline:
-
-> **You don't need to trust the AI model to trust the AI agent.** IntentFrame moves the trust boundary off the agent's reasoning and onto the policy-enforced runtime. The agent's decisions become proposals; the runtime decides whether they touch the user's world.
-
 See [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) and [docs/why-not-injection-shield.md](why-not-injection-shield.md) for the full argument.
 
 ---
@@ -151,19 +147,23 @@ See [docs/root_demo/executor-root-mode.md](root_demo/executor-root-mode.md) for 
 
 ## Q10. What does IntentFrame not claim?
 
+This list is the *epistemic* version: what we deliberately do not assert. The matching *operational* list — concrete attack categories that are out-of-scope for the boundary — lives in [docs/threat-model.md § Out-of-Scope Attacks](threat-model.md#out-of-scope-attacks). The README's "Does NOT protect" bullets are the high-impact subset of both. The three lists are intentionally redundant at different scopes; they should never contradict.
+
 IntentFrame does not claim:
 
 - The agent cannot be prompt-injected.
-- The agent's model is safe.
+- The agent's model is safe or aligned.
 - The Guardian or Analysis Engine LLMs are perfect.
 - Every semantic attack will be caught.
-- A hostile local root user is contained.
-- Direct unmanaged agent I/O is protected.
-- Actions outside the SDK boundary are governed.
-- The current release is enterprise-complete.
-- The root demo evaluates the agent model.
-- The system has been independently audited.
-- Cumulative multi-intent abuse is solved.
+- A hostile local root user (already root outside IntentFrame) is contained.
+- Direct unmanaged agent I/O — side channels outside registered executors — is protected.
+- Actions outside the SDK boundary (e.g., `os.system()` in developer-written code that bypasses `actor.submit()`) are governed.
+- The current release is enterprise-complete (multi-tenant policy governance, RBAC, delegation are not shipped).
+- The root demo evaluates the agent model — it evaluates the runtime boundary under hostile execution conditions, with a deterministic stub agent.
+- The system has been independently audited by a third party.
+- Cumulative multi-intent abuse (salami slicing) is solved — per-intent evaluation today, stateful tracking planned.
+- An adaptive adversary with full system knowledge cannot eventually find inputs that fool the AI layers.
+- Off-host audit log retention or external log signing is shipped (the local SHA-256 hash chain is — see [docs/threat-model.md § Shipped Hardening Beyond the Core Pipeline](threat-model.md#shipped-hardening-beyond-the-core-pipeline)).
 
 The public release claim is narrower:
 
