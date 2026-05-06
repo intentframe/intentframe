@@ -2,7 +2,11 @@
 
 > No single intelligent entity can simultaneously define, validate, and execute intent.
 
-IntentFrame is a runtime control plane for AI-decided actions. It automates the oversight you currently perform manually when supervising AI agents — understanding what actions will really do, judging whether they should be allowed, and executing only what passes policy.
+IntentFrame is a **runtime security control plane for AI-decided actions** — a policy-enforced pipeline that sits between an AI agent and the real world.
+
+The effect of that control plane is that it **automates the oversight a human would otherwise perform manually**: reading every action, understanding what it will really do, applying judgment, and clicking approve or reject. The agent does the work; IntentFrame automates the supervision.
+
+Both framings describe the same system from different angles. The security framing answers *"what is it?"* — a runtime boundary with deterministic gates, semantic review, and executor isolation. The oversight framing answers *"why does it exist?"* — because manual human-in-the-loop review of every AI action does not scale, and giving agents unsupervised access to the real world is not safe.
 
 ---
 
@@ -85,6 +89,26 @@ The Intent Frame is the fundamental primitive — a structured declaration of wh
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### Field reference (`intentframe_core.types.IntentFrame`)
+
+The shipped `IntentFrame` Pydantic model has the following fields:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `action` | `ActionType` enum | The typed operation (e.g., `READ_FILE`, `APPEND_ROW`, `RUN_COMMAND`, `PAY_INVOICE`) |
+| `target` | `str` | Who or what the action affects (path, recipient, command, URL) |
+| `data` | `Optional[Dict[str, Any]]` | Action-specific structured payload (amount, recipient, content) |
+| `reason` | `str` | The agent's stated justification — used by AE for reason-vs-data cross-checks |
+| `agent_id`, `session_id`, `sequence_id`, `timestamp` | identity | Who submitted the intent, when, and in what order |
+| `task_description`, `authorized_by`, `agent_type`, `actor_verified` | context | Bound at handshake; identifies the user policy this intent runs under |
+| `signature` | `str` | Actor handshake stamp (`sig_<agent_id>_<seq>`) — currently a session-bound identifier, not a cryptographic signature. See [docs/threat-model.md](threat-model.md) for the full trust model |
+
+`action`, `target`, `data`, and `reason` are the four fields that flow through the entire pipeline (deterministic gates, Analysis Engine, Guardian, Executor). The remainder are pipeline metadata.
+
+For a working code example showing `actor.submit({...})` with these fields, see the README quickstart snippet.
+
+### The human-governance parallel
+
 The parallel to human governance is not accidental:
 
 | Human governance | IntentFrame |
@@ -95,11 +119,17 @@ The parallel to human governance is not accidental:
 | Action is executed with credentials | Executor performs with credentials |
 | Record is created | Audit logs recorded |
 
-The principle is universal: accountability requires separation of desire from action, mediated by judgment.
+The principle is universal: **accountability requires separation of desire from action, mediated by judgment.** An Intent Frame is the unit of "desire"; the Analysis Engine and Guardian provide the mediating judgment; the Executor is the unit of action.
 
 ---
 
 ## The Actor SDK: Why Not an MCP Gateway
+
+> **No tool should ever enforce its own authority.**
+
+That single systems principle drives the SDK design. When tools enforce their own rules — `if amount > limit: return BLOCKED` inside each tool function — enforcement is scattered, inconsistent, and tied to specific implementations. Swap the model, add a new tool, change a policy, and you have to find every hardcoded check. Worse, an agent that finds a way to skip a tool's own check is past the boundary.
+
+IntentFrame separates capability from authority: the tools (executor adapters) only know how to *do* things. The policy (deterministic gates + AI judgment) decides whether things *should* be done. The runtime is the only path between the two. No tool gets to vouch for itself.
 
 The Actor SDK is the boundary between deterministic agent code and AI-decided operations. When a developer builds an agent, they route the LLM's chosen actions through `actor.submit()`:
 
@@ -130,6 +160,11 @@ IntentFrame uses an SDK approach rather than an MCP gateway because a gateway ca
 | Trust model | Surveillance (watching traffic) | Structural (architecture prevents bypass) |
 | Credential isolation | No | Yes — only Executor holds credentials |
 | Fail-closed | No | Yes |
+
+> **MCP Gateway is surveillance — watching traffic and hoping the agent routes through it.**
+> **IntentFrame SDK is structural — the agent has no other path to the executor.**
+
+That distinction is the entire reason IntentFrame is an SDK, not a proxy. A gateway-style filter requires the agent to cooperate by routing every action through it. An SDK boundary requires the developer to cooperate at integration time (by routing AI-decided actions through `actor.submit()`), but once that cooperation is in place, the agent itself has no alternative execution path: it does not hold credentials, does not have direct IPC with the executor, and does not know where the credential vault or executor sockets live. The trust boundary is the SDK call, not a network filter that can be skipped.
 
 The SDK approach means agents are structurally incapable of executing without going through the IntentFrame pipeline. The developer's deterministic code runs freely; the LLM's runtime decisions go through IntentFrame.
 
@@ -225,6 +260,28 @@ Output (Pydantic-structured `AnalysisReport`):
 - Scope analysis
 
 All output fields are bounded by `AEFieldLimit` — no single field can exceed 600 characters, no list can exceed 10–15 items. This structurally limits the surface available for transitive injection.
+
+#### Why temperature=0 and prompt design matter
+
+The AE runs `gpt-4o-mini` at `temperature=0`. This is deliberate. Prompt and temperature serve different functions:
+
+- **Prompt** shapes *where* the model concentrates probability mass — what it attends to and what analytical patterns it checks for. The AE prompt teaches three cross-checks: reason vs. data (catches Attack 15: reason says "$49.99", data is `$4,999`), key vs. value (catches Attack 17: vendor field contains a system policy dump), reason vs. target (catches `target=/etc/passwd` paired with `reason="reading expense report"`).
+- **Temperature** controls how faithfully the model commits to that concentration during generation. `temperature=0` is greedy decoding — the model always picks the highest-probability token, so the same intent produces the same analysis on every run.
+
+Together they are multiplicative: a strong prompt concentrates probability mass on the right analytical path, and `temperature=0` ensures the model commits to it every time. This is why Attack 2 reproduces 10/10 BLOCK across consecutive runs (see [docs/evidence.md § Reproducibility](evidence.md#reproducibility-10-consecutive-runs-of-attack-2)).
+
+`temperature=0` is not truly deterministic — GPU parallelism, sparse Mixture-of-Experts routing, and floating-point precision contribute residual ~5% variation even at `temperature=0`. This is why deterministic gates (`command_shield`, constraint checks, domain modules) backstop the AI layers: when the LLM stage rigidly misses something, the structural floor still holds.
+
+The Guardian uses a reasoning model (`gpt-5-mini`) which does not accept the `temperature` parameter; output variability is controlled via `reasoning.effort` instead.
+
+#### What active_domains and intent_limits provide to the Guardian
+
+The Guardian receives, alongside the AE's report, two policy-derived signals that are **independent of AE output**:
+
+- **`active_domains`** — deterministically extracted from the user's policy by `_extract_active_domains()`. If the user has a `spending` intent limit, the `spending` domain is in `active_domains` regardless of whether the AE classified the action as spending. A poisoned AE that omits the spending classification cannot remove the limit.
+- **`intent_limits`** — the user's natural-language semantic boundaries (`limit_id`, `domain`, `raw` text, optional `threshold`). Each limit is injected into the Guardian prompt as a trusted, named policy boundary. When the Guardian blocks, it cites the limit's `raw` text verbatim — the audit log shows which user policy was applied, not just "the AI said no."
+
+This is why the `invoice-face-value` limit appears verbatim in every Attack 2 block message: it is the user's policy text, anchored in the policy registry, that the Guardian is enforcing — not a free-form AI judgment.
 
 ### Guardian — "Should we allow it?"
 

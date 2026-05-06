@@ -69,6 +69,18 @@ Both configurations produce 100/100 BLOCK:
 
 The 1/100 slip in reduced configurations (ARP spoof) demonstrates why the full policy stack matters — defense-in-depth is real, not theater.
 
+### Other root-demo intent categories
+
+The root-demo fixture set on disk also includes two non-adversarial categories that are not part of the 220-intent attack/benign/gray-area proof package:
+
+| Directory | Count | Purpose |
+|---|---|---|
+| `demo/tests/root_demo/intents/general/` | 6 | Operator/sysadmin convenience commands (e.g. `df -h`, `uptime`, `hostname`) — exercise the read-only fast-path and confirm the pipeline doesn't over-block routine ops |
+| `demo/tests/root_demo/intents/normal/` | 8 | Normal-workflow commands (e.g. `dmesg`) — same purpose, different surface |
+| `demo/tests/root_demo/intents/false-positives/` | 0 | Reserved for future false-positive regression cases discovered in the field |
+
+These are runner conveniences, not part of the headline 220-intent proof. They are documented here so a reader who lists `intents/` and finds them does not have to wonder why they're invisible elsewhere.
+
 ---
 
 ## Suite 2: The Invoice/Payment Attack Suite

@@ -1,6 +1,8 @@
 # IntentFrame Principles
 
-These are the core invariants of the IntentFrame architecture. Each is a structural guarantee, not a guideline. If any is violated, the security model is broken.
+IntentFrame is a **runtime security control plane for AI-decided actions**. The effect of that control plane is that it automates the human oversight you would otherwise perform manually — reading every action, applying judgment, clicking approve or reject. The agent does the work; IntentFrame automates the supervision.
+
+The principles below are the structural invariants that make that control plane trustworthy. Each is a structural guarantee, not a guideline. If any is violated, the security model is broken.
 
 ---
 
@@ -8,9 +10,35 @@ These are the core invariants of the IntentFrame architecture. Each is a structu
 
 IntentFrame gates the non-deterministic operations an LLM chooses at runtime — the 5% of an agent program where the model makes decisions about what to do next. The 95% of deterministic, developer-written code runs freely without IntentFrame involvement.
 
-Traditional security tools (code review, static analysis, unit tests, sandboxing) work on deterministic code. None work for AI-decided actions because the code doesn't exist until the LLM generates intent at runtime. IntentFrame fills this gap: runtime validation of non-deterministic decisions before they become real-world actions.
+```
+┌──────────────────────────────────────────────────────────────┐
+│  A REAL AGENT PROGRAM                                         │
+│                                                               │
+│  95% DETERMINISTIC CODE (developer-written)                   │
+│  ├── Download models from HuggingFace                         │
+│  ├── Connect to APIs the developer wired up                   │
+│  ├── Parse JSON, validate schemas                             │
+│  ├── Manage local state in workspace                          │
+│  ├── Run inference on local models                            │
+│  ├── Log, retry, handle errors                                │
+│  └── All predictable. All reviewable. All testable.           │
+│                                                               │
+│  5% NON-DETERMINISTIC (AI-decided)                            │
+│  ├── "I should read the user's tax documents"                 │
+│  ├── "I should send an email to the user's boss"              │
+│  ├── "I should delete these old files"                        │
+│  ├── "I should approve this $12,000 expense"                  │
+│  └── Nobody coded these. The LLM chose them at runtime.       │
+│                                                               │
+│  IntentFrame gates the 5%. The 95% runs freely.               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Traditional security tools (code review, static analysis, unit tests, sandboxing) work on deterministic code. None work for AI-decided actions because the code doesn't exist until the LLM generates intent at runtime. You cannot code-review a decision that hasn't been made yet. You cannot write a unit test for an action the LLM hasn't chosen yet. IntentFrame fills this gap: runtime validation of non-deterministic decisions before they become real-world actions.
 
 The developer's deterministic code is their responsibility — reviewable, testable, accountable. The LLM's runtime decisions are nobody's responsibility — until IntentFrame makes them its own.
+
+> Traditional security handles deterministic code. IntentFrame handles non-deterministic decisions. Together, the whole agent program is covered.
 
 ---
 
@@ -49,6 +77,20 @@ This prevents the agent from socially engineering the user into policy changes t
 
 Policy changes are always out-of-band: the user adjusts settings before the next session, not during execution.
 
+### What lives inside a policy
+
+A user policy combines three kinds of rules, each enforced by a different layer:
+
+| Rule type | Where it lives | What it does | Enforced by |
+|---|---|---|---|
+| `allowed_actions` | `UserPolicy` | Permission map: which `ActionType`s are allowed at all (deny-by-default), and per-action `safe` flag + per-category `constraints` (paths, recipients, amounts) | Deterministic — `DeterministicGuardian` permission + constraint checks |
+| `domain_constraints` | `UserPolicy` (per critical domain — finance, deletion) | Typed structural rules: `max_amount`, `allowed_currencies`, `allowed_recipients`, `block_irreversible` | Deterministic — domain modules in `intentframe_components/guardian/domains/` |
+| `intent_limits` | `UserPolicy` | Cross-cutting semantic boundaries written as natural language with structured metadata: `limit_id`, `domain` (e.g., `spending`), `raw` text, optional `threshold`, `effect` | Semantic — injected into Guardian's prompt as a trusted, named policy boundary the Guardian cites verbatim when it blocks |
+
+Domain modules can BLOCK on structural violation but never ALLOW. Passing the structural check means "structurally valid," not "safe" — AI still evaluates everything else. Intent limits catch cases that structural rules cannot reach: an `HTTP_POST` to a payment API can be classified as "spending" by the Analysis Engine and bounded by the same `max-spend-per-txn` limit that catches `PAY_INVOICE`, even though there is no per-category amount constraint on `HTTP_POST`.
+
+The `active_domains` set passed to Guardian is also part of policy, not AI: it is **deterministically extracted** from the user's policy rules (`_extract_active_domains()`) and injected into Guardian's context regardless of how the Analysis Engine classified the action. A poisoned AE that misses the "spending" classification cannot remove the spending limit — the limit is anchored in policy, not in AE output.
+
 ---
 
 ## 5. Deterministic before AI
@@ -63,6 +105,18 @@ The two-layer model:
 | AI (Analysis Engine + Guardian) | Expensive | High but fallible | Theoretically possible |
 
 If deterministic policy blocks, the AI never runs and cannot override. The AI can only allow or block actions that already passed structural checks. This means the AI's surface is shrunk to only the genuinely ambiguous cases where semantic judgment is required — reducing both cost and attack surface.
+
+### How the layers compose: ALLOW = AND, BLOCK = OR
+
+The control flow across layers is conjunctive, not unanimous-vote-or-else:
+
+- **Deterministic BLOCK** → final. AI never runs.
+- **Deterministic pass** → AI still evaluates; AI can BLOCK on its own judgment (e.g., semantic deception that structural checks cannot see).
+- **Neither layer can override the other into ALLOW.** No deterministic pass forces AI to allow. No AI ALLOW overrides a deterministic BLOCK.
+
+> **ALLOW requires *all* layers to agree. BLOCK requires only one.**
+
+This is the same shape as defense-in-depth in any security system: many ways to fail safely, only one way to succeed. The AI does have *block authority* in its bounded role. What it lacks is *allow-override authority* over a deterministic block.
 
 ---
 

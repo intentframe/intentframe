@@ -20,6 +20,10 @@ It is closer to maker-checker control in finance: the reviewer is not magically 
 
 Concrete proof: attacks 15 and 17 in `demo/tests/test_redteam_attacks.py` are structurally valid (under amount caps, allowed paths, correct action types) but semantically deceptive. Deterministic gates alone would ALLOW them. Only the AI layer catches them. See [docs/evidence.md § Semantic-Only Catches](evidence.md#the-semantic-only-catches-attacks-15-and-17).
 
+The headline:
+
+> **You don't need to trust the AI model to trust the AI agent.** IntentFrame moves the trust boundary off the agent's reasoning and onto the policy-enforced runtime. The agent's decisions become proposals; the runtime decides whether they touch the user's world.
+
 See [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) and [docs/why-not-injection-shield.md](why-not-injection-shield.md) for the full argument.
 
 ---

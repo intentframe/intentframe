@@ -1,12 +1,12 @@
 # IntentFrame Threat Model
 
-IntentFrame is a runtime control boundary for AI-decided actions.
+IntentFrame is a **runtime security control plane for AI-decided actions**. The effect of that control plane is that it automates the human oversight you would otherwise perform manually — reading every action, applying judgment, clicking approve or reject. This document describes the security side of that system: what it defends against and what it does not.
 
 It does not claim the agent LLM is safe, unjailbreakable, or aligned. It assumes the agent may already be confused, compromised, prompt-injected, or hallucinating, and asks a narrower question:
 
 > Before this agent action touches the user's world, does it pass policy, deterministic gates, semantic review, and executor constraints?
 
-The system is best understood as post-compromise containment for agent actions, not prompt-injection prevention for the agent.
+The system is best understood as **post-compromise containment for agent actions**, not prompt-injection prevention for the agent. The oversight framing is the *effect*; the containment framing is the *mechanism*.
 
 ---
 
@@ -370,6 +370,10 @@ The honest public-facing promise:
 > Your device stays in a healthy, running state. Even if the agent hallucinates. Even if it gets prompt-injected. Even if it's compromised externally. IntentFrame catches the catastrophic categories — disk wipes, credential theft, security disabling, persistent backdoors — before execution.
 
 That is a real reduction in risk, not zero risk.
+
+The shorter form for skeptical readers:
+
+> **You don't need to trust the AI model to trust the AI agent.** IntentFrame moves the trust boundary off the agent's reasoning and onto the policy-enforced runtime — deterministic gates that cannot be prompt-injected, a semantic AI layer bounded by structured I/O and field caps, and an executor isolated from policy authority. The agent stays useful; the runtime stays accountable.
 
 ---
 
