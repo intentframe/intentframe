@@ -323,7 +323,13 @@ Profile structure:
   7. Non-negotiable deny overrides (always last, always wins)
 ```
 
-This mirrors Anthropic's sandbox-runtime approach. The sandbox is **kernel-enforced** — even a root-UID subprocess cannot violate the SBPL profile without a kernel exploit. This is why root-demo execution is safe: root gives privilege, but the Seatbelt profile constrains what that privilege can touch.
+This mirrors Anthropic's sandbox-runtime approach. The sandbox is **kernel-enforced** — even a root-UID subprocess cannot violate the SBPL profile without a kernel exploit. This is why root-demo execution is safe under the documented threat model: root gives privilege, but the Seatbelt profile constrains what that privilege can touch.
+
+**Two honest caveats:**
+
+1. **`sandbox-exec` is marked deprecated by Apple.** It still works on every shipping macOS through Tahoe and is the only generally-available CLI surface for SBPL profiles outside App Store entitlements; Apple has not announced a replacement for the unprivileged CLI use case. We track this as a forward-looking dependency risk, not a current-functionality risk. If/when `sandbox-exec` is removed, the executor would need to switch to App Sandbox entitlements (different operational model) or an alternative kernel-enforced sandbox (e.g., Endpoint Security framework, OS-vendor-specific). The architecture's separation between "Executor decides to run a command" and "kernel-enforced wrapper" stays intact across that swap.
+
+2. **A kernel exploit defeats the sandbox.** "Kernel-enforced" means the kernel decides; it does not mean the kernel cannot be subverted. A subprocess that holds an unpatched local kernel privilege escalation can break out of any Seatbelt profile. This is the same exposure as every userland sandbox on every OS and is explicitly out of scope (see [docs/threat-model.md § Out-of-Scope Attacks](threat-model.md#out-of-scope-attacks)).
 
 ---
 

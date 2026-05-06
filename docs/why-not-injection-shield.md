@@ -110,15 +110,19 @@ Both AI components use Pydantic `output_type`. Even if injection partially influ
 
 The transitive path (external agent → AE → Guardian) is structurally bounded. All AE free-text fields have `maxLength`/`maxItems` constraints enforced by structured output during generation, with Pydantic `max_length` validation as a second layer. A deterministic `_detect_overflow()` backstop flags `ae_output_anomaly` on the `AnalysisReport` if any field exceeds its bound. Guardian treats anomalies as elevated risk. No single AE field can carry a complete jailbreak payload (typical requirement: 800–1500+ chars; largest field: 600 chars).
 
-### The probability chain is already negligible
+### The probability chain is small in practice — but not formally bounded
 
 A successful injection must:
 1. Fool the AE's hardened prompt (random boundaries + immutable role + sandwich reinforcement + field bounds)
-2. AND fool the Guardian's independently hardened prompt
+2. AND fool the Guardian's separately-prompted evaluation
 3. AND produce valid Pydantic output in both cases
 4. AND not trigger any of the five deterministic layers
 
-Each layer is independent. The conjunction makes complete bypass negligible for the tested attack categories.
+The deterministic layers are independent in the strong sense — they share no model, no prompt, no learned weights. They cannot be jointly fooled by any single textual payload because they don't read text the same way (regex vs AST vs fnmatch vs hardcoded substring).
+
+The two AI layers (AE and Guardian) are independent in *prompt, role, objective, and structured output schema*, but they currently use models from the same provider family (OpenAI). That means residual model-correlated failure modes are possible and have to be measured, not assumed away. See [docs/why_llm_guarding_llm_deep_dive.md § The independence assumption](why_llm_guarding_llm_deep_dive.md) for the full treatment.
+
+The conjunction of all of the above makes complete bypass empirically rare on the tested attack categories — 23/24 in the invoice/payment suite, 39/43 in the transitive injection suite, with the failures being scope-limited (lookalike domains and pre-fabricated AE poisoning, see [docs/evidence.md](evidence.md)). It is not a formal probability bound, and we don't claim it as one.
 
 ---
 

@@ -162,6 +162,10 @@ IntentFrame validates whether an action violates policy. It does not validate wh
 
 If an attacker already has local root access outside IntentFrame (e.g., they compromised the machine through a separate vulnerability), they can kill IntentFrame processes, modify policy files, or tamper with the executor. IntentFrame is not a defense against a pre-existing local root compromise of the host itself.
 
+### Kernel-level attacker / sandbox escape
+
+The executor's macOS Seatbelt SBPL sandbox is **kernel-enforced**, which means the kernel decides — not that the kernel cannot be subverted. A subprocess holding an unpatched local kernel privilege escalation, a Seatbelt-specific bypass, or a SIP/AMFI bypass can break out of any SBPL profile. This is the same exposure every userland sandbox on every OS has. IntentFrame's sandboxing claim is contingent on the kernel and Seatbelt subsystem holding; it is not a defense against a kernel-level attacker. (Forward-looking: `sandbox-exec` is marked deprecated by Apple. See [docs/evidence.md § Execution Sandboxing](evidence.md#execution-sandboxing) for the dependency-risk treatment.)
+
 ### Cumulative multi-intent abuse (salami slicing)
 
 Today the system mostly evaluates per intent. A stateful policy ledger is needed to block "five allowed transactions that collectively violate policy." Five $4,000 transactions can each pass a $5,000 per-intent cap. Cumulative caps require a stateful policy layer (planned, not shipped). This gap is tracked as Attack 16 in `demo/tests/test_redteam_attacks.py`.
@@ -251,7 +255,14 @@ See [docs/why-not-injection-shield.md](why-not-injection-shield.md) for the full
 
 ### The probability chain
 
-A successful injection must: fool the AE's hardened prompt (random boundaries + immutable role + sandwich reinforcement + field bounds) AND fool the Guardian's independently hardened prompt AND produce valid Pydantic output in both cases AND not trigger any of the deterministic layers. Each layer is independent. The conjunction makes complete bypass negligible for the tested attack categories.
+A successful injection must: fool the AE's hardened prompt (random boundaries + immutable role + sandwich reinforcement + field bounds) AND fool the Guardian's separately-prompted evaluation AND produce valid Pydantic output in both cases AND not trigger any of the deterministic layers.
+
+What "independent" means here is worth being precise about:
+
+- The five **deterministic layers** are independent in the strong sense — they share no model, no prompt, no learned weights. They cannot be jointly fooled by any single textual payload because they don't read text the same way (regex vs AST vs fnmatch vs hardcoded substring).
+- The two **AI layers** (Analysis Engine and Guardian) are independent in prompt, role, objective, and Pydantic output schema. They currently use models from the same provider family (OpenAI), so residual model-correlated failure modes are possible and must be measured rather than assumed away. The Guardian uses a reasoning model and the AE uses a non-reasoning model with `temperature=0`, which reduces but does not eliminate correlation. See [docs/why_llm_guarding_llm_deep_dive.md](why_llm_guarding_llm_deep_dive.md) for the full treatment of the independence assumption.
+
+The conjunction of all of the above makes complete bypass empirically rare on the tested attack categories. It is not a formal probability bound, and the documentation does not claim it as one.
 
 ---
 
