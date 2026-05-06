@@ -476,6 +476,8 @@ First verified end-to-end defense against catastrophic terminal commands and soc
 | 2026-04-28 | Remediation: all 9 now BLOCK via new capability tags + policy constraints |
 | 2026-04-28 | Post-remediation: 100/100 BLOCK confirmed across all policy configurations |
 
+> **State of this document.** The dated measurements above (root-demo sweeps, the invoice/payment suite scorecard, and the transitive injection tallies) reflect runs through 2026-04-28. The codebase has continued to evolve — `command_shield`'s capability-tag set, the prompt-hardening primitives, and the deterministic test suites in `tests/` all keep accruing coverage in CI. The numbers cited in this document are not re-run on every commit; they are point-in-time measurements anchored to the dates shown. When a sweep is re-run with material changes, a new dated row is added to this table. If you are reading this near a release tag, treat the table as a *minimum* claim, not a current-as-of-today claim.
+
 ---
 
 ## What This Evidence Does NOT Prove

@@ -1,5 +1,7 @@
 # Why LLM Guarding LLM Works in IntentFrame
 
+> **Status.** Long-form deep dive. The compressed argument lives in [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) and [docs/faq.md § Q1](faq.md#q1-is-this-just-ai-guarding-ai). The dated measurements below reflect runs through 2026-04-28 — see [docs/evidence.md § Milestone Timeline](evidence.md#milestone-timeline) for the running log.
+
 This document answers the skeptical question:
 
 > If one LLM can be tricked, why should anyone trust another LLM to guard it?
@@ -267,6 +269,8 @@ This is the real security story: the LLM review is one layer, not the whole syst
 
 ## What the Evidence Shows
 
+> **Why 99/100 here, not the headline 100/100.** This section deliberately measures a *minimal-policy* configuration to isolate what the AI review contributes when user-written rules are weak. The headline 100/100 result quoted in [README](../README.md) and [docs/evidence.md § Suite 1: The Root Demo](evidence.md#suite-1-the-root-demo) is the *full-policy, post-2026-04-28-remediation* result; the 99/100 number used below is from the [minimal-policy run](../demo/tests/root_demo/docs/empty_deny_cap_and_intent_limits.md) and is the right measurement for an "AI review earning its keep" claim. Both are real; they just answer different questions.
+
 To test whether the AI review actually contributes value, IntentFrame was run against 100 attack-style commands with almost no user-written policy: only a handful of obvious blocked patterns, and none of the optional rules a real operator would normally configure. The deterministic analyzer and the AI review layer were left in place.
 
 The observed result:
@@ -457,15 +461,24 @@ The defense-in-depth claim also depends on details below the Guardian. IntentFra
 
 Important implementation details to preserve in the public argument:
 
-- `sandbox-exec` wraps macOS `RUN_COMMAND` execution, including the root demo path.
+- Every `RUN_COMMAND` subprocess is wrapped in a **kernel-enforced macOS Seatbelt SBPL profile** (`executor/sandbox/platforms/macos.py`) launched via `sandbox-exec`. The profile is dynamically built per execution from the planner's capability set, with `(deny default)` and a curated allowlist. Even root-UID subprocesses cannot violate the profile without a kernel exploit.
 - Policy can select sandbox templates per intent.
 - A hardened deny-path set protects sensitive root surfaces such as LaunchAgents, LaunchDaemons, `/etc`, `/System`, SSH configuration, `sudoers`, PAM, keychains, mail stores, shell startup files, `.ssh`, and `.gnupg`.
-- VFS mounts and adapter dispatch constrain what execution adapters can reach and perform.
+- VFS mounts (Workspace Resource Registry) constrain what execution adapters can reach by mapping virtual paths per user; the real on-disk path is never exposed to the Agent.
 - The executor, not the Agent, receives the analyzed command string and is the final enforcement point.
+- Audit log entries carry a SHA-256 hash chain (`prev_hash` + `entry_hash`); `audit_logger.verify_integrity()` walks the chain to detect any tampering. This makes post-hoc inspection and regression replay trustworthy.
+- Credentials never leave the executor; `CredentialScrubber` (`intentframe_credentials/redaction.py`) redacts known credential patterns from executor outputs and audit entries.
 
 This does not mean the sandbox catches every possible harmful action after an allow. The right claim is narrower: IntentFrame has post-authorization containment layers, so the Guardian is not the only thing standing between an unsafe proposal and host impact.
 
+Two honest caveats on the sandbox claim, repeated from [docs/evidence.md § Execution Sandboxing](evidence.md#execution-sandboxing) and [docs/threat-model.md § Out-of-Scope Attacks](threat-model.md#out-of-scope-attacks):
+
+- **`sandbox-exec` is marked deprecated by Apple.** It still ships and works on every shipping macOS through Tahoe, but Apple has not announced a replacement for the unprivileged CLI use case. If/when it is removed, the executor would need to switch to App Sandbox entitlements or another kernel-enforced sandbox; the architecture's separation between "Executor decides to run a command" and "kernel-enforced wrapper" survives that swap.
+- **A kernel exploit defeats any Seatbelt profile.** Same exposure as every userland sandbox on every OS. The sandbox claim is contingent on the kernel and Seatbelt holding; it is not a defense against a kernel-level attacker.
+
 The deterministic surface has also been hardened beyond a few ad hoc string checks. The command analyzer uses a capability taxonomy, capability tags, classifier tests, and mirrored deny sets in policy/bootstrap paths. That matters because taxonomy gaps are one of the main ways the asymmetric-evidence story can weaken: if the deterministic layer fails to name a behavior, the risk analyzer and Guardian receive less useful evidence.
+
+The Analysis Engine's free-text outputs are bounded by an `AEFieldLimit` enum (`maxLength` 300–600 chars per field, `maxItems` 10–15 per list) enforced by Pydantic's structured output. A `_detect_overflow()` backstop flags `ae_output_anomaly` if any field exceeds its bound — Guardian then treats the report as elevated risk. This is what closes the transitive-injection path (Agent → AE → Guardian): no single AE field can carry a complete jailbreak payload (typical requirement: 800–1500+ chars; largest field: 600 chars).
 
 ---
 
@@ -515,4 +528,18 @@ The measurements in this document come from supporting experiment notes under [`
 - [Plain-English policy run](../demo/tests/root_demo/docs/intent_limits_only.md): 100/100 blocked using non-technical user rules such as "don't change my network settings."
 - [Combined policy discussion](../demo/tests/root_demo/docs/combined_policy_discussion.md): why deterministic and semantic layers are both useful.
 - [Host-impact report](../demo/tests/root_demo/docs/2026-04-27-attack-sweep-host-impact.md): the earlier 91/100 result that motivated the tighter layers.
+
+For the second test surface — the invoice/payment red-team suite (24 attacks: 23 defended, 0 bypassed, 1 known gap) and the transitive injection boundary tests (39/43 PASS) — see [docs/evidence.md § Suite 2](evidence.md#suite-2-the-invoicepayment-attack-suite) and [§ Suite 3](evidence.md#suite-3-transitive-injection-boundary-tests). The OWASP Agentic Top 10 mapping for IntentFrame's coverage of agent-specific risks is in [docs/evidence.md § OWASP Agentic Top 10 Coverage](evidence.md#owasp-agentic-top-10-coverage).
+
+---
+
+## Related Documents
+
+- [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) — the compressed version of this argument
+- [docs/architecture.md](architecture.md) — full pipeline walkthrough; canonical layer reference
+- [docs/threat-model.md](threat-model.md) — what IntentFrame protects against and what it doesn't
+- [docs/principles.md](principles.md) — the structural invariants this argument relies on
+- [docs/evidence.md](evidence.md) — every test result cited here, with reproducibility notes
+- [docs/why-not-injection-shield.md](why-not-injection-shield.md) — why no dedicated injection detector
+- [docs/faq.md](faq.md) — Q1 and Q2 cover the same questions in compressed form
 
