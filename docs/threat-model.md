@@ -132,7 +132,7 @@ Actions not in the user's `allowed_actions` set, file paths outside `allowed_pat
 
 Actions that pass all deterministic checks but are dishonest: the `reason` claims "$49.99" while `data.amount` is $4,999; PII hidden in a legitimate-looking field; a benign-looking browser/API action that actually exfiltrates data. These require the AI semantic layer (Analysis Engine + Guardian) to detect.
 
-Concrete evidence: attacks 15 (stealth amount mismatch) and 17 (data exfiltration via vendor field) in `demo/tests/test_redteam_attacks.py` are structurally valid but semantically deceptive — only the AI layer catches them. See [docs/evidence.md § The Critical Trio](evidence.md#the-critical-trio-attacks-15-17-23).
+Concrete evidence: attacks 15 (stealth amount mismatch) and 17 (data exfiltration via vendor field) in `demo/tests/test_redteam_attacks.py` are structurally valid but semantically deceptive — only the AI layer catches them. See [docs/evidence.md § Semantic-Only Catches](evidence.md#the-semantic-only-catches-attacks-15-and-17).
 
 ### Transitive injection (AE → Guardian path)
 

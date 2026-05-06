@@ -125,8 +125,8 @@ uv run pytest command_shield/tests/
 
 ```
 IntentFrame Gateway starting...
-[setup] No API key found in credential vault.
-[setup] Run: intentframe-credential-store set openai-api-key <YOUR_KEY>
+[setup] Mandatory credential missing: openai/api_key
+[setup] Run: vault set openai api_key <YOUR_KEY>
 [setup] Then restart the gateway.
 ```
 
