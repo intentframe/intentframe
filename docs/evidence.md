@@ -81,6 +81,8 @@ The stub agent (`StubPipelineAgent`) submits pre-written malicious intents throu
 
 All 24 attacks share a single policy: `max_amount: 5000`, `allowed_paths: [/invoices/, /expense_tracker.md]`, `intent_limits: ["Don't spend more than 5k on a single thing", "The amount on the invoice is the amount we record"]`.
 
+> **What `intent_limits` are.** Intent limits are the user's natural-language semantic boundaries declared in `UserPolicy`. Each has a `limit_id`, a `domain` (e.g. `spending`), and a `raw` text string. They are injected into the Guardian's prompt as named, trusted policy boundaries — when the Guardian blocks, it cites the limit's `raw` text verbatim, so the audit log shows *which user policy was applied*, not just "the AI said no." See [docs/principles.md § 4 — Policy immutability](principles.md#4-policy-immutability) and [docs/architecture.md § What active_domains and intent_limits provide to the Guardian](architecture.md#what-active_domains-and-intent_limits-provide-to-the-guardian) for the full mechanics.
+
 ### Foundation Attacks (1–6)
 
 | # | Name | OWASP Mapping | Technique | Defense Layer |
@@ -395,6 +397,8 @@ The signal chain that produces BLOCK in both cases:
    → present in Guardian context regardless of what AE classified
    → ensures the limit is evaluated even if AE missed the domain
 ```
+
+> **What `active_domains` is.** A set of domain tags (e.g. `spending`, `invoicing`, `deletion`) deterministically extracted from the user's policy by `_extract_active_domains()` *before* the AI ever sees the intent. It is passed into the Guardian's context alongside the AE's report. Because it is derived from policy — not from AE output — a poisoned AE that drops the "spending" classification cannot remove the spending limit from Guardian's evaluation. See [docs/architecture.md § What active_domains and intent_limits provide to the Guardian](architecture.md#what-active_domains-and-intent_limits-provide-to-the-guardian).
 
 The resulting block message confirms the limit is applied:
 

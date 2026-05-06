@@ -106,6 +106,18 @@ This is the L0–L4 numbering used by the code (`intentframe_components/guardian
 
 When other docs say *"five deterministic layers cannot be prompt-injected"*, they mean: L0 (`command_shield`), L1 (Policy Registry floor), L2 (AE catastrophic path), L3a (`DeterministicGuardian`, including `TerminalChecker`), and L4 (adapter `quick_check()`) from View B. L3b (the AIGuardian) is the only AI-decision point in the deterministic stack.
 
+### Why `command_shield` and adapter `quick_check()` are listed as separate layers
+
+Both come from the same module (`command_shield/`), but they run at different points in the flow and play different roles. Listing them as one layer would hide a real defense-in-depth property:
+
+| | L0 — `command_shield` (full evaluation) | L4 — adapter `quick_check()` (floor) |
+|---|---|---|
+| Where it runs | Inside `DeterministicGuardian`, before the AI path | Inside the executor's terminal adapter (`executor/platforms/macos/adapters/terminal.py`), after Guardian approval, immediately before subprocess launch |
+| What it produces | A full `CommandReport` — verdict, capabilities, edges, code_intel — used by every later gate | A binary "is this catastrophic?" answer; if yes, refuse to launch even though Guardian said ALLOW |
+| Why it exists | The deterministic floor that drives capability tagging and read-only fast-path | The non-negotiable last resort if policy is misconfigured, missing, or somehow bypassed upstream |
+
+In code, the adapter re-invokes `command_shield.quick_check(command)` as the very last step before `subprocess.run`; if `report.is_catastrophic`, the command is refused even though it already passed all earlier gates. This is what makes "adapter quick_check" a distinct layer in defense-in-depth: it survives upstream misconfiguration. See `executor/platforms/macos/adapters/terminal.py` for the call site.
+
 ---
 
 ## The Intent Frame
