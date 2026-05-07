@@ -83,6 +83,12 @@ If you're new to IntentFrame, read in this order:
 - [terminal_use/current_terminal_policy_rationale.md](terminal_use/current_terminal_policy_rationale.md) — terminal policy reasoning
 - [terminal_use/current_deterministic_gates_mapping.md](terminal_use/current_deterministic_gates_mapping.md) — which gates fire on which command shapes
 
+### "I want to build an agent on IntentFrame"
+
+- [actor-sdk.md](actor-sdk.md) — the developer-facing positioning + integration guide; bring any LLM, any framework, route tool I/O through `actor.submit(...)`
+- [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py) — reference integration (OpenAI Agents SDK + Actor SDK)
+- [jarvis.md](jarvis.md) — the larger reference assistant built on the same SDK
+
 ### "I want to extend IntentFrame"
 
 - [executor/architecture.md](executor/architecture.md) — adapter pattern, how to add a new capability
@@ -137,6 +143,7 @@ If you're new to IntentFrame, read in this order:
 
 | Doc | What it covers |
 |---|---|
+| [actor-sdk.md](actor-sdk.md) | The developer-facing integration story; *"bring your own agent — any LLM, any framework — and route tool I/O through `actor.submit(...)`"*. The contract is one method, the boundary is one process away. |
 | [jarvis.md](jarvis.md) | The reference personal assistant; how Jarvis exercises the IntentFrame boundary, what it can do, what it deliberately is not |
 | [jarvis-telegram.md](jarvis-telegram.md) | Telegram bridge to Jarvis; why origin-independence of the boundary matters and what the bridge is / isn't evidence for |
 

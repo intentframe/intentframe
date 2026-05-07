@@ -92,6 +92,12 @@ Every result above is reproducible from a fresh clone, with raw logs in [`docs/e
 
 ---
 
+## 🔌 Bring Your Own Agent
+
+IntentFrame is **agent-agnostic**. Build with any LLM, any framework, any agent SDK — OpenAI Agents SDK, LangChain, AutoGen, Anthropic tool-use, a hand-rolled loop, whatever you reach for. The runtime doesn't care how your agent thinks. It cares what your agent tries to *do*.
+
+---
+
 ## 🤖 Try It: Meet Jarvis
 
 The fastest way to feel the difference is to use the assistant we built on top of IntentFrame.
@@ -216,9 +222,9 @@ Treating AI as a neutral tool that needs guardrails — not as an enemy — is h
 
 ## 🤔 "But isn't this just an LLM watching another LLM?"
 
-**Deterministic-First, AI-Where-It-Matters.**
-
 Reasonable question. Short answer: no, and here's why in one breath.
+
+**Deterministic-First, AI-Where-It-Matters.**
 
 Two LLMs would only fail the same way if they had the same job, the same input, and the same prompt. They don't.
 
@@ -258,8 +264,6 @@ Honest answer: this is a first-party test suite, run locally against a custom at
 > [!IMPORTANT]
 > Independent third-party audit is a stated next milestone, not a current claim.
 
-**"What if the project gets abandoned?"**
-The code is AGPL. The architecture is documented. The tests are public. The failure reports are public. You can fork it, audit it, and run it yourself. That is the entire point of building this in the open.
 
 **"Why isn't this just a feature built into AI agent SDKs?"**
 SDK-level approval gates work the same way every approval gate works: they ask the human. That solves the demo problem, not the autonomy problem. IntentFrame removes the agent's ability to act in the first place — that is a different shape of solution, and it doesn't compete with those gates so much as live underneath them.
@@ -290,12 +294,21 @@ For the full pipeline, see [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
+## 🔌 Where Your Agent Plugs In
+
+The agent in the diagram above is *your* agent — any LLM, any framework. The seam between it and the IntentFrame pipeline is one method: `actor.submit(...)`. Every tool body calls it; nothing else changes. Reference integrations live in [`jarvis_pa/`](jarvis_pa/) and [`external_agents/invoice_bot/`](external_agents/invoice_bot/).
+
+Full integration guide, framework patterns (OpenAI Agents SDK, LangChain, raw tool-calls), scope, and quick answers: [`docs/actor-sdk.md`](docs/actor-sdk.md).
+
+---
+
 ## 📚 Documentation
 
 | If you are... | Read this |
 |---|---|
 | Curious and want to try it | [`docs/quickstart.md`](docs/quickstart.md) → run Jarvis |
 | Wondering what Jarvis actually is | [`docs/jarvis.md`](docs/jarvis.md) → and [`docs/jarvis-telegram.md`](docs/jarvis-telegram.md) for the phone bridge |
+| Building your own agent on IntentFrame | [`docs/actor-sdk.md`](docs/actor-sdk.md) — bring any LLM/framework, integrate via `actor.submit(...)` |
 | Wondering "what is this really for?" | [`docs/autonomy.md`](docs/autonomy.md) (the delegatable-autonomy thesis) |
 | A skeptic who wants to break it | [`docs/threat-model.md`](docs/threat-model.md) → [`docs/evidence.md`](docs/evidence.md) |
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
