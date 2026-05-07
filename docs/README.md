@@ -65,6 +65,11 @@ If you're new to IntentFrame, read in this order:
 - [vfs-vs-host-tools.md](vfs-vs-host-tools.md) — workspace VFS vs host filesystem tools
 - [executor/security-model.md](executor/security-model.md) — prevention pipeline + sandbox templates
 
+### "What's actually built on top of IntentFrame?"
+
+- [jarvis.md](jarvis.md) — the reference personal assistant used as the daily-driver test bed; what it does, what it isn't, and how it exercises the runtime
+- [jarvis-telegram.md](jarvis-telegram.md) — the Telegram bridge that lets you message Jarvis from your phone; proves the boundary holds for off-device origin requests
+
 ### "How does the root demo work?"
 
 - [root_demo/PROOF.md](root_demo/PROOF.md) — proof snapshot
@@ -127,6 +132,13 @@ If you're new to IntentFrame, read in this order:
 | [email-sync.md](email-sync.md) | The EDI daemon — IMAP IDLE + SMTP + local SQLite mirror |
 | [macos-platform-server.md](macos-platform-server.md) | Swift native bridge for Calendar / Contacts / Reminders / iMessage / Notes / Notifications |
 | [vfs-vs-host-tools.md](vfs-vs-host-tools.md) | Workspace VFS file tools vs host file tools |
+
+### Reference clients (built on IntentFrame)
+
+| Doc | What it covers |
+|---|---|
+| [jarvis.md](jarvis.md) | The reference personal assistant; how Jarvis exercises the IntentFrame boundary, what it can do, what it deliberately is not |
+| [jarvis-telegram.md](jarvis-telegram.md) | Telegram bridge to Jarvis; why origin-independence of the boundary matters and what the bridge is / isn't evidence for |
 
 ### Reasoning and design
 
