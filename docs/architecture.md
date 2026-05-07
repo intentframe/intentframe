@@ -377,6 +377,8 @@ For `RUN_COMMAND`, the Executor applies a kernel-enforced sandbox (macOS Seatbel
 
 In the root-demo profile, the executor's `RUN_COMMAND` child subprocess can escalate through `sudo -n sandbox-exec`. But the rest of the stack — gateway, policy services, agent process — runs as the normal user. Root capability is intentionally scoped to the narrowest possible execution path.
 
+> **Deeper dive:** [executor.md](executor.md) is the canonical reference for the Executor — what it does, the engine-not-workbench mental model, credential isolation, the adapter pattern, the kernel sandbox, audit and rollback, and why the Executor (not Guardian) is the structural foundation of agent safety. The [`executor/`](executor/) subfolder contains long-form material on internal architecture, the prevention-first security model, the foundation argument, and the Executor as standalone infrastructure.
+
 ---
 
 ## The No Self-IO Principle
@@ -453,11 +455,29 @@ Deterministic-fast-path decisions are reproducible by definition. AI-path decisi
 
 ---
 
+## Runtime Model and Privacy
+
+The pipeline diagrams above are *logical* — they show roles (Agent → Actor → AE → Guardian → Executor), not processes. When IntentFrame is actually running, those roles are distributed across multiple OS processes communicating over Unix domain sockets in `~/.intentframe/run/`. This is what underwrites the credential-isolation and process-isolation properties the design relies on.
+
+For the concrete runtime picture — what processes exist, what each one does, where data lives on disk, and what (only OpenAI and IMAP/SMTP, by design) leaves the machine — see:
+
+- [processes.md](processes.md) — the full process tree and per-process responsibility table (includes "Why Unix domain sockets")
+- [privacy.md](privacy.md) — on-disk data layout, outbound-traffic catalog, and what never happens (no telemetry, no phone-home)
+- [modules.md](modules.md) — every workspace module mapped to its purpose, source, and process
+
+---
+
 ## Related Documents
 
+- [docs/README.md](README.md) — full docs index
+- [docs/modules.md](modules.md) — workspace module map (what every directory is for)
 - [docs/threat-model.md](threat-model.md) — what IntentFrame protects against and what it doesn't
 - [docs/principles.md](principles.md) — core invariants stated concisely
 - [docs/evidence.md](evidence.md) — test results and failure reports
+- [docs/credentials-vault.md](credentials-vault.md) — secret storage and the vault service
+- [docs/registries.md](registries.md) — policy / resource / action registries (the configuration plane)
+- [docs/email-sync.md](email-sync.md) — IMAP / SMTP daemon (EDI)
+- [docs/macos-platform-server.md](macos-platform-server.md) — Swift native bridge (Calendar, Contacts, iMessage, …)
 - [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) — why the AI hybrid model works
 - [docs/why-not-injection-shield.md](why-not-injection-shield.md) — why no dedicated injection detector
 - [docs/vfs-vs-host-tools.md](vfs-vs-host-tools.md) — workspace vs host filesystem tools

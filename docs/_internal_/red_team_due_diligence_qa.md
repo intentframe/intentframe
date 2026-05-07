@@ -365,12 +365,11 @@ the schema constraint, not because re-check is unnecessary in principle.
 
 ### Q35. What is the "No Self-IO" principle and why does it matter for security?
 
-From `.vscode/private-repo-content/concepts/core/No-Self-IO-Principle.md`
-(read in chat): no pipeline component — Guardian, Analysis Engine, Runtime —
-can use resources or trigger IO directly. If Guardian wanted user
-confirmation, it must return BLOCK to the agent; the agent must submit an
-`ASK_USER` intent that itself goes through the pipeline. This prevents
-Guardian from acting as an unsupervised agent.
+No pipeline component — Guardian, Analysis Engine, Runtime — can use
+resources or trigger IO directly. If Guardian wanted user confirmation, it
+must return BLOCK to the agent; the agent must submit an `ASK_USER` intent
+that itself goes through the pipeline. This prevents Guardian from acting
+as an unsupervised agent.
 
 ### Q36. Is policy stable for the lifetime of a task?
 
