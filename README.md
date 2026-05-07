@@ -24,7 +24,11 @@ That is what "autonomous AI agent" should mean, and currently doesn't.
 
 **The agent does the work. IntentFrame automates the oversight.**
 
-See [docs/autonomy.md](docs/autonomy.md) for the full thesis.
+See [docs/autonomy.md](docs/autonomy.md) for the full thesis. If a concrete
+analogy lands better for you, [docs/mental-models.md](docs/mental-models.md)
+walks through seven of them — pharmacy, contractor, accountant/CFO, financial
+advisor, licensed professional, fire, OS kernel — each with what it gets
+right and where it breaks down.
 
 ---
 

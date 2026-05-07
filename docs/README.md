@@ -11,10 +11,13 @@ This is the entry point. Pick the path that matches what you came here to do.
 If you're new to IntentFrame, read in this order:
 
 1. **[autonomy.md](autonomy.md)** — what IntentFrame is for: delegatable autonomy for AI agents, the licensing-shape thesis
-2. **[quickstart.md](quickstart.md)** — install, first run, demo commands
-3. **[architecture.md](architecture.md)** — the full pipeline (agent → actor → analysis engine → guardian → executor)
-4. **[principles.md](principles.md)** — the structural invariants that implement the autonomy thesis
-5. **[evidence.md](evidence.md)** — test results, root demo, failure reports
+2. **[mental-models.md](mental-models.md)** — pick the analogy that fits how you already think (pharmacy, contractor, kernel, fire, licensed professional, accountant/CFO, financial advisor)
+3. **[quickstart.md](quickstart.md)** — install, first run, demo commands
+4. **[architecture.md](architecture.md)** — the full pipeline (agent → actor → analysis engine → guardian → executor)
+5. **[principles.md](principles.md)** — the structural invariants that implement the autonomy thesis
+6. **[evidence.md](evidence.md)** — test results, root demo, failure reports
+
+> **Not technical?** Start with [mental-models.md](mental-models.md). It explains IntentFrame using everyday analogies — the pharmacy, the contractor in your office, the accountant and CFO — before any code or architecture.
 
 ---
 
@@ -29,6 +32,7 @@ If you're new to IntentFrame, read in this order:
 ### "What is this for, conceptually?"
 
 - [autonomy.md](autonomy.md) — the canonical thesis: delegatable autonomy as the goal, structural supervision as the means, the professional-licensing analogy
+- [mental-models.md](mental-models.md) — seven on-ramps for understanding IntentFrame, from non-technical (pharmacy, contractor) to systems-engineer (kernel, database engine), each with what it gets right and where it breaks
 - [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment) — why IntentFrame blocks before execution instead of sandboxing after
 
 ### "What does it actually protect against?"
@@ -89,6 +93,7 @@ If you're new to IntentFrame, read in this order:
 | Doc | What it covers |
 |---|---|
 | [autonomy.md](autonomy.md) | The thesis: delegatable autonomy as the goal, structural supervision as the means, professional licensing as the analogy |
+| [mental-models.md](mental-models.md) | Seven analogies for understanding IntentFrame, from non-technical to systems-engineer, with honest "what each gets right / where it breaks" |
 | [architecture.md](architecture.md) | The logical pipeline, the separation invariant, fast-path security, the no-self-IO principle |
 | [principles.md](principles.md) | The invariants that implement the thesis |
 | [threat-model.md](threat-model.md) | What's protected, what isn't, the trust boundaries |

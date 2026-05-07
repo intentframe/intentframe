@@ -221,6 +221,7 @@ Everything else in the docs — the pipeline, the gates, the executor, the audit
 ## Related Documents
 
 - [README](../README.md) — short version of this thesis on the project landing page
+- [mental-models.md](mental-models.md) — the same system viewed through six other analogies (pharmacy, contractor, accountant/CFO, financial advisor, fire, OS kernel) for readers who think in different mental models
 - [principles.md](principles.md) — the structural invariants that implement this thesis
 - [architecture.md](architecture.md) — the pipeline shape
 - [threat-model.md](threat-model.md) — the security side: what unsupervised autonomy fails at, what structural supervision blocks

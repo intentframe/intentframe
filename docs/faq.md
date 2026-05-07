@@ -2,6 +2,8 @@
 
 Common questions from skeptical readers, security engineers, and developers evaluating IntentFrame.
 
+> **Looking for an intuitive framing before diving into the questions?** [docs/mental-models.md](mental-models.md) walks through seven analogies — pharmacy, contractor, accountant/CFO, financial advisor, licensed professional, fire, OS kernel — each with what it gets right and where it breaks down. Pick whichever fits how you already think.
+
 ---
 
 ## Q1. Is this just AI guarding AI?
