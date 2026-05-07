@@ -104,8 +104,10 @@ You can try it in two terminal commands after setup, and you can watch the audit
 
 Jarvis is the *"see, this is what it feels like when an agent runs without you babysitting it"* experience. IntentFrame is the part doing the work that makes that safe.
 
+You can also message Jarvis from your phone. A small [Telegram bridge](docs/jarvis-telegram.md) connects to Jarvis over a local socket, so you can chat with your Mac from anywhere. Every action it proposes still goes through the same IntentFrame pipeline before touching anything — the boundary holds regardless of whether the request originated on your keyboard or on the other side of the world. That's the architectural claim, made concrete: a remote origin is the same as a local origin, because the pipeline doesn't care where the intent came from.
+
 > [!TIP]
-> Setup, requirements, and run instructions are at the bottom of this README, and in [`docs/quickstart.md`](docs/quickstart.md).
+> Setup, requirements, and run instructions are at the bottom of this README, and in [`docs/quickstart.md`](docs/quickstart.md). For what Jarvis is and isn't, see [`docs/jarvis.md`](docs/jarvis.md).
 
 ---
 
@@ -293,6 +295,7 @@ For the full pipeline, see [`docs/architecture.md`](docs/architecture.md).
 | If you are... | Read this |
 |---|---|
 | Curious and want to try it | [`docs/quickstart.md`](docs/quickstart.md) → run Jarvis |
+| Wondering what Jarvis actually is | [`docs/jarvis.md`](docs/jarvis.md) → and [`docs/jarvis-telegram.md`](docs/jarvis-telegram.md) for the phone bridge |
 | Wondering "what is this really for?" | [`docs/autonomy.md`](docs/autonomy.md) (the delegatable-autonomy thesis) |
 | A skeptic who wants to break it | [`docs/threat-model.md`](docs/threat-model.md) → [`docs/evidence.md`](docs/evidence.md) |
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
@@ -358,7 +361,11 @@ On first launch, the gateway CLI starts the gateway stack. If the OpenAI API key
 
 ### Trying Jarvis or the Root Demo
 
-To try Jarvis after the gateway is running, see [`jarvis_pa/README.md`](jarvis_pa/README.md).
+Jarvis runs as a service managed by the gateway. After `intentframe-gateway-cli` reaches normal mode, you talk to Jarvis directly inside the same REPL — type naturally or use `chat <message>`. Other commands (`status`, `logs jarvis`, `audit`, `vault`, `policies`, `help`) are documented in [`intentframe_cli/README.md`](intentframe_cli/README.md).
+
+To message Jarvis from your phone, store a Telegram bot token (`vault set telegram bot_token`) and your allowed Telegram user ID (`env set telegram.allowed_user_id YOUR_ID`) in the same REPL — the gateway brings up the Telegram bridge automatically. See [`docs/jarvis-telegram.md`](docs/jarvis-telegram.md) for what the bridge is and isn't.
+
+For the public-audience overview of Jarvis, see [`docs/jarvis.md`](docs/jarvis.md). For Jarvis-internal architecture (memory, skills, heartbeat, sub-agents, server endpoints), see [`jarvis_pa/README.md`](jarvis_pa/README.md).
 
 For the root-demo execution profile (the test sweep described above), see [`docs/root_demo/executor-root-mode.md`](docs/root_demo/executor-root-mode.md).
 
