@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 from command_shield.config import DEFAULT_CONFIG, ShieldConfig
 from command_shield.patterns import match_patterns
 from command_shield.structural import decompose, normalize
+from command_shield.telemetry import record_classification
 from command_shield.verdict import (
     CommandReport,
     Edge,
@@ -323,8 +324,17 @@ def _run(
             None,
         )
 
+    final_verdict = _final_verdict(signals)
+    record_classification(
+        command,
+        final_verdict,
+        capabilities,
+        matched_patterns=tuple(
+            s.signal_id for s in signals if s.check == "pattern"
+        ),
+    )
     return CommandReport(
-        verdict=_final_verdict(signals),
+        verdict=final_verdict,
         command=command,
         normalized_command=normalized,
         signals=tuple(signals),

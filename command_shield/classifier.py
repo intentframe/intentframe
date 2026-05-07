@@ -87,6 +87,461 @@ refined so that policy can allow/deny at the tool grain (e.g. allow
     capability:spawns_process    — shells out / spawns a child process
     capability:stdin_exec        — pipes data into an interpreter (`… | python -`)
 
+    capability:data_read:browser_cookies       — plutil / cat / cp / sqlite3 on
+                                                  Safari / Chrome / Chromium /
+                                                  Brave / Edge / Firefox / Vivaldi
+                                                  / Arc cookie stores
+    capability:data_read:auth_authority        — dscl reads of account
+                                                  AuthenticationAuthority /
+                                                  ShadowHashData / KerberosKeys /
+                                                  Password / SMBPasswordServerList
+    capability:data_read:credential_material   — security dump-keychain,
+                                                  security find-*-password -w/-g,
+                                                  sqlite3 / cp on TCC.db,
+                                                  gpg --export-secret-keys /
+                                                  --export-secret-subkeys /
+                                                  --export-ownertrust, reads of
+                                                  ~/.gnupg/private-keys-v1.d,
+                                                  *.kdbx / *.agilekeychain /
+                                                  *.opvault password vaults,
+                                                  Bitwarden Group Container,
+                                                  cp|mv|rsync|scp of ~/.ssh/id_*
+    capability:data_read:shell_history         — .bash_history / .zsh_history /
+                                                  .fish_history / .ksh_history /
+                                                  .sh_history / .history /
+                                                  .psql_history / .mysql_history
+                                                  / .node_repl_history /
+                                                  .python_history / .sqlite_history
+                                                  / .rediscli_history / .lesshst
+    capability:data_read:browser_profile_data  — Chrome/Chromium/Brave/Edge/
+                                                  Vivaldi/Arc Login Data /
+                                                  History / Web Data / Bookmarks
+                                                  / Top Sites / Visited Links /
+                                                  Network Action Predictor /
+                                                  Shortcuts; Firefox
+                                                  places.sqlite /
+                                                  formhistory.sqlite /
+                                                  logins.json / key*.db /
+                                                  signons.sqlite /
+                                                  permissions.sqlite
+    capability:data_read:messaging_history     — iMessage chat.db / Attachments,
+                                                  WhatsApp Group Container,
+                                                  Messages Group Container,
+                                                  Telegram Desktop, Signal,
+                                                  Slack storage, Discord
+    capability:data_read:personal_records      — AddressBook Application Support
+                                                  / *.abcddb, Notes Group
+                                                  Container / NoteStore.sqlite,
+                                                  Mail V* stores, iOS MobileSync
+                                                  Backup, *.photoslibrary,
+                                                  *.calendar stores
+    capability:data_read:dotfile_secrets       — .env / .envrc / .env.<stage> /
+                                                  .npmrc / .pypirc / .netrc /
+                                                  .gemrc / .pgpass / .my.cnf /
+                                                  .pip/pip.conf /
+                                                  .docker/config.json — the
+                                                  canonical "secrets in a
+                                                  dotfile" surface
+    capability:data_read:cloud_tokens          — .aws/credentials, .aws/config,
+                                                  .kube/config,
+                                                  .config/gcloud/** credentials,
+                                                  .azure/accessTokens.json,
+                                                  .terraform.d/credentials.tfrc
+                                                  .json, .vault-token,
+                                                  .hcp/credentials, Kubernetes
+                                                  service-account token mount,
+                                                  gcloud/aws/az access-token
+                                                  print verbs
+    capability:data_read:db_client_history     — mongosh history / .mongorc.js
+                                                  / .mongoshrc.js / .dbshell /
+                                                  .snowsql/history / .duckdbrc
+                                                  / .cqlshrc (db-client history
+                                                  files not already covered by
+                                                  ``shell_history``)
+    capability:data_read:browser_session_data  — Chromium-family Local Storage
+                                                  / Session Storage / IndexedDB
+                                                  / Service Worker / Cache /
+                                                  {Current,Last} {Session,Tabs};
+                                                  Firefox sessionstore /
+                                                  storage/default / cache2
+                                                  entries
+    capability:data_read:password_manager_export
+                                              — 1Password *.1pif exports,
+                                                  bitwarden/lastpass/dashlane/
+                                                  keepass/enpass/roboform
+                                                  _export.{csv,json,xml,zip,
+                                                  1pif}; password-manager app
+                                                  data containers beyond the
+                                                  ``credential_material``
+                                                  shapes
+    capability:data_read:process_env           — /proc/<pid>/environ reads,
+                                                  ``ps`` invocations with an
+                                                  ``e`` flag (BSD env dump),
+                                                  ``launchctl print`` /
+                                                  ``procinfo``
+    capability:data_read:ssh_known_hosts       — ~/.ssh/known_hosts /
+                                                  ~/.ssh/config reads — lateral-
+                                                  movement recon surface
+    capability:data_read:mail_store            — Thunderbird profile ImapMail/
+                                                  Mail/Messages, Microsoft
+                                                  Outlook for Mac app data,
+                                                  Airmail / Spark app data,
+                                                  raw *.mbox stores (Apple
+                                                  Mail's Library/Mail/V* is
+                                                  already covered by
+                                                  ``personal_records``)
+    capability:data_read:process_memory        — debugger attach-by-pid
+                                                  (lldb / gdb / frida /
+                                                  frida-trace / dtrace
+                                                  -p), lldb / gdb
+                                                  attach-by-name,
+                                                  gdb ``attach <pid>``
+                                                  subcommand,
+                                                  /proc/<pid>/mem reads,
+                                                  ``gcore <pid>`` core
+                                                  dumps.  ``strace -p`` /
+                                                  ``lsof -p`` are
+                                                  deliberately NOT tagged
+                                                  — they observe system
+                                                  calls without reading
+                                                  memory.
+
+    capability:system_mutate:host_network_config   — networksetup -set*/
+                                                      -create*/-delete*/-add*/
+                                                      -remove*/-switchtolocation;
+                                                      arp -s|-d; route add|del|
+                                                      change|replace|flush;
+                                                      ip <obj> add|del|...;
+                                                      ifconfig <if> up|down|mtu|ip
+    capability:system_mutate:hostname              — scutil --set HostName /
+                                                      LocalHostName / ComputerName;
+                                                      hostname <new>
+    capability:system_mutate:time_sync             — systemsetup -setusingnetwork
+                                                      time / -setnetworktimeserver
+                                                      / -settimezone / -settime /
+                                                      -setdate; sntp -S
+    capability:system_mutate:security_daemon       — launchctl unload|bootout|
+                                                      disable|remove|stop|
+                                                      kickstart -k targeting
+                                                      EDR / TCC / Santa / osquery
+                                                      / Jamf / Kandji;
+                                                      spctl --master-disable;
+                                                      csrutil disable
+    capability:system_mutate:browser_security_pref — defaults write on
+                                                      com.apple.Safari /
+                                                      com.google.Chrome /
+                                                      org.mozilla.firefox
+    capability:system_mutate:firewall              — pfctl -d|-e|-f|-F;
+                                                      ip[6]tables / iptables-
+                                                      save / iptables-restore /
+                                                      iptables-legacy
+                                                      -F|-X|-Z|-D|-I|-A|-N|-E|
+                                                      -P <chain> ACCEPT|DROP|
+                                                      REJECT|QUEUE;
+                                                      nft flush|delete|add|
+                                                      insert|replace|create|
+                                                      rename; ufw disable|enable
+                                                      |reset|default|allow|deny
+                                                      |reject|limit|delete|
+                                                      insert; firewall-cmd
+                                                      --add/remove/change/set-*
+                                                      / --panic-on/-off /
+                                                      --reload; socketfilterfw
+                                                      --setglobalstate /
+                                                      --setallowsigned(app) /
+                                                      --setloggingmode /
+                                                      --setblockall /
+                                                      --setstealthmode /
+                                                      --unblockapp / --blockapp;
+                                                      ipfw add|delete|flush|
+                                                      zero|resetlog|disable|
+                                                      enable
+    capability:system_mutate:hosts_file            — redirect / tee / cp / mv /
+                                                      install / ln / sed -i /
+                                                      python|perl|ruby|awk write
+                                                      shapes that land at
+                                                      /etc/hosts
+    capability:system_mutate:privilege_config      — visudo (not ``-c``);
+                                                      redirect / tee / cp / mv /
+                                                      install / ln / sed -i
+                                                      targeting /etc/sudoers,
+                                                      /etc/sudoers.d/<file>,
+                                                      /etc/passwd, /etc/shadow,
+                                                      /etc/gshadow, /etc/group,
+                                                      /etc/pam.d/<file>
+    capability:system_mutate:user_account          — dseditgroup -o edit|create|
+                                                      delete; pwpolicy -set*/
+                                                      -clear*/-resetpolicy/
+                                                      -disableuser/-enableuser;
+                                                      dscl . -passwd|-delete|
+                                                      -append|-merge|-change|
+                                                      -create; sysadminctl
+                                                      -addUser|-deleteUser|
+                                                      -resetPasswordFor|
+                                                      -secureTokenOn/-Off|
+                                                      -newPassword|-adminUser|
+                                                      -*GuestAccess|
+                                                      -guestAccount|-filesystem;
+                                                      Linux useradd|usermod|
+                                                      userdel|adduser|deluser|
+                                                      groupadd|groupmod|
+                                                      groupdel|addgroup|
+                                                      delgroup|chpasswd|
+                                                      newusers;
+                                                      passwd <other-user>
+    capability:system_mutate:remote_access         — systemsetup
+                                                      -setremotelogin /
+                                                      -setremoteappleevents /
+                                                      -setwakeonnetworkaccess /
+                                                      -setwakeonmodem /
+                                                      -setcomputersleep /
+                                                      -setdisplaysleep /
+                                                      -setharddisksleep /
+                                                      -setrestartfreeze /
+                                                      -setrestartpoweron /
+                                                      -setallowpowerbuttontosleep
+                                                      computer / -setstartupdisk
+                                                      / -setdisableloginchime
+    capability:system_mutate:disk_encryption       — fdesetup enable|disable|
+                                                      add|remove|changerecovery
+                                                      |sync|authrestart
+    capability:system_mutate:kernel_tunable        — sysctl -w / sysctl -p /
+                                                      sysctl <name>=<value>;
+                                                      redirect or tee into
+                                                      /proc/sys/<path>
+    capability:system_mutate:persistence           — at noon|midnight|teatime|
+                                                      today|tomorrow|<HH[:MM]>
+                                                      [am|pm]|now|+|-f; osascript
+                                                      involving ``System Events``
+                                                      + ``login item`` or ``make
+                                                      [new] login item``
+    capability:system_mutate:mdm_profile            — profiles -I / -R / -E /
+                                                      install / remove / renew
+                                                      (configuration-profile
+                                                      install / removal)
+    capability:system_mutate:boot_policy            — bputil set-* / disable-*;
+                                                      bless --setBoot / --bootefi;
+                                                      nvram <name>=<value> / -d /
+                                                      -c; firmwarepasswd
+                                                      -setpasswd / -delete /
+                                                      -setmode (boot / firmware
+                                                      trust state)
+    capability:system_mutate:audit_log              — audit -n / -s / -t / -R /
+                                                      -A / -c; log erase; log
+                                                      config (BSM / unified
+                                                      logging subsystem
+                                                      mutation)
+    capability:system_mutate:tcc_privacy            — tccutil reset / insert;
+                                                      sqlite3 .TCC.db with
+                                                      INSERT / UPDATE / DELETE /
+                                                      REPLACE verbs
+    capability:system_mutate:backup                 — tmutil disable / enable /
+                                                      startbackup / stopbackup /
+                                                      delete / inherit /
+                                                      setdestination /
+                                                      removedestination /
+                                                      addexclusion /
+                                                      removeexclusion; asr
+                                                      restore / create /
+                                                      imagescan
+    capability:system_mutate:installer_pkg          — installer -pkg / -package;
+                                                      softwareupdate --install /
+                                                      -i; pkgutil --forget
+    capability:system_mutate:kernel_extension       — kextload / kextunload /
+                                                      kmutil load / unload
+                                                      (kernel / system
+                                                      extensions)
+    capability:system_mutate:service_mgmt           — systemctl start / stop /
+                                                      restart / enable /
+                                                      disable / mask / unmask /
+                                                      daemon-reload / …;
+                                                      service <name>
+                                                      (start|stop|…);
+                                                      rc-update add / del;
+                                                      chkconfig --add / --del /
+                                                      on / off; update-rc.d
+    capability:system_mutate:launchd_mutation       — launchctl load / unload /
+                                                      bootstrap / bootout /
+                                                      enable / disable /
+                                                      remove / stop / start /
+                                                      kickstart / submit /
+                                                      setenv / unsetenv /
+                                                      override / limit /
+                                                      config — superset of
+                                                      ``security_daemon``
+                                                      (which fires
+                                                      additionally when the
+                                                      target service name is a
+                                                      known security daemon)
+    capability:system_mutate:cron_mutation          — crontab -e / -r / -u /
+                                                      <file> (install from
+                                                      file); redirect / tee /
+                                                      cp / mv / install / ln
+                                                      targeting
+                                                      /etc/cron.{d,daily,
+                                                      hourly,weekly,monthly}/
+    capability:system_mutate:browser_extension      — defaults write on
+                                                      Chrome/Edge/Firefox
+                                                      ExtensionInstall*
+                                                      policy keys; writes to
+                                                      browser policies.json /
+                                                      External Extensions
+                                                      directories
+    capability:system_mutate:screen_sharing         — Apple Remote Desktop
+                                                      ``kickstart`` activate /
+                                                      configure / access /
+                                                      restart / deactivate /
+                                                      uninstall; com.apple.
+                                                      RemoteDesktop kickstart
+                                                      path invocation
+    capability:system_mutate:print_config           — cupsenable / cupsdisable
+                                                      / cupsaccept / cupsreject
+                                                      / lpadmin / lpoptions
+    capability:system_mutate:radio_power            — networksetup
+                                                      -setairportpower /
+                                                      -setairportnetwork;
+                                                      airport -z /
+                                                      --disassociate /
+                                                      --associate; blueutil
+                                                      -p / --power
+    capability:system_mutate:ca_trust               — rogue root-CA install
+                                                      / trust-anchor
+                                                      mutation:
+                                                      ``security
+                                                      add-trusted-cert /
+                                                      remove-trusted-cert /
+                                                      add-certificates``,
+                                                      ``update-ca-certificates``,
+                                                      ``update-ca-trust``,
+                                                      ``trust anchor``,
+                                                      ``certutil
+                                                      -A|-M|-D``, and
+                                                      direct writes /
+                                                      copies into
+                                                      /etc/ssl/certs,
+                                                      /etc/pki/ca-trust/
+                                                      source/anchors,
+                                                      /etc/ca-certificates/
+                                                      trust-source/
+                                                      anchors, or
+                                                      /usr/local/share/
+                                                      ca-certificates.
+                                                      One command turns
+                                                      the session into a
+                                                      silent TLS MITM
+                                                      platform.
+    capability:system_mutate:shell_init             — shell-init-file
+                                                      persistence via
+                                                      redirect / tee /
+                                                      cp / mv / install
+                                                      / ln / sed -i
+                                                      targeting
+                                                      ~/.bashrc,
+                                                      ~/.zshrc,
+                                                      ~/.zshenv,
+                                                      ~/.zprofile,
+                                                      ~/.profile,
+                                                      ~/.bash_profile,
+                                                      ~/.bash_login,
+                                                      ~/.kshrc,
+                                                      ~/.inputrc, and
+                                                      similar siblings;
+                                                      ~/.config/fish/
+                                                      config.fish; and
+                                                      the system-wide
+                                                      /etc/profile,
+                                                      /etc/profile.d/,
+                                                      /etc/bash.bashrc,
+                                                      /etc/zshrc,
+                                                      /etc/zshenv,
+                                                      /etc/paths(.d/),
+                                                      /etc/fish/
+                                                      config.fish
+                                                      surfaces.  Bare
+                                                      reads of the same
+                                                      files are NOT
+                                                      tagged — only
+                                                      write / edit
+                                                      verbs.
+    capability:system_mutate:history_tamper         — shell-history
+                                                      anti-forensics:
+                                                      ``history -c``,
+                                                      ``history -d
+                                                      <n>``, ``history
+                                                      -w /dev/null``,
+                                                      ``history -r
+                                                      /dev/null``;
+                                                      ``unset
+                                                      HISTFILE``,
+                                                      ``HISTFILE=/dev/
+                                                      null`` (with or
+                                                      without
+                                                      ``export``);
+                                                      ``HISTSIZE=0``,
+                                                      ``HISTFILESIZE=0``;
+                                                      ``set +o
+                                                      history``;
+                                                      ``rm``/``shred``/
+                                                      ``truncate`` of
+                                                      ``.bash_history``
+                                                      / ``.zsh_history``
+                                                      / ``.fish_history``
+                                                      / ``.ksh_history``
+                                                      / ``.sh_history``;
+                                                      redirect-truncate
+                                                      (``> ~/.bash_
+                                                      history``); append
+                                                      via ``>>`` or
+                                                      ``tee`` (fake-
+                                                      entry injection);
+                                                      ``cp``/``mv`` that
+                                                      overwrite a shell
+                                                      history file.
+                                                      Legitimate
+                                                      inspection shapes
+                                                      (``history``,
+                                                      ``history N``,
+                                                      ``history | …``,
+                                                      ``set -o
+                                                      history``,
+                                                      ``HISTFILE=~/my
+                                                      custom.hist``)
+                                                      stay untagged.
+
+    capability:network_exfil:http_upload           — curl/wget/http/xh requests
+                                                      that reference a LOCAL
+                                                      file as the body / upload
+                                                      payload: curl -T /
+                                                      --upload-file, -F ...=@,
+                                                      -d|--data|--data-binary|
+                                                      --data-ascii|--data-
+                                                      urlencode @file; wget
+                                                      --post-file / --body-file;
+                                                      HTTPie/xh ``name@path`` /
+                                                      ``name=@path`` request-
+                                                      item syntax
+    capability:network_exfil:file_transfer_outbound — scp / rsync commands whose
+                                                      final positional is a
+                                                      ``[user@]host:`` remote
+                                                      endpoint (LOCAL → REMOTE
+                                                      direction); sftp batch
+                                                      mode with -b
+    capability:network_exfil:ssh_tunnel             — ssh -R / -L / -D (remote /
+                                                      local / dynamic port
+                                                      forwarding)
+    capability:network_exfil:cloud_upload           — aws s3 cp / sync / mv /
+                                                      mb / rb; aws s3api
+                                                      put-object /
+                                                      upload-part(-copy) /
+                                                      create-multipart-upload;
+                                                      gsutil cp / mv / rsync;
+                                                      gcloud storage cp / mv /
+                                                      rsync; az storage blob /
+                                                      file upload(-batch); mc
+                                                      cp / mv / mirror; b2
+                                                      upload-file /
+                                                      upload-unbound-stream
+
 Each hit produces a Signal with check="capability" and signal_id set to
 the capability tag.  Multiple capabilities per command are expected;
 they are not mutually exclusive.  Policy can match exact tags or use
@@ -145,6 +600,7 @@ from __future__ import annotations
 import re
 import shlex
 
+from command_shield.capabilities import CORPUS as _CAPABILITY_CORPUS
 from command_shield.verdict import Signal
 
 # ── Capability IDs ───────────────────────────────────────────────────
@@ -162,6 +618,89 @@ CAPABILITY_STDIN_EXEC = "capability:stdin_exec"
 CAPABILITY_FILESYSTEM_WRITE = "capability:filesystem_write"
 CAPABILITY_READ_ONLY = "capability:read_only"
 CAPABILITY_NETWORK_PROBE = "capability:network_probe"
+# ── Sensitive surface families (refined-only) ────────────────────────
+# All three are emitted only as ``<base>:<suffix>`` refined tags — the
+# bare base form is never seen on a command.  Consumers MUST prefix-
+# match these families (literal equality against ``capability:data_read``
+# / ``capability:system_mutate`` / ``capability:network_exfil`` will
+# never fire).
+#
+#   * ``capability:data_read:*`` — reads that yield information an
+#     agent must not exfiltrate under the root-compromised-agent threat
+#     model.  Suffixes cover browser cookies (``browser_cookies``),
+#     macOS Directory-Services account records (``auth_authority``),
+#     keychain / TCC.db / GPG secret-key / password-manager vault
+#     contents (``credential_material``), shell-history stores
+#     (``shell_history``), browser saved-login / history / bookmark /
+#     form-autofill data beyond cookies (``browser_profile_data``),
+#     messaging-client on-disk histories (``messaging_history``),
+#     high-PII personal stores (``personal_records``), dotfile secrets
+#     (``dotfile_secrets``), cloud-provider CLI tokens / token-printing
+#     verbs (``cloud_tokens``), non-shell DB-client history files
+#     (``db_client_history``), browser Local/Session storage / IndexedDB
+#     / Service Worker / Firefox sessionstore (``browser_session_data``),
+#     password-manager export files and app containers
+#     (``password_manager_export``), process-environment dumps
+#     (``process_env``), ~/.ssh/known_hosts / config / authorized_keys
+#     (``ssh_known_hosts``), non-Apple mail stores (``mail_store``),
+#     and debugger-attach / ``/proc/<pid>/mem`` / ``gcore`` reads of
+#     live process memory (``process_memory``).  Structurally these
+#     commands are read-shaped,
+#     so this family is treated as read-only-incompatible in the
+#     classifier gate (``_safe_for_read_only``): emitting
+#     ``data_read:*`` suppresses ``read_only:*`` on the same command so
+#     the consumer fast-path license is not accidentally available for
+#     a sensitive read.
+#
+#   * ``capability:system_mutate:*`` — commands that change host /
+#     network / identity / trust-surface state.  Suffixes cover routing
+#     and interface config (``host_network_config``), hostname
+#     (``hostname``), NTP / clock (``time_sync``), launchd jobs for
+#     EDR / TCC / security daemons plus the macOS trust-disable shapes
+#     (``security_daemon``), browser security preferences
+#     (``browser_security_pref``), packet-filter / firewall mutations
+#     (``firewall``), DNS-hijack writes to /etc/hosts (``hosts_file``),
+#     sudoers / pam.d / passwd / shadow / group / gshadow writes
+#     (``privilege_config``), user-and-group account mutation verbs
+#     (``user_account``), systemsetup remote-access and power toggles
+#     (``remote_access``), FileVault encryption toggles
+#     (``disk_encryption``), kernel tunable writes (``kernel_tunable``),
+#     ``at`` / AppleScript login-item persistence
+#     (``persistence``), MDM ``profiles`` install / remove
+#     (``mdm_profile``), boot-chain mutation — bputil / bless / nvram
+#     / firmwarepasswd (``boot_policy``), audit / unified-logging
+#     subsystem mutation (``audit_log``), tccutil reset / TCC.db writes
+#     (``tcc_privacy``), Time Machine / asr backup mutation
+#     (``backup``), installer / softwareupdate / pkgutil --forget
+#     (``installer_pkg``), kext / kmutil load / unload
+#     (``kernel_extension``), Linux service-manager verbs
+#     (``service_mgmt``), generic launchctl mutation superset
+#     (``launchd_mutation``), crontab -e / -r / -u / <file> and
+#     /etc/cron.* writes (``cron_mutation``), browser extension-install
+#     policy writes (``browser_extension``), ARD ``kickstart``
+#     (``screen_sharing``), CUPS printer daemon mutation
+#     (``print_config``), Wi-Fi / Bluetooth radio power
+#     (``radio_power``), rogue-CA / trust-anchor installs
+#     (``ca_trust``), shell-init-file persistence
+#     (``shell_init``), and shell-history anti-forensics
+#     (``history_tamper``).  Structurally these are mutating and so would
+#     not qualify for ``read_only:*`` on their own; the read-only-
+#     incompatible membership is belt-and-braces against an
+#     unanticipated co-occurrence.
+#
+#   * ``capability:network_exfil:*`` — commands whose primary effect is
+#     moving local-host data outbound over the network, distinct from
+#     ``network_probe:*`` (which is idempotent remote queries).
+#     Suffixes cover HTTP-body / file-upload shapes (``http_upload``),
+#     scp / rsync / sftp with a remote destination
+#     (``file_transfer_outbound``), ssh port forwarding
+#     (``ssh_tunnel``), and cloud-object-store / MinIO / B2 upload
+#     verbs (``cloud_upload``).  Treated as read-only-incompatible in
+#     the classifier gate so a ``curl -T secrets.tar …`` can never be
+#     blessed as a read-only fast-path candidate.
+CAPABILITY_DATA_READ = "capability:data_read"
+CAPABILITY_SYSTEM_MUTATE = "capability:system_mutate"
+CAPABILITY_NETWORK_EXFIL = "capability:network_exfil"
 
 
 # ── Detection rules ─────────────────────────────────────────────────
@@ -172,34 +711,72 @@ CAPABILITY_NETWORK_PROBE = "capability:network_probe"
 # negatives are preferable to false positives, since the verdict comes
 # from step 3 patterns and these signals are advisory.
 
-# Refined rules: one per manager so policy can allow/deny at tool grain.
-# Order matters only within a capability family (first match wins per tag
-# in `seen`); across capabilities all independent rules are evaluated.
-_PACKAGE_INSTALL_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(?:pip3?|pipx|uv|poetry|conda|mamba)\s+install\b"), "pip"),
-    (re.compile(r"\b(?:npm|pnpm)\s+(?:i|install|add)\b|\byarn\s+(?:add|install)\b"), "npm"),
-    (re.compile(r"\bbrew\s+(?:install|reinstall|upgrade)\b"), "brew"),
-    (re.compile(r"\bapt(?:-get)?\s+(?:install|upgrade)\b"), "apt"),
-    (re.compile(r"\byum\s+(?:install|update)\b"), "yum"),
-    (re.compile(r"\bdnf\s+(?:install|upgrade)\b"), "dnf"),
-    (re.compile(r"\bpacman\s+-S\b"), "pacman"),
-    (re.compile(r"\bapk\s+add\b"), "apk"),
-    (re.compile(r"\bgem\s+install\b"), "gem"),
-    (re.compile(r"\bcargo\s+install\b"), "cargo"),
-    (re.compile(r"\bgo\s+install\b"), "go"),
-    (re.compile(r"\bcomposer\s+(?:install|require)\b"), "composer"),
+# Refined rules for package install / stdin exec / script execution are
+# loaded from ``command_shield/capabilities/*.yaml`` via the corpus.
+# Only rules that carry a suffix participate as refined (per-interpreter
+# or per-manager) tags; the bare umbrella rule for stdin_exec lives in
+# the same YAML but is emitted separately from the ``_RULES`` tuple
+# below.  Order matters only within a capability family (first match
+# wins per tag in ``seen``); across capabilities all independent rules
+# are evaluated.
+_PACKAGE_INSTALL_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("package_install")
+    if r.suffix
 )
 
-# Refined rules: one per interpreter.  Excludes inline `-c` / `-e` /
-# `--eval` forms (those are classified as inline code by the language
-# detector, not as script-file execution).
-_SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\bpython3?\s+[^|;&]*\.py\b"), "python"),
-    (re.compile(r"\bnode\s+[^|;&]*\.(?:js|mjs|cjs)\b"), "node"),
-    (re.compile(r"\bruby\s+[^|;&]*\.rb\b"), "ruby"),
-    (re.compile(r"\bperl\s+[^|;&]*\.pl\b"), "perl"),
-    (re.compile(r"\b(?:bash|sh|zsh|ksh|dash)\s+[^|;&]*\.(?:sh|bash|zsh)\b"), "shell"),
-    (re.compile(r"(?:^|[\s;&|])\./[\w.][\w./-]*"), "local_binary"),
+_STDIN_EXEC_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("stdin_exec")
+    if r.suffix
+)
+
+_SCRIPT_EXECUTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("script_execution")
+    if r.suffix
+)
+
+
+# Sensitive-data-read refined rules — loaded from
+# ``command_shield/capabilities/data_read.yaml``.  Emission is
+# driven purely by the main ``_RULES`` loop (no structural-
+# bareness gate), since the point of the family is to tag the
+# command regardless of shape; a policy that denies
+# ``capability:data_read:browser_cookies`` wants the deny to
+# fire whether the command is bare, composed, or hidden behind
+# an indirection.  Multiple rules may share a suffix — the
+# first one to match adds the tag, subsequent rules with the
+# same suffix are skipped by the main classification loop
+# (``if cap_id in seen``).
+_DATA_READ_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix) for r in _CAPABILITY_CORPUS.by_family("data_read")
+)
+
+
+# System-mutation refined rules — loaded from
+# ``command_shield/capabilities/system_mutate.yaml``.  Each regex is
+# the mutation-verb shape for a host / network / trust-surface
+# mutation class; the corresponding read forms stay untagged here and
+# are picked up by the read-only family instead.
+_SYSTEM_MUTATE_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("system_mutate")
+)
+
+
+# Network-exfil refined rules — loaded from
+# ``command_shield/capabilities/network_exfil.yaml``.  Distinct from
+# ``network_probe:*`` (idempotent remote queries): every tag here
+# says "this command carries LOCAL data outbound".  Emission is
+# driven purely by the main ``_RULES`` loop (no structural-bareness
+# gate), since the point of the family is to tag the command whether
+# it is bare, composed, pipelined, or hidden behind indirection — a
+# policy that denies ``capability:network_exfil:cloud_upload`` wants
+# the deny to fire in all shapes.
+_NETWORK_EXFIL_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family("network_exfil")
 )
 
 
@@ -211,6 +788,24 @@ def _expand_refined(
     return tuple(
         (rx, f"{base}:{suffix}", desc_template.format(suffix=suffix))
         for rx, suffix in rules
+    )
+
+
+def _family_bare(family: str) -> tuple[tuple[re.Pattern[str], str, str], ...]:
+    """Return ``(pattern, tag, description)`` rows for bare-family rules.
+
+    "Bare" here means the YAML rule has no ``suffix``, so the emitted
+    tag is ``capability:<family>`` with no trailing ``:<sub>``.  Used
+    by :data:`_RULES` to expand single-tag capability families
+    (``compilation``, ``network_bind``, ``background_exec``,
+    ``download_and_exec``, ``binary_download``, ``process_signal``,
+    ``spawns_process``, ``filesystem_write``, and the ``stdin_exec``
+    umbrella rule) loaded from YAML.
+    """
+    return tuple(
+        (r.pattern, r.capability_tag(), r.description)
+        for r in _CAPABILITY_CORPUS.by_family(family)
+        if not r.suffix
     )
 
 
@@ -227,131 +822,63 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         CAPABILITY_SCRIPT_EXECUTION,
         "Command executes a {suffix} script or local binary",
     ),
-    # Compilation / build — compilers and build drivers.
-    (
-        re.compile(
-            r"(?:^|[\s;&|])(?:gcc|g\+\+|clang|clang\+\+|cc|ld)\b"
-            r"|\bmake\b"
-            r"|\bcmake\b"
-            r"|\bcargo\s+build\b"
-            r"|\bgo\s+build\b"
-            r"|\brustc\b"
-            r"|\bjavac\b"
-            r"|\bswiftc\b"
-            r"|\btsc\b"
-        ),
-        CAPABILITY_COMPILATION,
-        "Command compiles or links code",
-    ),
-    # Network bind — opening a listener on a local port.  Accepts
-    # both the short `-l` (possibly inside a combined flag bundle like
-    # `-lk`) and the long `--listen` form.
-    (
-        re.compile(
-            r"\bnc\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))"
-            r"|\bncat\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))"
-            r"|\bsocat\b[^|]*\bLISTEN\b"
-            r"|\bpython3?\s+-m\s+http\.server\b"
-            r"|\bpython3?\s+-m\s+SimpleHTTPServer\b"
-            r"|\bphp\s+-S\b"
-            r"|\bruby\s+-run\s+-e\s+httpd\b"
-        ),
-        CAPABILITY_NETWORK_BIND,
-        "Command binds a local network listener",
-    ),
-    # Background execution — persists beyond the current shell.
-    (
-        re.compile(
-            r"\bnohup\b"
-            r"|\bdisown\b"
-            r"|\bsetsid\b"
-            r"|\bscreen\s+-d(?:m)?\b"
-            r"|\btmux\s+new-session\s+-d\b"
-            r"|[^&|]&\s*(?:$|[;\n])"
-        ),
-        CAPABILITY_BACKGROUND_EXEC,
-        "Command runs a process in the background",
-    ),
-    # Download-and-execute — fetch remote payload piped into a shell.
-    # (Note: catastrophic subset of this is already caught by step 3.
-    # Here we tag the capability for any remote-fetch-then-execute shape.)
-    (
-        re.compile(
-            r"\b(?:curl|wget|fetch|aria2c)\b[^|]*\|\s*"
-            r"(?:sh|bash|zsh|dash|python3?|perl|ruby|node)\b"
-        ),
-        CAPABILITY_DOWNLOAD_AND_EXEC,
-        "Command downloads a remote payload and pipes it to an interpreter",
-    ),
-    # Binary download — fetches a remote payload to disk without piping
-    # it straight to a shell.  The pipe-to-shell variant is already tagged
-    # as download_and_exec above; both may fire together for
-    # `curl -O url | sh` shapes, which is intentional.
-    (
-        re.compile(
-            r"\bcurl\b[^|]*\s-[OoLJ]\b"
-            r"|\bwget\b(?![^|]*\|\s*(?:sh|bash|zsh|dash|python3?|perl|ruby|node))"
-            r"|\baria2c\b"
-        ),
-        CAPABILITY_BINARY_DOWNLOAD,
-        "Command downloads a remote payload to disk",
-    ),
-    # Stdin-piped interpreter execution — `… | python -`, `… | bash`.
-    # Distinct from download_and_exec (no network fetch component) and
-    # from script_execution (no literal file path).  Treated as a
-    # capability rather than a verdict-bearing pattern because benign
-    # uses exist (`echo 'print(1)' | python`), but the edge body is
-    # unresolvable so policy layers may want to deny it outright.
-    (
-        re.compile(
-            r"\|\s*(?:python3?|python2|node|nodejs|ruby|perl|"
-            r"bash|sh|zsh|dash|ksh|ash)(?:\s+-)?(?=\s|$|\||;|&)"
-        ),
+    # Refined: stdin-piped exec (one rule per interpreter family).
+    # Emitted alongside the binary CAPABILITY_STDIN_EXEC below so
+    # ``_READ_ONLY_INCOMPATIBLE_CAPS`` (literal-string lookup) keeps
+    # working, while policy layers gain ``stdin_exec:<lang>`` granularity
+    # for the python+shell-only deny set.
+    *_expand_refined(
+        _STDIN_EXEC_RULES,
         CAPABILITY_STDIN_EXEC,
-        "Command pipes input into an interpreter (stdin exec)",
+        "Command pipes input into a {suffix} interpreter (stdin exec)",
     ),
-    # Process signaling — kill/pkill/killall family.
-    (
-        re.compile(
-            r"\bkill\s+-\w*\b"
-            r"|\bkill\s+-?\d+\b"
-            r"|\bkillall\b"
-            r"|\bpkill\b"
-            r"|\bskill\b"
-        ),
-        CAPABILITY_PROCESS_SIGNAL,
-        "Command sends signals to processes",
+    # Refined: sensitive data-read surfaces (one rule per data class).
+    # No base ``capability:data_read`` tag is emitted; consumers prefix-
+    # match on ``capability:data_read:*`` — see module docstring and
+    # ``_safe_for_read_only`` / ``_composition_is_all_read_only`` for
+    # the classifier-side suppression of ``read_only:*`` when any
+    # ``data_read:*`` tag fires on the same command.
+    *_expand_refined(
+        _DATA_READ_RULES,
+        CAPABILITY_DATA_READ,
+        "Command reads sensitive {suffix} material",
     ),
-    # Generic spawn — shells out via common indirection verbs.
-    (
-        re.compile(
-            r"\bxargs\b"
-            r"|\bfind\b[^|]*-exec\b"
-            r"|\bsudo\b"
-            r"|\bsu\b(?=\s+-)"
-            r"|\bssh\b"
-            r"|\bdocker\s+(?:run|exec)\b"
-            r"|\bkubectl\s+exec\b"
-        ),
-        CAPABILITY_SPAWNS_PROCESS,
-        "Command spawns or delegates to another process",
+    # Refined: system-mutation surfaces (one rule per surface).
+    # No base ``capability:system_mutate`` tag is emitted; consumers
+    # prefix-match on ``capability:system_mutate:*``.  The rules are
+    # positive-mutation matches only — read forms of the same tools
+    # stay tagged under the read-only family.
+    *_expand_refined(
+        _SYSTEM_MUTATE_RULES,
+        CAPABILITY_SYSTEM_MUTATE,
+        "Command mutates host {suffix} state",
     ),
-    # Filesystem write via shell redirection or `tee`.  The leading
-    # boundary `(?:^|[\s;&|])` ensures a literal `>` in a quoted arg
-    # (e.g. `grep "a>b" f`) does NOT match after shlex has stripped
-    # the quotes — the `>` would be preceded by a word character.
-    # Writes to `/dev/null`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/*`
-    # are excluded as benign sinks; writes to other `/dev/*` paths are
-    # already caught by catastrophic patterns.
-    (
-        re.compile(
-            r"(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*"
-            r"(?!/dev/(?:null|stdout|stderr|fd/\d+)(?:\s|$))\S"
-            r"|\|\s*tee\b"
-        ),
-        CAPABILITY_FILESYSTEM_WRITE,
-        "Command writes to a file via shell redirection or tee",
+    # Refined: network-exfil surfaces (one rule per exfil shape).
+    # No base ``capability:network_exfil`` tag is emitted; consumers
+    # prefix-match on ``capability:network_exfil:*``.  Treated as
+    # read-only-incompatible so an exfil-shaped curl / rsync / aws-s3
+    # command never receives a ``read_only:*`` fast-path tag.
+    *_expand_refined(
+        _NETWORK_EXFIL_RULES,
+        CAPABILITY_NETWORK_EXFIL,
+        "Command moves local data outbound via {suffix}",
     ),
+    # Bare single-tag capability families — loaded from
+    # ``command_shield/capabilities/*.yaml``.  Each rule emits a single
+    # ``capability:<family>`` tag with no ``:<sub>`` suffix.  The
+    # ``stdin_exec`` umbrella rule lives in the same YAML as the per-
+    # interpreter refined rules above; ``_family_bare`` selects only
+    # suffix-less rows so the umbrella fires in addition to the refined
+    # per-interpreter tags.
+    *_family_bare("compilation"),
+    *_family_bare("network_bind"),
+    *_family_bare("background_exec"),
+    *_family_bare("download_and_exec"),
+    *_family_bare("binary_download"),
+    *_family_bare("stdin_exec"),
+    *_family_bare("process_signal"),
+    *_family_bare("spawns_process"),
+    *_family_bare("filesystem_write"),
 )
 
 
@@ -370,346 +897,9 @@ _RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
 # -exec`, `sed -i`) are excluded via negative lookahead so those
 # commands never receive a read-only tag.
 
-_READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    # ── filesystem_list ──────────────────────────────────────────────
-    # `ls` / `tree` / `stat` / `file` / `du` / `df` plus metadata tools:
-    # `lsattr` (ext-attrs), `getfacl` (ACLs), `namei` (path resolution),
-    # `pathchk` (portable-name check), `findmnt` / `mountpoint` (mount
-    # inspection), `lsblk` / `blkid` (block-device inspection).
-    (
-        re.compile(
-            r"\A(?:ls|tree|stat|file|du|df|lsattr|getfacl|namei|pathchk"
-            r"|findmnt|mountpoint|lsblk|blkid)"
-            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "filesystem_list",
-    ),
-    # `find` — excluded when any write/exec flag is present.
-    (
-        re.compile(
-            r"\Afind"
-            r"(?!.*\s-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)\b)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "filesystem_list",
-    ),
-
-    # ── filesystem_read ──────────────────────────────────────────────
-    # File readers.  `sed` and `awk` are intentionally NOT included —
-    # both support in-place write modes (`sed -i`, `awk -i inplace`).
-    # Hashers (`md5sum`, `sha*sum`, `b2sum`, `shasum`, `cksum`, `sum`)
-    # are read-only computations over file contents.
-    (
-        re.compile(
-            r"\A(?:cat|head|tail|less|more|wc|hexdump|xxd|od|nl|tac|rev"
-            r"|md5sum|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum"
-            r"|b2sum|shasum|cksum|sum)"
-            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "filesystem_read",
-    ),
-
-    # ── search ───────────────────────────────────────────────────────
-    # Content search.  `grep -P` with `(?{...})` perl-embed requires
-    # `use re 'eval'` which grep does not enable, so it is safe as a
-    # read-only operation from grep's side.  Structured-data queries
-    # (`jq`, `yq`) have no in-place write mode; `xmllint` DOES have
-    # `--output` so its write form is excluded via negative lookahead.
-    (
-        re.compile(
-            r"\A(?:grep|egrep|fgrep|rg|ack|jq|yq)"
-            r"(?:\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?)*"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "search",
-    ),
-    # `xmllint` — excluded when `--output` / `-o` is present.
-    (
-        re.compile(
-            r"\Axmllint"
-            r"(?!(?:.*\s)(?:--output\b|-o\b))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "search",
-    ),
-
-    # ── process_inspect ──────────────────────────────────────────────
-    # Process / runtime / host-activity inspection.  `dmesg` typically
-    # requires root on Linux and is intentionally omitted to keep the
-    # tag trustworthy for non-privileged agents.
-    (
-        re.compile(
-            r"\A(?:ps|top|htop|lsof|pgrep|pidof|uptime|w|jobs|fg|bg"
-            r"|free|vmstat|iostat|mpstat|ipcs|nproc|arch"
-            r"|last|lastlog|who|users|finger|getent|cal|ncal)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "process_inspect",
-    ),
-
-    # ── system_info ──────────────────────────────────────────────────
-    # Identity / environment / docs / terminal-query tools.  Several
-    # binaries here share a name with writers (`sysctl`, `stty`,
-    # `ulimit`); those get separate rules below that positively match
-    # only the read forms.
-    (
-        re.compile(
-            r"\A(?:uname|whoami|id|hostname|date|pwd|env|printenv|echo"
-            r"|true|false|which|whereis|type|history|readlink|basename"
-            r"|dirname|realpath|locale|tty|groups"
-            r"|man|info|apropos|whatis|tldr|tput"
-            r"|alias|clear|reset"
-            r"|seq|factor|printf)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "system_info",
-    ),
-    # `sysctl` — read forms only.  Excludes `-w|--write` (set value)
-    # and `-p|--load` (load values from file).
-    (
-        re.compile(
-            r"\Asysctl"
-            r"(?!(?:.*\s)(?:-w\b|--write\b|-p\b|--load\b))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "system_info",
-    ),
-    # `ulimit` — bare invocation or a single inspection flag (no
-    # trailing value).  `ulimit -n 4096` (value-bearing) is rejected.
-    (
-        re.compile(r"\Aulimit(?:\s+-[A-Za-z])?\s*\Z"),
-        "system_info",
-    ),
-    # `stty` — bare / `-a` / `-g` (dump settings in restoreable form).
-    # Any other form mutates terminal attributes.
-    (
-        re.compile(r"\Astty(?:\s+(?:-a|--all|-g|--save))?\s*\Z"),
-        "system_info",
-    ),
-
-    # ── vcs_inspect ──────────────────────────────────────────────────
-    # Git read-only sub-commands.  `git config --get` / `--list` only;
-    # `git config key value` (write) is rejected.
-    (
-        re.compile(
-            r"\Agit\s+(?:status|log|diff|show|branch|remote|rev-parse"
-            r"|ls-files|ls-tree|ls-remote|describe|blame|shortlog"
-            r"|reflog|stash\s+list|tag(?:\s+-l)?|for-each-ref"
-            r"|config\s+(?:--get|--list|-l))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Mercurial read-only sub-commands.
-    (
-        re.compile(
-            r"\Ahg\s+(?:status|st|log|diff|cat|annotate|branch|manifest"
-            r"|tip|summary|heads|parents|identify|paths|showconfig)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Subversion read-only sub-commands.
-    (
-        re.compile(
-            r"\Asvn\s+(?:status|st|log|diff|di|info|list|ls|cat"
-            r"|propget|pg|propdump|pd|proplist|pl|blame|annotate|praise)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Fossil read-only sub-commands.
-    (
-        re.compile(
-            r"\Afossil\s+(?:status|timeline|info|ls|finfo|branch|diff)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-    # Bazaar read-only sub-commands.
-    (
-        re.compile(
-            r"\Abzr\s+(?:status|st|log|diff|info|ls|cat|annotate)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "vcs_inspect",
-    ),
-
-    # ── text_transform ───────────────────────────────────────────────
-    # Pure stdin/file → stdout processors.  `sed` / `awk` / general-
-    # purpose interpreters are deliberately excluded because their
-    # argument body can do anything.
-    #
-    # `sort` / `sdiff` have `-o outfile` write modes; excluded via
-    # negative lookahead.  `uniq` has a two-positional write form
-    # (`uniq input output`); handled with its own stricter rule.
-    (
-        re.compile(
-            r"\A(?:sort|sdiff)"
-            r"(?!(?:.*\s)(?:-o\b|--output\b))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "text_transform",
-    ),
-    (
-        re.compile(
-            r"\Auniq"
-            # Any number of flags (with optional attached or numeric
-            # argument for -f/-s/-w/-D/-C).
-            r"(?:"
-            r"\s+-{1,2}[A-Za-z0-9][A-Za-z0-9\-]*(?:=\S+)?"
-            r"|\s+-[fsDCw]\s+\d+"
-            r")*"
-            # At most ONE positional (the input file); forbidding a
-            # second positional rejects `uniq input output`.
-            r"(?:\s+[^-][^\s]*)?\s*\Z",
-        ),
-        "text_transform",
-    ),
-    (
-        re.compile(
-            r"\A(?:cut|paste|join|tr|column|fold|fmt|pr|expand|unexpand"
-            r"|comm|diff|diff3|cmp|colordiff|delta)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "text_transform",
-    ),
-
-    # ── network_inspect ──────────────────────────────────────────────
-    # Local network-state inspection with no outbound traffic.  Tools
-    # that actively probe remote hosts (`ping`, `traceroute`, `dig`,
-    # `nmap`, `curl`, `wget`) are deliberately NOT tagged here — they
-    # belong to a separate `network_probe` family if/when desired.
-    (
-        re.compile(
-            r"\A(?:netstat|ss)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `arp` — excluded on `-s` (add entry) / `-d` (delete entry).
-    (
-        re.compile(
-            r"\Aarp"
-            r"(?!(?:.*\s)-[sd]\b)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `ip <obj> show|list|get`.  Explicit verb-discrimination rejects
-    # `ip addr add`, `ip route del`, etc.
-    (
-        re.compile(
-            r"\Aip(?:\s+-\S+)*"
-            r"\s+(?:addr|address|link|route|neigh|neighbour|rule"
-            r"|tunnel|netns|xfrm|maddr|mroute|tcp_metrics|token)"
-            r"\s+(?:show|list|s|l|get|save)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `route` — excluded on `add|del|delete|flush|change|replace`.
-    (
-        re.compile(
-            r"\Aroute"
-            r"(?!(?:.*\s)(?:add|del|delete|flush|change|replace)\b)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "network_inspect",
-    ),
-    # `ifconfig` — safe forms: bare, `-a|-s|-v`, or a single interface
-    # name.  Any trailing modification verb (`up|down|<ip>|mtu|...`)
-    # takes a second token and fails the end-anchor.
-    (
-        re.compile(
-            r"\Aifconfig(?:\s+(?:-[asv]|[a-zA-Z][a-zA-Z0-9]+))?\s*\Z",
-        ),
-        "network_inspect",
-    ),
-
-    # ── archive_inspect ──────────────────────────────────────────────
-    # List contents of an archive without extracting.
-    #
-    # `tar` mode letters are exclusive; the negative lookahead rejects
-    # any bundle containing `c|x|r|A|u` or the long-form write verbs.
-    # `f?` allows the rare stdin-driven `tar -t` form.
-    (
-        re.compile(
-            r"\Atar"
-            r"(?!(?:.*\s)(?:-[a-zA-Z]*[cxrAu][a-zA-Z]*\b"
-            r"|--(?:create|extract|append|update|concatenate|catenate|delete)\b))"
-            r"\s+(?:-[a-zA-Z]*t[a-zA-Z]*|--list)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-    # `unzip` with a safe mode flag (list/verbose/zipinfo/test/stream).
-    # Bundle may combine only letters from `[lvZtpcq]`, rejecting
-    # extraction modifiers (`-o|-n|-d|-j`).
-    (
-        re.compile(
-            r"\Aunzip\s+-[lvZtpcq]+"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-    (
-        re.compile(r"\Azipinfo(?:\s+[^\s]+)+\s*\Z"),
-        "archive_inspect",
-    ),
-    # Compression list / test modes.
-    (
-        re.compile(
-            r"\A(?:gzip|bzip2|xz|zstd|lzma)"
-            r"\s+(?:-l|--list|-t|--test|-tv)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-    # Streaming decompressors that write to stdout (cat/less/more/grep
-    # on compressed archives).  None of these write back to disk.
-    (
-        re.compile(
-            r"\A(?:zcat|bzcat|xzcat|zstdcat|lz4cat"
-            r"|zless|zmore|bzless|bzmore|xzless|xzmore|zstdless|zstdmore"
-            r"|zgrep|zegrep|zfgrep|bzgrep|xzgrep|zstdgrep)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "archive_inspect",
-    ),
-
-    # ── container_inspect ────────────────────────────────────────────
-    # Read-only container-runtime and cluster queries.  `docker run` /
-    # `docker exec` / `kubectl apply` / `kubectl exec` / `kubectl
-    # delete` etc. are NOT in the subcommand list and therefore do not
-    # match; `docker exec` / `kubectl exec` also get tagged as
-    # `capability:spawns_process` which the gate rejects separately.
-    (
-        re.compile(
-            r"\A(?:docker|podman)\s+"
-            r"(?:ps|images|image\s+(?:ls|inspect|history)"
-            r"|logs|inspect|info|version|history|port|diff|top|stats"
-            r"|events|network\s+(?:ls|inspect)"
-            r"|volume\s+(?:ls|inspect)"
-            r"|container\s+(?:ls|inspect|logs|top|diff|port|stats)"
-            r"|system\s+(?:df|info|events))"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "container_inspect",
-    ),
-    (
-        re.compile(
-            r"\Akubectl\s+"
-            r"(?:get|describe|logs|top|version"
-            r"|api-resources|api-versions|explain"
-            r"|config\s+(?:view|get-contexts|current-context)"
-            r"|cluster-info|auth\s+can-i)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "container_inspect",
-    ),
+_READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family('read_only')
 )
 
 
@@ -730,238 +920,9 @@ _READ_ONLY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 # `http_download` is checked before `http_get` so `curl -o` writes
 # don't masquerade as idempotent reads.
 
-_NETWORK_PROBE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    # ── icmp ────────────────────────────────────────────────────────
-    # `ping` / `ping6` — ICMP echo.  Requires at least one arg (the
-    # host); bare `ping` is interactive and rare.
-    (
-        re.compile(r"\Aping6?(?:\s+[^\s]+)+\s*\Z"),
-        "icmp",
-    ),
-
-    # ── trace ───────────────────────────────────────────────────────
-    # Hop-by-hop route discovery.
-    (
-        re.compile(
-            r"\A(?:traceroute6?|tracepath6?|mtr)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "trace",
-    ),
-
-    # ── dns ─────────────────────────────────────────────────────────
-    # DNS query tools.  Idempotent at the DNS layer; no side effects
-    # beyond a resolver cache hit.
-    (
-        re.compile(
-            r"\A(?:dig|nslookup|host|drill|kdig)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "dns",
-    ),
-
-    # ── whois ───────────────────────────────────────────────────────
-    (
-        re.compile(r"\Awhois(?:\s+[^\s]+)+\s*\Z"),
-        "whois",
-    ),
-
-    # ── http_mutate ─────────────────────────────────────────────────
-    # Checked BEFORE http_get / http_download so that a POST-ish curl
-    # is never downgraded to a read tag.  Triggers: explicit non-safe
-    # `-X` / `--request`, or any body/upload flag.
-    (
-        re.compile(
-            r"\A(?:curl|xh)\b"
-            r"(?=(?:.*\s)(?:"
-            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
-            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
-            r"|--data-urlencode\b|--data-ascii\b|--json\b"
-            r"|-F\b|--form\b|--form-string\b"
-            r"|-T\b|--upload-file\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_mutate",
-    ),
-    # HTTPie / xh with an explicit non-safe HTTP verb positional
-    # (`http POST example.com`) OR any body-field / form-upload token.
-    # HTTPie request-item grammar reminders:
-    #   name=value    JSON string body field  (mutate)
-    #   name:=value   JSON non-string field   (mutate)
-    #   name==value   query parameter         (NOT mutate)
-    #   name:value    HTTP header             (NOT mutate)
-    #   name@path     file upload (legacy)    (mutate)
-    #   name=@path    file upload (modern)    (mutate)
-    (
-        re.compile(
-            r"\A(?:http|https|xh)\b"
-            r"(?=.*(?:"
-            r"\s(?:POST|PUT|DELETE|PATCH)\b"
-            r"|=@"
-            r"|:="
-            r"|\s(?:-f|--form)\b"
-            r"|\s[A-Za-z_][\w.-]*=[^=\s]"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_mutate",
-    ),
-    # wget writing a body.
-    (
-        re.compile(
-            r"\Awget\b"
-            r"(?=(?:.*\s)(?:"
-            r"--post-data\b|--post-file\b"
-            r"|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|--body-data\b|--body-file\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_mutate",
-    ),
-
-    # ── http_download ───────────────────────────────────────────────
-    # `curl -o|-O|--output|--remote-name` persists response to disk.
-    # Checked before `http_get` so disk writes aren't hidden.
-    (
-        re.compile(
-            r"\Acurl\b"
-            r"(?!(?:.*\s)(?:"
-            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
-            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
-            r"|--data-urlencode\b|--data-ascii\b|--json\b"
-            r"|-F\b|--form\b|--form-string\b"
-            r"|-T\b|--upload-file\b"
-            r"))"
-            r"(?=(?:.*\s)(?:-o\b|-O\b|--output\b|--remote-name\b))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_download",
-    ),
-    # wget default mode writes to disk (only `-O -` streams to stdout).
-    (
-        re.compile(
-            r"\Awget\b"
-            r"(?!(?:.*\s)(?:"
-            r"-O\s+-"                        # stdout-stream form
-            r"|--post-data\b|--post-file\b"  # or mutating body
-            r"|--method(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|--body-data\b|--body-file\b"
-            r"|--help\b|-h\b|--version\b|-V\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_download",
-    ),
-
-    # ── http_get ────────────────────────────────────────────────────
-    # Idempotent HTTP with response to stdout.  Must survive all the
-    # mutate / download lookaheads.  Also excludes `--help` / `-V`
-    # so flag-only invocations aren't mis-tagged as probes.
-    (
-        re.compile(
-            r"\Acurl\b"
-            r"(?!(?:.*\s)(?:"
-            r"-X\s+(?:POST|PUT|DELETE|PATCH)"
-            r"|--request(?:\s+|=)(?:POST|PUT|DELETE|PATCH)"
-            r"|-d\b|--data\b|--data-raw\b|--data-binary\b"
-            r"|--data-urlencode\b|--data-ascii\b|--json\b"
-            r"|-F\b|--form\b|--form-string\b"
-            r"|-T\b|--upload-file\b"
-            r"|-o\b|-O\b|--output\b|--remote-name\b"
-            r"|--help\b|-h\b|--version\b|-V\b|--manual\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_get",
-    ),
-    # wget stdout-stream form only.
-    (
-        re.compile(
-            r"\Awget\s+-O\s+-"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_get",
-    ),
-    # HTTPie / xh without mutation tokens.  Mirror-image of the
-    # http_mutate rule: same lookahead body, inverted to a negative
-    # assertion, plus exclusions for help / version flags.
-    (
-        re.compile(
-            r"\A(?:http|https|xh)\b"
-            r"(?!.*(?:"
-            r"\s(?:POST|PUT|DELETE|PATCH)\b"
-            r"|=@"
-            r"|:="
-            r"|\s(?:-f|--form)\b"
-            r"|\s[A-Za-z_][\w.-]*=[^=\s]"
-            r"|\s(?:--help|-h|--version)\b"
-            r"))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "http_get",
-    ),
-
-    # ── port_scan ───────────────────────────────────────────────────
-    # TCP/UDP connect-mode scanning.  `nc -l` / `ncat -l` already get
-    # tagged `capability:network_bind`; the lookahead prevents double-
-    # tagging as port_scan.
-    (
-        re.compile(
-            r"\A(?:nmap|masscan|zmap)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "port_scan",
-    ),
-    (
-        re.compile(
-            r"\A(?:nc|ncat|netcat)"
-            # Reject listen-mode forms: `-l` standalone, `-l` anywhere
-            # inside a combined flag bundle (e.g. `-lk`, `-lnv`), or
-            # the long `--listen` form.
-            r"(?!(?:.*\s)(?:-[a-zA-Z]*l[a-zA-Z]*\b|--listen\b))"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "port_scan",
-    ),
-
-    # ── file_transfer ───────────────────────────────────────────────
-    # Bulk file movement over the network.
-    (
-        re.compile(
-            r"\A(?:scp|sftp)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "file_transfer",
-    ),
-    # `rsync` — tagged only when a `[user@]host:` endpoint appears.
-    # Local-only rsync (`rsync -av src/ dst/`) emits no network traffic
-    # and is intentionally NOT tagged.
-    (
-        re.compile(
-            r"\Arsync\b"
-            r"(?=.*(?:\s|=)(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:)"
-            r"(?:\s+[^\s]+)+\s*\Z",
-        ),
-        "file_transfer",
-    ),
-    # `rclone` — narrow allowlist of sub-commands that touch remote
-    # backends.  Purely-local rclone commands (`rclone config`,
-    # `rclone version`, `rclone help`) are not tagged.
-    (
-        re.compile(
-            r"\Arclone\s+"
-            r"(?:copy|sync|move|copyto|moveto|copyurl|mount|serve"
-            r"|cat|rcat|lsjson|ls|lsl|lsd|lsf|tree|size|md5sum|sha1sum"
-            r"|check|cryptcheck|hashsum|ncdu|dedupe|cleanup|purge"
-            r"|delete|deletefile|rmdir|rmdirs|touch)"
-            r"(?:\s+[^\s]+)*\s*\Z",
-        ),
-        "file_transfer",
-    ),
+_NETWORK_PROBE_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (r.pattern, r.suffix)
+    for r in _CAPABILITY_CORPUS.by_family('network_probe')
 )
 
 
@@ -1345,8 +1306,11 @@ def _safe_for_read_only(
     ``filesystem_write``, ``spawns_process``, ``network_bind``,
     ``background_exec``, ``download_and_exec``, ``binary_download``,
     ``process_signal``, ``compilation``, or any refined
-    ``package_install:*`` / ``script_execution:*`` tag disqualifies
-    the command from receiving any ``read_only:*`` tag.
+    ``package_install:*`` / ``script_execution:*`` / ``data_read:*``
+    / ``system_mutate:*`` / ``network_exfil:*`` tag disqualifies the
+    command from receiving any ``read_only:*`` tag. The sensitive-tag
+    suppression rule prevents a sensitive-surface command from also
+    being blessed as a cheap read-only fast-path candidate downstream.
     """
     if not _structurally_bare(
         command,
@@ -1362,6 +1326,12 @@ def _safe_for_read_only(
         if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_DATA_READ}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_SYSTEM_MUTATE}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_NETWORK_EXFIL}:"):
             return False
 
     return True
@@ -1387,14 +1357,17 @@ def _composition_is_all_read_only(
        process-substitution, variable-expansion, parse/shlex failure,
        interpreter indirection).
     4. No already-emitted capability in the read-only-incompatible
-       set or the refined package_install / script_execution
-       families.  This is the single broadest safety gate: any
-       sub-segment that emits ``filesystem_write`` (redirects,
-       ``tee``), ``spawns_process`` (``xargs``, ``sudo``, ``ssh``,
-       ``docker run``, …), ``stdin_exec`` (``| sh``, ``| python -``),
+       set or the refined package_install / script_execution /
+       data_read / system_mutate / network_exfil families.  This is
+       the single broadest safety gate: any sub-segment that emits
+       ``filesystem_write`` (redirects, ``tee``), ``spawns_process``
+       (``xargs``, ``sudo``, ``ssh``, ``docker run``, …),
+       ``stdin_exec`` (``| sh``, ``| python -``),
        ``download_and_exec`` (``curl … | sh``), ``background_exec``
-       (trailing ``&``), ``network_bind``, etc. disqualifies the
-       whole composition automatically.
+       (trailing ``&``), ``network_bind``, ``data_read:*``
+       (sensitive data reads), ``system_mutate:*`` (host-state
+       mutations), ``network_exfil:*`` (outbound data transfer),
+       etc. disqualifies the whole composition automatically.
     5. Every bare shell token in the re-tokenised command that lies
        in ``_SHELL_COMPOSITION_TOKENS`` must also lie in
        ``_READ_ONLY_COMPOSITION_JOINERS`` — i.e. only ``|``, ``||``,
@@ -1420,6 +1393,12 @@ def _composition_is_all_read_only(
         if cap_id.startswith(f"{CAPABILITY_PACKAGE_INSTALL}:"):
             return False
         if cap_id.startswith(f"{CAPABILITY_SCRIPT_EXECUTION}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_DATA_READ}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_SYSTEM_MUTATE}:"):
+            return False
+        if cap_id.startswith(f"{CAPABILITY_NETWORK_EXFIL}:"):
             return False
 
     try:

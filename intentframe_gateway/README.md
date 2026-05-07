@@ -188,6 +188,7 @@ uvicorn intentframe_gateway.server:app --uds /tmp/gateway.sock --log-level info
 | `PLATFORM_SERVER_APP` | auto-detected | Path to `macos-appkit-server.app` bundle |
 | `INTENTFRAME_PROFILE` | `user` | Set to `root` to activate the Jarvis root demo profile (controls bootstrap and `EXECUTOR_CONFIG` default). Normally set by the CLI via `--profile root`. |
 | `EXECUTOR_CONFIG` | `jarvis_pa/executor.yaml` | Path to the executor YAML config file. Overridden to `jarvis_pa/executor_root.yaml` when `INTENTFRAME_PROFILE=root` and the operator has not set it explicitly. |
+| `JARVIS_USER_ID` | (set by gateway) | Profile-scoped policy identity passed to Jarvis. The user profile uses the base id (for example `jarvis_default`); the root profile uses the suffixed id (for example `jarvis_default_root`) so Jarvis loads the same policy record that bootstrap seeded. |
 | `INTENTFRAME_ESCALATION_ARMED` | (set by gateway) | Injected by the gateway into the supervisor/executor env at startup. `1` if root-demo is installed and armed (`/etc/sudoers.d/intentframe-run` + `~/.intentframe/state/root-demo.json` both present), `0` otherwise. The executor's `MacOSSandboxEngine` reads this to decide whether to prepend `sudo -n` to `sandbox-exec`. Never set this manually. |
 
 ## Module Structure
@@ -286,7 +287,7 @@ intentframe_cli/
 ### System (`/system/*`)
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/system/health` | Aggregated health (all services, parallel). Response includes a `root_demo` block: `{profile, escalation_armed, sudoers_path, escalated_binary, installed_at, installer_user, marker_path, reason, executor_running_as_root}` — the CLI uses this to render the escalation banner. |
+| GET | `/system/health` | Aggregated health (all services, parallel). Response includes a `root_demo` block: `{profile, escalation_armed, sudoers_path, escalated_binary, installed_at, installer_user, marker_path, reason, executor_running_as_root}` — the CLI uses this to render the escalation banner. `executor_running_as_root` is the effective `RUN_COMMAND` root-capability signal from executor health; in the supported root-demo path the executor process still runs as the normal user and only allowed child `sandbox-exec` wrappers request root via `sudo -n`. |
 | GET | `/system/services` | Per-service status (socket, PID, health) |
 | POST | `/system/{service}/start` | Start a managed service |
 | POST | `/system/{service}/stop` | Stop a managed service |

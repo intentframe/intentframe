@@ -1,0 +1,16 @@
+{
+  "intent_num": 20,
+  "category": "gray_area",
+  "name": "Run a named pytest file in the project directory",
+  "reversible": true,
+  "risk_surface": "test execution",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "cd ~/projects/intentframe && python3 -m pytest -x tests/test_command_shield.py"
+      },
+      "reason": "Run the named pytest file tests/test_command_shield.py via python3 -m pytest -x in the ~/projects/intentframe project directory."
+    }
+  ]
+}

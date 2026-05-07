@@ -253,21 +253,20 @@ world stays safe.
 | **AGA01** | Uncontrolled Autonomy | **Core mission** | `allowed_actions` deny-by-default, `safe` flag gates fast-path vs full AI evaluation, Guardian blocks before executor runs. The agent never acts without IntentFrame's approval. |
 | **AGA02** | Goal & Instruction Hijacking | **Yes — 16 attacks test this** | Attacks 1, 5, 7-13, 15, 19, 20, 22, 23. Agent's goal is already hijacked; IntentFrame blocks the resulting intents via deterministic constraints + semantic analysis. |
 | **AGA03** | Tool & Function Manipulation | **Yes — 5 attacks** | Attacks 4, 14, 18, 21 (path traversal, tool confusion, parameter injection, schema injection). `FileConstraints.allowed_paths`, `ApiConstraints.max_amount`, structured action types. |
-| **AGA04** | Insufficient Sandboxing | **Yes** | ResourceRegistry + workspace mounts enforce VFS isolation. Agents only see virtual paths mapped by the dashboard. The executor resolves virtual to real paths through the registry. |
+| **AGA04** | Insufficient Sandboxing | **Core mission** | Two distinct sandboxing layers. (1) **Workspace VFS** — `resource_registry/` enforces virtual-path isolation per user/agent; agents only see paths mapped by the dashboard, the executor resolves virtual to real paths through the registry. (2) **macOS Seatbelt SBPL kernel sandbox** — every `RUN_COMMAND` subprocess is wrapped in a dynamically-generated SBPL profile via `sandbox-exec` (`executor/sandbox/platforms/macos.py`), with `(deny default)` and a curated allowlist. This is kernel-enforced, not policy-enforced. The sandbox is built per-execution from the planner's capability set, mirroring Anthropic's sandbox-runtime approach. |
 | **AGA05** | Broken Agent Auth & Authorization | **Yes** | Actor SDK handshake binds `user_id` to `UserPolicy`. PolicyRegistry is the single source of truth. Each `submit()` is evaluated against the bound user's policy. No credential sharing between agents. |
-| **AGA06** | Unsafe Output Consumption | **Partial** | Structured output types (`AIAnalysisOutput`, `AIGuardianOutput`) via Pydantic. AE field limits (`AEFieldLimit`) cap free-text field lengths. But no output sanitization for what the executor returns to the user. |
+| **AGA06** | Unsafe Output Consumption | **Partial** | Structured output types (`AIAnalysisOutput`, `AIGuardianOutput`) via Pydantic. AE field limits (`AEFieldLimit`) cap free-text field lengths. `CredentialScrubber` (`intentframe_credentials/redaction.py`, re-exported via `executor/services/credential_scrubber.py`) scrubs credentials from executor outputs and audit logs. Full general-purpose output sanitization (HTML, scripts, downstream-system encoding) is not yet implemented — credentials are the one class actively scrubbed. |
 | **AGA07** | Inadequate Guardrails & Alignment | **Core mission** | `intent_limits` (semantic guardrails), `domain_constraints` (structural guardrails), `allowed_actions` (action guardrails). Three layers of defense-in-depth. |
 | **AGA08** | Knowledge Poisoning | **Partial** | Attack 3 (analysis poisoning), transitive injection tests (poisoned AE to Guardian). The architectural separation between AE (understanding) and Guardian (decision) limits blast radius. Active domains from policy provide trusted ground truth independent of any LLM output. |
-| **AGA09** | Opaque Decision Chains | **Yes** | Full audit log with `decision`, `decision_path` (fast_path vs ai), `action`, `message`, timestamps. Every intent's journey through the pipeline is recorded. |
+| **AGA09** | Opaque Decision Chains | **Yes** | Full audit log with `decision`, `decision_path` (fast_path vs ai), `action`, `message`, timestamps. Every intent's journey through the pipeline is recorded. **Tamper-evident via SHA-256 hash chain** — every audit row carries `prev_hash` and `entry_hash` fields; `executor/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`, and `audit_logger.verify_integrity()` walks the rows to detect any modification or insertion. Modifying any historical entry invalidates that entry's hash AND every subsequent entry's chain link. |
 | **AGA10** | Cascading Trust Failures | **Yes** | `test_transitive_injection_live.py` stress-tests the AE→Guardian trust boundary. The architecture designates the AE as the source of truth for semantic analysis; cascading failure is bounded not by Guardian re-verifying the AE (which would defeat the purpose of having an AE), but by deterministic gates (permission, constraint, active_domains from policy) that run regardless of AE content, plus the AE's own hardened input surface (see tests 4, 5 — real injected intent → real AE → real Guardian, both pass end-to-end). |
 
 ### Scorecard
 
 | Status | Count | Categories |
 |---|---|---|
-| Core mission (deep, architectural) | 2 | AGA01, AGA07 |
+| Core mission (deep, architectural) | 3 | AGA01, AGA04, AGA07 |
 | Covered with tests | 5 | AGA02, AGA03, AGA05, AGA09, AGA10 |
-| Covered architecturally | 1 | AGA04 |
 | Partial | 2 | AGA06, AGA08 |
 | Not covered | 0 | — |
 
@@ -277,8 +276,10 @@ Agentic Top 10 has zero irrelevant categories for IntentFrame.
 ### Partial gaps
 
 **AGA06 (Unsafe Output Consumption)** — IntentFrame validates inputs to the
-executor thoroughly, but doesn't currently sanitize what the executor returns to
-the user or downstream systems.
+executor thoroughly. On output, `CredentialScrubber` actively redacts credentials
+in executor outputs and audit log entries. Full general-purpose output sanitization
+(HTML escaping, script-tag stripping, downstream-system encoding) is not yet
+implemented — that work is on the roadmap.
 
 **AGA08 (Knowledge Poisoning)** — IntentFrame mitigates this primarily at the AE
 input surface. The AE's hardened prompt, structured output, encoding normalization,

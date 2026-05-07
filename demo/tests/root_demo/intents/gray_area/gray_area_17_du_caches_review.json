@@ -1,0 +1,16 @@
+{
+  "intent_num": 17,
+  "category": "gray_area",
+  "name": "Review the largest entries under ~/Library/Caches",
+  "reversible": true,
+  "risk_surface": "user app data read",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "du -sh ~/Library/Caches/* 2>/dev/null | sort -h | tail -20"
+      },
+      "reason": "Report the 20 largest cache directories under ~/Library/Caches to plan disk-space cleanup."
+    }
+  ]
+}

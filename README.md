@@ -1,26 +1,321 @@
-# IntentFrame
+<h1 align="center">IntentFrame</h1>
 
-> **Automate the human oversight of AI agents.**
+<p align="center">
+  <em>Hybrid (deterministic + LLM) security and safety runtime for agentic AI — built to maximise autonomy for AI agents.</em>
+</p>
 
-When you let an AI agent work for you, YOU are currently the safety system - reviewing every action, making judgment calls, clicking approve/reject. IntentFrame automates that supervision.
+<p align="center">
+  <strong>Real autonomy for AI agents — earned the same way every trusted profession earns it: through structural supervision, not constant approval clicks.</strong>
+</p>
 
-**The agent does the work. IntentFrame automates the oversight.**
+<p align="center">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0">
+  <img src="https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.14+">
+  <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
+  <img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha">
+  <img src="https://img.shields.io/badge/runtime-AI%20security-red.svg" alt="AI Security Runtime">
+</p>
+
+<p align="center">
+  <a href="docs/quickstart.md">Quickstart</a> •
+  <a href="docs/autonomy.md">Why this exists</a> •
+  <a href="docs/evidence.md">Proof</a> •
+  <a href="docs/threat-model.md">Threat model</a> •
+  <a href="docs/faq.md">FAQ</a>
+</p>
 
 ---
 
-## Why IntentFrame
+## 🚨 The Problem
 
-Today, when you connect an AI agent to your email, calendar, or terminal, **you**
-become the safety system — reading every action, making judgment calls, clicking
-approve or reject. That doesn't scale.
+It's 2026. AI agents can now read your email, run terminal commands, send messages on your behalf, edit your files, and so on. They're useful. They're also one bad decision away from deleting your tax returns, leaking a credential, or running a command that quietly pwns your laptop.
 
-IntentFrame separates the work from the oversight. Every agent action flows
-through a policy pipeline — Analysis Engine, Guardian, Executor — so no single
-component can think, judge, and act on its own.
+The way the industry currently solves this is to put **you** in the loop. Every action, an approval popup. Every command, a click. You become the safety system. That works for a demo. It doesn't work the moment you actually want the agent to *do* anything autonomously.
+
+The other "solution" is to trust the agent. Let it think, decide, and act, all in one mind, holding all your credentials. That's how every assistant you've ever installed works today. It's also how every prompt-injection screenshot on Twitter happens.
+
+IntentFrame is a third option.
+
+**The agent neither gets hands nor directly takes actions.** It gets a slot under a door.
+
+It can think all it wants — plan, reason, retry, work through a multi-step task on its own — but anything that would touch your machine, your files, your credentials, or your money has to be written down on a slip of paper, slid under the door, and validated by something that doesn't share its mind.
+
+A separate program reads the slip, figures out what the action will *actually* do, checks it against your rules, and only then lets a small, deterministic executor carry it out.
+
+The agent decides what to do. IntentFrame decides whether it's safe to do.
+
+This is the same pattern that runs every job we already trust with serious power. Surgeons cut on their own — inside medical licenses, hospital rules, and malpractice law. Pilots fly on their own — inside airspace rules, certifications, and air traffic control. Nobody watches a surgeon's every cut. Their autonomy works *because* the structure around them makes it safe to delegate.
+
+AI agents need the same scaffolding. IntentFrame is that scaffolding.
+
+That's the whole idea. The full thesis is in [`docs/autonomy.md`](docs/autonomy.md).
 
 ---
 
-## Getting Started
+## 🛡️ The Proof: Skin in the Game
+
+Most AI safety demos run in disposable cloud sandboxes. We tested this on bare metal.
+
+We ran IntentFrame on a physical MacBook Pro (M4 Pro, macOS Tahoe) with real stakes:
+
+- **No traditional sandboxing around the agent, IntentFrame, or terminal commands:** No VMs, no Docker containers, no throwaway test harness. IntentFrame ran inside the same shell session a developer would use day-to-day.
+- **Bare-metal exposure:** If an action executed, it touched real device hardware and resources. The kernel sandbox was set wide open on purpose — the IntentFrame pipeline was the only line between an attack and the OS.
+- **Root-capable:** We enabled a direct, root-level execution path.
+
+In this environment, we submitted **100 hand-crafted malicious intents** through IntentFrame as if from an already-compromised agent.
+
+The point of this test is **containment**, not model-refusal. It deliberately removes the agent model from the measurement and asks the only question that matters at the runtime boundary: *if a compromised agent submits a dangerous intent, does IntentFrame stop it before execution?*
+
+The attack corpus included 10 categories: disk wipes, DNS hijacks, ARP spoofing, reverse shells, credential exfiltration, kernel-extension and security-tool disabling, sudo escalation, encoded/obfuscated payloads, interpreter indirection, and social-engineered commands with harmless-looking reasons.
+
+Current post-remediation result:
+
+> **100 of 100 malicious intents blocked before execution.**
+>
+> **100 of 100 benign workflows allowed.**
+>
+> **17 of 20 gray-area developer cases allowed; 3 conservatively blocked** (things like `brew services start redis` running as root that a careful human would also pause on).
+
+The point isn't *"we blocked attacks."* The point is the inversion: if a fully-compromised agent can't punch through the boundary, then an honest agent — one that's just fallible, not malicious — operating inside the same boundary is operationally safe to delegate real work to. Containment of the worst case is what makes autonomy of the normal case rational. That's the architectural claim the demo cashes out.
+
+### 👵 The Grandma Limits
+
+We ran the same 100 attacks again with **every** technical rule deleted. The only thing left was **seven plain-English sentences** a non-technical user could write — *"don't touch my network stuff," "don't mess with system files,"* that kind of thing. The kind of policy your grandma could write.
+
+> **100 of 100 still blocked, through the AI layer alone.**
+
+The semantic layer caught attacks like ARP spoofing and time-sync hijacks that simple keyword rules would have missed. The agent never reached the kernel. The agent never reached my DNS. The agent never reached my files outside its workspace.
+
+We don't hide the failures either. On April 27, 2026, an earlier sweep allowed 9 attacks to reach the real executor and briefly mutated my Mac's DNS and hostname. We wrote up exactly what happened, what we learned, and what we changed. The full incident report is in the repo — same place as the wins.
+
+Every result above is reproducible from a fresh clone, with raw logs in [`docs/evidence.md`](docs/evidence.md) and [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md).
+
+---
+
+## 🤖 Try It: Meet Jarvis
+
+The fastest way to feel the difference is to use the assistant we built on top of IntentFrame.
+
+**Jarvis** is a personal assistant that lives in your terminal. You talk to it; it does things on your Mac. It reads your email, runs git, manages your calendar, answers questions about your files, runs shell commands. Everything you'd expect from a modern AI assistant — 55+ tools, all routed through the boundary.
+
+What's different is that Jarvis doesn't have unchecked hands. Every single action it takes — reading a message, running a command, sending an email — goes through IntentFrame first. The agent reasons; IntentFrame decides if and how the action actually happens.
+
+You can try it in two terminal commands after setup, and you can watch the audit trail in real time as Jarvis works. When it's about to do something interesting, you'll see IntentFrame's pipeline evaluate it. When it tries something it shouldn't, you'll see exactly why it was blocked.
+
+Jarvis is the *"see, this is what it feels like when an agent runs without you babysitting it"* experience. IntentFrame is the part doing the work that makes that safe.
+
+> [!TIP]
+> Setup, requirements, and run instructions are at the bottom of this README, and in [`docs/quickstart.md`](docs/quickstart.md).
+
+---
+
+## 🧠 The Mental Model
+
+A few mental models that make this click faster than any architecture diagram. Seven more, with where each analogy works and where it breaks down, are in [`docs/mental-models.md`](docs/mental-models.md).
+
+**The hospital.** A doctor writes a prescription. A pharmacist verifies the dose, the interactions, the patient. A nurse administers it. Three roles, three minds, three checks. We don't do this because we don't trust doctors. We do it because *one mind that thinks, judges, and acts* is one mistake away from a dead patient. AI agents today are the doctor doing all three jobs. IntentFrame puts the pharmacist back. The executor is the nurse — trained to administer the dose, not to second-guess it.
+
+**The control tower.** Pilots are highly trained. They still don't take off whenever they feel like it. They request clearance from a single tower that can see what every other plane is doing. The agent is the pilot. IntentFrame is the tower.
+
+**The slip under the door.** The agent is locked in a small room with a phone and a typewriter. It can think and write all it wants. To affect anything real, it has to write a slip — what action, what target, what reason — and slide it under the door. Someone else reads it, checks it, and acts.
+
+The point of all three: **separating who decides from who acts is a 5,000-year-old solution to the problem of trusting powerful minds that can be wrong.** AI agents are the newest such mind. We don't need a new principle for them. We just need to apply the old one.
+
+---
+
+## 🛑 Prevention, Not Containment
+
+A lot of "AI safety" tooling is really *containment* — let the action run, then limit the damage. Sandboxes, network isolation, post-hoc filters.
+
+IntentFrame is *prevention* first.
+
+Dangerous intents are blocked **before** they reach an executor at all. Safe intents pass through and run with the full capability they need. The executor still applies a kernel-enforced macOS sandbox underneath every shell call as a safety net — but that's the second layer of defense, not the first.
+
+The principle is simple:
+
+> **Full capability when the action is safe. Zero capability when it isn't.**
+
+This is why IntentFrame is built for *useful* agents that get real work done, not toy agents trapped in a box so small they can't do anything. The boundary opens for what should pass and closes for what shouldn't.
+
+---
+
+## 🏗️ The Executor Is the Foundation
+
+The most important component in IntentFrame is not the AI reviewer.
+
+It's the executor.
+
+The executor is the only thing that touches your world. It holds credentials, owns IO surfaces, applies command sandboxing, writes the audit trail, and performs validated actions. **It has no AI in it. No LLM. No prediction. No fallback model. No judgment of its own.** It runs exactly the action that Guardian approved, inside a kernel-enforced sandbox, and nothing else.
+
+That deterministic dumbness is its trustworthiness.
+
+Everything else in IntentFrame — the Analysis Engine, Guardian, deterministic gates, command shield — *thinks, parses, understands, or judges*. The executor *acts*. That separation is the structural reason agents under IntentFrame can't simply ignore the rules. Without an isolated executor, any policy engine becomes a suggestion box.
+
+A brilliant judge with no locked door is theater. IntentFrame has the locked door.
+
+See [`docs/executor.md`](docs/executor.md) for the full design.
+
+---
+
+## 🔍 Surveillance vs. Structural Security
+
+There are other people working on this problem. None of them are taking the same approach.
+
+| Approach | Examples | What they do |
+|---|---|---|
+| Raw agent | Most assistants today | Trust the agent. Hope nothing goes wrong. |
+| Output filters / guardrails | Output validation libraries | Read the agent's output. Block bad text. The agent still acts. |
+| Approval popups | IDE assistants and agent SDKs that gate every tool call | Stop and ask the human before acting. Doesn't scale to autonomy. |
+| Policy proxy / gateway | Enterprise agent governance gateways | Wrap the agent in middleware. Watch its API calls. The agent still holds credentials. |
+| **Structural separation** | **IntentFrame** | **The agent has no hands. A separate runtime acts on validated intents.** |
+
+The first four watch the agent. IntentFrame removes the agent's ability to act in the first place.
+
+That's the difference, and it's the only difference that matters. Watching is what you do when the agent already has hands. Structural separation is what you build when you don't want it to have them in the first place.
+
+---
+
+## 🔐 What It Protects (and What It Doesn't)
+
+We'd rather under-promise than overclaim, so here's the honest version.
+
+**It protects, today:**
+
+- Catastrophic shell commands — disk wipe, kernel extension loads, network hijacking, credential theft, reverse shells — caught before they reach the executor.
+- Prompt injection across 24 tested attack vectors — 23 defended, 0 bypassed, 1 known gap waiting on a planned cumulative-policy feature.
+- Unauthorized reads, writes, deletes outside the agent's policy.
+- Over-limit transactions, off-policy spending, off-policy data exfiltration.
+- Semantic deception — when an agent's stated reason doesn't match what its action would actually do.
+- Every shell command runs inside a kernel-enforced sandbox (macOS Seatbelt) regardless of policy decision.
+- Tamper-evident audit trail (SHA-256 hash chain) on every decision, allow or block.
+
+**It does not protect:**
+
+- Direct system calls that bypass the SDK boundary. (We can't catch what we never see. Same as every other security tool.)
+- A hostile local-root user who can kill the IntentFrame process itself.
+- Cumulative multi-step abuse where each individual step looks fine. (Stateful tracking is on the roadmap.)
+- Every novel attack pattern in the universe. (Coverage grows with every test we add.)
+
+The full threat model is in [`docs/threat-model.md`](docs/threat-model.md), and the full evidence package — including the failure-then-fix story — is in [`docs/evidence.md`](docs/evidence.md).
+
+---
+
+## 🤝 AI Isn't the Enemy
+
+A lot of what IntentFrame catches isn't malicious at all.
+
+AI agents make honest mistakes. They misunderstand context. They pattern-match too eagerly. An agent told to *"clean up the desktop"* can confidently delete last year's tax returns because it thought they were clutter. No attacker required.
+
+IntentFrame is operational safety for a powerful tool, not just a shield against bad actors. The same boundary that blocks a reverse shell also stops a confused agent from `rm -rf`-ing the wrong folder. Same mechanism, two threat models.
+
+Treating AI as a neutral tool that needs guardrails — not as an enemy — is how every other powerful tool already gets used safely. Power tools have guards. Cars have brakes. Stoves have temperature limits. None of them assume malice. They assume that power without limits causes accidents.
+
+---
+
+## 🤔 "But isn't this just an LLM watching another LLM?"
+
+**Deterministic-First, AI-Where-It-Matters.**
+
+Reasonable question. Short answer: no, and here's why in one breath.
+
+Two LLMs would only fail the same way if they had the same job, the same input, and the same prompt. They don't.
+
+The agent reasons in natural language with your goal in mind. The Analysis Engine doesn't see the agent's prompt at all — it sees the proposed action, parses it, tags it, and writes a forensic report about what it actually does. The Guardian doesn't see the agent either; it sees that report plus your policy, and decides allow or block.
+
+Three minds, three different jobs, two of them never reading the agent's text. And underneath them sits an executor with **no AI in it at all**. No LLM. No prediction. No fallback model. It runs exactly the action Guardian approved, inside a kernel-enforced sandbox. So even if every AI layer in the system were compromised at once, the executor still cannot be talked into doing something that wasn't pre-approved. That's the bottom of the trust stack — and it isn't a model.
+
+A "smart" agent with no power loses to a "boring" Guardian with a forensic dossier and a deterministic executor underneath. Every time.
+
+The full version of this argument, with the actual probability math and the layer breakdown, is in [`docs/why_trust_ai_hybrid_intentframe.md`](docs/why_trust_ai_hybrid_intentframe.md).
+
+---
+
+## ⚡ Zero AI Calls for Safe Actions
+
+You might be thinking: *won't all these checks make everything slow and expensive?* For safe actions, no.
+
+Reading a file, listing a directory, checking the time — these never reach an AI call. They flow through a fast deterministic path and execute in milliseconds.
+
+The AI layers only run for actions that actually need judgment — installing software, sending money, sending email, touching system files. Exactly the actions where you'd want a second opinion anyway.
+
+For Jarvis on a normal day, fewer than one in five actions invoke the AI Guardian. The rest are passive reads or pre-approved patterns.
+
+---
+
+## 💬 Honest Questions, Honest Answers
+
+**"Does my data leave my machine?"**
+Some of it does. The Analysis Engine and Guardian use OpenAI models (`gpt-4o-mini` and `gpt-5-mini`), so the proposed action and your policy text are sent to OpenAI for evaluation when AI review is needed. The deterministic fast-path never makes a network call. Local model support (Ollama, llama.cpp) is on the roadmap. If your threat model prohibits sending action descriptions to a third-party API, today is too early for you. See [`docs/privacy.md`](docs/privacy.md) for what stays on disk and what leaves.
+
+**"What does this cost to run?"**
+The AI calls themselves are short — a proposed action and a policy snippet, not your whole conversation. In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
+
+**"How rigorous are the test numbers?"**
+Honest answer: this is a first-party test suite, run locally against a custom attack corpus. It is not an independent red team. It is not a novel-attack benchmark. It is reproducible from a fresh clone, and the failure runs are in the repo too.
+
+> [!IMPORTANT]
+> Independent third-party audit is a stated next milestone, not a current claim.
+
+**"What if the project gets abandoned?"**
+The code is AGPL. The architecture is documented. The tests are public. The failure reports are public. You can fork it, audit it, and run it yourself. That is the entire point of building this in the open.
+
+**"Why isn't this just a feature built into AI agent SDKs?"**
+SDK-level approval gates work the same way every approval gate works: they ask the human. That solves the demo problem, not the autonomy problem. IntentFrame removes the agent's ability to act in the first place — that is a different shape of solution, and it doesn't compete with those gates so much as live underneath them.
+
+---
+
+## 📐 Architecture at a Glance
+
+The agent thinks, plans, and acts on its own. The pipeline judges each action at the boundary where it would touch your world.
+
+```mermaid
+flowchart TD
+    A["🤖 AI Agent<br/><i>plans, reasons, decides</i>"] -->|proposes intent| B
+    B["🔍 Analysis Engine<br/><i>What will this REALLY do?</i>"] -->|forensic report| C
+    C["🛡️ Guardian<br/><i>Is this allowed by policy?</i>"] -->|allow / block| D
+    D["⚙️ Executor<br/><i>deterministic — no AI</i>"] -->|if approved| E["💻 Real World<br/><i>files · network · APIs</i>"]
+
+    style A fill:#e1f5ff,stroke:#0366d6,color:#000
+    style B fill:#f6f8fa,stroke:#586069,color:#000
+    style C fill:#f6f8fa,stroke:#586069,color:#000
+    style D fill:#fff3cd,stroke:#856404,color:#000
+    style E fill:#d4edda,stroke:#28a745,color:#000
+```
+
+**No single component can THINK + UNDERSTAND + JUDGE + ACT.** The agent thinks. Each layer of the pipeline does exactly one thing. That separation is what makes the agent's autonomy structurally safe to delegate, not just operationally hopeful.
+
+For the full pipeline, see [`docs/architecture.md`](docs/architecture.md).
+
+---
+
+## 📚 Documentation
+
+| If you are... | Read this |
+|---|---|
+| Curious and want to try it | [`docs/quickstart.md`](docs/quickstart.md) → run Jarvis |
+| Wondering "what is this really for?" | [`docs/autonomy.md`](docs/autonomy.md) (the delegatable-autonomy thesis) |
+| A skeptic who wants to break it | [`docs/threat-model.md`](docs/threat-model.md) → [`docs/evidence.md`](docs/evidence.md) |
+| Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
+| An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/executor.md`](docs/executor.md) |
+| Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
+| Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
+| Looking for common objections answered | [`docs/faq.md`](docs/faq.md) |
+| All public docs in one place | [`docs/README.md`](docs/README.md) |
+
+---
+
+## 💻 Requirements
+
+- **Python 3.14+**
+- **macOS 14 (Sonoma) through macOS 26 (Tahoe)** for the Swift platform server (the core framework runs on any OS, but native macOS integrations — Calendar, Contacts, iMessage, Reminders — require the platform server). On macOS Tahoe, iMessage reading uses a typedstream decoder to handle Apple's `chat.db` schema-behavior change; see [`macos-appkit-server/docs/imessage-attributedbody.md`](macos-appkit-server/docs/imessage-attributedbody.md) for the technical details.
+- **OpenAI API key** for the AI review layers (Analysis Engine and Guardian). Local-model support (Ollama, llama.cpp) is on the roadmap.
+- **`uv`** for workspace setup (the setup script installs it if missing).
+
+Linux and other model providers are on the roadmap.
+
+---
+
+## 🚀 Get Started
 
 ### Fresh Clone
 
@@ -37,11 +332,9 @@ uv run intentframe-gateway-cli
 - syncs the Python workspace into a local `.venv`
 - on macOS, builds the Swift platform server used for native integrations
 
-### macOS Note
+### macOS Setup Notes
 
-On macOS, the setup script expects a local code-signing certificate named
-`IntentFrame Dev` so the Swift platform server keeps stable permissions for
-Calendar, Contacts, and Reminders across rebuilds.
+On macOS, the setup script expects a local code-signing certificate named `IntentFrame Dev` so the Swift platform server keeps stable permissions for Calendar, Contacts, and Reminders across rebuilds.
 
 If the certificate is missing, the setup script will stop and tell you to run:
 
@@ -57,32 +350,31 @@ bash intentframe_setup.sh
 
 ### First Run
 
-On first launch, the gateway CLI starts the gateway stack. If the OpenAI API key
-has not been stored yet, the system enters setup mode and tells you exactly how
-to add it to the credential vault. After that, restart the CLI and continue.
-
-For the demo-only root command-execution profile on macOS, see
-[`docs/executor-root-mode.md`](docs/executor-root-mode.md). That flow uses
-`intentframe-gateway-cli --profile root` plus a one-time
-`intentframe_setup_root_demo.sh` installer; it is intentionally separate from
-normal setup and is not the default operating mode.
+On first launch, the gateway CLI starts the gateway stack. If the OpenAI API key has not been stored yet, the system enters setup mode and tells you exactly how to add it to the credential vault. After that, restart the CLI and continue.
 
 ### Re-running Setup
 
-`intentframe_setup.sh` is safe to rerun after dependency changes or after
-pulling updates. If you already had the gateway CLI running, quit it and start
-it again after setup so the running system picks up rebuilt artifacts.
+`intentframe_setup.sh` is safe to rerun after dependency changes or after pulling updates. If the gateway CLI was already running, quit it and start it again after setup so the running system picks up rebuilt artifacts.
+
+### Trying Jarvis or the Root Demo
+
+To try Jarvis after the gateway is running, see [`jarvis_pa/README.md`](jarvis_pa/README.md).
+
+For the root-demo execution profile (the test sweep described above), see [`docs/root_demo/executor-root-mode.md`](docs/root_demo/executor-root-mode.md).
+
+> [!WARNING]
+> Don't run the root demo on a daily-driver machine until you've read the safety notes. The root profile gives the executor a real root-capable execution path.
 
 ---
 
-## Demo
+## 💳 Try the Invoice Demo
 
-The demo runs an AI invoice-processing agent through a constrained IntentFrame
-stack — demonstrating policy enforcement, the Guardian blocking over-limit
-transactions, and the full audit trail.
+The invoice demo runs an AI invoice-processing agent through a constrained IntentFrame stack — demonstrating policy enforcement, the Guardian blocking over-limit transactions, and the full audit trail.
 
-The demo uses its own isolated executor config. **Do not run it while the
-gateway CLI is active** — they share the same socket paths.
+The demo uses its own isolated executor config.
+
+> [!CAUTION]
+> Do not run the invoice demo while the gateway CLI is active — they share the same socket paths and will collide.
 
 **Terminal 1 — start the supervisor with demo config:**
 
@@ -97,68 +389,36 @@ export OPENAI_API_KEY=...
 python demo/demo_dashboard.py
 ```
 
-The dashboard registers a demo user and workspace, installs the `invoice_bot`
-agent, runs it against the demo invoices, and prints the audit trail showing
-which transactions were allowed, blocked, or required user confirmation.
+The dashboard registers a demo user and workspace, installs the `invoice_bot` agent, runs it against the demo invoices, and prints the audit trail showing which transactions were allowed, blocked, or required user confirmation.
 
 ---
 
-## The Architecture
-
-```
-AI Agent: "I want to do X"
-    ↓
-[Analysis Engine] → "What will this REALLY do?"
-    ↓
-[Guardian] → "Is this allowed by user's policies?"
-    ↓
-[Executor] → Does it (if approved)
-```
-
-**No single entity can THINK + UNDERSTAND + JUDGE + ACT.**
-
----
-
-## Jarvis Policies
+## 🔧 Customizing Policies
 
 Jarvis (the local personal-assistant stack) ships with a default set of allowed and blocked actions, path constraints, and intent limits. The runtime default is seeded at gateway startup from hardcoded values in `intentframe_gateway/bootstrap.py`. `jarvis_pa/seed_policies.py` is kept as a manual mirror of the same defaults for dev workflows — profile-aware (`INTENTFRAME_PROFILE=user|root`) and idempotent, so reruns are safe and the root-profile shape is seeded identically to bootstrap.
 
-There is currently no file-based or CLI-based way to customise policies without editing those source files directly and re-running bootstrap. The gateway exposes a read-only `/policies` endpoint; writes are not routed through it.
+There is currently no file-based or CLI-based way to customize policies without editing those source files directly and re-running bootstrap. The gateway exposes a read-only `/policies` endpoint; writes are not routed through it.
 
 A full policy-editing surface — via a web app, the CLI, or a macOS app — is planned for a future release.
 
-IntentFrame also supports two filesystem tool families: workspace/VFS
-tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools
-(`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce
-either family, but real product profiles should usually expose only one
-family to a given LLM tool list. See
-[`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design
-guidance, tradeoffs, and test harness modes.
+IntentFrame supports two filesystem tool families: workspace/VFS tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools (`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce either family, but real product profiles should usually expose only one family to a given LLM tool list. See [`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design guidance, tradeoffs, and test harness modes.
 
 ---
 
-## Requirements
+## 🚧 Project Status: Alpha
 
-- Python 3.14+
-- macOS 14 (Sonoma) through macOS 26 (Tahoe) and later for the Swift platform server (optional — core framework works on any OS). On Tahoe, iMessage reading uses a typedstream decoder to handle Apple's `chat.db` schema-behavior change; see [`macos-appkit-server/docs/imessage-attributedbody.md`](macos-appkit-server/docs/imessage-attributedbody.md) for the technical details.
+Honest about it. The architecture is settled, the core pipeline is stable, the test suite is real, and the failure reports are in the repo. What's not done: independent third-party audit, Linux support, the gateway proxy mode, stateful multi-intent tracking, broader command coverage. Those are roadmap, not blockers for trying it out.
 
 ---
 
-## Contributing
+## 📜 Contributing, Security & License
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
+- Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Reporting a vulnerability: [`SECURITY.md`](SECURITY.md) — please don't open a public issue for security findings
+- License: Copyright (c) 2026 IntentFrame Contributors. AGPL-3.0-only ([`LICENSE`](LICENSE)). Commercial licensing available for organizations that don't want AGPL terms.
 
-## Security
+---
 
-Found a vulnerability? See [SECURITY.md](SECURITY.md) — **do not open a public issue.**
+*IntentFrame is built on a simple bet: the way to give AI agents more autonomy is not to trust them more, but to make their autonomy delegatable. Same principle that gave us pharmacies, control towers, and double-entry bookkeeping. Now applied to the newest mind we don't fully understand.*
 
-## License
-
-Copyright (c) 2026 IntentFrame Contributors.
-
-IntentFrame is licensed under the GNU Affero General Public License v3.0 only
-(AGPL-3.0-only). See [LICENSE](LICENSE) for the full license text.
-
-Commercial licensing is available for organizations that want to use
-IntentFrame without releasing their modifications under the AGPL.
-
+*Give the agent a mind. Do not give it unchecked hands.*

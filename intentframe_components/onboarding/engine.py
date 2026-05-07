@@ -131,9 +131,10 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - Don't ask for sensitive information
 
 ### Terminal (RUN_COMMAND)
-- HIGH RISK - always flag as warning
-- Specify allowed command patterns from constraints
-- Require confirmation for destructive operations
+- HIGH RISK - always flag as warning.
+- Specify allowed command patterns from constraints.
+- Require confirmation for destructive operations.
+- If u have deny_capabilities, you must include a guardrail to how to use the run_command action.
 
 ### Data Modification (WRITE_FILE, DELETE_FILE, WRITE_HOST_FILE, DELETE_HOST_FILE)
 - Flag as irreversible operations
@@ -144,6 +145,11 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - Do NOT list concrete email addresses in guardrails
 - Phrase email rules conceptually (for example: "only send/reply/forward emails to the user's contacts")
 
+### Custom User Rules
+- The user has provided these specific custom rules as raw text.
+- Translate each rule into a strict, actionable guardrail.
+- Preserve the user's core intent and wording; do not mention internal policy names or IDs.
+
 ## General Rules
 - Be specific and actionable (not vague)
 - Reference actual constraints from user context
@@ -152,10 +158,77 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
 - Never dump large resolved allowlists into guardrails; summarize them conceptually
 
 ## Output
-- guardrails: 5-10 specific rules (not too many, not too few)
+- guardrails: 5-20 specific rules (not too many, not too few)
 - warnings: Only if there are genuine risks (empty list is fine)
 - confidence: How well you understand this agent type (0.0-1.0)
 - summary: One sentence about what you set up"""
+
+    @staticmethod
+    def _summarize_deny_capabilities(deny_caps) -> str:
+        """Render `deny_capabilities` as a structured, lossless brief.
+
+        Design: feed the meta-LLM the FULL deny set (no summarisation,
+        no information loss) and let `_build_instructions` carry the
+        rendering hint (one positive-steering guardrail, not deny
+        enumeration). This keeps two concerns cleanly separated:
+
+          - Input to the meta-LLM: lossless structured policy data, so
+            its reasoning about guardrail shape is grounded in the real
+            deny set rather than this layer's interpretation of it.
+            Critical for audit, for robustness to policy changes (no
+            shadow summary drifts as new families/tags are added), and
+            for letting the LLM judge edge cases (compilation-only vs
+            full python+shell clamp vs a partial mix) on its own.
+
+          - Output (the guardrail bullets the meta-LLM authors): minimal
+            positive steering, enforced via the meta-prompt in
+            `_build_instructions`. The LLM-facing layer's job is only
+            to steer the agent toward the canonical path, not to repeat
+            the deny list as guardrail prose.
+
+        Tags are grouped by capability family for legibility — every
+        tag is preserved verbatim under its family bucket.
+        """
+        if not deny_caps:
+            return f"{len(deny_caps)} capability families denied"
+
+        SCRIPT_PREFIX = "capability:script_execution:"
+        STDIN_PREFIX = "capability:stdin_exec:"
+        PKG_PREFIX = "capability:package_install:"
+
+        by_family: dict[str, list[str]] = {
+            "script_execution": [],
+            "stdin_exec": [],
+            "package_install": [],
+            "other": [],
+        }
+        for tag in sorted(deny_caps):
+            if tag.startswith(SCRIPT_PREFIX):
+                by_family["script_execution"].append(tag[len(SCRIPT_PREFIX):])
+            elif tag.startswith(STDIN_PREFIX):
+                by_family["stdin_exec"].append(tag[len(STDIN_PREFIX):])
+            elif tag.startswith(PKG_PREFIX):
+                by_family["package_install"].append(tag[len(PKG_PREFIX):])
+            else:
+                by_family["other"].append(tag.removeprefix("capability:"))
+
+        parts: list[str] = []
+        for family, items in by_family.items():
+            if items:
+                parts.append(f"{family}={{{', '.join(items)}}}")
+
+        return (
+            f"deny_capabilities: {'; '.join(parts)}"
+        )
+
+    @staticmethod
+    def _summarize_intent_limits(intent_limits) -> str:
+        if not intent_limits:
+            return "  None"
+        return "\n".join(
+            f"  - {limit.raw}"
+            for limit in intent_limits
+        )
 
     @staticmethod
     def _summarize_constraints(action: str, constraints: ConstraintTypes) -> str:
@@ -195,12 +268,18 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
         if isinstance(constraints, TerminalConstraints):
             blocked = ", ".join(repr(pattern) for pattern in constraints.blocked_patterns)
             allowed = ", ".join(repr(cmd) for cmd in constraints.allowed_commands)
-            if blocked and allowed:
-                return f"blocked patterns: [{blocked}]; allowed commands: [{allowed}]"
+            deny_caps = constraints.deny_capabilities or frozenset()
+            parts: list[str] = []
             if blocked:
-                return f"blocked patterns: [{blocked}]"
+                parts.append(f"blocked patterns: [{blocked}]")
             if allowed:
-                return f"allowed commands: [{allowed}]"
+                parts.append(f"allowed commands: [{allowed}]")
+            if deny_caps:
+                parts.append(
+                    AIOnboardingEngine._summarize_deny_capabilities(deny_caps)
+                )
+            if parts:
+                return "; ".join(parts)
             return "terminal command constraints are configured"
 
         return constraints.model_dump_json()
@@ -251,6 +330,7 @@ Category2: READ_HOST_FILE, LIST_HOST_DIRECTORY, WRITE_HOST_FILE, DELETE_HOST_FIL
                 )
 
         constraint_str = "\n".join(constraint_summary_lines) if constraint_summary_lines else "  None"
+        intent_limit_str = self._summarize_intent_limits(user_context.intent_limits)
 
         prompt = f"""Generate context and guardrails for this agent:
 
@@ -272,6 +352,9 @@ Safe (fast-path) Actions: {', '.join(sorted(safe_list)) if safe_list else 'None'
 
 Constraints:
 {constraint_str}
+
+Custom User Rules:
+{intent_limit_str}
 """
 
         if user_context.metadata:

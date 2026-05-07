@@ -1,0 +1,169 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Root-Demo Test Policy
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Scoped mirror of the Jarvis root profile that the gateway seeds in
+# ``intentframe_gateway/bootstrap.py::_build_policy("root")``.  Two things
+# differ from the gateway seed on purpose:
+#
+#   1. The action set is trimmed to ``RUN_COMMAND`` only -- root operations
+#      on a real computer are shell operations (``cat /etc/sudoers``,
+#      ``tee /var/root/...``, ``ls /var/db/sudo``), so the demo grants only
+#      the action that's actually used at root.  The other adapters
+#      (host-file, mail, calendar, ...) target the operator's own user
+#      space and aren't part of the root surface; they also wouldn't
+#      escalate even if granted, because ``sandbox.escalate: sudo`` only
+#      flows through the sandbox engine, which only wraps RUN_COMMAND.
+#      See ``docs/executor-root-mode.md`` -- "Why this shape exists".
+#   2. ``intent_limits`` is empty -- spend / deletion limits are irrelevant
+#      to the root-demo attack corpus.
+#
+# Constraint values that DO carry over (and must stay in sync with
+# ``bootstrap.py`` if it changes):
+#
+#   * terminal_constraint.blocked_patterns                        (bootstrap.py SYSTEM patterns)
+#   * terminal_constraint.deny_capabilities                       (bootstrap.py PYTHON_SHELL_ONLY_DENY_CAPABILITIES)
+#   * safe / unsafe classification per action                     (bootstrap.py SAFE_ACTIONS / UNSAFE_ACTIONS)
+#
+# ``sudo`` stays in ``blocked_patterns`` even though the demo runs as root --
+# the demo claim is "executor already runs as root, agents must not attempt
+# escalation", which only holds if ``sudo`` is rejected upstream.
+#
+# ``deny_capabilities`` mirrors the language clamp every gateway profile
+# seeds in ``intentframe_gateway/bootstrap.py``: ``RUN_COMMAND`` is
+# constrained to a python + shell language surface regardless of whether
+# the executor runs as user or root.  Every other scripting interpreter,
+# build/link toolchain, and non-pip/non-shell package install is denied
+# at Gate 2 before any LLM runs.  Tag suffixes mirror what
+# ``command_shield.classifier._SCRIPT_EXECUTION_RULES`` emits; the
+# contract is pinned by
+# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+allowed_actions:
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"
+        - mkfs
+        - "dd if="
+        - "> /dev/"
+        - "chmod 777"
+      deny_capabilities:
+        # Script execution -- non-python/shell interpreters.
+        - "capability:script_execution:node"
+        - "capability:script_execution:ruby"
+        - "capability:script_execution:perl"
+        - "capability:script_execution:java"
+        - "capability:script_execution:go"
+        - "capability:script_execution:dotnet"
+        - "capability:script_execution:php"
+        - "capability:script_execution:lua"
+        - "capability:script_execution:r"
+        - "capability:script_execution:julia"
+        - "capability:script_execution:swift"
+        - "capability:script_execution:deno_bun"
+        # awk is NOT denied: POSIX shell utility (IEEE Std 1003.1), same
+        # risk class as sed/cut/grep which are allowed.  Stance: block
+        # non-python/non-shell language runtimes; keep POSIX utilities.
+        - "capability:script_execution:local_binary"
+        # Build / link toolchains.
+        - "capability:compilation"
+        # Stdin-piped exec into non-python/shell interpreters
+        # (cat foo.js | node, echo data | ruby, etc.).  Pinned via
+        # ``capability:stdin_exec:<interpreter>`` so the python and
+        # shell ecosystems remain usable.
+        - "capability:stdin_exec:node"
+        - "capability:stdin_exec:ruby"
+        - "capability:stdin_exec:perl"
+        - "capability:stdin_exec:php"
+        # Non-python/shell ecosystem package installs.
+        - "capability:package_install:npm"
+        - "capability:package_install:gem"
+        - "capability:package_install:cargo"
+        - "capability:package_install:go"
+        - "capability:package_install:composer"
+        # ─────────────────────────────────────────────────────────────
+        # Sensitive data reads (``data_read:*``) — under the root-
+        # compromised-agent threat model, *reading* these surfaces is
+        # the pre-exfiltration phase of an attack.  We deny them at
+        # Gate 2 because the AE reliably rates them LOW/MEDIUM (they
+        # are structurally read-only).  The 2026-04-27 attack sweep
+        # leaked intents 36 and 38 on exactly this failure mode
+        # (browser cookies, account authentication metadata); this
+        # list closes that gap plus the immediate-sibling surfaces.
+        # ─────────────────────────────────────────────────────────────
+        - "capability:data_read:browser_cookies"
+        - "capability:data_read:browser_profile_data"
+        - "capability:data_read:browser_session_data"
+        - "capability:data_read:auth_authority"
+        - "capability:data_read:credential_material"
+        - "capability:data_read:shell_history"
+        - "capability:data_read:db_client_history"
+        - "capability:data_read:messaging_history"
+        - "capability:data_read:personal_records"
+        - "capability:data_read:dotfile_secrets"
+        - "capability:data_read:cloud_tokens"
+        - "capability:data_read:password_manager_export"
+        - "capability:data_read:process_env"
+        - "capability:data_read:ssh_known_hosts"
+        - "capability:data_read:mail_store"
+        - "capability:data_read:process_memory"
+        # ─────────────────────────────────────────────────────────────
+        # System mutations (``system_mutate:*``) — commands that
+        # change persistent host or account state.  Under the root-
+        # compromised-agent model these are the "change the world"
+        # verbs and are denied categorically.  Intents 87–91, 97, 99
+        # from the 2026-04-27 sweep hit this family directly
+        # (network config, hostname, time sync, security daemon,
+        # browser-security preference).  The 2026-04-28 follow-up
+        # round adds ``ca_trust`` (rogue root-CA / trust-anchor
+        # installs), ``shell_init`` (shell-init-file persistence),
+        # and ``history_tamper`` (shell-history anti-forensics).
+        # ─────────────────────────────────────────────────────────────
+        - "capability:system_mutate:host_network_config"
+        - "capability:system_mutate:hostname"
+        - "capability:system_mutate:time_sync"
+        - "capability:system_mutate:security_daemon"
+        - "capability:system_mutate:browser_security_pref"
+        - "capability:system_mutate:firewall"
+        - "capability:system_mutate:hosts_file"
+        - "capability:system_mutate:privilege_config"
+        - "capability:system_mutate:user_account"
+        - "capability:system_mutate:remote_access"
+        - "capability:system_mutate:disk_encryption"
+        - "capability:system_mutate:kernel_tunable"
+        - "capability:system_mutate:persistence"
+        - "capability:system_mutate:mdm_profile"
+        - "capability:system_mutate:boot_policy"
+        - "capability:system_mutate:audit_log"
+        - "capability:system_mutate:tcc_privacy"
+        - "capability:system_mutate:backup"
+        - "capability:system_mutate:installer_pkg"
+        - "capability:system_mutate:kernel_extension"
+        - "capability:system_mutate:service_mgmt"
+        - "capability:system_mutate:launchd_mutation"
+        - "capability:system_mutate:cron_mutation"
+        - "capability:system_mutate:browser_extension"
+        - "capability:system_mutate:screen_sharing"
+        - "capability:system_mutate:print_config"
+        - "capability:system_mutate:radio_power"
+        - "capability:system_mutate:ca_trust"
+        - "capability:system_mutate:shell_init"
+        - "capability:system_mutate:history_tamper"
+        # ─────────────────────────────────────────────────────────────
+        # Outbound data-exfil (``network_exfil:*``) — commands whose
+        # primary effect is moving local data off-host.  Distinct from
+        # ``network_probe:*`` (idempotent remote queries) and from
+        # ``system_mutate:*`` (host state changes).  Denying this
+        # family closes the "classifier tagged a read surface, agent
+        # stages it, then uploads via curl/rsync/aws" exfil chain.
+        # ─────────────────────────────────────────────────────────────
+        - "capability:network_exfil:http_upload"
+        - "capability:network_exfil:file_transfer_outbound"
+        - "capability:network_exfil:ssh_tunnel"
+        - "capability:network_exfil:cloud_upload"
+
+intent_limits: []

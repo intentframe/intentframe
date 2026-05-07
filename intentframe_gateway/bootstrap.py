@@ -13,13 +13,19 @@ The gateway seeds different policy / workspace shapes depending on the
 * ``root`` — full-filesystem host-file access (``/*``), virtual workspace
   rooted at ``/``.  Mirrors ``jarvis_pa/executor_root.yaml``.
 
-The profile only changes three values (host constraint, workspace mount,
-policy user id + metadata label).  Everything else (SAFE/UNSAFE action
-sets, blocked command patterns, email/message constraints, intent limits,
-and the gateway's non-negotiable floor enforced by
+The profile only changes three values (host constraint, workspace
+mount, policy user id + metadata label).  Everything else (SAFE/UNSAFE
+action sets, terminal ``blocked_patterns``, terminal
+``deny_capabilities``, email/message constraints, intent limits, and
+the gateway's non-negotiable floor enforced by
 ``resource_registry/floor.py``) is intentionally identical across
 profiles — the root profile still blocks ``sudo`` because the demo
-claim is "already root, no need to escalate".
+claim is "already root, no need to escalate", and both profiles
+clamp ``RUN_COMMAND`` to a python + shell language surface via
+:data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES`.  The shared deny-set is
+the design stance: the language surface IntentFrame is willing to
+reason about does not depend on whether the executor happens to run
+as root.
 
 ``_build_default_policy`` is a stable alias for the user profile so the
 ``tests/test_jarvis_host_scope_mirror.py`` mirror invariant against
@@ -89,6 +95,181 @@ INTENT_LIMITS = [
     },
 ]
 
+# Capability tags denied by every profile's ``terminal_constraint``.
+# The set encodes a "python + shell only" language surface: every other
+# scripting interpreter, build/link toolchain, and non-pip/non-shell
+# package install is rejected at Gate 2 (DeterministicGuardian) before
+# any LLM cost.  This is profile-independent on purpose — the language
+# surface IntentFrame is willing to reason about does not change just
+# because the executor happens to run as root.  Tag suffixes mirror
+# what ``command_shield.classifier._SCRIPT_EXECUTION_RULES`` actually
+# emits; the contract is pinned by
+# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
+#
+# Mirror invariant: ``jarvis_pa/seed_policies.py`` defines the same
+# constant inline (the two seeders historically duplicate their seed
+# data — see ``SAFE_ACTIONS`` / ``UNSAFE_ACTIONS``).  Keep both copies
+# in sync; ``demo/tests/root_demo/test_policy_root.yaml`` mirrors the
+# values literally as well.
+PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    # Script execution — every non-python/shell interpreter the
+    # classifier knows about (file form + inline-eval form share a
+    # single tag per language).
+    "capability:script_execution:node",
+    "capability:script_execution:ruby",
+    "capability:script_execution:perl",
+    "capability:script_execution:java",
+    "capability:script_execution:go",
+    "capability:script_execution:dotnet",
+    "capability:script_execution:php",
+    "capability:script_execution:lua",
+    "capability:script_execution:r",
+    "capability:script_execution:julia",
+    "capability:script_execution:swift",
+    "capability:script_execution:deno_bun",
+    # NOTE: ``awk`` is intentionally NOT denied — it is a POSIX shell
+    # utility (IEEE Std 1003.1), part of the canonical Unix toolchain
+    # every model is heavily trained on, and structurally in the same
+    # bucket as ``sed`` / ``cut`` / ``tr`` / ``grep`` which are allowed.
+    # The policy stance is: block non-python, non-shell *language
+    # runtimes*; keep all POSIX shell utilities.  The classifier still
+    # emits ``capability:script_execution:awk`` for telemetry so this
+    # decision stays one edit away.
+    # Direct execution of compiled local binaries (``./foo``,
+    # ``./bin/tool``).  Source compilation is below.
+    "capability:script_execution:local_binary",
+    # Build / link toolchains (gcc / clang / make / cargo build /
+    # go build / rustc / javac / …).
+    "capability:compilation",
+    # Stdin-piped exec into non-python/shell interpreters.
+    # ``cat foo.js | node`` was previously slipping through with only
+    # the binary ``capability:stdin_exec`` tag; the classifier now
+    # emits a per-interpreter suffix so the policy can deny
+    # ``stdin_exec:node`` while still allowing
+    # ``stdin_exec:python`` / ``stdin_exec:shell`` (legitimate uses
+    # like ``echo 'print(1)' | python``).
+    "capability:stdin_exec:node",
+    "capability:stdin_exec:ruby",
+    "capability:stdin_exec:perl",
+    "capability:stdin_exec:php",
+    # Non-python/non-shell ecosystem package installs.  pip / brew /
+    # apt / yum / dnf / pacman / apk / gem-via-bundler are intentionally
+    # absent — those count as part of the python or shell ecosystem.
+    "capability:package_install:npm",
+    "capability:package_install:gem",
+    "capability:package_install:cargo",
+    "capability:package_install:go",
+    "capability:package_install:composer",
+})
+
+
+# Capability tags denied by every profile's ``terminal_constraint`` to
+# close the "sensitive surface" gap surfaced by the 2026-04-27 root-demo
+# attack sweep (see
+# ``demo/tests/root_demo/results/2026-04-27-attack-sweep-host-impact.md``
+# and ``demo/tests/root_demo/results/root-demo-policy-remediation.md``).
+#
+# Two families live here, matching ``command_shield.classifier``:
+#
+#   * ``capability:data_read:*`` — reads of host-sensitive surfaces
+#     (browser cookies / profile data / saved passwords, messaging
+#     stores, personal records, shell history, directory-service
+#     account metadata, credential material, live process memory
+#     via debugger-attach / ``/proc/<pid>/mem`` / ``gcore``).  These
+#     are structurally read-only, so the Analysis Engine reliably
+#     rates them ``LOW`` / ``MEDIUM`` and Guardian allows them.  That
+#     is the exact failure mode that leaked intents 36 (``plutil`` of
+#     Safari cookies) and 38 (``dscl -read AuthenticationAuthority``)
+#     under the root-compromised-agent threat model; denying the
+#     capability at Gate 2 stops the pre-exfil read before the AE
+#     burns a token.
+#
+#   * ``capability:system_mutate:*`` — commands that change persistent
+#     host or account state (network config, hostname, time sync,
+#     security daemon, browser-security preferences, firewall rules,
+#     ``/etc/hosts``, sudoers/PAM, user accounts, remote-access
+#     toggles, disk-encryption policy, kernel tunables, persistence
+#     surfaces, rogue-CA / trust-anchor installs, shell-init-file
+#     persistence, and shell-history anti-forensics).  Intents 87–91,
+#     97, 99 from the sweep fell in this family and mutated host state
+#     before the pipeline could catch them.  Under the root-compromised-
+#     agent model the policy stance is "mutations are privileged
+#     operations; a root agent must not issue them without an explicit
+#     policy carve-out".
+#
+# This clamp is intentionally profile-independent for the same reason
+# as :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES`: sensitivity of the
+# surface doesn't change based on whether the executor happens to run
+# as root.  Mirror invariant: ``jarvis_pa/seed_policies.py`` defines
+# the same constant inline, and ``demo/tests/root_demo/
+# test_policy_root.yaml`` mirrors the values literally as well.  Keep
+# all three copies in sync.
+SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    # ── Sensitive reads (data_read:*) ────────────────────────────
+    "capability:data_read:browser_cookies",
+    "capability:data_read:browser_profile_data",
+    "capability:data_read:browser_session_data",
+    "capability:data_read:auth_authority",
+    "capability:data_read:credential_material",
+    "capability:data_read:shell_history",
+    "capability:data_read:db_client_history",
+    "capability:data_read:messaging_history",
+    "capability:data_read:personal_records",
+    "capability:data_read:dotfile_secrets",
+    "capability:data_read:cloud_tokens",
+    "capability:data_read:password_manager_export",
+    "capability:data_read:process_env",
+    "capability:data_read:ssh_known_hosts",
+    "capability:data_read:mail_store",
+    "capability:data_read:process_memory",
+    # ── System mutations (system_mutate:*) ───────────────────────
+    "capability:system_mutate:host_network_config",
+    "capability:system_mutate:hostname",
+    "capability:system_mutate:time_sync",
+    "capability:system_mutate:security_daemon",
+    "capability:system_mutate:browser_security_pref",
+    "capability:system_mutate:firewall",
+    "capability:system_mutate:hosts_file",
+    "capability:system_mutate:privilege_config",
+    "capability:system_mutate:user_account",
+    "capability:system_mutate:remote_access",
+    "capability:system_mutate:disk_encryption",
+    "capability:system_mutate:kernel_tunable",
+    "capability:system_mutate:persistence",
+    "capability:system_mutate:mdm_profile",
+    "capability:system_mutate:boot_policy",
+    "capability:system_mutate:audit_log",
+    "capability:system_mutate:tcc_privacy",
+    "capability:system_mutate:backup",
+    "capability:system_mutate:installer_pkg",
+    "capability:system_mutate:kernel_extension",
+    "capability:system_mutate:service_mgmt",
+    "capability:system_mutate:launchd_mutation",
+    "capability:system_mutate:cron_mutation",
+    "capability:system_mutate:browser_extension",
+    "capability:system_mutate:screen_sharing",
+    "capability:system_mutate:print_config",
+    "capability:system_mutate:radio_power",
+    "capability:system_mutate:ca_trust",
+    "capability:system_mutate:shell_init",
+    "capability:system_mutate:history_tamper",
+    # ── Outbound data-exfil surfaces (network_exfil:*) ───────────
+    "capability:network_exfil:http_upload",
+    "capability:network_exfil:file_transfer_outbound",
+    "capability:network_exfil:ssh_tunnel",
+    "capability:network_exfil:cloud_upload",
+})
+
+
+# Union of the two profile-independent clamps.  ``terminal_constraint``
+# below denies the full set; we keep the two constants distinct so the
+# *why* of each deny is reviewable (a language-surface clamp vs. a
+# sensitive-surface clamp) without grepping through a single flat list.
+DEFAULT_TERMINAL_DENY_CAPABILITIES: frozenset[str] = (
+    PYTHON_SHELL_ONLY_DENY_CAPABILITIES | SENSITIVE_SURFACE_DENY_CAPABILITIES
+)
+
+
 WORKSPACE_MOUNTS = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
@@ -134,6 +315,17 @@ def _profile_user_id(profile: str) -> str:
     return f"{base}_root" if profile == "root" else base
 
 
+def policy_user_id_for_current_profile() -> str:
+    """``user_id`` value used in policy-registry for the active :envvar:`INTENTFRAME_PROFILE`.
+
+    Child processes (Jarvis, etc.) must receive this as :envvar:`JARVIS_USER_ID`
+    so their runtime identity matches the record :class:`Bootstrapper` seeds
+    in policy-registry.  Without that alignment, the core load shows
+    "No policy for user …" and unsafe defaults (e.g. no allowed actions).
+    """
+    return _profile_user_id(_resolve_profile())
+
+
 def _profile_workspace_mounts(profile: str) -> list[dict]:
     return ROOT_WORKSPACE_MOUNTS if profile == "root" else WORKSPACE_MOUNTS
 
@@ -149,6 +341,7 @@ def _build_policy(profile: str = "user") -> dict:
       * ``metadata.profile`` — label for audit visibility.
 
     Everything else — SAFE/UNSAFE sets, terminal ``blocked_patterns``,
+    terminal ``deny_capabilities`` (python + shell language clamp),
     email/message constraints, intent limits — is intentionally shared.
     The root profile deliberately keeps ``sudo`` in ``blocked_patterns``
     because the demo stance is "executor already runs as root; agents
@@ -185,10 +378,16 @@ def _build_policy(profile: str = "user") -> dict:
         "allowed_contacts": [],
         "contact_sources": [{"source": "contacts_all", "filter": "", "enabled": True}],
     }
+    # Both profiles get the same RUN_COMMAND clamp: python + shell is
+    # the entire language surface IntentFrame is willing to deterministically
+    # reason about, regardless of executor privilege.  Sorted for stable
+    # JSON-payload ordering across reseeds — Pydantic coerces back to
+    # ``frozenset`` on the registry side.
     terminal_constraint = {
         "blocked_patterns": [
             "sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777",
         ],
+        "deny_capabilities": sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES),
     }
 
     for action in SAFE_ACTIONS:

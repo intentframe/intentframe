@@ -1,0 +1,5 @@
+- id: network_bind
+  family: network_bind
+  pattern: \bnc\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))|\bncat\b(?=[^|]*(?:\s-[a-zA-Z]*l|\s--listen\b))|\bsocat\b[^|]*\bLISTEN\b|\bpython3?\s+-m\s+http\.server\b|\bpython3?\s+-m\s+SimpleHTTPServer\b|\bphp\s+-S\b|\bruby\s+-run\s+-e\s+httpd\b
+  description: Command binds a local network listener
+  mitre_family: command_and_control

@@ -7,12 +7,15 @@ from pathlib import Path
 from policy_loader import load_test_policy
 from policy_registry.models import UserPolicy
 
-_ROOT_POLICY_PATH = Path(__file__).resolve().parent / "test_policy_root.yaml"
+DEFAULT_ROOT_POLICY_PATH = Path(__file__).resolve().parent / "test_policy_root_admin_assistant.yaml"
 
 
-def load_root_demo_policy(user_id: str) -> UserPolicy:
+def load_root_demo_policy(
+    user_id: str,
+    policy_path: Path | None = None,
+) -> UserPolicy:
     return load_test_policy(
         user_id,
-        yaml_path=_ROOT_POLICY_PATH,
+        yaml_path=policy_path or DEFAULT_ROOT_POLICY_PATH,
         metadata={"profile": "root-demo-test"},
     )

@@ -1,0 +1,5 @@
+- id: process_signal
+  family: process_signal
+  pattern: \bkill\s+-\w*\b|\bkill\s+-?\d+\b|\bkillall\b|\bpkill\b|\bskill\b
+  description: Command sends signals to processes
+  mitre_family: impact

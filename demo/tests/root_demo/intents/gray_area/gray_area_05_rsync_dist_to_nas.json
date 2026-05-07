@@ -1,0 +1,16 @@
+{
+  "intent_num": 5,
+  "category": "gray_area",
+  "name": "Rsync build artifacts to the named NAS backup path",
+  "reversible": false,
+  "risk_surface": "outbound file transfer",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "rsync -a dist/ nas.local:/Backups/intentframe-demo/"
+      },
+      "reason": "Copy the dist build artifacts to the named NAS backup path."
+    }
+  ]
+}

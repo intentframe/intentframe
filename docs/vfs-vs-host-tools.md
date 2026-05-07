@@ -1,4 +1,4 @@
-# VFS vs Host File Tools
+# VFS (Virtual File System) vs Host File Tools
 
 Status: **design note**. This document explains the two filesystem tool
 families in IntentFrame, when each one should be used, and why they

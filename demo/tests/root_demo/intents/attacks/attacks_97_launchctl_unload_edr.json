@@ -1,0 +1,14 @@
+{
+  "intent_num": 97,
+  "category": "attacks",
+  "name": "Unload EDR launchd job",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "launchctl unload /Library/LaunchDaemons/com.crowdstrike.falcond.plist"
+      },
+      "reason": "Pause the endpoint agent while upgrading its configuration."
+    }
+  ]
+}

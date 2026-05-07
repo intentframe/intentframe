@@ -55,10 +55,9 @@ Those questions belong to the higher layers in IntentFrame:
 - Guardian applies policy and authorization,
 - the executor only runs what survives the earlier gates.
 
-That division is intentional.  The root-profile demo is specifically
-about showing that even when the executor is highly privileged,
-IntentFrame's deterministic gate still refuses known catastrophic
-primitives *before* semantic reasoning or execution happens.
+That division is intentional: deterministic inspection should surface
+known catastrophic primitives *before* semantic reasoning or execution,
+regardless of which runtime or policy layer consumes the report.
 
 ## Why It Exists
 
@@ -166,13 +165,22 @@ The regex pack lives at `command_shield/patterns/*.json` and is loaded at import
 - `macos.json` — macOS-specific primitives: `diskutil erase*`, keychain dump / password extraction, Time Machine deletion, directory-services account / group mutation (`dscl . -create|passwd|change|merge|append /Users|Groups/…`), Gatekeeper / SIP / boot-arg tampering (`spctl --master-disable`, `csrutil disable|enable|clear`, `nvram` writes, `bless -…`), kernel-extension loading (`kextload`, `kextunload`, `kmutil load|unload|install|…`), TCC database access, and **AppleScript privilege escalation** (`…with administrator privileges`, case-insensitive).
 - `persistence.json` — launchd / cron / at persistence: `launchctl load|unload` of specific system paths, the broader modern launchd verbs (`launchctl bootstrap|bootout|kickstart|enable|disable|submit|remove`), plist moves into `/Library/Launch*`, `crontab -e`, `crontab -` (stdin replace), `at now|<digit>|-f …`, `systemctl stop|disable|mask` of critical services, bash-history clearing.
 - `credential_access.json` — reads / exfil of `~/.ssh/`, `~/.aws/`, `~/.kube/`, `~/.gnupg/`, `.env`, `~/.git-credentials`, etc.
-- `exfiltration.json` — `curl … | sh`, base64-piped exec, reverse shells, `ssh host 'rm -rf /'`, etc.
+- `exfiltration.json` — remote-code and exfiltration shapes. `curl … | sh` / `wget … | sh`, base64-piped exec, reverse shells, and `ssh host 'rm -rf /'` remain `CATASTROPHIC`. `curl … | python` (`RCE-003`) is deliberately `NEEDS_REVIEW`: it is still a named signal, but benign LLM-native data plumbing such as fetching JSON and parsing it with Python is reviewed by AE/Guardian instead of being hard-blocked at the pattern layer.
 
 Every pattern either produces a `CATASTROPHIC` or a `NEEDS_REVIEW` verdict; `SAFE` is the default when nothing matches.  Patterns never look at user policy, privilege level, or session state — they encode fixed-system facts only.
 
-#### Why these families exist (root-demo relevance)
+#### Why these families exist
 
-When the executor runs as root (the Jarvis root-profile demo), the kernel-level sandbox floor is intentionally minimal so the demo can showcase `RUN_COMMAND` with broad capability.  `command_shield` is the deterministic pre-gate that holds the line *regardless* of executor privilege.  The privilege-escalation pack in `catastrophic.json` (pkexec, doas, runuser, machinectl shell, sandbox-exec) and the macOS system-security pack in `macos.json` (SIP toggle, NVRAM writes, kext load/unload, `bless`, AppleScript admin prompt, dscl account control) exist specifically so that an agent with maximum executor privilege still cannot reach for a new security domain, a firmware / boot-path mutation, or a persistent local-account backdoor.  They have zero effect on benign legitimate commands — each regex targets a narrow, well-known system primitive.
+`command_shield` is the deterministic pre-gate for command strings, so
+high-impact primitives should be named before execution privilege,
+runtime policy, or semantic user intent enters the decision. The
+privilege-escalation pack in `catastrophic.json` (pkexec, doas,
+runuser, machinectl shell, sandbox-exec) and the macOS system-security
+pack in `macos.json` (SIP toggle, NVRAM writes, kext load/unload,
+`bless`, AppleScript admin prompt, dscl account control) exist so a
+command cannot quietly reach for a new security domain, a firmware /
+boot-path mutation, or a persistent local-account backdoor. Each regex
+targets a narrow, well-known system primitive.
 
 #### Known false-positive surface
 
@@ -213,24 +221,25 @@ upstream in the AI layers, not in the deterministic regex gate.
    (`sudo`, `reboot`, `mkfs`, `dd`, `chmod 777`, `diskutil eraseDisk`,
    `tccutil reset`, `launchctl load /Library/LaunchDaemons/…`, …) do
    **not** carry echo-guards either — an `echo "sudo reboot"` fires
-   `IF-SUDO-001` today.  The new root-demo patterns follow the same
+   `IF-SUDO-001` today.  These high-impact patterns follow the same
    convention so the pack stays uniform.
 2. **CATASTROPHIC surfaces the block, doesn't hide it.**  A false
    positive returns a hard rejection with a named pattern ID that the
-   caller sees.  A false *negative* on one of these verbs when the
-   executor runs as root is the actual security failure.  The
-   asymmetry favors over-blocking for the demo narrative.
+   caller sees.  A false *negative* on one of these verbs can hand a
+   high-impact primitive to downstream layers without a deterministic
+   warning. The asymmetry favors over-blocking for these fixed-system
+   primitives.
 3. **Echo-of-verb is already a weak signal.**  A plausibly benign
    command that quotes a privileged verb is uncommon in real agent
    usage; an attacker who wants to smuggle a privileged verb into a
    command string has easier paths (interpreter indirection, base64
    decoding, process substitution) that the pipeline's *structural*
    layer catches independently of these regexes.
-4. **Downgrading would mask the demo point.**  Moving these to
-   `NEEDS_REVIEW` would defer the decision to Guardian / AE on every
-   hit, including the real attempts the demo is meant to block.  The
-   point of the root-profile demo is that `command_shield` *alone*
-   refuses these verbs, regardless of how generous the executor is.
+4. **Downgrading would weaken the deterministic contract.**  Moving
+   these to `NEEDS_REVIEW` would defer every hit to downstream semantic
+   review, including real attempts to invoke these fixed-system
+   primitives. The point of the hardstop pattern layer is that
+   `command_shield` alone names and refuses those verbs.
 
 **What could be done when the FP cost becomes real.**
 
@@ -252,10 +261,10 @@ Listed in increasing order of effort / risk:
    `printf`, `git commit -m`, `cat <<EOF … EOF`).  Most surgical, but
    changes a shared preprocessing step that every pattern consumes.
 4. **Downgrade prose-heavy patterns to `NEEDS_REVIEW`** and let the
-   downstream Guardian / AE disambiguate invocation vs quoting.  Only
+   downstream semantic layers disambiguate invocation vs quoting. Only
    worth it for patterns that are pure English phrases
-   (`IF-OSASCRIPT-ADMIN-001` is the lone candidate today).  Costs an
-   AI round-trip per hit.
+   (`IF-OSASCRIPT-ADMIN-001` is the lone candidate today). Costs a
+   downstream review step per hit.
 5. **Two-pass: match → verify head.**  After a pattern hits, confirm
    the matched span starts a shell *simple command* head (via
    `bashlex`).  Most expensive, highest precision, biggest contract
@@ -278,6 +287,11 @@ matching xfail(s), and leave the broader remediation for later.
 
 Step 7 emits deterministic capability tags describing what the command can do, not whether it is allowed.
 
+Regex-backed capability rules live in `command_shield/capabilities/*.yaml`.
+The classifier loads that corpus at import time and keeps only the structural
+gates in Python (for example, the read-only and network-probe checks that
+must prove a command is a bare safe shape before emitting a positive tag).
+
 Current capability families:
 
 - package install:
@@ -295,11 +309,26 @@ Current capability families:
   - `capability:package_install:composer`
 - script execution:
   - `capability:script_execution:python`
+  - `capability:script_execution:shell`
   - `capability:script_execution:node`
   - `capability:script_execution:ruby`
   - `capability:script_execution:perl`
-  - `capability:script_execution:shell`
+  - `capability:script_execution:java`
+  - `capability:script_execution:go`
+  - `capability:script_execution:dotnet`
+  - `capability:script_execution:php`
+  - `capability:script_execution:lua`
+  - `capability:script_execution:r`
+  - `capability:script_execution:julia`
+  - `capability:script_execution:swift`
+  - `capability:script_execution:deno_bun`
+  - `capability:script_execution:awk`
   - `capability:script_execution:local_binary`
+  - Inline-eval forms such as `node -e`, `ruby -e`, `perl -e`,
+    and `php -r` use the same per-runtime tags as file-form script
+    execution. `awk` / `gawk` / `mawk` are tagged for visibility but
+    are POSIX shell utilities; the default python/shell-only policy
+    intentionally allows them.
 - read-only (positive family — emitted in two shapes: a bare
   single-head invocation gets a precise sub-tag; a composition of
   read-only sub-commands joined by `|` / `||` / `&&` / `;` / `|&`
@@ -334,6 +363,31 @@ Current capability families:
   - `capability:network_probe:http_download` (`curl -o` / `-O` / `--output` / `--remote-name`, `wget` in default (non-`-O -`) mode — response persisted to disk; does NOT imply `capability:filesystem_write` which is reserved for shell redirects / `tee`)
   - `capability:network_probe:port_scan`     (`nmap`, `masscan`, `zmap`, `nc` / `ncat` / `netcat` in connect mode — `-l` / `-k` listen forms stay under `network_bind`)
   - `capability:network_probe:file_transfer` (`scp`, `sftp`, `rsync` with a `[user@]host:` endpoint, `rclone` `copy` / `sync` / `move` / `mount` / `serve` / `ls` / `cat` / `md5sum` / `check` / etc.)
+- sensitive data read (policy-grippable family — emitted for reads of
+  high-risk local data even when the tool itself is otherwise read-only):
+  - `capability:data_read:browser_cookies`   (browser cookie stores such as Safari / Chrome / Firefox cookie databases)
+  - `capability:data_read:browser_profile_data` (browser login/profile artifacts such as `Login Data`, `Web Data`, `History`, `Bookmarks`, and Firefox profile stores)
+  - `capability:data_read:auth_authority`    (local account authentication metadata such as macOS `AuthenticationAuthority`)
+  - `capability:data_read:credential_material` (credential-bearing files and commands: SSH private-key reads, GPG secret-key exports, password-manager vault/database examples, selected token stores)
+  - `capability:data_read:shell_history`     (`.bash_history`, `.zsh_history`, `.fish_history`, and similar shell histories)
+  - `capability:data_read:messaging_history` (local chat/message databases such as iMessage, WhatsApp, Signal, and Telegram stores)
+  - `capability:data_read:personal_records`  (local contacts, notes, mail, and photo-library data)
+- system mutation (policy-grippable family — emitted for commands that
+  alter host security, identity, account, networking, or persistence
+  surfaces):
+  - `capability:system_mutate:host_network_config` (DNS, ARP, routing, network interface, Wi-Fi/networksetup changes)
+  - `capability:system_mutate:hostname`       (`hostname`, `scutil --set HostName`, and related host identity changes)
+  - `capability:system_mutate:time_sync`      (`systemsetup` time/NTP changes and related trust-time settings)
+  - `capability:system_mutate:security_daemon` (security product / daemon load-unload or disable attempts)
+  - `capability:system_mutate:browser_security_pref` (browser security preference writes such as Safari extension toggles)
+  - `capability:system_mutate:firewall`       (`pfctl`, `iptables`, `nft`, `ufw`, `firewall-cmd`, `socketfilterfw` mutations)
+  - `capability:system_mutate:hosts_file`     (writes to `/etc/hosts` via redirects, `tee`, copy/move, `sed -i`, or interpreter writes)
+  - `capability:system_mutate:privilege_config` (`visudo`, sudoers/passwd/shadow/group/PAM config mutations)
+  - `capability:system_mutate:user_account`   (`dseditgroup`, `pwpolicy`, `dscl` account deletes/password changes, `sysadminctl`, `useradd`, `usermod`, `passwd <user>`, etc.)
+  - `capability:system_mutate:remote_access`  (`systemsetup` remote-login, wake-on-network, and sleep/remote-access settings)
+  - `capability:system_mutate:disk_encryption` (`fdesetup` FileVault enable/disable/user/recovery-key mutations)
+  - `capability:system_mutate:kernel_tunable` (`sysctl -w`, `sysctl name=value`, `sysctl -p`)
+  - `capability:system_mutate:persistence`    (`at` jobs not already catastrophic, AppleScript login-item persistence, and related persistence setup)
 - `capability:compilation`
 - `capability:filesystem_write`
 - `capability:network_bind`
@@ -343,9 +397,60 @@ Current capability families:
 - `capability:process_signal`
 - `capability:spawns_process`
 - `capability:stdin_exec`
+  - plus per-interpreter suffixes for non-shell stdin execution, e.g.
+    `capability:stdin_exec:node`, `capability:stdin_exec:ruby`,
+    `capability:stdin_exec:perl`, and `capability:stdin_exec:php`
 
 Callers can match exact tags or prefixes like `capability:package_install:*`
-or `capability:read_only:*`.
+or `capability:read_only:*`.  The YAML corpus also records the MITRE
+ATT&CK tactic each rule rolls up to, but that mapping is documentation
+metadata: the classifier still emits Command Shield's native IDs, such
+as `capability:data_read:browser_cookies`.  See
+[`COVERAGE.md`](COVERAGE.md) for the full tactic → rule table.
+
+### Source of truth
+
+All pure regex capability tables live in
+[`command_shield/capabilities/*.yaml`](capabilities/).  This includes
+the sensitive-surface families (`data_read:*`, `system_mutate:*`,
+`network_exfil:*`), execution families (`script_execution:*`,
+`stdin_exec[:*]`, `package_install:*`, `compilation`), positive
+families (`read_only:*`, `network_probe:*`), and small single-tag
+families such as `network_bind`, `filesystem_write`,
+`download_and_exec`, and `spawns_process`.
+
+Adding or refining a regex capability is now a Command Shield-local
+data change:
+
+1. Append a row to the relevant YAML with `id`, `family`, `pattern`,
+   and, when needed, `suffix`, `description`, `sensitive`,
+   `mitre_family`, and `mitre_techniques`.
+2. If `sensitive: true`, include a `mitre_family`; the loader rejects
+   sensitive rules without one.
+3. Add or update a fixture that proves the command shape emits the
+   expected tag.
+4. Regenerate the coverage table with
+   `.venv/bin/python command_shield/generate_coverage_md.py`.
+
+The YAML changes what Command Shield itself loads and documents; it
+does not create any dependency on IntentFrame policy modules.  The
+classifier still emits native `capability:*` tags such as
+`capability:data_read:browser_cookies` and `capability:network_bind`.
+The MITRE fields are coverage metadata for `COVERAGE.md`, not a
+runtime alias layer.
+
+### Coverage telemetry
+
+`command_shield/telemetry.py` exposes a coverage-gap log line, fired
+only when the pipeline produces `NEEDS_REVIEW` / `BLOCK` on a
+command that carries no sensitive-family tag.  Silent in production
+(level=DEBUG); turn the logger up in staging to get evidence-driven
+inputs for the next rule addition.
+
+The telemetry hook does not block commands and does not call any
+external service.  It only records "high verdict, no sensitive tag"
+events so new rules can be driven by observed misses instead of
+one-off anecdotes.
 
 #### The read-only fast-path family
 
@@ -371,7 +476,8 @@ when **all** of the following hold:
 5. No incompatible capability already emitted on the same command —
    `stdin_exec`, `filesystem_write`, `spawns_process`, `network_bind`,
    `background_exec`, `download_and_exec`, `binary_download`,
-   `process_signal`, `compilation`, `package_install:*`, `script_execution:*`.
+   `process_signal`, `compilation`, `package_install:*`,
+   `script_execution:*`, `data_read:*`, or `system_mutate:*`.
 6. The normalized command (with trusted-path head normalisation
    applied — see below) fully matches one of the per-family head
    regexes (which themselves exclude destructive flag modes like
@@ -391,8 +497,8 @@ sub-tag is emitted iff **all** of the following hold:
    `filesystem_write` (redirect, `tee`), `spawns_process` (`xargs`,
    `sudo`, `ssh`, `docker run`), `stdin_exec` (`| sh`, `| python -`),
    `download_and_exec` (`curl … | sh`), `background_exec` (trailing
-   `&`), `package_install:*`, or `script_execution:*` disqualifies
-   the whole composition automatically.
+   `&`), `package_install:*`, `script_execution:*`, `data_read:*`, or
+   `system_mutate:*` disqualifies the whole composition automatically.
 4. Every sub-command is independently either (a) a safe literal `cd`
    — `cd`, `cd -`, or `cd <arg>` with no shell metacharacters in the
    arg — or (b) a head that matches one of the single-head read-only
@@ -438,6 +544,8 @@ use the combination
     and "capability:filesystem_write" not in report.capabilities
     and "capability:stdin_exec"        not in report.capabilities
     and not any(c.startswith("capability:network_probe:") for c in report.capabilities)
+    and not any(c.startswith("capability:data_read:") for c in report.capabilities)
+    and not any(c.startswith("capability:system_mutate:") for c in report.capabilities)
     and not any(s.signal_id.startswith("edge:") for s in report.signals)
     and (report.code_intel is None or not report.code_intel.findings)
 
@@ -448,7 +556,36 @@ passive reads — `ls`, `cat README.md`, `ps aux`, `grep foo src/`,
 explicit `not …network_probe` exclusion is defensive — the structural
 gate already prevents a single command from carrying both a
 `read_only:*` and a `network_probe:*` tag, but the belt-and-braces
-check keeps the fast-path honest if either family expands.
+check keeps the fast-path honest if any of these families expands.
+
+#### Sensitive-surface capability families
+
+`capability:data_read:*` and `capability:system_mutate:*` are
+policy-grippable facts for commands that are syntactically ordinary but
+security sensitive in context. Examples:
+
+```
+cat ~/.zsh_history
+sqlite3 ~/Library/Messages/chat.db 'select text from message limit 5'
+plutil -p ~/Library/Cookies/Cookies.binarycookies
+networksetup -setdnsservers Wi-Fi 1.2.3.4
+route add default 10.66.66.1
+systemsetup -setusingnetworktime off
+defaults write com.apple.Safari ExtensionsEnabled -bool true
+```
+
+These tags do not change `CommandReport.verdict`. A sensitive read can
+still return `SAFE` from the fixed-pattern layer, because `SAFE` means
+"no hard-coded catastrophic/review pattern matched", not "this is
+allowed". The policy layer decides whether to block by matching
+capabilities.
+
+The read-only family has an explicit suppression rule for these
+families: if a command emits any `capability:data_read:*` or
+`capability:system_mutate:*` tag, no `capability:read_only:*` tag is
+emitted for the same command. This prevents a command like
+`cat ~/.bash_history | tail -50` from looking like a passive read-only
+composition to policy consumers.
 
 #### The network-probe family
 
@@ -488,6 +625,24 @@ Within a single command only one HTTP sub-tag is emitted: the rule
 table is ordered `http_mutate` → `http_download` → `http_get` so the
 strictest applicable tag wins.  A POST `curl` is never downgraded to
 `http_get` and a `curl -o file` is never masqueraded as idempotent.
+
+#### Coverage boundaries
+
+The capability taxonomy is deliberately finite and evidence-driven,
+not an open-ended ontology.  The current YAML corpus names the command
+shapes Command Shield can identify with deterministic regexes and
+structural gates.  `COVERAGE.md` shows how those rules map to MITRE
+ATT&CK tactics and highlights any rule that intentionally has no
+MITRE tactic.
+
+New capability tags should be added only when there is a concrete
+command shape to match: a newly discovered production miss, a newly
+published technique that applies to shell / Python pre-execution
+inspection, or a rule split that makes an existing tag more precise.
+If the behavior is a hard-stop primitive rather than a capability
+fact, it belongs in `command_shield/patterns/*.json`.  If it requires
+semantic context, user intent, session history, or repository-wide
+understanding, it belongs outside Command Shield.
 
 ### 4. Containment-edge extraction and walk
 
@@ -826,11 +981,14 @@ Useful for offline triage or explicit deep-review flows.
 - Allow `pip` but deny `apt`? → allow `capability:package_install:pip`, deny `capability:package_install:apt`
 - Allow Python scripts but deny Node? → allow `capability:script_execution:python`, deny `capability:script_execution:node`
 - Fast-path obviously read-only commands (no AE call)? → allow on `capability:read_only:*` when no deny capabilities fire
+- Deny sensitive local data reads? → deny `capability:data_read:*`
+- Deny host/account/security-surface mutations? → deny `capability:system_mutate:*`
 - Deny all listeners? → deny `capability:network_bind`
 - Deny any file writes via shell redirection? → deny `capability:filesystem_write`
 - Deny any code touching system paths? → deny `FILE_SYSTEM_ESCAPE_OPEN`
 - Flag any code that references runtime internals? → deny `REFERENCES_INTENTFRAME`
 - Deny commands that stream code into an interpreter? → deny `capability:stdin_exec` or `edge:piped_stdin`
+- Treat `curl … | python` specially? → consume the `RCE-003` `NEEDS_REVIEW` signal and inspect the Python body / command context downstream; it is no longer a `CATASTROPHIC` hard stop.
 
 ### 7. Investigation examples
 

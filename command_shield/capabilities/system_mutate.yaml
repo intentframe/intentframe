@@ -1,0 +1,241 @@
+- id: system_mutate__host_network_config
+  family: system_mutate
+  suffix: host_network_config
+  pattern: \bnetworksetup\s+-(?:set[A-Za-z]+|create[A-Za-z]+|delete[A-Za-z]+|add[A-Za-z]+|remove[A-Za-z]+|switchtolocation)\b|\barp\s+(?:[^|;&]*\s)?-[sd]\b|\broute\s+(?:-[A-Za-z]+(?:\s+\S+)?\s+)*(?:add|del|delete|change|replace|flush)\b|\bip\s+(?:addr|address|link|route|neigh|neighbour|rule|tunnel|netns|xfrm)\s+(?:add|del|delete|change|replace|flush|set)\b|\bifconfig\s+\S+\s+(?:up|down|mtu|\d+\.\d+\.\d+\.\d+)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.004
+- id: system_mutate__hostname
+  family: system_mutate
+  suffix: hostname
+  pattern: \bscutil\s+--set\s+(?:HostName|LocalHostName|ComputerName)\b|\bhostname\s+[A-Za-z0-9][^\s]*
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1036
+- id: system_mutate__time_sync
+  family: system_mutate
+  suffix: time_sync
+  pattern: \bsystemsetup\s+-set(?:usingnetworktime|networktimeserver|timezone|time|date)\b|\bsntp\s+-S\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1070.006
+- id: system_mutate__security_daemon
+  family: system_mutate
+  suffix: security_daemon
+  pattern: \blaunchctl\s+(?:unload|bootout|disable|remove|stop|kickstart\s+-k)\b[^|;&]*\b(?:crowdstrike|falcond|sentinelone|sophos|mcafee|defender|tccd|santa|osquery|jamf|kandji|com\.apple\.tcc|com\.apple\.sandboxd)\b|\bspctl\s+--master-disable\b|\bcsrutil\s+disable\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.001
+- id: system_mutate__browser_security_pref
+  family: system_mutate
+  suffix: browser_security_pref
+  pattern: \bdefaults\s+write\s+(?:com\.apple\.Safari(?:TechnologyPreview)?|com\.google\.Chrome|org\.mozilla\.firefox)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.001
+- id: system_mutate__firewall
+  family: system_mutate
+  suffix: firewall
+  pattern: \bpfctl\s+(?:-[a-zA-Z]+\s+)*-[dfeF]\b|\bip6?tables-restore\b|\bip6?tables(?:-legacy)?\s+(?:-[a-zA-Z]+\s+)*(?:-F|-X|-Z|-D|-I|-A|-N|-E|-P\s+\S+\s+(?:ACCEPT|DROP|REJECT|QUEUE))\b|\bnft\s+(?:flush|delete|add|insert|replace|create|rename)\b|\bufw\s+(?:disable|enable|reset|default|allow|deny|reject|limit|delete|insert)\b|\bfirewall-cmd\s+(?:--(?:add|remove|change|set)-[a-zA-Z-]+|--panic-on|--panic-off|--reload|--complete-reload|--runtime-to-permanent)\b|\bsocketfilterfw\s+--(?:setglobalstate|setallowsigned(?:app)?|setloggingmode|setblockall|setstealthmode|unblockapp|blockapp|add|remove)\b|\bipfw\s+(?:add|delete|flush|zero|resetlog|disable|enable)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.004
+- id: system_mutate__hosts_file
+  family: system_mutate
+  suffix: hosts_file
+  pattern: (?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/hosts\b|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/hosts\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/hosts\b|\bsed\s+[^|;&]*-i\b[^|;&]*\s+/etc/hosts\b|\b(?:python3?|perl|ruby|awk)\b[^|;&]*/etc/hosts\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1565.001
+- id: system_mutate__privilege_config
+  family: system_mutate
+  suffix: privilege_config
+  pattern: \bvisudo\b(?!\s+-c)|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/(?:sudoers(?:\.d/[^\s|;&]*)?|passwd|shadow|gshadow|group|pam\.d/[^\s|;&]*)\b|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/(?:sudoers(?:\.d/[^\s|;&]*)?|passwd|shadow|gshadow|group|pam\.d/[^\s|;&]*)\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/(?:sudoers(?:\.d/?[^\s|;&]*)?|passwd|shadow|gshadow|group|pam\.d/?[^\s|;&]*)\b|\bsed\s+[^|;&]*-i\b[^|;&]*\s+/etc/(?:sudoers|passwd|shadow|gshadow|group)\b
+  sensitive: true
+  mitre_family: privilege_escalation
+  mitre_techniques:
+  - T1548.003
+- id: system_mutate__user_account
+  family: system_mutate
+  suffix: user_account
+  pattern: \bdseditgroup\b[^|;&]*-o\s+(?:edit|create|delete)\b|\bpwpolicy\b[^|;&]*-(?:setpolicy|setaccountpolicies|clearaccountpolicies|setglobalpolicy|resetpolicy|disableuser|enableuser)\b|\bdscl\b[^|;&]*\s-(?:passwd|delete|append|merge|change|create)\b|\bsysadminctl\b[^|;&]*-(?:addUser|deleteUser|resetPasswordFor|secureTokenOn|secureTokenOff|newPassword|adminUser|afpGuestAccess|smbGuestAccess|guestAccount|filesystem)\b|\b(?:useradd|usermod|userdel|adduser|deluser|groupadd|groupmod|groupdel|addgroup|delgroup|chpasswd|newusers)\b|(?:^|[;&|])\s*passwd\s+[A-Za-z_][A-Za-z0-9_-]*
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1136
+- id: system_mutate__remote_access
+  family: system_mutate
+  suffix: remote_access
+  pattern: \bsystemsetup\s+-set(?:remotelogin|remoteappleevents|wakeonnetworkaccess|wakeonmodem|computersleep|displaysleep|harddisksleep|restartfreeze|restartpoweron|allowpowerbuttontosleepcomputer|startupdisk|disableloginchime)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1021
+- id: system_mutate__disk_encryption
+  family: system_mutate
+  suffix: disk_encryption
+  pattern: \bfdesetup\s+(?:enable|disable|remove|add|changerecovery|sync|authrestart)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1486
+  - T1490
+- id: system_mutate__kernel_tunable
+  family: system_mutate
+  suffix: kernel_tunable
+  pattern: \bsysctl\s+(?:-[a-zA-Z]+\s+)*-w\b|\bsysctl\s+(?:-[a-zA-Z]+\s+)*-p\b|\bsysctl\s+(?:-[a-zA-Z]+\s+)*[A-Za-z_][A-Za-z0-9_.]*=|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/proc/sys/[^\s|;&]+|\btee\s+(?:-[a-zA-Z]+\s+)*/proc/sys/[^\s|;&]+
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.004
+- id: system_mutate__persistence
+  family: system_mutate
+  suffix: persistence
+  pattern: \bat\s+(?:noon|midnight|teatime|today|tomorrow|\d{1,2}(?::\d{2})?(?:am|pm|AM|PM)?(?:\s|$))|\bat\s+(?:now|\+)|\bat\s+-f\b|\bosascript\b[^|;&]*\bSystem\s+Events\b[^|;&]*\blogin\s+item\b|\bosascript\b[^|;&]*\bmake\s+(?:new\s+)?login\s+item\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1547
+  - T1037
+- id: system_mutate__mdm_profile
+  family: system_mutate
+  suffix: mdm_profile
+  pattern: \bprofiles\s+(?:-[A-Za-z]+\s+)*(?:-I|-R|-E|install|remove|renew)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1556
+- id: system_mutate__boot_policy
+  family: system_mutate
+  suffix: boot_policy
+  pattern: \bbputil\s+(?:-[a-zA-Z]+|set-[a-zA-Z-]+|disable-[a-zA-Z-]+|enable-[a-zA-Z-]+)\b|\bbless\s+(?:[^|;&]*\s)?(?:--setBoot|--bootefi|--mount\b[^|;&]*\s--setBoot)\b|\bnvram\s+(?:-[a-zA-Z]+\s+)*[A-Za-z_][\w.-]*=|\bnvram\s+-d\s+[A-Za-z_]|\bnvram\s+-c\b|\bfirmwarepasswd\s+-(?:setpasswd|delete|setmode)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1542
+- id: system_mutate__audit_log
+  family: system_mutate
+  suffix: audit_log
+  pattern: \baudit\s+-(?:n|t|s|r|A|R|c)\b|\blog\s+(?:erase|config)\b|\baslmanager\s+-(?:a|s|e)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.006
+  - T1070
+- id: system_mutate__tcc_privacy
+  family: system_mutate
+  suffix: tcc_privacy
+  pattern: \btccutil\s+(?:reset|insert)\b|\bsqlite3\b[^|;&]*\bTCC\.db\b[^|;&]*\b(?:INSERT|UPDATE|DELETE|REPLACE)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1562.001
+- id: system_mutate__backup
+  family: system_mutate
+  suffix: backup
+  pattern: \btmutil\s+(?:disable|enable|startbackup|stopbackup|delete|inherit|setdestination|removedestination|addexclusion|removeexclusion)\b|\basr\s+(?:restore|create|imagescan)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1490
+- id: system_mutate__installer_pkg
+  family: system_mutate
+  suffix: installer_pkg
+  pattern: \binstaller\s+(?!(?:[^|;&]*\s)?-pkginfo\b)(?:[^|;&]*\s)?-(?:pkg|package)\b|\bsoftwareupdate\s+(?:--install|-i)\b|\bpkgutil\s+--forget\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1072
+- id: system_mutate__kernel_extension
+  family: system_mutate
+  suffix: kernel_extension
+  pattern: \b(?:kextload|kextunload)\b|\bkextutil\s+(?:-[a-zA-Z]+\s+)*-l\b|\bkmutil\s+(?:load|unload)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1547.006
+- id: system_mutate__service_mgmt
+  family: system_mutate
+  suffix: service_mgmt
+  pattern: \bsystemctl\s+(?:start|stop|restart|reload|enable|disable|mask|unmask|daemon-reload|daemon-reexec|set-default|isolate|kill|reset-failed|edit|link|revert|preset|preset-all|reenable)\b|(?:^|[\s;&|])service\s+\S+\s+(?:start|stop|restart|reload|force-reload|try-restart)\b|\brc-update\s+(?:add|del|delete)\b|\bchkconfig\s+(?:--add|--del|--level(?:\s+\S+)?|(?:--level\s+\S+\s+)?\S+\s+(?:on|off|reset|resetpriorities))\b|\bupdate-rc\.d\s+\S+\s+(?:defaults|enable|disable|remove|start|stop)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1543.002
+- id: system_mutate__launchd_mutation
+  family: system_mutate
+  suffix: launchd_mutation
+  pattern: \blaunchctl\s+(?:load|unload|bootstrap|bootout|enable|disable|remove|stop|start|kickstart|submit|setenv|unsetenv|override|limit|config|reboot|userswitch)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1543.004
+- id: system_mutate__cron_mutation
+  family: system_mutate
+  suffix: cron_mutation
+  pattern: \bcrontab\s+(?:-[uU]\s+\S+\s+)*(?:-r|-e)\b|\bcrontab\s+(?:-[uU]\s+\S+\s+)*[^-\s|;&][^\s|;&]*(?=\s|$|\||;|&)|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/cron\.(?:d|daily|hourly|weekly|monthly)/[^\s|;&]+|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/cron\.(?:d|daily|hourly|weekly|monthly)/[^\s|;&]+|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/cron\.(?:d|daily|hourly|weekly|monthly)/[^\s|;&]+
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1053.003
+- id: system_mutate__browser_extension
+  family: system_mutate
+  suffix: browser_extension
+  pattern: \bdefaults\s+write\s+(?:com\.google\.Chrome|com\.microsoft\.Edge|org\.mozilla\.firefox)\s+ExtensionInstall(?:Forcelist|Allowlist|Blocklist|Sources)\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*[^\s|;&]*/(?:distribution/policies\.json|Chrome/External\s+Extensions/[^\s|;&]+)\b|\btee\s+(?:-[a-zA-Z]+\s+)*[^\s|;&]*/(?:distribution/policies\.json|Chrome/External\s+Extensions/[^\s|;&]+)\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+[^\s|;&]*/(?:distribution/policies\.json|Chrome/External\s+Extensions/[^\s|;&]+)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1176
+- id: system_mutate__screen_sharing
+  family: system_mutate
+  suffix: screen_sharing
+  pattern: \b/System/Library/CoreServices/RemoteManagement/ARDAgent\.app/Contents/Resources/kickstart\b|(?<![a-zA-Z])kickstart\s+-(?:activate|configure|access|restart|deactivate|uninstall)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1021.004
+- id: system_mutate__print_config
+  family: system_mutate
+  suffix: print_config
+  pattern: \b(?:cupsenable|cupsdisable|cupsaccept|cupsreject|lpadmin|lpoptions)\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques: []
+- id: system_mutate__radio_power
+  family: system_mutate
+  suffix: radio_power
+  pattern: \bnetworksetup\s+-(?:setairportpower|setairportnetwork)\b|\bairport\s+(?:-z|--disassociate|--associate)\b|\bblueutil\b(?:\s+-[a-zA-Z]+)*\s+-(?:p|power)\b|\bblueutil\b[^|;&]*--power\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques: []
+- id: system_mutate__ca_trust
+  family: system_mutate
+  suffix: ca_trust
+  pattern: \bsecurity\s+(?:add-trusted-cert|remove-trusted-cert|add-certificates)\b|\b(?:update-ca-certificates|update-ca-trust)\b|\btrust\s+anchor\b|\bcertutil\b[^|;&]*\s-[AMD]\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?:/etc/(?:ssl/certs|pki/ca-trust/source/anchors|ca-certificates/trust-source/anchors)|/usr/local/share/ca-certificates)/[^\s|;&]+|\btee\s+(?:-[a-zA-Z]+\s+)*(?:/etc/(?:ssl/certs|pki/ca-trust/source/anchors|ca-certificates/trust-source/anchors)|/usr/local/share/ca-certificates)/[^\s|;&]+|\b(?:cp|mv|install|ln)\b[^|;&]*\s+(?:/etc/(?:ssl/certs|pki/ca-trust/source/anchors|ca-certificates/trust-source/anchors)|/usr/local/share/ca-certificates)/[^\s|;&]+
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1553.004
+- id: system_mutate__shell_init
+  family: system_mutate
+  suffix: shell_init
+  pattern: (?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bash(?:rc|_profile|_login|_logout|_aliases|_env)|zshrc|zshenv|zprofile|zlogin|zlogout|profile|kshrc|cshrc|tcshrc|inputrc)\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|\btee\s+(?:-[a-zA-Z]+\s+)*(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bash(?:rc|_profile|_login|_logout|_aliases|_env)|zshrc|zshenv|zprofile|zlogin|zlogout|profile|kshrc|cshrc|tcshrc|inputrc)\b|\btee\s+(?:-[a-zA-Z]+\s+)*(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bashrc|bash_profile|bash_login|zshrc|zshenv|zprofile|zlogin|profile|kshrc|inputrc)\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|\bsed\b[^|;&]*-i\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.(?:bashrc|bash_profile|zshrc|zshenv|zprofile|profile|kshrc)\b|\bsed\b[^|;&]*-i\b[^|;&]*\s+(?:~/|\$HOME/|[^\s|;&]*/)?\.config/fish/config\.fish\b|(?:^|[\s;&|])(?:>>?|&>|2>>?)\s*/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b|\btee\s+(?:-[a-zA-Z]+\s+)*/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b|\b(?:cp|mv|install|ln)\b[^|;&]*\s+/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b|\bsed\b[^|;&]*-i\b[^|;&]*\s+/etc/(?:profile(?:\.d/[^\s|;&]+)?|bash\.bashrc|bashrc|zshrc|zshenv|zprofile|paths(?:\.d/[^\s|;&]+)?|fish/config\.fish)\b
+  sensitive: true
+  mitre_family: persistence
+  mitre_techniques:
+  - T1546.004
+- id: system_mutate__history_tamper
+  family: system_mutate
+  suffix: history_tamper
+  pattern: \bhistory\s+-c\b|\bhistory\s+-d\b|\bhistory\s+-[wr]\s+/dev/null\b|(?:^|[\s;&|])unset\s+HISTFILE\b|(?:^|[\s;&|])(?:export\s+)?HISTFILE\s*=\s*/dev/null\b|(?:^|[\s;&|])(?:export\s+)?HIST(?:SIZE|FILESIZE)\s*=\s*0\b|(?:^|[\s;&|])set\s+\+o\s+history\b|\b(?:rm|shred|truncate)\b[^|;&]*\s(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|\b(?:cp|mv)\b[^|;&]*\s+(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|\btee\s+(?:-[a-zA-Z]+\s+)*(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|(?:^|[\s;&|])(?:>|>>|&>|2>>?)\s*(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b|(?:^|[\s;&|]):\s+>\s*(?:~/?|[^\s|;&]*/)?\.(?:bash|zsh|fish|ksh|sh)_history\b
+  sensitive: true
+  mitre_family: defense_evasion
+  mitre_techniques:
+  - T1070.003

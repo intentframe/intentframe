@@ -1,0 +1,235 @@
+# ==============================================================================
+# Root-Demo Policy - Local Maintenance Profile
+# ==============================================================================
+#
+# This profile describes the owner's policy for autonomous root-capable command
+# execution on a personal Mac. It is agent-agnostic: any agent using this system
+# is evaluated against the same owner-defined boundaries.
+#
+# The balance is preventive first: anything that changes device trust, access,
+# security, network, or authentication boundaries is denied at Gate 2 with
+# deny_capabilities. Useful local maintenance and user-content work stays open
+# and is judged by the semantic intent limits below.
+#
+# Hard-denied surfaces:
+#   * non-python/non-shell runtimes and build/package ecosystems
+#   * credential, session, token, and high-sensitivity authentication reads
+#   * remote-control channels
+#   * access creation, privilege changes, security weakening, and network changes
+#
+# Semantically judged surfaces:
+#   * ordinary documents, messages, mail, app data, and user-owned content
+#   * service management, launchd/cron, maintenance persistence
+#   * scoped backups, shell convenience changes, local config edits
+#   * explicit owner-requested external transfers
+#   * cleanup of named logs, caches, temp files, and test artifacts
+#
+# The semantic limits describe what is allowed on the system, not who the agent
+# is. They give Guardian positive context for useful maintenance and negative
+# context for actions the owner does not permit.
+# ==============================================================================
+
+allowed_actions:
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"
+        - mkfs
+        - "dd if="
+        - "> /dev/disk"
+        - "> /dev/rdisk"
+        - "> /dev/pf"
+        - "> /dev/kmem"
+        - "> /dev/mem"
+        - "chmod 777"
+      deny_capabilities:
+        # Language clamp: root maintenance may use shell, Python, and normal
+        # POSIX utilities. Other language runtimes, local binaries, compilation,
+        # and non-python/non-shell package ecosystems are outside the automatic
+        # root surface.
+        - "capability:script_execution:node"
+        - "capability:script_execution:ruby"
+        - "capability:script_execution:perl"
+        - "capability:script_execution:java"
+        - "capability:script_execution:go"
+        - "capability:script_execution:dotnet"
+        - "capability:script_execution:php"
+        - "capability:script_execution:lua"
+        - "capability:script_execution:r"
+        - "capability:script_execution:julia"
+        - "capability:script_execution:swift"
+        - "capability:script_execution:deno_bun"
+        - "capability:script_execution:local_binary"
+        - "capability:compilation"
+        - "capability:stdin_exec:node"
+        - "capability:stdin_exec:ruby"
+        - "capability:stdin_exec:perl"
+        - "capability:stdin_exec:php"
+        - "capability:package_install:npm"
+        - "capability:package_install:gem"
+        - "capability:package_install:cargo"
+        - "capability:package_install:go"
+        - "capability:package_install:composer"
+
+        # Authentication-power reads: autonomous root commands must not inspect
+        # secrets, live sessions, tokens, password material, remote-access trust
+        # inventories, process environments, or process memory. Ordinary user
+        # content is handled by semantic intent limits rather than hard-denied
+        # here.
+        - "capability:data_read:browser_cookies"
+        - "capability:data_read:browser_session_data"
+        - "capability:data_read:auth_authority"
+        - "capability:data_read:credential_material"
+        - "capability:data_read:dotfile_secrets"
+        - "capability:data_read:cloud_tokens"
+        - "capability:data_read:password_manager_export"
+        - "capability:data_read:process_env"
+        - "capability:data_read:ssh_known_hosts"
+        - "capability:data_read:process_memory"
+
+        # Remote-control channels: external transfers are judged semantically
+        # because a user may explicitly request them, but tunnels create a new
+        # way into or through the machine and stay hard-denied.
+        - "capability:network_exfil:ssh_tunnel"
+
+        # Never-auto mutations: these change trust, access, security, network, or
+        # identity boundaries. They are blocked even if some rare admin task might
+        # occasionally want them.
+        - "capability:system_mutate:host_network_config"
+        - "capability:system_mutate:hostname"
+        - "capability:system_mutate:time_sync"
+        - "capability:system_mutate:security_daemon"
+        - "capability:system_mutate:browser_security_pref"
+        - "capability:system_mutate:firewall"
+        - "capability:system_mutate:hosts_file"
+        - "capability:system_mutate:privilege_config"
+        - "capability:system_mutate:user_account"
+        - "capability:system_mutate:remote_access"
+        - "capability:system_mutate:disk_encryption"
+        - "capability:system_mutate:kernel_tunable"
+        - "capability:system_mutate:mdm_profile"
+        - "capability:system_mutate:boot_policy"
+        - "capability:system_mutate:audit_log"
+        - "capability:system_mutate:tcc_privacy"
+        - "capability:system_mutate:installer_pkg"
+        - "capability:system_mutate:kernel_extension"
+        - "capability:system_mutate:browser_extension"
+        - "capability:system_mutate:screen_sharing"
+        - "capability:system_mutate:print_config"
+        - "capability:system_mutate:radio_power"
+        - "capability:system_mutate:ca_trust"
+        - "capability:system_mutate:history_tamper"
+
+intent_limits:
+  - limit_id: local-maintenance-scope
+    domain: scope
+    description: "Allowed local maintenance work"
+    raw: >-
+      This system allows autonomous local maintenance work. Acceptable actions
+      include inspecting local system state, reading non-secret configuration,
+      listing files, checking disk usage, reading logs, cleaning clearly named
+      temporary files, caches, old logs, and test artifacts, creating local
+      backups, organizing files in clearly named local paths, managing clearly
+      named local services, and running shell or Python scripts for local
+      maintenance.
+
+      Installing clearly named and known/popular Python packages with pip and Homebrew packages
+      with brew is allowed for local development and maintenance.
+
+      The action should have a clear benign purpose and should name the affected
+      path, file, service, or setting when it changes something.
+    effect: block
+    scope: per_action
+
+  - limit_id: user-content-access-allowed
+    domain: scope
+    description: "Normal user content may be used for requested tasks"
+    raw: >-
+      Accessing ordinary user content is allowed when it is relevant to the
+      requested task and stays within the user's intended workflow. This
+      includes documents, downloads, desktop files, project files, notes, emails,
+      messages, browser history, application data, logs, shell history, and
+      other local user-owned content.
+
+      The action should have a clear purpose and should not secretly collect,
+      stage, summarize, or search user content for unrelated reasons.
+    effect: block
+    scope: per_action
+
+  - limit_id: visible-maintenance-automation
+    domain: scope
+    description: "Allowed scheduled maintenance and shell convenience changes"
+    raw: >-
+      Scheduled jobs, service changes, shell aliases, PATH entries, and other
+      persistent changes are allowed only when they are visible, clearly named,
+      local to this machine, reversible, and directly related to normal
+      maintenance, backups, cleanup, rotation, health checks, or user
+      productivity.
+
+      Hidden jobs, disguised names, credential-related jobs, network-beaconing
+      jobs, remote-control behavior, or persistence unrelated to the stated task
+      are not allowed.
+    effect: block
+    scope: per_action
+
+  - limit_id: authentication-secrets-boundary
+    domain: security
+    description: "Credentials and authentication material are off limits"
+    raw: >-
+      Accessing credentials or authentication material is not allowed. This
+      includes passwords, private keys, API tokens, session cookies, saved
+      logins, password-manager data, keychain secrets, cloud credentials,
+      process environments, and other material that would let the agent
+      impersonate the user, unlock accounts, or gain new access.
+
+      SSH trust records, remote-access inventories, and similar
+      authentication-adjacent metadata are treated as part of the device
+      boundary, not ordinary user content.
+
+      Ordinary user content is not prohibited by this rule. The boundary is
+      authentication power, not whether the file or app data is personal.
+    effect: block
+    scope: per_action
+
+  - limit_id: external-transfer-boundary
+    domain: security
+    description: "External transfer must match the requested task"
+    raw: >-
+      Sending local user content to another computer or external service is
+      allowed only when the requested task clearly requires that exact transfer,
+      destination, and purpose.
+
+      Silent uploads, bulk collection, hidden staging, credential transfer,
+      unrelated posting, or sending local data to an unexplained destination is
+      not allowed. Downloading requested public resources is allowed.
+    effect: block
+    scope: per_action
+
+  - limit_id: trust-boundary-changes-prohibited
+    domain: security
+    description: "Do not change trust, access, network, or security boundaries"
+    raw: >-
+      Actions that change how this machine connects, trusts, authenticates, or
+      exposes itself are not allowed. This includes changing network settings,
+      DNS, routing, VPN, proxy, hosts files, firewall, antivirus, privacy
+      controls, disk encryption, audit protections, system integrity features,
+      browser security, certificates, trust stores, users, passwords, admin
+      rights, sudo access, SSH keys, remote login, screen sharing, tunnels, or
+      other remote access paths.
+    effect: block
+    scope: per_action
+
+  - limit_id: destructive-or-broad-changes-prohibited
+    domain: safety
+    description: "Block broad or irreversible changes"
+    raw: >-
+      Deleting personal files, removing backups or archives, wiping storage,
+      formatting devices, modifying broad areas of the filesystem, or making
+      irreversible changes is not allowed as part of normal work.
+
+      Scoped cleanup of clearly named temporary files, caches, logs, and test
+      artifacts is allowed when the affected path and purpose are clear.
+    effect: block
+    scope: per_action

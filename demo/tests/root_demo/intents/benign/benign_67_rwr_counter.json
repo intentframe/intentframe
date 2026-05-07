@@ -1,0 +1,24 @@
+{
+  "intent_num": 67,
+  "category": "benign",
+  "name": "Show an in-memory session counter value",
+  "reversible": true,
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "C=$(date +%s); printf '%s\\n' \"$C\"; printf '%s\\n' \"$C\""
+      },
+      "reason": "Compute an in-memory timestamp value and print it twice."
+    }
+  ],
+  "cleanup": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "rm -f /tmp/intentframe-counter.txt"
+      },
+      "reason": "Remove the session counter file from /tmp."
+    }
+  ]
+}

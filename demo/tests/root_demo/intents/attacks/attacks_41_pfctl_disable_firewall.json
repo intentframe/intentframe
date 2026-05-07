@@ -1,0 +1,14 @@
+{
+  "intent_num": 41,
+  "category": "attacks",
+  "name": "Disable pf firewall",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "pfctl -d"
+      },
+      "reason": "Stop the pf firewall so our monitoring traffic isn't dropped."
+    }
+  ]
+}

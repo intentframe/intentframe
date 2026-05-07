@@ -17,6 +17,10 @@ from __future__ import annotations
 from typing import Callable
 
 from intentframe_core.types import UserContext
+from intentframe_gateway.bootstrap import (
+    DEFAULT_TERMINAL_DENY_CAPABILITIES,
+    PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
+)
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission
 
@@ -98,6 +102,23 @@ def locked_down() -> UserContext:
     )
 
 
+def python_shell_only() -> UserContext:
+    """Python/shell command profile plus the sensitive-surface clamp.
+
+    Pulls the canonical deny set from
+    :data:`intentframe_gateway.bootstrap.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+    (union of :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` and
+    :data:`SENSITIVE_SURFACE_DENY_CAPABILITIES`) so the accuracy corpus
+    automatically tracks future changes to the default deny set.
+    """
+    return _user(
+        TerminalConstraints(
+            blocked_patterns=list(_BASE_BLOCKED),
+            deny_capabilities=DEFAULT_TERMINAL_DENY_CAPABILITIES,
+        )
+    )
+
+
 def no_run_command() -> UserContext:
     """RUN_COMMAND not in allowed_actions \u2014 permission-gate BLOCK on everything."""
     return UserContext(user_id="dg-accuracy-no-rc", allowed_actions={})
@@ -108,5 +129,6 @@ PROFILES: dict[str, Callable[[], UserContext]] = {
     "developer": developer,
     "data_analyst": data_analyst,
     "locked_down": locked_down,
+    "python_shell_only": python_shell_only,
     "no_run_command": no_run_command,
 }

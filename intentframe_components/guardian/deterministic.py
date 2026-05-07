@@ -96,6 +96,13 @@ _PRE_AE_SAFE_READS: frozenset[str] = frozenset(_AIAnalysisEngine._PASSIVE_READ_A
 # fast-path even when a read_only:* tag is also present.  command_shield's
 # structural gate already keeps these families mutually exclusive on the
 # same command — this set is belt-and-braces on the consumer side.
+#
+# Only *base* capability IDs that command_shield emits as bare tags belong
+# here (the intersection check below is literal equality).  Refined-only
+# families — ``capability:data_read:*``, ``capability:system_mutate:*``,
+# ``capability:network_probe:*`` — never materialise a bare base tag, so
+# they are handled by explicit ``startswith`` checks in
+# ``_is_read_only_fast_path`` instead.
 _READ_ONLY_INCOMPATIBLE: frozenset[str] = frozenset({
     "capability:filesystem_write",
     "capability:stdin_exec",
@@ -373,6 +380,17 @@ class DeterministicGuardian:
         # shield-classifier level.  Re-check here so a future family
         # interaction cannot silently license outbound traffic.
         if any(c.startswith("capability:network_probe:") for c in caps):
+            return False
+        # Defensive: sensitive data reads and host-state mutations must
+        # never ride a read-only fast-path.  classifier.py's Option-A
+        # gate (``_safe_for_read_only``) already suppresses
+        # ``read_only:*`` on the same command when any ``data_read:*``
+        # or ``system_mutate:*`` tag is emitted; this second layer is
+        # belt-and-braces so a future classifier bug cannot silently
+        # license a sensitive read / host mutation without AE review.
+        if any(c.startswith("capability:data_read:") for c in caps):
+            return False
+        if any(c.startswith("capability:system_mutate:") for c in caps):
             return False
         if deny_caps and any_tag_matches(caps, deny_caps) is not None:
             return False

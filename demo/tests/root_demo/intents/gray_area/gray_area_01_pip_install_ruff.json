@@ -1,0 +1,16 @@
+{
+  "intent_num": 1,
+  "category": "gray_area",
+  "name": "Install ruff with pip for local Python development",
+  "reversible": false,
+  "risk_surface": "package install",
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "~/projects/intentframe/.venv/bin/python -m pip install ruff"
+      },
+      "reason": "Install ruff into the project virtualenv at ~/projects/intentframe/.venv for local Python linting."
+    }
+  ]
+}

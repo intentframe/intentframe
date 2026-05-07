@@ -18,6 +18,14 @@ Seeds different policy / workspace shapes depending on the
 * ``root`` — full-filesystem host-file access (``/*``), virtual workspace
   rooted at ``/``.  Mirrors ``jarvis_pa/executor_root.yaml``.
 
+Both profiles seed ``terminal_constraint.deny_capabilities`` with
+:data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` so ``RUN_COMMAND`` is
+clamped to a python + shell language surface regardless of executor
+privilege.  The corresponding constant in
+``intentframe_gateway/bootstrap.py`` is the canonical source — the
+two seeders historically duplicate their seed data; keep both copies
+in sync.
+
 Idempotent: checks for an existing policy before POSTing so reruns are
 safe (workspace seed is idempotent on the registry's 409 response).
 
@@ -183,6 +191,120 @@ INTENT_LIMITS = [
 ]
 
 
+# Capability tags denied by every profile's ``terminal_constraint``.
+# Profile-independent on purpose: the language surface IntentFrame is
+# willing to reason about does not change just because the executor
+# happens to run as root.  Must match ``intentframe_gateway/bootstrap.py
+# ::PYTHON_SHELL_ONLY_DENY_CAPABILITIES`` exactly — both seeders are
+# run against the same registry and an asymmetric seed would silently
+# let whichever seeder ran second relax the other's policy.  The
+# contract between this set and the classifier is pinned by
+# ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
+PYTHON_SHELL_ONLY_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    "capability:script_execution:node",
+    "capability:script_execution:ruby",
+    "capability:script_execution:perl",
+    "capability:script_execution:java",
+    "capability:script_execution:go",
+    "capability:script_execution:dotnet",
+    "capability:script_execution:php",
+    "capability:script_execution:lua",
+    "capability:script_execution:r",
+    "capability:script_execution:julia",
+    "capability:script_execution:swift",
+    "capability:script_execution:deno_bun",
+    # NOTE: ``awk`` is intentionally NOT denied — POSIX shell utility,
+    # same risk class as sed/cut/grep which are allowed.  Policy stance
+    # is: block non-python, non-shell *language runtimes*; keep POSIX
+    # shell utilities.  Classifier still tags it for telemetry.
+    "capability:script_execution:local_binary",
+    "capability:compilation",
+    "capability:stdin_exec:node",
+    "capability:stdin_exec:ruby",
+    "capability:stdin_exec:perl",
+    "capability:stdin_exec:php",
+    "capability:package_install:npm",
+    "capability:package_install:gem",
+    "capability:package_install:cargo",
+    "capability:package_install:go",
+    "capability:package_install:composer",
+})
+
+
+# Sensitive-surface clamp (``data_read:*`` + ``system_mutate:*`` +
+# ``network_exfil:*``).  See the canonical definition in
+# ``intentframe_gateway/bootstrap.py``
+# (``SENSITIVE_SURFACE_DENY_CAPABILITIES``) — both seeders are run
+# against the same registry and an asymmetric seed would silently let
+# whichever seeder ran second relax the other's policy.  This clamp
+# closes the root-demo attack-sweep gap (intents 36, 38, 87–91, 97,
+# 99) where the AE reliably rated sensitive reads / host mutations as
+# LOW/MEDIUM and Guardian allowed them; denying at Gate 2 on the
+# classifier tag catches those shapes without burning an AE call.
+SENSITIVE_SURFACE_DENY_CAPABILITIES: frozenset[str] = frozenset({
+    # Sensitive reads (``data_read:*``).
+    "capability:data_read:browser_cookies",
+    "capability:data_read:browser_profile_data",
+    "capability:data_read:browser_session_data",
+    "capability:data_read:auth_authority",
+    "capability:data_read:credential_material",
+    "capability:data_read:shell_history",
+    "capability:data_read:db_client_history",
+    "capability:data_read:messaging_history",
+    "capability:data_read:personal_records",
+    "capability:data_read:dotfile_secrets",
+    "capability:data_read:cloud_tokens",
+    "capability:data_read:password_manager_export",
+    "capability:data_read:process_env",
+    "capability:data_read:ssh_known_hosts",
+    "capability:data_read:mail_store",
+    "capability:data_read:process_memory",
+    # System mutations (``system_mutate:*``).
+    "capability:system_mutate:host_network_config",
+    "capability:system_mutate:hostname",
+    "capability:system_mutate:time_sync",
+    "capability:system_mutate:security_daemon",
+    "capability:system_mutate:browser_security_pref",
+    "capability:system_mutate:firewall",
+    "capability:system_mutate:hosts_file",
+    "capability:system_mutate:privilege_config",
+    "capability:system_mutate:user_account",
+    "capability:system_mutate:remote_access",
+    "capability:system_mutate:disk_encryption",
+    "capability:system_mutate:kernel_tunable",
+    "capability:system_mutate:persistence",
+    "capability:system_mutate:mdm_profile",
+    "capability:system_mutate:boot_policy",
+    "capability:system_mutate:audit_log",
+    "capability:system_mutate:tcc_privacy",
+    "capability:system_mutate:backup",
+    "capability:system_mutate:installer_pkg",
+    "capability:system_mutate:kernel_extension",
+    "capability:system_mutate:service_mgmt",
+    "capability:system_mutate:launchd_mutation",
+    "capability:system_mutate:cron_mutation",
+    "capability:system_mutate:browser_extension",
+    "capability:system_mutate:screen_sharing",
+    "capability:system_mutate:print_config",
+    "capability:system_mutate:radio_power",
+    "capability:system_mutate:ca_trust",
+    "capability:system_mutate:shell_init",
+    "capability:system_mutate:history_tamper",
+    # Outbound data-exfil surfaces (``network_exfil:*``).
+    "capability:network_exfil:http_upload",
+    "capability:network_exfil:file_transfer_outbound",
+    "capability:network_exfil:ssh_tunnel",
+    "capability:network_exfil:cloud_upload",
+})
+
+
+# Union of the two profile-independent clamps; mirrors
+# ``intentframe_gateway/bootstrap.py::DEFAULT_TERMINAL_DENY_CAPABILITIES``.
+DEFAULT_TERMINAL_DENY_CAPABILITIES: frozenset[str] = (
+    PYTHON_SHELL_ONLY_DENY_CAPABILITIES | SENSITIVE_SURFACE_DENY_CAPABILITIES
+)
+
+
 def _build_policy(profile: str = "user") -> dict:
     allowed_actions: dict[str, dict] = {}
     # MIRROR INVARIANT (pinned by tests/test_jarvis_host_scope_mirror.py for
@@ -233,6 +355,7 @@ def _build_policy(profile: str = "user") -> dict:
             "> /dev/",
             "chmod 777",
         ],
+        "deny_capabilities": sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES),
     }
 
     for action in UNSAFE_ACTIONS:

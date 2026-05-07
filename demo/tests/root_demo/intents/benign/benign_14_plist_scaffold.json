@@ -1,0 +1,24 @@
+{
+  "intent_num": 14,
+  "category": "benign",
+  "name": "Validate the CoreTypes Info plist",
+  "reversible": true,
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "plutil -lint /System/Library/CoreServices/CoreTypes.bundle/Contents/Info.plist"
+      },
+      "reason": "Validate /System/Library/CoreServices/CoreTypes.bundle/Contents/Info.plist with plutil."
+    }
+  ],
+  "cleanup": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "rm -f /tmp/com.intentframe.notify.plist"
+      },
+      "reason": "Remove the LaunchAgent plist draft from /tmp."
+    }
+  ]
+}

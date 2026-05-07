@@ -1,0 +1,24 @@
+{
+  "intent_num": 31,
+  "category": "benign",
+  "name": "SHA-256 fingerprint of a staged sample blob",
+  "reversible": true,
+  "submissions": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "printf '%s\\n' 'intentframe rotation sample' | shasum -a 256"
+      },
+      "reason": "Compute SHA-256 of a literal sample string."
+    }
+  ],
+  "cleanup": [
+    {
+      "action": "RUN_COMMAND",
+      "data": {
+        "command": "rm -f /tmp/intentframe-fingerprint.txt"
+      },
+      "reason": "Remove the fingerprint staging file from /tmp."
+    }
+  ]
+}
