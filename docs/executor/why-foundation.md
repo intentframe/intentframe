@@ -30,7 +30,7 @@ No single intelligent entity can simultaneously:
   2. Validate intent
   3. Execute intent
 
-Breaking this invariant recreates the original autonomy risk.
+Breaking this invariant collapses structural supervision back into unsupervised autonomy.
 ```
 
 Now ask: which component physically enforces this invariant?

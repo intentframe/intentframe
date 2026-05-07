@@ -2,11 +2,22 @@
 
 > No single intelligent entity can simultaneously define, validate, and execute intent.
 
-IntentFrame is a **runtime security control plane for AI-decided actions** — a policy-enforced pipeline that sits between an AI agent and the real world.
+IntentFrame is a **runtime security control plane for AI-decided actions** — a policy-enforced pipeline that 
+sits between an AI agent and the real world.
 
-The effect of that control plane is that it **automates the oversight a human would otherwise perform manually**: reading every action, understanding what it will really do, applying judgment, and clicking approve or reject. The agent does the work; IntentFrame automates the supervision.
+The effect of that control plane is that it **automates the oversight a human would otherwise perform 
+manually**: reading every action, understanding what it will really do, applying judgment, and clicking 
+approve or reject. The agent does the work; IntentFrame automates the supervision.
 
-Both framings describe the same system from different angles. The security framing answers *"what is it?"* — a runtime boundary with deterministic gates, semantic review, and executor isolation. The oversight framing answers *"why does it exist?"* — because manual human-in-the-loop review of every AI action does not scale, and giving agents unsupervised access to the real world is not safe.
+Also it is the **structural supervision layer that makes AI agents delegatable** — a policy-enforced pipeline that sits between an AI agent and the real world. The agent stays operationally autonomous: it decides what to do, plans how, and acts on its own. The pipeline judges each action only at the boundary where it would touch the user's world. This is the same shape as professional licensing for human surgeons, pilots, and engineers — see [autonomy.md](autonomy.md) for the full thesis.
+
+Three framings describe the same system from different angles:
+
+- **Capability framing** (*what is it for?*) — the missing infrastructure that closes the autonomy gap, so agents can act on the user's behalf without per-action human approval.
+- **Security framing** (*what does it do?*) — a runtime boundary with deterministic gates, semantic review, and executor isolation.
+- **Oversight framing** (*what does it replace?*) — the manual human-in-the-loop review that doesn't scale; the structural supervision absorbs the work that real-time observation used to do.
+
+All three describe the same pipeline. The capability framing is the goal, the security framing is the mechanism, the oversight framing is what you no longer have to do.
 
 ---
 
@@ -23,6 +34,23 @@ Executor:        ACTS        (cannot judge)
 ```
 
 This is the fundamental design constraint. Every other architectural decision flows from it.
+
+---
+
+## The Design Choice: Prevention, not Containment
+
+Before the structural details, the foundational design choice: IntentFrame **prevents** dangerous actions from ever reaching execution. It does not let them execute and try to **contain** the damage afterwards.
+
+| Prevention model (IntentFrame) | Containment model (traditional sandboxing) |
+|---|---|
+| Understand → Block if dangerous → Execute if safe | Let action through → Restrict what it can do |
+| Everything reaching the executor is guaranteed safe | Executor must restrict every action |
+| Executor runs with full privileges | Executor runs with limited privileges |
+| Agent has effective root access — through the pipeline | Agent has restricted access — limited by sandbox |
+
+This is what makes the pipeline depth justified — five layers of deterministic and semantic checks before any action runs — and what makes full executor capability (including root-level shell access in the [root demo](root_demo/PROOF.md)) safe. Everything that reaches the executor has already been judged safe; the kernel sandbox under `RUN_COMMAND` is a non-negotiable safety net, not the primary boundary.
+
+For the principle in full, see [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment). For the philosophy applied to `RUN_COMMAND` specifically, see [executor/security-model.md](executor/security-model.md#the-philosophy-prevention-not-containment).
 
 ---
 

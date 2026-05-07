@@ -129,7 +129,21 @@ IntentFrame doesn't care *why* the agent was compromised. It cares: given that i
 
 ---
 
-## Q9. Does the executor run as root?
+## Q9. Why doesn't IntentFrame just sandbox the agent's tools?
+
+Because sandboxing is a *containment* model — let the action through, then restrict what it can do. IntentFrame is a *prevention* model — understand the action, block it if dangerous, execute it with full capability if safe.
+
+Sandbox-every-tool gives you "limited but always available" capability: the agent can technically do something but only inside the sandbox's box. That works for an analyst running a Jupyter notebook on untrusted code. It does not work for an assistant that needs to read your real calendar, send a real email, run a real shell command, and pay a real invoice — those are the actions that have to actually happen for the agent to be useful, and a sandbox that strips them down to "limited" makes the agent useless.
+
+Prevention flips the contract: the agent has *full* capability when behaving correctly, and *zero* capability when not. There is no "limited but always" middle. The pipeline (Command Shield, DeterministicGuardian, Analysis Engine, AI Guardian, adapter `quick_check()`) decides which side of that line each intent falls on.
+
+The kernel sandbox under `RUN_COMMAND` (macOS Seatbelt) does exist, but it sits *underneath* the prevention pipeline as a non-negotiable safety net for the rare case where prevention fails. It is not the primary defense, and it is not applied to typed adapters (file, email, calendar, etc.) because those have no subprocess to confine — the adapter itself *is* the boundary.
+
+See [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment) and [executor/security-model.md](executor/security-model.md#the-philosophy-prevention-not-containment) for the full argument.
+
+---
+
+## Q10. Does the executor run as root?
 
 No. The executor service process is normally a normal-user process. Only the executor's `RUN_COMMAND` child sandbox subprocess can request root through `sudo -n sandbox-exec`, and only when:
 
@@ -145,7 +159,7 @@ See [docs/root_demo/executor-root-mode.md](root_demo/executor-root-mode.md) for 
 
 ---
 
-## Q10. What does IntentFrame not claim?
+## Q11. What does IntentFrame not claim?
 
 This list is the *epistemic* version: what we deliberately do not assert. The matching *operational* list — concrete attack categories that are out-of-scope for the boundary — lives in [docs/threat-model.md § Out-of-Scope Attacks](threat-model.md#out-of-scope-attacks). The README's "Does NOT protect" bullets are the high-impact subset of both. The three lists are intentionally redundant at different scopes; they should never contradict.
 

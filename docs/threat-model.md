@@ -1,14 +1,23 @@
 # IntentFrame Threat Model
 
-IntentFrame is a **runtime security control plane for AI-decided actions**. The same control plane that automates human oversight (see [README](../README.md) and [docs/architecture.md](architecture.md)) is, when viewed from the security side, a containment boundary against agent compromise.
+IntentFrame is a **runtime security control plane for AI-decided actions**. The same control plane that 
+automates human oversight (see [README](../README.md) and [docs/architecture.md](architecture.md)) is, when 
+viewed from the security side, a containment boundary against agent compromise.
 
-This document describes the security side: what the boundary protects against, what it does not, and what would refute the claim.
+This document describes the security side: what the boundary protects against, what it does not, and what 
+would refute the claim.
+
+IntentFrame's goal is **full delegatable autonomy** for AI agents — the licensing-shape structural supervision layer that makes operationally autonomous agents safe to leave alone (see [autonomy.md](autonomy.md)). This document is the same system viewed from the security side: what the structural supervision blocks, what it does not, and what would refute the claim.
 
 The threat model does not claim the agent LLM is safe, unjailbreakable, or aligned. It assumes the agent may already be confused, compromised, prompt-injected, or hallucinating, and asks a narrower question:
 
 > Before this agent action touches the user's world, does it pass policy, deterministic gates, semantic review, and executor constraints?
 
-The system is best understood as post-compromise containment for agent actions, not prompt-injection prevention for the agent. Both framings — "automate oversight" and "post-compromise containment" — describe the same pipeline; the first emphasises what it does for the user, the second emphasises what it withstands from the agent.
+**Autonomy is not the threat. Unsupervised autonomy is.** The threat model addresses the failure mode of today's agent frameworks — operational autonomy without structural supervision, which is what produces the news stories. IntentFrame's structural supervision (pre-declared policy, deterministic gates, semantic review, executor isolation, audit trail) is precisely what removes that failure mode without removing the autonomy. The agent stays operationally autonomous. The structure holds the boundary at the moment the action would touch the world.
+
+The system is best understood as **post-compromise structural supervision** for agent actions, not prompt-injection prevention for the agent. Both framings — "structural supervision for delegatable autonomy" and "post-compromise containment of agent actions" — describe the same pipeline; the first emphasises what it does *for* the user (and the agent), the second emphasises what it withstands *from* the agent.
+
+> **A note on terminology.** This document uses "containment" to mean *containing a compromised agent's ability to take harmful actions* — the post-compromise boundary IntentFrame draws around the agent process. That is different from "containment" in the traditional sandboxing sense (let actions execute, then restrict their consequences at the kernel level). IntentFrame's boundary is a **prevention** boundary, not a sandboxing boundary: dangerous actions are blocked before they execute, not contained after they run. The kernel sandbox under `RUN_COMMAND` exists as a safety net for the rare case where prevention fails — not as the primary defense. See [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment).
 
 ---
 

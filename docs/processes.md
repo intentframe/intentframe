@@ -334,7 +334,7 @@ By default, **every IntentFrame process runs as the normal user**. None of them 
 - Even when escalated, the subprocess runs inside a kernel-enforced Seatbelt sandbox.
 - The executor service itself, the gateway, the supervisor, the policy services, the agent — all run as the normal user.
 
-See [faq.md § Q9](faq.md#q9-does-the-executor-run-as-root) and [root_demo/executor-root-mode.md](root_demo/executor-root-mode.md) for the full privilege model.
+See [faq.md § Q10](faq.md#q10-does-the-executor-run-as-root) and [root_demo/executor-root-mode.md](root_demo/executor-root-mode.md) for the full privilege model.
 
 ---
 
@@ -376,5 +376,5 @@ The supervisor's four core services (`policy-registry`, `resource-registry`, `ex
 - [executor/architecture.md](executor/architecture.md) — Executor internals (note: that doc's "four layers" are *internal* to the executor process; not to be confused with the four supervised services here)
 - [executor/why-foundation.md](executor/why-foundation.md) — Why process isolation matters for safety
 - [architecture.md](architecture.md) — The pipeline architecture (logical, not process-level)
-- [faq.md § Q9](faq.md#q9-does-the-executor-run-as-root) — Privilege model
+- [faq.md § Q10](faq.md#q10-does-the-executor-run-as-root) — Privilege model
 - [`../external_data_ingestion/README.md`](../external_data_ingestion/README.md) — EDI design and configuration

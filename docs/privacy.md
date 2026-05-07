@@ -232,7 +232,7 @@ These are honest limitations, not hidden behaviors:
 - **Logs may contain intent text** — action types, targets, reasons, paths, and decision paths appear in plaintext logs. Credentials are scrubbed; intent metadata is not.
 - **No log rotation** — logs in `~/.intentframe/logs/` grow without bound until you rotate them externally. (Tracked.)
 - **OpenAI is the AI provider** — the AE and Guardian are tied to OpenAI in the current implementation. Provider abstraction is on the roadmap (Anthropic, local models). Until then, your AE/Guardian prompts are subject to OpenAI's data policies.
-- **Off-host audit retention is not shipped** — audit logs are local SHA-256 hash-chained but not signed for off-host integrity. See [faq.md § Q10](faq.md#q10-what-does-intentframe-not-claim).
+- **Off-host audit retention is not shipped** — audit logs are local SHA-256 hash-chained but not signed for off-host integrity. See [faq.md § Q11](faq.md#q11-what-does-intentframe-not-claim).
 - **Jarvis memory embeddings live with OpenAI metadata** — embeddings are stored locally, but the model that produced them is OpenAI's. You can clear `~/.intentframe/jarvis/memory.db` to reset.
 
 ---

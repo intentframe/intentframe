@@ -10,10 +10,11 @@ This is the entry point. Pick the path that matches what you came here to do.
 
 If you're new to IntentFrame, read in this order:
 
-1. **[quickstart.md](quickstart.md)** — install, first run, demo commands
-2. **[architecture.md](architecture.md)** — the full pipeline (agent → actor → analysis engine → guardian → executor)
-3. **[principles.md](principles.md)** — the invariants behind the design, stated concisely
-4. **[evidence.md](evidence.md)** — test results, root demo, failure reports
+1. **[autonomy.md](autonomy.md)** — what IntentFrame is for: delegatable autonomy for AI agents, the licensing-shape thesis
+2. **[quickstart.md](quickstart.md)** — install, first run, demo commands
+3. **[architecture.md](architecture.md)** — the full pipeline (agent → actor → analysis engine → guardian → executor)
+4. **[principles.md](principles.md)** — the structural invariants that implement the autonomy thesis
+5. **[evidence.md](evidence.md)** — test results, root demo, failure reports
 
 ---
 
@@ -24,6 +25,11 @@ If you're new to IntentFrame, read in this order:
 - [quickstart.md](quickstart.md) — install, configure OpenAI key, run the gateway, run the demo
 - [processes.md](processes.md) — what processes will be running on your machine after startup
 - [faq.md](faq.md) — common setup and operational questions
+
+### "What is this for, conceptually?"
+
+- [autonomy.md](autonomy.md) — the canonical thesis: delegatable autonomy as the goal, structural supervision as the means, the professional-licensing analogy
+- [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment) — why IntentFrame blocks before execution instead of sandboxing after
 
 ### "What does it actually protect against?"
 
@@ -82,8 +88,9 @@ If you're new to IntentFrame, read in this order:
 
 | Doc | What it covers |
 |---|---|
+| [autonomy.md](autonomy.md) | The thesis: delegatable autonomy as the goal, structural supervision as the means, professional licensing as the analogy |
 | [architecture.md](architecture.md) | The logical pipeline, the separation invariant, fast-path security, the no-self-IO principle |
-| [principles.md](principles.md) | The invariants behind the design |
+| [principles.md](principles.md) | The invariants that implement the thesis |
 | [threat-model.md](threat-model.md) | What's protected, what isn't, the trust boundaries |
 | [evidence.md](evidence.md) | Test results and proof artifacts |
 | [faq.md](faq.md) | Common questions and objections |

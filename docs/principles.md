@@ -1,14 +1,18 @@
 # IntentFrame Principles
 
-IntentFrame is a **runtime security control plane for AI-decided actions**. The effect of that control plane is that it automates the human oversight you would otherwise perform manually — reading every action, applying judgment, clicking approve or reject. The agent does the work; IntentFrame automates the supervision.
+IntentFrame is a **runtime security control plane for AI-decided actions**. The effect of that control plane 
+is that it automates the human oversight you would otherwise perform manually — reading every action, applying 
+judgment, clicking approve or reject. The agent does the work; IntentFrame automates the supervision.
 
-The principles below are the structural invariants that make that control plane trustworthy. Each is a structural guarantee, not a guideline. If any is violated, the security model is broken.
+Our goal is **full delegatable autonomy** for AI agents — the same kind of autonomy that licensed professionals (surgeons, pilots, engineers) already have, brought into being for AI agents for the first time. The means is **structural supervision**: pre-declared policy, deterministic gates, semantic review, executor isolation, and an immutable audit trail. The agent stays operationally autonomous; the structure holds the boundaries. See [autonomy.md](autonomy.md) for the full thesis.
+
+The principles below are the structural invariants that make that supervision trustworthy. Each is a structural guarantee, not a guideline. If any is violated, the model is broken — and the system collapses back into one of the two unscalable alternatives: trust by faith, or manual approval of every action.
 
 ---
 
 ## 1. IntentFrame gates AI-decided actions, not all code
 
-IntentFrame gates the non-deterministic operations an LLM chooses at runtime — the 5% of an agent program where the model makes decisions about what to do next. The 95% of deterministic, developer-written code runs freely without IntentFrame involvement.
+IntentFrame applies structural supervision to the non-deterministic operations an LLM chooses at runtime — the 5% of an agent program where the model decides what to do next. The 95% of deterministic, developer-written code runs freely. The agent's reasoning, planning, and tool selection are all uncovered: the agent decides everything *operationally*, and only when an action would touch the user's world does the pipeline render a judgment.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -34,15 +38,36 @@ IntentFrame gates the non-deterministic operations an LLM chooses at runtime —
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Traditional security tools (code review, static analysis, unit tests, sandboxing) work on deterministic code. None work for AI-decided actions because the code doesn't exist until the LLM generates intent at runtime. You cannot code-review a decision that hasn't been made yet. You cannot write a unit test for an action the LLM hasn't chosen yet. IntentFrame fills this gap: runtime validation of non-deterministic decisions before they become real-world actions.
+Traditional security tools (code review, static analysis, unit tests, sandboxing) work on deterministic code. None work for AI-decided actions because the code doesn't exist until the LLM generates intent at runtime. You cannot code-review a decision that hasn't been made yet. You cannot write a unit test for an action the LLM hasn't chosen yet. IntentFrame fills this gap: structural supervision of non-deterministic decisions, applied at the moment they would become real-world actions.
 
-The developer's deterministic code is their responsibility — reviewable, testable, accountable. The LLM's runtime decisions are nobody's responsibility — until IntentFrame makes them its own.
+The developer's deterministic code is their responsibility — reviewable, testable, accountable. The LLM's runtime decisions had no responsible structure — until IntentFrame supplied one.
 
-> Traditional security handles deterministic code. IntentFrame handles non-deterministic decisions. Together, the whole agent program is covered.
+> Traditional security handles deterministic code. IntentFrame handles non-deterministic decisions. Together, the whole agent program is covered — and the agent retains full operational autonomy over the part where autonomy actually matters (reasoning, planning, iteration), with structural supervision only at the boundary where actions touch the world.
 
 ---
 
-## 2. Thought must not directly become action
+## 2. Prevention before containment
+
+IntentFrame is a *prevention* system, not a *containment* system. The pipeline exists to detect and block dangerous actions before they execute — not to let actions through and restrict their consequences afterwards.
+
+| Prevention model (IntentFrame) | Containment model (traditional sandboxing) |
+|---|---|
+| Understand → Block if dangerous → Execute if safe | Let action through → Restrict what it can do |
+| Everything reaching the executor is guaranteed safe | Executor must restrict every action |
+| Executor runs with full privileges | Executor runs with limited privileges |
+| Agent has effective root access — through the pipeline | Agent has restricted access — limited by sandbox |
+
+This is why the prevention pipeline (`command_shield`, `DeterministicGuardian`, Analysis Engine, AI Guardian, adapter `quick_check()`) is the product. The kernel sandbox under `RUN_COMMAND` is a non-negotiable safety net for the rare cases where prevention fails — not the primary defense.
+
+The choice has direct consequences. Containment-based agent security limits agent capability by construction: the more you sandbox, the less the agent can do, even when behaving correctly. Prevention-based security allows full capability when the agent is behaving correctly and zero capability when it isn't. There is no "limited but always available" middle state — the gate is open for safe actions and closed for unsafe ones.
+
+> Prevention gives the agent maximum capability. Containment restricts it. IntentFrame chooses prevention because that is the only model where full capability and full safety can coexist.
+
+For the philosophy applied to `RUN_COMMAND` specifically — the only action type that requires both prevention and containment — see [executor/security-model.md](executor/security-model.md#the-philosophy-prevention-not-containment).
+
+---
+
+## 3. Thought must not directly become action
 
 An AI agent's reasoning must never result in direct execution. Every action the agent decides to take must pass through the IntentFrame pipeline as a structured Intent Frame — a proposal, not a command.
 
@@ -52,7 +77,7 @@ This is the fundamental separation: desire is separated from action, mediated by
 
 ---
 
-## 3. No Self-IO
+## 4. No Self-IO
 
 No component of the IntentFrame pipeline — Guardian, Analysis Engine, Actor, or the Runtime itself — may trigger, consume, or act upon any resource or IO service.
 
@@ -67,7 +92,7 @@ If Guardian wants to ask the user a question, it cannot trigger `ASK_USER` direc
 
 ---
 
-## 4. Policy immutability
+## 5. Policy immutability
 
 Policies are static for the lifetime of a task. They are loaded at handshake and never change until the task completes. Nothing that happens during execution — no user response, no adapter result, no agent request — can alter, override, or extend the policies that Guardian enforces.
 
@@ -93,7 +118,7 @@ The `active_domains` set passed to Guardian is also part of policy, not AI: it i
 
 ---
 
-## 5. Deterministic before AI
+## 6. Deterministic before AI
 
 Deterministic enforcement always runs first. AI evaluation only occurs for actions that pass all deterministic checks and cannot be decided without semantic judgment.
 
@@ -120,7 +145,7 @@ This is the same shape as defense-in-depth in any security system: many ways to 
 
 ---
 
-## 6. AI is bounded, not sovereign
+## 7. AI is bounded, not sovereign
 
 The AI layers (Analysis Engine and Guardian) carry real authority for semantic judgment, but that authority is bounded:
 
@@ -133,7 +158,7 @@ The AI is trusted for semantic review inside the policy envelope. It is not the 
 
 ---
 
-## 7. Executor as enforcement point
+## 8. Executor as enforcement point
 
 The Executor is the sole entity with credentials and real execution capability. It is the only component that touches the real world. This makes it the last physical enforcement point.
 
@@ -146,7 +171,7 @@ The agent has no direct IPC or credential access to the Executor. Communication 
 
 ---
 
-## 8. Auditability
+## 9. Auditability
 
 Every intent's journey through the pipeline is recorded with:
 

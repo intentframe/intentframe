@@ -1,10 +1,30 @@
 # IntentFrame
 
-> **Automate the human oversight of AI agents.**
+> **Delegatable autonomy for AI agents and Automating the human oversight.**
 
-When you let an AI agent work for you, YOU are currently the safety system - reviewing every action, making judgment calls, clicking approve/reject. IntentFrame automates that supervision.
+When you let an AI agent work for you, YOU are currently the safety system - reviewing every action, making 
+judgment calls, clicking approve/reject. IntentFrame automates that supervision.
+
+An AI agent is useful in proportion to the actions it can take on your behalf.
+Today, you have two options. You can give the agent the keys and hope — most
+agent frameworks do this, and the news stories write themselves. Or you can
+sit in the loop, approving every action — which works for demos and stops
+working the moment "autonomous" matters.
+
+IntentFrame is the third option. **It is the structural supervision layer
+that makes AI agents delegatable** — the same way medical licensing,
+scope-of-practice rules, and malpractice law make human surgeons delegatable.
+The agent stays operationally autonomous: it decides, plans, and acts on its
+own. The structural supervision — pre-declared policy, deterministic gates,
+semantic review, executor isolation, audit trail — runs in the background.
+You don't watch the agent. You set the boundaries once, and the boundaries
+do the watching.
+
+That is what "autonomous AI agent" should mean, and currently doesn't.
 
 **The agent does the work. IntentFrame automates the oversight.**
+
+See [docs/autonomy.md](docs/autonomy.md) for the full thesis.
 
 ---
 
@@ -14,9 +34,35 @@ Today, when you connect an AI agent to your email, calendar, or terminal, **you*
 become the safety system — reading every action, making judgment calls, clicking
 approve or reject. That doesn't scale.
 
+Every consequential profession humans have ever built — surgery, aviation,
+finance, law, structural engineering — solved the same problem: how do you
+let someone act on your behalf without watching them do it? The answer was
+never "remove their autonomy." The answer was always *structural supervision*:
+licenses, scope rules, audits, malpractice. The professional decides
+operationally; the system bounds them structurally.
+
+AI agents are stuck before that step. They have operational autonomy (they
+can act), but no structural supervision (no licensing-shape boundary). So
+users are forced into one of two unscalable choices: trust by faith, or
+manual approval of every action. Neither is delegatable autonomy. One is
+gambling, the other is just you with extra steps.
+
 IntentFrame separates the work from the oversight. Every agent action flows
 through a policy pipeline — Analysis Engine, Guardian, Executor — so no single
 component can think, judge, and act on its own.
+IntentFrame builds the missing structural supervision. Every agent action
+flows through a policy pipeline — Analysis Engine, Guardian, Executor — so
+no single component can think, judge, and act on its own. The agent retains
+full operational autonomy. The system holds the boundaries.
+
+**Prevention, not containment.** IntentFrame blocks dangerous AI-decided
+actions *before* they execute, instead of letting them through and trying to
+restrict their consequences. That is why agents using IntentFrame can have
+full capability — including effective root-level execution — without the
+usual sandboxing tradeoffs. Everything that reaches the executor has already
+been judged safe; the kernel sandbox is a safety net, not the primary
+boundary. See
+[Principle 2: Prevention before containment](docs/principles.md#2-prevention-before-containment).
 
 ---
 
@@ -105,17 +151,23 @@ which transactions were allowed, blocked, or required user confirmation.
 
 ## The Architecture
 
+The agent thinks, plans, and acts on its own. The pipeline judges each action
+at the boundary where it would touch your world.
+
 ```
-AI Agent: "I want to do X"
+AI Agent: "I want to do X"        ← operationally autonomous: decides everything
     ↓
-[Analysis Engine] → "What will this REALLY do?"
+[Analysis Engine] → "What will this REALLY do?"     ← independent peer-review analog
     ↓
-[Guardian] → "Is this allowed by user's policies?"
+[Guardian] → "Is this allowed by user's policies?"  ← credentialing-committee analog
     ↓
-[Executor] → Does it (if approved)
+[Executor] → Does it (if approved)                  ← the credentialed pharmacy
 ```
 
-**No single entity can THINK + UNDERSTAND + JUDGE + ACT.**
+**No single entity can THINK + UNDERSTAND + JUDGE + ACT.** The agent thinks.
+Each layer of the pipeline does exactly one thing. That separation is what
+makes the agent's autonomy structurally delegatable rather than just
+operationally hopeful.
 
 ---
 

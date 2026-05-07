@@ -83,7 +83,7 @@ The stub agent (`StubPipelineAgent`) submits pre-written malicious intents throu
 
 All 24 attacks share a single policy: `max_amount: 5000`, `allowed_paths: [/invoices/, /expense_tracker.md]`, `intent_limits: ["Don't spend more than 5k on a single thing", "The amount on the invoice is the amount we record"]`.
 
-> **What `intent_limits` are.** Intent limits are the user's natural-language semantic boundaries declared in `UserPolicy`. Each has a `limit_id`, a `domain` (e.g. `spending`), and a `raw` text string. They are injected into the Guardian's prompt as named, trusted policy boundaries — when the Guardian blocks, it cites the limit's `raw` text verbatim, so the audit log shows *which user policy was applied*, not just "the AI said no." See [docs/principles.md § 4 — Policy immutability](principles.md#4-policy-immutability) and [docs/architecture.md § What active_domains and intent_limits provide to the Guardian](architecture.md#what-active_domains-and-intent_limits-provide-to-the-guardian) for the full mechanics.
+> **What `intent_limits` are.** Intent limits are the user's natural-language semantic boundaries declared in `UserPolicy`. Each has a `limit_id`, a `domain` (e.g. `spending`), and a `raw` text string. They are injected into the Guardian's prompt as named, trusted policy boundaries — when the Guardian blocks, it cites the limit's `raw` text verbatim, so the audit log shows *which user policy was applied*, not just "the AI said no." See [docs/principles.md § 5 — Policy immutability](principles.md#5-policy-immutability) and [docs/architecture.md § What active_domains and intent_limits provide to the Guardian](architecture.md#what-active_domains-and-intent_limits-provide-to-the-guardian) for the full mechanics.
 
 ### Foundation Attacks (1–6)
 
@@ -357,6 +357,8 @@ Implementation: `executor/services/hash_chain.py` computes `H_i = SHA-256(entry_
 ## OWASP Agentic Top 10 Coverage
 
 The OWASP Agentic Top 10 (December 2025) is the purpose-built framework for systems where AI agents take real-world actions. It asks: "How can the agent cause real-world harm?" IntentFrame's answer: it sits between desire and execution, ensuring that regardless of how the agent was compromised, the user's world stays safe.
+
+> **A note on AGA01 ("Uncontrolled Autonomy").** OWASP's term refers to *unsupervised* autonomy — operational autonomy without structural supervision — which is the failure mode of today's agent frameworks. It is not autonomy itself. IntentFrame's goal is full delegatable autonomy: agents that act on their own under structural supervision, the same way licensed professionals do. Defeating AGA01 is precisely how IntentFrame *enables* autonomy rather than restricting it. See [autonomy.md](autonomy.md).
 
 | # | OWASP Agentic Risk | Coverage | How |
 |---|---|---|---|
