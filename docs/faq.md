@@ -64,11 +64,13 @@ The right answer is both: deterministic enforcement for known structures, AI eva
 
 ## Q4. Does this protect direct shell/file access outside IntentFrame?
 
-No. If a developer writes `os.system("rm -rf /")` directly in their Python code — bypassing the Actor SDK and `actor.submit()` — IntentFrame never enters the picture.
+IntentFrame's contract with the developer is one line: route every AI-decided I/O action through `actor.submit(...)`. That is the SDK boundary, and inside it there is no bypass path — the agent literally cannot execute without the runtime evaluating the intent first.
 
-The SDK approach requires developer cooperation: the developer routes AI-decided actions through `actor.submit()`. The developer's own deterministic code is their responsibility, handled by traditional security tooling.
+Outside the boundary, IntentFrame doesn't apply. If a developer writes `os.system("rm -rf /")` *directly* in their Python code — bypassing the Actor SDK entirely — IntentFrame never enters the picture for that line. The developer's own deterministic code is the developer's responsibility, the same way it would be without IntentFrame, and is handled by traditional security tooling (code review, static analysis, sandboxing).
 
-This is the cost of the SDK approach vs. a gateway/proxy model. Both require developer cooperation — IntentFrame requires it earlier in the stack (at SDK integration time), gateway approaches require it at proxy configuration time. IntentFrame's advantage: within the boundary, there is no bypass path. The agent literally cannot execute without going through the pipeline.
+This is the cost of the SDK approach vs. a gateway/proxy model. Both require developer cooperation — IntentFrame requires it earlier in the stack (at SDK integration time), gateway approaches require it at proxy configuration time. IntentFrame's advantage: the contract is exactly one method (`submit`), the integration is two-sided (your tool body calls it; nothing else has to change), and within the boundary the agent has no door to anywhere except `submit`. So as long as you funnel AI-decided I/O through it, no clever prompt and no LLM bug gets the agent past the runtime.
+
+For the developer-side framing of this contract, see [`actor-sdk.md`](actor-sdk.md).
 
 ---
 

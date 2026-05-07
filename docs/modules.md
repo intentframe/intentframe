@@ -328,10 +328,10 @@ A direct answer to "does docs/ cover all tracked workspace modules?":
 | `supervisor` | — | — | ✅ via [processes.md](processes.md), [credentials-vault.md](credentials-vault.md) |
 | `intentframe_cli` | ✅ | — | ✅ via [quickstart.md](quickstart.md) |
 | `intentframe_dashboard` | — | — | ✅ via [quickstart.md](quickstart.md) and demo |
-| `intentframe_actor` | — | — | ✅ via [architecture.md](architecture.md) |
-| `jarvis_pa` | ✅ | — | ✅ via [processes.md](processes.md), module README |
-| `jarvis_telegram` | ✅ | — | ✅ via module READMEs |
-| `external_agents` | — | — | ✅ via [architecture.md](architecture.md), `invoice_bot` example |
+| `intentframe_actor` | — | ✅ [actor-sdk.md](actor-sdk.md) | ✅ |
+| `jarvis_pa` | ✅ | ✅ [jarvis.md](jarvis.md) | ✅ |
+| `jarvis_telegram` | ✅ | ✅ [jarvis-telegram.md](jarvis-telegram.md) | ✅ |
+| `external_agents` | — | ✅ via [actor-sdk.md](actor-sdk.md) | ✅ via [architecture.md](architecture.md), `invoice_bot` example |
 
 ---
 
@@ -339,11 +339,9 @@ A direct answer to "does docs/ cover all tracked workspace modules?":
 
 These are deliberate choices, documented so they don't look accidental:
 
-- **No public doc for `intentframe_actor`.** The Actor SDK's surface is one class and ~5 methods. The `__init__.py` docstring is sufficient. A future dedicated SDK doc may be added when the agent-developer audience grows.
 - **No public doc for `intentframe_dashboard`.** The dashboard is the platform's admin API; the demo shows how it's used. A dedicated doc would be appropriate when the dashboard gets a UI beyond the current programmatic / config-file interface.
 - **No public doc for `intentframe_server` / `intentframe_components`.** They're the implementation of the pipeline that's already documented at the right level in [architecture.md](architecture.md). Splitting them out would duplicate without adding clarity.
 - **No public doc for `executor_client`.** Pure plumbing — the public-facing details are the executor's, not the client's.
-- **No public doc for `jarvis_pa` / `jarvis_telegram`.** These are user-facing reference applications, not platform infrastructure. Their READMEs are user-targeted.
 
 ---
 
