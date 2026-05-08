@@ -30,19 +30,29 @@
 
 It's 2026. AI agents can now read your email, run terminal commands, send messages on your behalf, edit your files, and so on. They're useful. They're also one bad decision away from deleting your tax returns, leaking a credential, or running a command that quietly pwns your laptop.
 
-The way the industry currently solves this is to put **you** in the loop. Every action, an approval popup. Every command, a click. You become the safety system. That works for a demo. It doesn't work the moment you actually want the agent to *do* anything autonomously.
+Today's industry has two answers, both bad. IntentFrame is a third:
 
-The other "solution" is to trust the agent. Let it think, decide, and act, all in one mind, holding all your credentials. That's how every assistant you've ever installed works today. It's also how every prompt-injection screenshot on Twitter happens.
+|                       | 👁️ Human-in-the-loop          | 🤝 Trust the agent               | 🚪 **IntentFrame**                |
+| --------------------- | ----------------------------- | -------------------------------- | --------------------------------- |
+| **Who decides?**      | You, on every action          | The agent, alone                 | Agent proposes, runtime validates |
+| **Autonomy**          | None                          | Total                            | Bounded                           |
+| **Failure mode**      | Approval fatigue              | Prompt injection → game over     | Intent rejected, audited          |
+| **Holds credentials** | You                           | The agent                        | Isolated executor                 |
 
-IntentFrame is a third option.
+**The agent neither gets hands nor takes actions directly — it gets a slot under a door.**
 
-**The agent neither gets hands nor takes actions directly.** It gets a slot under a door.
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+    A["🤖 Agent<br/>(any LLM / framework)"] -->|"intent slip"| V{{"🚪 IntentFrame<br/>Validator"}}
+    V -->|"✓ allowed"| E["⚙️ Executor<br/>(holds credentials)"]
+    V -->|"✗ blocked"| X["📝 Audit log"]
+    E --> S["💻 Your machine<br/>files · network · money"]
+```
 
-It can think all it wants — plan, reason, retry, work through a multi-step task on its own — but anything that would touch your machine, your files, your credentials, or your money has to be written down on a slip of paper, slid under the door, and validated by something that doesn't share its mind.
+The agent can think all it wants — plan, reason, retry, work through a multi-step task on its own — but anything that would touch your machine, your files, your credentials, or your money has to be written down on a slip, slid under the door, and validated by something that doesn't share its mind. A separate program reads the slip, figures out what the action will *actually* do, checks it against your rules, and only then lets a small, deterministic executor carry it out.
 
-A separate program reads the slip, figures out what the action will *actually* do, checks it against your rules, and only then lets a small, deterministic executor carry it out.
-
-The agent decides what to do. IntentFrame decides whether it's safe to do.
+> **The agent decides what to do. IntentFrame decides whether it's safe to do.**
 
 This is the same pattern that runs every job we already trust with serious power. Surgeons cut on their own — inside medical licenses, hospital rules, and malpractice law. Pilots fly on their own — inside airspace rules, certifications, and air traffic control. Nobody watches a surgeon's every cut. Their autonomy works *because* the structure around them makes it safe to delegate.
 
