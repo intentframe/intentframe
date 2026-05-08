@@ -335,7 +335,7 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 ## 💻 Requirements
 
 - **Python 3.14+**
-- **macOS 14 (Sonoma) through macOS 26 (Tahoe)** for the Swift platform server (the core framework runs on any OS, but native macOS integrations — Calendar, Contacts, iMessage, Reminders — require the platform server). On macOS Tahoe, iMessage reading uses a typedstream decoder to handle Apple's `chat.db` schema-behavior change; see [`macos-appkit-server/docs/imessage-attributedbody.md`](macos-appkit-server/docs/imessage-attributedbody.md) for the technical details.
+- **macOS 14 (Sonoma) through macOS 26 (Tahoe), Apple Silicon (M1 or later)** — Intel Mac is not supported. The Swift platform server, Seatbelt sandbox, and `sandbox-exec` escalation path are tested exclusively on Apple Silicon. Native macOS integrations (Calendar, Contacts, iMessage, Reminders) require the platform server. On macOS Tahoe, iMessage reading uses a typedstream decoder to handle Apple's `chat.db` schema-behavior change; see [`macos-appkit-server/docs/imessage-attributedbody.md`](macos-appkit-server/docs/imessage-attributedbody.md) for the technical details.
 - **OpenAI API key** for the AI review layers (Analysis Engine and Guardian). Local-model support (Ollama, llama.cpp) is on the roadmap.
 - **`uv`** for workspace setup (the setup script installs it if missing).
 
