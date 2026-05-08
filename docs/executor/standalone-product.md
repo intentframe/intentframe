@@ -263,6 +263,55 @@ is a novel piece of infrastructure for the AI age.
 
 ---
 
+## Singletonness as a deployment property
+
+The kernel analogy is not just descriptive of *what* the Executor is — it
+also describes *how it is meant to run*. You don't run two kernels for two
+apps. You don't run two browsers in the same render pass. There is exactly
+one trusted runtime for the privileged surface, and every program on the
+machine is a client of it.
+
+The Executor is meant the same way: **one Executor per machine, mediating
+every agent on it.** The deployment model in [`../processes.md`](../processes.md)
+is intentionally one process tree per device. There is one credential vault
+because there is one Executor. There is one audit chain because there is
+one Executor. There is one policy surface because there is one Executor. n
+agents become clients of one trusted boundary instead of n separate trust
+footprints to vet independently.
+
+This is not an implementation accident; it is a load-bearing design choice
+that the rest of the security model depends on:
+
+- **Two executors** would mean credentials replicated across both, and an
+  agent that gets to *choose which executor to call* turns bypass into a
+  routing problem.
+- **Two policy pipelines** would mean an action allowed by one and blocked
+  by the other has ambiguous status; "allowed by IntentFrame" stops having
+  a single meaning.
+- **Two audit chains** would fork the tamper-evident record exactly when
+  you most need it to be linear.
+
+What singletonness costs the agent author is named honestly in
+[../single-runtime.md](../single-runtime.md): agents become clients of the
+runtime, not standalone artifacts; new action families are runtime-side
+adapters (~50–100 lines, see [architecture.md](architecture.md)), not
+in-process function tools; the runtime is a dependency. Mitigations are
+AGPL-3.0, the small executor surface, the config-driven action registry,
+and a one-method agent-side seam (`actor.submit(...)`) — see
+[../actor-sdk.md](../actor-sdk.md).
+
+What singletonness *gives* — and what no other model in the landscape
+gives — is the property that the trust calculation is tractable: **one
+runtime to vet, one runtime to update, one runtime to audit, n agents to
+use freely.**
+
+For the public-audience version of this argument, including comparison
+tables against function-tools-in-process, MCP, Composio, Apple Shortcuts,
+and Open Interpreter from the *singletonness* angle, see
+[../single-runtime.md](../single-runtime.md).
+
+---
+
 ## Why this matters
 
 The shift the Executor enables is the shift from:
@@ -297,6 +346,7 @@ the ecosystem currently lacks.
 ## Related documents
 
 - [../executor.md](../executor.md) — The Executor overview
+- [../single-runtime.md](../single-runtime.md) — One runtime per machine, the singletonness argument in public-audience form
 - [architecture.md](architecture.md) — Internal architecture and adapter pattern
 - [security-model.md](security-model.md) — Prevention-first execution model
 - [why-foundation.md](why-foundation.md) — Why the Executor is the structural foundation

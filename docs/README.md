@@ -33,6 +33,7 @@ If you're new to IntentFrame, read in this order:
 
 - [autonomy.md](autonomy.md) — the canonical thesis: delegatable autonomy as the goal, structural supervision as the means, the professional-licensing analogy
 - [mental-models.md](mental-models.md) — seven on-ramps for understanding IntentFrame, from non-technical (pharmacy, contractor) to systems-engineer (kernel, database engine), each with what it gets right and where it breaks
+- [single-runtime.md](single-runtime.md) — *"one runtime per machine, mediating every agent on it"*; what singletonness means as a deployment property and what it asks of agents
 - [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment) — why IntentFrame blocks before execution instead of sandboxing after
 
 ### "What does it actually protect against?"
@@ -105,6 +106,7 @@ If you're new to IntentFrame, read in this order:
 |---|---|
 | [autonomy.md](autonomy.md) | The thesis: delegatable autonomy as the goal, structural supervision as the means, professional licensing as the analogy |
 | [mental-models.md](mental-models.md) | Seven analogies for understanding IntentFrame, from non-technical to systems-engineer, with honest "what each gets right / where it breaks" |
+| [single-runtime.md](single-runtime.md) | One runtime per machine; the singletonness property, the load-bearing reason it has to be a singleton, what it asks of agents and frameworks, the trade-offs named honestly, comparison to MCP / Composio / function-tools-in-process |
 | [architecture.md](architecture.md) | The logical pipeline, the separation invariant, fast-path security, the no-self-IO principle |
 | [principles.md](principles.md) | The invariants that implement the thesis |
 | [threat-model.md](threat-model.md) | What's protected, what isn't, the trust boundaries |

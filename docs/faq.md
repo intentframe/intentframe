@@ -191,6 +191,25 @@ That is concrete, testable, and falsifiable.
 
 ---
 
+## Q12. Does this lock me into IntentFrame for tool capabilities?
+
+Honestly: yes — at the runtime layer. This is the trade-off the design makes deliberately, and it deserves a straight answer.
+
+The model is a singleton: one IntentFrame runtime per machine, one Executor, one credential vault, one audit chain, one policy surface. Every agent on the machine is a *client* of that runtime. That is what makes the security story tractable — **one runtime to vet, n agents to use freely** — but it also means agents become clients of the runtime instead of standalone artifacts. If your agent needs an action that the Executor doesn't support yet (a new SaaS API, a new device capability, a new file format), you don't add a function tool to your agent — you add a runtime-side adapter (~50–100 lines per [executor/architecture.md](executor/architecture.md)) and wire it into the action registry. It is small code, but it is *runtime-side* code.
+
+Same shape of dependency exists with **MCP servers** (you depend on the MCP server author and the protocol), **Composio / Arcade.dev** (you depend on the platform, and your credentials live with them), **Kagent** (you depend on the runtime), **Apple Shortcuts** (you depend on Apple). The choice is which dependency to take, not whether to have one — anything that owns the credential boundary owns *some* dependency.
+
+What we ship to make the trade-off honest:
+
+- **AGPL-3.0** — anyone can fork and maintain the runtime independently of the original maintainer.
+- **Small executor surface** — adapters are ~50–100 lines each; the executor core is small enough to fork and audit.
+- **Config-driven action registry** — extending capabilities does not require modifying the executor core.
+- **No agent-layer lock-in** — the seam is one method (`actor.submit({...dict...})`); re-pointing your agent at a different IntentFrame fork is a config change, not a rewrite.
+
+What singletonness *gives* in return is the property no per-agent model gives: credentials, audit, and policy are unified at the device, not replicated across n agents that each have to be vetted independently. See [single-runtime.md](single-runtime.md) for the full development of this trade-off, including the migration friction sizing for retrofitting existing OSS agents.
+
+---
+
 ## Related Documents
 
 - [docs/threat-model.md](threat-model.md) — full threat model with in-scope / out-of-scope
@@ -199,3 +218,4 @@ That is concrete, testable, and falsifiable.
 - [docs/evidence.md](evidence.md) — test evidence and failure reports
 - [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) — the AI hybrid argument in depth
 - [docs/why-not-injection-shield.md](why-not-injection-shield.md) — injection shield decision record
+- [docs/single-runtime.md](single-runtime.md) — one runtime per machine; the singletonness property and its honest trade-offs
