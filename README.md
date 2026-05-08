@@ -296,17 +296,12 @@ SDK-level approval gates work the same way every approval gate works: they ask t
 The agent thinks and plans on its own. The pipeline judges each proposed action at the boundary where it would touch your world.
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     A["🤖 AI Agent<br/><i>plans, reasons, decides</i>"] -->|proposes intent| B
     B["🔍 Analysis Engine<br/><i>What will this REALLY do?</i>"] -->|forensic report| C
     C["🛡️ Guardian<br/><i>Is this allowed by policy?</i>"] -->|allow / block| D
     D["⚙️ Executor<br/><i>deterministic — no AI</i>"] -->|if approved| E["💻 Real World<br/><i>files · network · APIs</i>"]
-
-    style A fill:#e1f5ff,stroke:#0366d6,color:#000
-    style B fill:#f6f8fa,stroke:#586069,color:#000
-    style C fill:#f6f8fa,stroke:#586069,color:#000
-    style D fill:#fff3cd,stroke:#856404,color:#000
-    style E fill:#d4edda,stroke:#28a745,color:#000
 ```
 
 **No single component can THINK + UNDERSTAND + JUDGE + ACT.** The agent thinks. Each layer of the pipeline does exactly one thing. That separation is what makes the agent's autonomy structurally safe to delegate, not just operationally hopeful.
