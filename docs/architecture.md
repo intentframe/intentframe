@@ -117,6 +117,23 @@ This is the L1–L5 numbering used in the diagram above and in [docs/threat-mode
 | L4 | Judges | Guardian | Partially trusted (AI) — but its deterministic step is fully trusted |
 | L5 | Acts | Executor + adapters | Trusted enforcement point |
 
+### View C — Bounded intelligence per layer (authority-based)
+
+This view is grouped by *what kind of authority each layer is allowed to wield*. Every layer is intelligent, but no layer combines all three of *thinking*, *judging*, and *acting* — each has **amputated authority** (specific cognitive capabilities, deliberately restricted power). This is what prevents any single component from running away with a decision.
+
+| Layer | Intelligence type | Allowed to | Forbidden from |
+|---|---|---|---|
+| **Actor (SDK)** | Syntactic + contextual | Validate structure, authenticate channel, enrich context, detect malformed requests | Reinterpret goals, optimize outcomes, decide policy exceptions, invent actions |
+| **Analysis Engine** | Semantic understanding | Predict what an action will *actually* do; report it as evidence | Make ALLOW/BLOCK decisions; modify the intent |
+| **Guardian** | Judgement (non-executive) | Evaluate intent vs policy, detect anomalies, reason over history, escalate uncertainty, deny | Take side effects, hold credentials, "helpfully" complete tasks, substitute its own goals |
+| **Executor** | Mechanical | Execute conditionally, retry intelligently, rollback, reason about failure modes | Question wisdom, modify intent, decide what's "good for user" |
+
+**Key principle:** *Intelligence is used to evaluate. Authority is restricted to permission/denial. Execution is mechanically bound.*
+
+**Why this doesn't recurse infinitely:** No layer can think → judge → act in one place. Guardian can judge but not act. Executor can act but not judge. Actor can parse but not decide. The Agent (L1) can think but not do anything else.
+
+This complements [docs/principles.md § 3 — Thought must not directly become action](principles.md#3-thought-must-not-directly-become-action), [§ 4 — No Self-IO](principles.md#4-no-self-io), and [§ 7 — AI is bounded, not sovereign](principles.md#7-ai-is-bounded-not-sovereign), and is shown from the developer-facing angle in [docs/actor-sdk.md § Platform Control Model](actor-sdk.md#platform-control-model).
+
 ### View B — Deterministic-vs-AI layers (control-flow-based)
 
 This is the L0–L4 numbering used by the code (`intentframe_components/guardian/deterministic.py`) and referenced in [docs/threat-model.md § What Is Hard-Enforced Without AI](threat-model.md#what-is-hard-enforced-without-ai), [docs/faq.md § Q2](faq.md#q2-what-if-the-guardian-llm-is-prompt-injected), and [docs/why-not-injection-shield.md](why-not-injection-shield.md). Layers are grouped by *what kind of check runs at each step*.

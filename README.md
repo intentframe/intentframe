@@ -1,7 +1,7 @@
 <h1 align="center">IntentFrame</h1>
 
 <p align="center">
-  <em>Hybrid (deterministic + LLM) security and safety runtime for agentic AI — built to maximise autonomy for AI agents.</em>
+  <em>Hybrid (deterministic + LLM) security and safety runtime for agentic AI — built to maximize autonomy for AI agents.</em>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ The other "solution" is to trust the agent. Let it think, decide, and act, all i
 
 IntentFrame is a third option.
 
-**The agent neither gets hands nor directly takes actions.** It gets a slot under a door.
+**The agent neither gets hands nor takes actions directly.** It gets a slot under a door.
 
 It can think all it wants — plan, reason, retry, work through a multi-step task on its own — but anything that would touch your machine, your files, your credentials, or your money has to be written down on a slip of paper, slid under the door, and validated by something that doesn't share its mind.
 
@@ -49,6 +49,16 @@ This is the same pattern that runs every job we already trust with serious power
 AI agents need the same scaffolding. IntentFrame is that scaffolding.
 
 That's the whole idea. The full thesis is in [`docs/autonomy.md`](docs/autonomy.md).
+
+---
+
+## 🖥️ An Operating System for Agency
+
+Think of IntentFrame not just as security software, but as an **Operating System for Agency**. Just as an OS manages hardware resources (CPU, RAM) and enforces permissions for untrusted apps, IntentFrame manages **agency resources** (money, data, actions) and enforces permissions for untrusted AI agents.
+
+> **Users trust a single runtime, not hundreds of agents.**
+
+Every agent on the device — whatever LLM, whatever framework, whatever vendor — submits intents through this same runtime. There is one executor that holds credentials. One audit chain. One policy surface. One door.
 
 ---
 
@@ -76,7 +86,7 @@ Current post-remediation result:
 >
 > **17 of 20 gray-area developer cases allowed; 3 conservatively blocked** (things like `brew services start redis` running as root that a careful human would also pause on).
 
-The point isn't *"we blocked attacks."* The point is the inversion: if a fully-compromised agent can't punch through the boundary, then an honest agent — one that's just fallible, not malicious — operating inside the same boundary is operationally safe to delegate real work to. Containment of the worst case is what makes autonomy of the normal case rational. That's the architectural claim the demo cashes out.
+The point isn't *"we blocked attacks."* The point is the inversion: if a fully compromised agent can't punch through the boundary, then an honest agent — one that's just fallible, not malicious — operating inside the same boundary is operationally safe to delegate real work to. Containment of the worst case is what makes autonomy of the normal case rational. That's the architectural claim the demo cashes out.
 
 ### 👵 The Grandma Limits
 
@@ -95,6 +105,8 @@ Every result above is reproducible from a fresh clone, with raw logs in [`docs/e
 ## 🔌 Bring Your Own Agent
 
 IntentFrame is **agent-agnostic**. Build with any LLM, any framework, any agent SDK — OpenAI Agents SDK, LangChain, AutoGen, Anthropic tool-use, a hand-rolled loop, whatever you reach for. The runtime doesn't care how your agent thinks. It cares what your agent tries to *do*.
+
+**IntentFrame validates OUTCOMES, not IMPLEMENTATIONS.**
 
 ---
 
@@ -119,7 +131,7 @@ You can also message Jarvis from your phone. A small [Telegram bridge](docs/jarv
 
 ## 🧠 The Mental Model
 
-A few mental models that make this click faster than any architecture diagram. Seven more, with where each analogy works and where it breaks down, are in [`docs/mental-models.md`](docs/mental-models.md).
+A few mental models that make this click faster than any architecture diagram. Seven more, including where each analogy works and where it breaks down, are in [`docs/mental-models.md`](docs/mental-models.md).
 
 **The hospital.** A doctor writes a prescription. A pharmacist verifies the dose, the interactions, the patient. A nurse administers it. Three roles, three minds, three checks. We don't do this because we don't trust doctors. We do it because *one mind that thinks, judges, and acts* is one mistake away from a dead patient. AI agents today are the doctor doing all three jobs. IntentFrame puts the pharmacist back. The executor is the nurse — trained to administer the dose, not to second-guess it.
 
@@ -153,7 +165,7 @@ The most important component in IntentFrame is not the AI reviewer.
 
 It's the executor.
 
-The executor is the only thing that touches your world. It holds credentials, owns IO surfaces, applies command sandboxing, writes the audit trail, and performs validated actions. **It has no AI in it. No LLM. No prediction. No fallback model. No judgment of its own.** It runs exactly the action that Guardian approved, inside a kernel-enforced sandbox, and nothing else.
+The executor is the only thing that touches your world. It holds credentials, owns I/O surfaces, applies command sandboxing, writes the audit trail, and performs validated actions. **It has no AI in it. No LLM. No prediction. No fallback model. No judgment of its own.** It runs exactly the action that Guardian approved, inside a kernel-enforced sandbox, and nothing else.
 
 That deterministic dumbness is its trustworthiness.
 
@@ -195,7 +207,7 @@ We'd rather under-promise than overclaim, so here's the honest version.
 - Over-limit transactions, off-policy spending, off-policy data exfiltration.
 - Semantic deception — when an agent's stated reason doesn't match what its action would actually do.
 - Every shell command runs inside a kernel-enforced sandbox (macOS Seatbelt) regardless of policy decision.
-- Tamper-evident audit trail (SHA-256 hash chain) on every decision, allow or block.
+- Tamper-evident audit trail (SHA-256 hash chain) on every decision, whether allow or block.
 
 **It does not protect:**
 
@@ -228,7 +240,7 @@ Reasonable question. Short answer: no, and here's why in one breath.
 
 Two LLMs would only fail the same way if they had the same job, the same input, and the same prompt. They don't.
 
-The agent reasons in natural language with your goal in mind. The Analysis Engine doesn't see the agent's prompt at all — it sees the proposed action, parses it, tags it, and writes a forensic report about what it actually does. The Guardian doesn't see the agent either; it sees that report plus your policy, and decides allow or block.
+The agent reasons in natural language with your goal in mind. The Analysis Engine doesn't see the agent's prompt at all — it sees the proposed action, parses it, tags it, and writes a forensic report about what it actually does. The Guardian doesn't see the agent either; it sees that report plus your policy, and decides whether to allow or block.
 
 Three minds, three different jobs, two of them never reading the agent's text. And underneath them sits an executor with **no AI in it at all**. No LLM. No prediction. No fallback model. It runs exactly the action Guardian approved, inside a kernel-enforced sandbox. So even if every AI layer in the system were compromised at once, the executor still cannot be talked into doing something that wasn't pre-approved. That's the bottom of the trust stack — and it isn't a model.
 
@@ -253,7 +265,7 @@ For Jarvis on a normal day, fewer than one in five actions invoke the AI Guardia
 ## 💬 Honest Questions, Honest Answers
 
 **"Does my data leave my machine?"**
-Some of it does. The Analysis Engine and Guardian use OpenAI models (`gpt-4o-mini` and `gpt-5-mini`), so the proposed action and your policy text are sent to OpenAI for evaluation when AI review is needed. The deterministic fast-path never makes a network call. Local model support (Ollama, llama.cpp) is on the roadmap. If your threat model prohibits sending action descriptions to a third-party API, today is too early for you. See [`docs/privacy.md`](docs/privacy.md) for what stays on disk and what leaves.
+Some of it does. The Analysis Engine and Guardian use OpenAI models (`gpt-4o-mini` and `gpt-5-mini`), so the proposed action and your policy text are sent to OpenAI for evaluation when AI review is needed. The deterministic fast-path never makes a network call. Local model support (Ollama, llama.cpp) is on the roadmap. If your threat model prohibits sending action descriptions to a third-party API, this release is too early for you. See [`docs/privacy.md`](docs/privacy.md) for what stays on disk and what leaves.
 
 **"What does this cost to run?"**
 The AI calls themselves are short — a proposed action and a policy snippet, not your whole conversation. In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
@@ -264,7 +276,6 @@ Honest answer: this is a first-party test suite, run locally against a custom at
 > [!IMPORTANT]
 > Independent third-party audit is a stated next milestone, not a current claim.
 
-
 **"Why isn't this just a feature built into AI agent SDKs?"**
 SDK-level approval gates work the same way every approval gate works: they ask the human. That solves the demo problem, not the autonomy problem. IntentFrame removes the agent's ability to act in the first place — that is a different shape of solution, and it doesn't compete with those gates so much as live underneath them.
 
@@ -272,7 +283,7 @@ SDK-level approval gates work the same way every approval gate works: they ask t
 
 ## 📐 Architecture at a Glance
 
-The agent thinks, plans, and acts on its own. The pipeline judges each action at the boundary where it would touch your world.
+The agent thinks and plans on its own. The pipeline judges each proposed action at the boundary where it would touch your world.
 
 ```mermaid
 flowchart TD
@@ -296,9 +307,9 @@ For the full pipeline, see [`docs/architecture.md`](docs/architecture.md).
 
 ## 🔌 Where Your Agent Plugs In
 
-The agent in the diagram above is *your* agent — any LLM, any framework. The seam between it and the IntentFrame pipeline is one method: `actor.submit(...)`. Every tool body calls it; nothing else changes. Reference integrations live in [`jarvis_pa/`](jarvis_pa/) and [`external_agents/invoice_bot/`](external_agents/invoice_bot/).
+The agent in the diagram above is *your* agent — any LLM, any framework. The seam between it and the IntentFrame runtime is one method: `actor.submit(...)`. Every tool body calls it; nothing else changes. The runtime owns credentials, validation, audit, and execution; your agent keeps reasoning, business logic, UI, and framework choice.
 
-Full integration guide, framework patterns (OpenAI Agents SDK, LangChain, raw tool-calls), scope, and quick answers: [`docs/actor-sdk.md`](docs/actor-sdk.md).
+Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-sdk.md). Why all agents share one runtime / one executor / one policy surface: [`docs/single-runtime.md`](docs/single-runtime.md). Reference integrations: [`jarvis_pa/`](jarvis_pa/) and [`external_agents/invoice_bot/`](external_agents/invoice_bot/).
 
 ---
 
@@ -309,10 +320,11 @@ Full integration guide, framework patterns (OpenAI Agents SDK, LangChain, raw to
 | Curious and want to try it | [`docs/quickstart.md`](docs/quickstart.md) → run Jarvis |
 | Wondering what Jarvis actually is | [`docs/jarvis.md`](docs/jarvis.md) → and [`docs/jarvis-telegram.md`](docs/jarvis-telegram.md) for the phone bridge |
 | Building your own agent on IntentFrame | [`docs/actor-sdk.md`](docs/actor-sdk.md) — bring any LLM/framework, integrate via `actor.submit(...)` |
+| Wondering why there is one runtime / one executor | [`docs/single-runtime.md`](docs/single-runtime.md) — one door for every agent action on the machine |
 | Wondering "what is this really for?" | [`docs/autonomy.md`](docs/autonomy.md) (the delegatable-autonomy thesis) |
 | A skeptic who wants to break it | [`docs/threat-model.md`](docs/threat-model.md) → [`docs/evidence.md`](docs/evidence.md) |
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
-| An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/executor.md`](docs/executor.md) |
+| An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/executor.md`](docs/executor.md) → [`docs/executor/standalone-product.md`](docs/executor/standalone-product.md) |
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
 | Looking for common objections answered | [`docs/faq.md`](docs/faq.md) |
@@ -327,7 +339,7 @@ Full integration guide, framework patterns (OpenAI Agents SDK, LangChain, raw to
 - **OpenAI API key** for the AI review layers (Analysis Engine and Guardian). Local-model support (Ollama, llama.cpp) is on the roadmap.
 - **`uv`** for workspace setup (the setup script installs it if missing).
 
-Linux and other model providers are on the roadmap.
+Linux support and additional model providers are on the roadmap.
 
 ---
 
@@ -421,13 +433,13 @@ There is currently no file-based or CLI-based way to customize policies without 
 
 A full policy-editing surface — via a web app, the CLI, or a macOS app — is planned for a future release.
 
-IntentFrame supports two filesystem tool families: workspace/VFS tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools (`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce either family, but real product profiles should usually expose only one family to a given LLM tool list. See [`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design guidance, tradeoffs, and test harness modes.
+IntentFrame supports two filesystem tool families: workspace/VFS tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools (`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce either family, but real product profiles should usually expose only one family to a given LLM tool list. See [`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design guidance, trade-offs, and test harness modes.
 
 ---
 
 ## 🚧 Project Status: Alpha
 
-Honest about it. The architecture is settled, the core pipeline is stable, the test suite is real, and the failure reports are in the repo. What's not done: independent third-party audit, Linux support, the gateway proxy mode, stateful multi-intent tracking, broader command coverage. Those are roadmap, not blockers for trying it out.
+Honest about it. The architecture is settled, the core pipeline is stable, the test suite is real, and the failure reports are in the repo. What's not done: independent third-party audit, Linux support, the gateway proxy mode, stateful multi-intent tracking, broader command coverage. Those are roadmap items, not blockers for trying it out.
 
 ---
 

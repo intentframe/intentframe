@@ -8,6 +8,81 @@ For the Actor's source, see [`../intentframe_actor/actor.py`](../intentframe_act
 
 ---
 
+## What this frees you from
+
+The point of routing tool I/O through one runtime is that **agent developers stop shipping security with every agent.** You focus on the agent. IntentFrame handles the rest.
+
+### Platform Control Model
+
+Two boxes — one for what the platform owns, one for what the developer owns. The line between them does not move.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  PLATFORM-CONTROLLED (IntentFrame)                       │
+│  • Actor SDK (cryptographically signed releases)         │
+│  • Analysis Engine (semantic understanding of actions)   │
+│  • Guardian: deterministic gates + AI judgement          │
+│  • Executor (the only entity with credentials)           │
+│  • All security logic                                    │
+│  • All AI prompts and validation rules                   │
+│  • Audit, hash chain, sandbox profiles                   │
+└──────────────────────────────────────────────────────────┘
+                          ▲
+                          │ Developers integrate via SDK
+                          │ Cannot modify security layers
+┌──────────────────────────────────────────────────────────┐
+│  THIRD-PARTY DEVELOPER CONTROLS                          │
+│  • Agent reasoning / business logic only                 │
+│  • Natural-language intent declarations                  │
+│  • Extension hooks (context, error handling, UI)         │
+│  • NEVER: Security logic, credentials, validation        │
+└──────────────────────────────────────────────────────────┘
+```
+
+> **Android parallel.** App developers write app logic. Android OS controls the permission system. Developers cannot modify how permissions work.
+>
+> **IntentFrame.** Agent developers write reasoning. IntentFrame controls Actor / Guardian / Executor. Developers cannot modify the security layers.
+>
+> **Trust model.** Users trust the platform once, not each individual agent. Like trusting iOS, not each app.
+
+### What Guardian validates (and what it doesn't)
+
+The split is sharper than it sounds. Guardian validates **outcomes**, not implementations.
+
+**Guardian DOES validate:**
+
+| Check | Question |
+|---|---|
+| **Action effect** | What will *actually* happen to the user's system? |
+| **User authority** | Does this user have permission for this effect? |
+| **Policy compliance** | Does this violate any user-defined rules? |
+| **Contextual integrity** | Does this make sense given what we know? |
+| **Anomaly detection** | Is this unusual compared to normal patterns? |
+
+**Guardian DOES NOT validate:**
+
+| Not checked | Why |
+|---|---|
+| Code syntax | That's the agent developer's job |
+| Implementation logic | That's the agent developer's job |
+| Algorithm efficiency | That's the agent developer's job |
+| Programming best practices | That's the agent developer's job |
+
+**Guardian validates OUTCOMES, not IMPLEMENTATIONS.** Everything between *"the agent decided to act"* and *"the action touches the world"* is the runtime's responsibility. Everything before *"the agent decided to act"* — the prompt, the model, the planning, the code that wraps `actor.submit()` — is yours.
+
+### What your agent does not have to ship
+
+- **Credential handling.** Your agent never holds the user's API keys, OAuth tokens, IMAP passwords, or service-account secrets. Those live with the executor.
+- **Authorization logic.** Whether action X is allowed for user Y is computed by the runtime against user-owned policy. Your agent doesn't decide; it asks.
+- **Outcome validation.** Will this command actually wipe a disk? Does this email address match the policy? Does this path escape the workspace? The Analysis Engine and Guardian answer these.
+- **Audit and tamper-evident logging.** The runtime keeps a SHA-256 hash-chained record of every intent, every decision, every execution. You don't need a logging strategy for security-relevant events; one is provided.
+- **Sandboxing for terminal commands and filesystem actions.** The executor wraps risky executions in an OS-level sandbox profile. You don't ship sandbox code in your agent.
+- **Prompt-injection containment for the action surface.** Even if your agent is fully prompt-injected, the action it submits is evaluated against policy on its own merits — the injection has to *also* fool an independent Guardian LLM that never saw the malicious prompt.
+
+What your agent *does* keep — and what the runtime explicitly **does not** touch — is in the next two sections. The split is intentional and load-bearing: it's the same split Android makes between "your app" and "the OS."
+
+---
+
 ## The contract
 
 IntentFrame makes **one** demand of an agent developer: every action that would touch the user's world — read a file, send an email, run a shell command, hit an API, query a database — must be expressed as a structured `IntentFrame` and submitted through the Actor SDK.
