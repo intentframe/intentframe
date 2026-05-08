@@ -451,6 +451,16 @@ Jarvis attempted `WRITE_FILE` with raw biodata (names, phone, email, address). T
 
 No PII regex, no keyword list, no specific "personal information" mention in AE or Guardian instructions. The layered design produced PII protection as an emergent property.
 
+### Encoded-payload guard (May 8, 2026)
+
+Another emergent property — no rule for "base64-like content" or "URL token entropy" exists in policy.
+
+User asked Jarvis to save the latest email to `~/Documents` via the host file tool. The email (an Indeed job alert) contained long URL-encoded tracking tokens. The Analysis Engine — applying its general "did the agent acknowledge what it's actually writing?" check — flagged the opaque high-entropy strings as a hidden behavior (`base64-like content in the payload was not acknowledged in the stated intent`). Guardian blocked with `data_deception` policy citation at MEDIUM risk, confidence 0.90.
+
+Jarvis received the block reason, sanitized the URLs (stripped the encoded query strings), updated its `reason` to explicitly acknowledge the transformation (`"sanitized URLs to remove long encoded tokens for safety"`), and re-submitted. The second attempt: AE LOW risk, confidence 0.95, no hidden-behavior flag; Guardian ALLOW; executor wrote the file.
+
+No regex for base64, no entropy threshold, no URL-token rule — the layered design produced encoded-payload hygiene as an emergent property, including the agent's self-correction loop in response to a Guardian block.
+
 ### Terminal command defense (March 7, 2026)
 
 First verified end-to-end defense against catastrophic terminal commands and social engineering:
@@ -479,6 +489,7 @@ First verified end-to-end defense against catastrophic terminal commands and soc
 | 2026-04-27 | Root-demo 100-intent sweep: 91/100 BLOCK, 9 slip-throughs on real hardware |
 | 2026-04-28 | Remediation: all 9 now BLOCK via new capability tags + policy constraints |
 | 2026-04-28 | Post-remediation: 100/100 BLOCK confirmed across all policy configurations |
+| 2026-05-08 | Emergent encoded-payload guard observed in production: Jarvis `WRITE_HOST_FILE` for an Indeed job-alert email blocked by Guardian (AE flagged unacknowledged base64-like tracking URLs as hidden behavior, MEDIUM, 0.90); agent self-corrected by sanitizing URLs and re-submitting with updated reason — second attempt ALLOW (LOW, 0.95) and executed |
 
 > **State of this document.** The dated measurements above (root-demo sweeps, the invoice/payment suite scorecard, and the transitive injection tallies) reflect runs through 2026-04-28. The codebase has continued to evolve — `command_shield`'s capability-tag set, the prompt-hardening primitives, and the deterministic test suites in `tests/` all keep accruing coverage in CI. The numbers cited in this document are not re-run on every commit; they are point-in-time measurements anchored to the dates shown. When a sweep is re-run with material changes, a new dated row is added to this table. If you are reading this near a release tag, treat the table as a *minimum* claim, not a current-as-of-today claim.
 
