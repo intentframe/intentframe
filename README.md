@@ -167,7 +167,6 @@ The fastest way to feel the difference is to use the assistant we built on top o
 What's different is that Jarvis doesn't have unchecked hands. Every single action it takes — reading a message, running a command, sending an email — goes through IntentFrame first. The agent reasons; IntentFrame decides if and how the action actually happens.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     autonumber
     actor U as You
