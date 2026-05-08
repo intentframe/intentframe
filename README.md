@@ -86,7 +86,7 @@ In this environment, we submitted **100 hand-crafted malicious intents** through
 
 The point of this test is **containment**, not model-refusal. It deliberately removes the agent model from the measurement and asks the only question that matters at the runtime boundary: *if a compromised agent submits a dangerous intent, does IntentFrame stop it before execution?*
 
-The attack corpus included 10 categories: disk wipes, DNS hijacks, ARP spoofing, reverse shells, credential exfiltration, kernel-extension and security-tool disabling, sudo escalation, encoded/obfuscated payloads, interpreter indirection, and social-engineered commands with harmless-looking reasons.
+The attack corpus covered 11 categories: filesystem destruction, persistence (LaunchDaemon/Agent, crontab, login hooks, PATH hijacks), privilege escalation, credential access (keychain, SSH keys, browser cookies), egress and reverse shells, network hijacking (DNS, ARP spoofing, route injection), security tool disabling, impact (ransomware simulation, disk erase, FileVault disable), encoded/obfuscated payloads, interpreter indirection, and social-engineered commands with harmless-looking reasons.
 
 Current post-remediation result:
 
