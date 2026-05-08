@@ -209,22 +209,15 @@ That's the difference, and it's the only difference that matters. Watching is wh
 
 We'd rather under-promise than overclaim, so here's the honest version.
 
-**It protects, today:**
-
-- Catastrophic shell commands — disk wipe, kernel extension loads, network hijacking, credential theft, reverse shells — caught before they reach the executor.
-- Prompt injection across 24 tested attack vectors — 23 defended, 0 bypassed, 1 known gap waiting on a planned cumulative-policy feature.
-- Unauthorized reads, writes, deletes outside the agent's policy.
-- Over-limit transactions, off-policy spending, off-policy data exfiltration.
-- Semantic deception — when an agent's stated reason doesn't match what its action would actually do.
-- Every shell command runs inside a kernel-enforced sandbox (macOS Seatbelt) regardless of policy decision.
-- Tamper-evident audit trail (SHA-256 hash chain) on every decision, whether allow or block.
-
-**It does not protect:**
-
-- Direct system calls that bypass the SDK boundary. (We can't catch what we never see. Same as every other security tool.)
-- A hostile local-root user who can kill the IntentFrame process itself.
-- Cumulative multi-step abuse where each individual step looks fine. (Stateful tracking is on the roadmap.)
-- Every novel attack pattern in the universe. (Coverage grows with every test we add.)
+| ✅ Protects today | ❌ Does not protect |
+| --- | --- |
+| Catastrophic shell commands — disk wipe, kernel extension loads, network hijacking, credential theft, reverse shells — caught before they reach the executor. | Direct system calls that bypass the SDK boundary. (We can't catch what we never see. Same as every other security tool.) |
+| Prompt injection across 24 tested attack vectors — 23 defended, 0 bypassed, 1 known gap waiting on a planned cumulative-policy feature. | A hostile local-root user who can kill the IntentFrame process itself. |
+| Unauthorized reads, writes, deletes outside the agent's policy. | Cumulative multi-step abuse where each individual step looks fine. (Stateful tracking is on the roadmap.) |
+| Over-limit transactions, off-policy spending, off-policy data exfiltration. | Every novel attack pattern in the universe. (Coverage grows with every test we add.) |
+| Semantic deception — when an agent's stated reason doesn't match what its action would actually do. | |
+| Every shell command runs inside a kernel-enforced sandbox (macOS Seatbelt) regardless of policy decision. | |
+| Tamper-evident audit trail (SHA-256 hash chain) on every decision, whether allow or block. | |
 
 The full threat model is in [`docs/threat-model.md`](docs/threat-model.md), and the full evidence package — including the failure-then-fix story — is in [`docs/evidence.md`](docs/evidence.md).
 
