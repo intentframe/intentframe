@@ -128,6 +128,32 @@ The fastest way to feel the difference is to use the assistant we built on top o
 
 What's different is that Jarvis doesn't have unchecked hands. Every single action it takes — reading a message, running a command, sending an email — goes through IntentFrame first. The agent reasons; IntentFrame decides if and how the action actually happens.
 
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+sequenceDiagram
+    autonumber
+    actor U as You
+    participant J as Jarvis (Agent)
+    participant IF as IntentFrame
+    participant E as Executor
+    participant M as macOS
+
+    U->>J: "Send the quarterly report to Alice"
+    J->>IF: submit(intent: SEND_EMAIL, to=alice@…, body=...)
+    IF->>IF: Analysis Engine — what does this REALLY do?
+    IF->>IF: Guardian — does policy allow it?
+    alt allowed
+        IF->>E: execute(validated intent)
+        E->>M: SMTP send via email client
+        M-->>E: ok
+        E-->>J: success + audit id
+        J-->>U: "Sent."
+    else blocked
+        IF-->>J: blocked + reason (cited policy)
+        J-->>U: "I can't do that — policy: not in allowed recipients."
+    end
+```
+
 You can try it in two terminal commands after setup, and you can watch the audit trail in real time as Jarvis works. When it's about to do something interesting, you'll see IntentFrame's pipeline evaluate it. When it tries something it shouldn't, you'll see exactly why it was blocked.
 
 Jarvis is the *"see, this is what it feels like when an agent runs without you babysitting it"* experience. IntentFrame is the part doing the work that makes that safe.
@@ -191,13 +217,13 @@ See [`docs/executor.md`](docs/executor.md) for the full design.
 
 There are other people working on this problem. None of them are taking the same approach.
 
-| Approach | Examples | What they do |
-|---|---|---|
-| Raw agent | Most assistants today | Trust the agent. Hope nothing goes wrong. |
-| Output filters / guardrails | Output validation libraries | Read the agent's output. Block bad text. The agent still acts. |
-| Approval popups | IDE assistants and agent SDKs that gate every tool call | Stop and ask the human before acting. Doesn't scale to autonomy. |
-| Policy proxy / gateway | Enterprise agent governance gateways | Wrap the agent in middleware. Watch its API calls. The agent still holds credentials. |
-| **Structural separation** | **IntentFrame** | **The agent has no hands. A separate runtime acts on validated intents.** |
+| Approach | Examples | What they do | Agent has hands? |
+|---|---|---|:---:|
+| Raw agent | Most assistants today | Trust the agent. Hope nothing goes wrong. | ✅ |
+| Output filters / guardrails | Output validation libraries | Read the agent's output. Block bad text. The agent still acts. | ✅ |
+| Approval popups | IDE assistants and agent SDKs that gate every tool call | Stop and ask the human before acting. Doesn't scale to autonomy. | ✅ |
+| Policy proxy / gateway | Enterprise agent governance gateways | Wrap the agent in middleware. Watch its API calls. The agent still holds credentials. | ✅ |
+| **Structural separation** | **IntentFrame** | **The agent has no hands. A separate runtime acts on validated intents.** | ❌ |
 
 The first four watch the agent. IntentFrame removes the agent's ability to act in the first place.
 
@@ -267,20 +293,36 @@ For Jarvis on a normal day, fewer than one in five actions invoke the AI Guardia
 
 ## 💬 Honest Questions, Honest Answers
 
-**"Does my data leave my machine?"**
+<details>
+<summary><strong>"Does my data leave my machine?"</strong></summary>
+
 Some of it does. The Analysis Engine and Guardian use OpenAI models (`gpt-4o-mini` and `gpt-5-mini`), so the proposed action and your policy text are sent to OpenAI for evaluation when AI review is needed. The deterministic fast-path never makes a network call. Local model support (Ollama, llama.cpp) is on the roadmap. If your threat model prohibits sending action descriptions to a third-party API, this release is too early for you. See [`docs/privacy.md`](docs/privacy.md) for what stays on disk and what leaves.
 
-**"What does this cost to run?"**
+</details>
+
+<details>
+<summary><strong>"What does this cost to run?"</strong></summary>
+
 The AI calls themselves are short — a proposed action and a policy snippet, not your whole conversation. In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
 
-**"How rigorous are the test numbers?"**
+</details>
+
+<details>
+<summary><strong>"How rigorous are the test numbers?"</strong></summary>
+
 Honest answer: this is a first-party test suite, run locally against a custom attack corpus. It is not an independent red team. It is not a novel-attack benchmark. It is reproducible from a fresh clone, and the failure runs are in the repo too.
 
 > [!IMPORTANT]
 > Independent third-party audit is a stated next milestone, not a current claim.
 
-**"Why isn't this just a feature built into AI agent SDKs?"**
+</details>
+
+<details>
+<summary><strong>"Why isn't this just a feature built into AI agent SDKs?"</strong></summary>
+
 SDK-level approval gates work the same way every approval gate works: they ask the human. That solves the demo problem, not the autonomy problem. IntentFrame removes the agent's ability to act in the first place — that is a different shape of solution, and it doesn't compete with those gates so much as live underneath them.
+
+</details>
 
 ---
 
@@ -342,6 +384,14 @@ Linux support and additional model providers are on the roadmap.
 ---
 
 ## 🚀 Get Started
+
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+    A["1 · Clone"] --> B["2 · bash intentframe_setup.sh"]
+    B --> C["3 · Add OpenAI key<br/>(prompted on first run)"]
+    C --> D["4 · uv run intentframe-gateway-cli<br/>→ chat with Jarvis"]
+```
 
 ### Fresh Clone
 
