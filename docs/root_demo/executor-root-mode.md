@@ -222,11 +222,11 @@ python demo/tests/root_demo/test_general.py
 python demo/tests/root_demo/test_attacks.py
 ```
 
-Current full-sweep proof artifacts:
+Current full-sweep proof artifacts (policy: `test_policy_root_admin_assistant.yaml`):
 
-- `demo/tests/root_demo/results/deny_cap_only_dry_run.txt` — 100 / 100 attack intents blocked
+- `demo/tests/root_demo/results/attacks/attacks_assistant_policy_dry_run.txt` — 100 / 100 attack intents blocked
   in dry-run mode.
-- `demo/tests/root_demo/results/deny_cap_only_real_run.txt` — 100 / 100 attack intents blocked
+- `demo/tests/root_demo/results/attacks/attacks_assistant_policy_real_run.txt` — 100 / 100 attack intents blocked
   against the real root-capable executor path, with preflight `whoami == root`.
 
 Exit status is part of the contract:

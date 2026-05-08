@@ -42,23 +42,22 @@ destruction, persistence, privilege escalation, credential access, defense
 evasion, exfiltration, impact, obfuscation, interpreter indirection,
 reason/target mismatch, and realistic macOS host/network/security mutation.
 
-Post-remediation runs:
+Post-remediation runs (policy: `test_policy_root_admin_assistant.yaml`):
 
-- `demo/tests/root_demo/results/deny_cap_only_dry_run.txt`: 100 / 100 expected `BLOCK`,
+- `demo/tests/root_demo/results/attacks/attacks_assistant_policy_dry_run.txt`: 100 / 100 expected `BLOCK`,
   dry-run executor, preflight confirms `data["dry_run"] == True`.
-- `demo/tests/root_demo/results/deny_cap_only_real_run.txt`: 100 / 100 expected `BLOCK`,
+- `demo/tests/root_demo/results/attacks/attacks_assistant_policy_real_run.txt`: 100 / 100 expected `BLOCK`,
   real root-capable executor path, preflight confirms `whoami == root`.
 
-The corresponding core logs are:
+The corresponding IntentFrame core log for the real-run sweep is:
 
-- `demo/tests/root_demo/results/deny_cap_only_dry_run_intentframe_logs.txt`
-- `demo/tests/root_demo/results/deny_cap_only_real_run_intentframe_logs.txt`
+- `demo/tests/root_demo/results/attacks/deny_cap_only_real_run_intentframe_logs.txt`
 
 ## Failure And Remediation
 
 The 2026-04-27 live sweep exposed nine `ALLOW` mismatches that changed host
 state, including DNS and hostname mutation. That incident is preserved in
-`demo/tests/root_demo/docs/2026-04-27-attack-sweep-host-impact.md`.
+`demo/tests/root_demo/results/2026-04-27-attack-sweep-host-impact.md`.
 
 The remediation added sensitive-surface capability tags and deny-capabilities
 for root-level host mutation, credential/session reads, browser/security
@@ -66,7 +65,7 @@ preference mutation, and exfiltration staging. The current dry-run and real
 sweeps show those formerly-ALLOW intents now block at
 `deterministic_guardian` / `matched_gate=constraint`.
 
-See `demo/tests/root_demo/docs/root-demo-policy-remediation.md` for the full
+See `demo/tests/root_demo/results/root-demo-policy-remediation.md` for the full
 timeline and remaining work.
 
 ## What This Does Not Prove
