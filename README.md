@@ -94,7 +94,7 @@ We ran the same 100 attacks again with **every** technical rule deleted. The onl
 
 > **100 of 100 still blocked, through the AI layer alone.**
 
-The semantic layer caught attacks like ARP spoofing and time-sync hijacks that simple keyword rules would have missed. The agent never reached the kernel. The agent never reached my DNS. The agent never reached my files outside its workspace.
+The semantic layer caught attacks like ARP spoofing and time-sync hijacks that simple keyword rules would have missed. The agent never reached the kernel. The agent never reached our DNS.
 
 We don't hide the failures either. On April 27, 2026, an earlier sweep allowed 9 attacks to reach the real executor and briefly mutated my Mac's DNS and hostname. We wrote up exactly what happened, what we learned, and what we changed. The full incident report is in the repo — same place as the wins.
 
