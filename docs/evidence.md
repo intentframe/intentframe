@@ -38,18 +38,19 @@ The 3 false positives (e.g., `brew services start redis`, temp file cleanup, rsy
 
 ### What the attack corpus covers
 
-10 distinct categories across the 100 attacks:
+11 distinct categories across the 100 attacks:
 
-1. **Privilege escalation** — sudo chains, SUID manipulation, capability abuse
-2. **Filesystem destruction** — `rm -rf /`, `mkfs`, `dd if=/dev/zero`
-3. **Credential theft** — SSH key exfiltration, keychain access, auth metadata
-4. **Data exfiltration** — curl/wget to external servers, DNS exfil, encoded payloads
-5. **Reverse shells** — bash, python, netcat, perl variants
-6. **Network hijacking** — DNS mutation, ARP spoofing, route injection
-7. **Security tool disabling** — EDR unload, firewall disabling, audit tampering
-8. **Encoded/obfuscated payloads** — base64, hex, ROT13, variable obfuscation
-9. **Interpreter indirection** — `python3 -c "import os; os.system(...)"`, bash -c chains
-10. **Social engineering with lying reasons** — benign-sounding reasons paired with destructive commands
+1. **Filesystem destruction** — `rm -rf /`, `mkfs`, `dd if=/dev/zero`, fork bomb, shutdown/reboot (11 intents)
+2. **Persistence** — LaunchDaemon/Agent bootstrap, crontab injection, login hooks, PATH hijack via `.bash_profile`/`.zshrc`, Python `.pth` auto-exec, `osascript` login items (11 intents)
+3. **Privilege escalation** — sudoers NOPASSWD, PAM pam_permit, `dscl` user/group creation, SUID binary, SSH authorized_keys injection (9 intents)
+4. **Credential access** — keychain read/dump, SSH private key, AWS credentials, Safari cookies, TCC.db, auth authority (7 intents)
+5. **Egress / C2** — curl-pipe-sh, wget-pipe-bash, netcat reverse shell, bash `/dev/tcp`, SSH tunnel, curl POST exfil, tar-pipe-nc, SCP exfil (8 intents)
+6. **Network hijacking** — DNS mutation via `/etc/hosts` and `networksetup`, ARP spoofing, default-route hijack, hostname takeover, NTP-off (part of realistic suite, 16 intents total)
+7. **Security tool disabling** — Gatekeeper off, SIP off, pf/application firewall off, NVRAM single-user boot, log erase, kext load, tccd unload, Time Machine disable (10 intents)
+8. **Impact** — ransomware simulation (OpenSSL bulk-encrypt), `diskutil eraseDisk`, `fdesetup disable`, `find -exec rm` on documents (4 intents)
+9. **Encoded / obfuscated payloads** — base64, hex printf, variable alias, `eval`, subshell, chained commands, string-split (11 intents)
+10. **Interpreter indirection** — `python3 -c "import os; os.system(...)"`, `python -c ctypes`, bash -c chains, `python urllib` remote exec (8 intents)
+11. **Social engineering with lying reasons** — benign-sounding reasons paired with destructive targets (5 intents)
 
 Each benign test deliberately mirrors a specific attack: benign #85 (`dig apple.com`) mirrors attack #85 (DNS exfiltration). This proves the pipeline distinguishes intent, not just command structure.
 
