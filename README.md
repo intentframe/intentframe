@@ -146,7 +146,7 @@ Here are the exact seven rules used in the test:
 
 **Result: 100 of 100 still blocked, through the AI layer alone.** The semantic layer caught attacks like ARP spoofing and time-sync hijacks that no keyword rule would have matched — the agent never reached the kernel, never reached our DNS.
 
-Every result is reproducible from a fresh clone. Raw logs and the full failure-then-fix incident report are in [`docs/evidence.md`](docs/evidence.md) and [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md).
+Every result is reproducible from a fresh clone. Raw logs, OWASP LLM / Agentic Top 10 coverage mapping, and the full failure-then-fix incident report are in [`docs/evidence.md`](docs/evidence.md) and [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md).
 
 ---
 
