@@ -50,10 +50,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
+import platform
+import socket
+import subprocess
 import sys
 import termios
 import time
 import tty
+from importlib.metadata import version as _pkg_ver
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -71,6 +76,7 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.spinner import Spinner
+from rich.table import Table
 from rich.text import Text
 
 from intentframe_server.client import IntentFrameClient
@@ -92,6 +98,61 @@ console = Console()
 _TYPEWRITER_DELAY      = 0.030   # per-char delay in user message reveal
 _INTER_SUBMISSION_GAP  = 0.6     # pause between attempts within turn 3
 _POST_DECISION_GAP     = 0.4     # pause after a decision panel renders
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Device-info helpers — same sources as root_test_runner._print_environment_block
+# ─────────────────────────────────────────────────────────────────────────
+
+def _os_str() -> str:
+    try:
+        name  = subprocess.check_output(
+            ["sw_vers", "-productName"],    text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        ver   = subprocess.check_output(
+            ["sw_vers", "-productVersion"], text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        build = subprocess.check_output(
+            ["sw_vers", "-buildVersion"],   text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        return f"{name} {ver} (Build {build})"
+    except Exception:
+        return platform.platform()
+
+
+def _cpu_brand() -> str:
+    try:
+        return subprocess.check_output(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return platform.processor() or platform.machine()
+
+
+def _mem_str() -> str:
+    try:
+        mem_bytes = int(subprocess.check_output(
+            ["sysctl", "-n", "hw.memsize"], text=True, stderr=subprocess.DEVNULL,
+        ).strip())
+        return f"{mem_bytes // (1024 ** 3)} GB"
+    except Exception:
+        return "unknown"
+
+
+def _intentframe_version() -> str:
+    try:
+        ver: str = _pkg_ver("intentframe")
+    except Exception:
+        ver = "unknown"
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        return f"{ver} (commit {sha})"
+    except Exception:
+        return ver
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -234,6 +295,76 @@ def _typewrite(msg: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────
 # Rich panel renderers
 # ─────────────────────────────────────────────────────────────────────────
+
+def _print_environment_panel(
+    *,
+    dry_run: bool,
+    whoami: str,
+    policy_path: "Path | None",
+) -> None:
+    """Two-panel startup banner: loud identity block + full device provenance.
+
+    Panel 1 — bold, colored, instantly readable in a recording:
+      real mode:    red border, "⚠ REAL HOST EXECUTION  root @ hostname"
+      dry-run mode: yellow border, soft copy
+
+    Panel 2 — same fields as root_test_runner._print_environment_block,
+    rendered as a compact Rich Table.grid inside a neutral panel.
+    """
+    hostname = socket.gethostname()
+
+    # ── Panel 1: loud banner ───────────────────────────────────────────────
+    if dry_run:
+        banner = Text.from_markup(
+            f"  [bold yellow]dry-run[/]  ·  no host I/O  ·  "
+            f"[dim]simulated as {whoami or 'root'}  @  {hostname}[/]"
+        )
+        banner_border = "yellow"
+    else:
+        banner = Text.from_markup(
+            f"  [bold red on white] ⚠  REAL HOST EXECUTION [/]"
+            f"  [bold]{whoami or 'root'}[/]  @  [bold]{hostname}[/]\n"
+            f"  [red]Allowed commands will run on this machine.[/]"
+        )
+        banner_border = "red"
+
+    console.print(Panel(banner, border_style=banner_border, padding=(0, 1)))
+
+    # ── Panel 2: device provenance grid ───────────────────────────────────
+    executor_str = (
+        "dry-run  (DryRunExecutor — no host I/O)"
+        if dry_run
+        else "real  (profile=root, commands will execute on host)"
+    )
+    policy_name = (
+        policy_path.name if policy_path else DEFAULT_ROOT_POLICY_PATH.name
+    )
+    started = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="dim", justify="right", no_wrap=True)
+    grid.add_column()
+    grid.add_row("OS",          _os_str())
+    grid.add_row("Host",        hostname)
+    grid.add_row("Arch",        f"{platform.machine()}  ·  {_cpu_brand()}")
+    grid.add_row("Memory",      _mem_str())
+    grid.add_row("Python",      platform.python_version())
+    grid.add_row("IntentFrame", _intentframe_version())
+    grid.add_row(
+        "Executor",
+        f"[bold red]{executor_str}[/]" if not dry_run else f"[dim italic]{executor_str}[/]",
+    )
+    grid.add_row("Policy",      policy_name)
+    grid.add_row("Started",     started)
+
+    console.print(Panel(
+        grid,
+        title="[bold]Environment[/]",
+        border_style="bright_black",
+        padding=(0, 2),
+    ))
+    console.print()
+
 
 def _print_menu(mode_label: str) -> str:
     console.print()
@@ -517,13 +648,9 @@ async def _startup(
         return None
 
     console.print(f"  [green]✓[/] {pf_label}")
-    console.print()
+    _print_environment_panel(dry_run=dry_run, whoami=pf_out, policy_path=policy_path)
 
-    mode_label = (
-        "dry-run  (DryRunExecutor — no host I/O)"
-        if dry_run
-        else f"real  (whoami → {pf_out!r}, root-capable)"
-    )
+    mode_label = "dry-run" if dry_run else f"real  (root @ {socket.gethostname()})"
     return agent, mode_label, dry_run
 
 
