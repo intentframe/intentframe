@@ -184,43 +184,6 @@ CHAT_TURNS: Dict[str, Dict[str, Any]] = {
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# Layer annotation rendered under each decision panel.
-#
-# Resolution order:
-#   BLOCK:
-#     data["layer"] = "command_shield"          → Deterministic Guardian Code Block
-#     data["layer"] = "deterministic_guardian"  → Deterministic Guardian Code Block
-#     data["layer"] = ""  (absent)              → AI Guardian Block
-#     data["layer"] = <other>                   → use raw layer string
-#   ALLOW (data is the adapter response, no layer/gate fields):
-#     data["matched_gate"] = "run_command_read_only" → Deterministic Guardian
-#     data["matched_gate"] = <other>                 → Deterministic gate
-#     data["matched_gate"] absent                    → fall back to
-#                                                      submission's
-#                                                      expected_layer
-# ─────────────────────────────────────────────────────────────────────────
-
-_LAYER_LABELS: Dict[str, "tuple[str, str]"] = {
-    "deterministic_read_only": (
-        "Instant Safety Rule",
-        "safe read-only command · no AI needed",
-    ),
-    "command_shield": (
-        "Instant Safety Rule",
-        "obvious dangerous command · no AI needed",
-    ),
-    "deterministic_guardian": (
-        "Instant Safety Rule",
-        "blocked by owner policy · no AI needed",
-    ),
-    "ai_guardian": (
-        "AI Guardian Block",
-        "semantic policy evaluation",
-    ),
-}
-
-
 def _resolve_layer_key(
     data: Dict[str, Any],
     decision: str,
@@ -244,19 +207,6 @@ def _resolve_layer_key(
     if gate:
         return f"deterministic:{gate}"
     return expected_layer or "ai_guardian"
-
-
-def _annotation_for_layer(layer_key: str) -> str:
-    if layer_key in _LAYER_LABELS:
-        name, detail = _LAYER_LABELS[layer_key]
-        return f"[bold]{name}[/]  [dim]{detail}[/]"
-    if layer_key.startswith("deterministic:"):
-        gate = layer_key.split(":", 1)[1]
-        return (
-            f"[bold]Deterministic Guardian Code Block[/]  "
-            f"[dim]gate={gate} · no AI call[/]"
-        )
-    return f"[bold]{layer_key}[/]"
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -307,7 +257,7 @@ def _print_menu(mode_label: str) -> str:
     console.print()
     console.print("  [dim]q  quit[/]")
     console.print()
-    console.print("  Press a key: ", end="")
+    console.print("  Choose a turn key: ", end="")
     while True:
         key = _getch()
         if key in CHAT_TURNS or key in ("q", "Q", "\x03"):
