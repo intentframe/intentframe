@@ -90,7 +90,7 @@ For most actions an agent takes — reads, lookups, known-safe commands — Inte
 
 The added cost is often <20% of the agent's own cost (agent uses big model × big context; AE and Guardian use small model × focused prompt), not 3x. And for fast-path actions, it's literally 0%.
 
-**Where it is honestly expensive:** bulk operations (1000 invoices each hitting AI layers), real-time interactive agents (500–1000ms per action is noticeable), first-time novel write patterns.
+**Where it is honestly expensive:** bulk operations (1000 invoices each hitting AI layers), real-time interactive agents (the two AI calls — Analysis Engine + Guardian — add ~8–15s per consequential action at current API response times; for an autonomous agent working in the background this is acceptable, but it is noticeable in a synchronous interactive loop), first-time novel write patterns.
 
 **Why it gets adopted anyway:** the cost of one wrong agent action (deleted files, leaked credentials, unauthorized payment, embarrassing email) exceeds thousands of validation calls. This is the same tradeoff as HTTPS, code review, 2FA, and database transactions — security overhead universally adopted when the cost of failure exceeds the cost of checking.
 

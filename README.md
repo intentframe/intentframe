@@ -340,7 +340,11 @@ Some of it does. The Analysis Engine and Guardian use OpenAI models (`gpt-4o-min
 <details>
 <summary><strong>"What does this cost to run?"</strong></summary>
 
-The AI calls themselves are short — a proposed action and a policy snippet, not your whole conversation. In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
+The AI calls themselves are focused — a proposed action and a policy snippet, not your whole conversation. Two small-model calls (Analysis Engine + AI Guardian) run for consequential actions, adding roughly 8–15 seconds at current API response times. Fast-path actions — reads, known-safe commands, obvious blocks — add nothing. 
+
+For an autonomous agent working in the background, 10 seconds of safety review before a write or destructive action is the same tradeoff as a careful human pausing before deleting something. 
+
+In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
 
 </details>
 
