@@ -340,26 +340,40 @@ def _print_intent_panel(label: str, command: str, reason: str) -> None:
     console.print()
 
 
-async def _submit_with_spinner(agent: "StubPipelineRootAgent", intent: dict) -> "Any":
+async def _submit_with_spinner(
+    agent: "StubPipelineRootAgent", intent: dict
+) -> "tuple[Any, float]":
+    """Submit an intent and return (result, elapsed_ms)."""
     with Live(
         Spinner("dots", text="[dim] waiting for IntentFrame result…[/]"),
         refresh_per_second=12,
         console=console,
         transient=True,
     ):
-        return await agent.submit(intent)
+        t0 = time.perf_counter()
+        result = await agent.submit(intent)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+    return result, elapsed_ms
+
+
+def _fmt_elapsed(elapsed_ms: float) -> str:
+    if elapsed_ms >= 1000:
+        return f"{elapsed_ms / 1000:.2f}s"
+    return f"{elapsed_ms:.0f}ms"
 
 
 def _print_allow_panel(
     data: Dict[str, Any],
     dry_run: bool,
     expected_layer: str,
+    elapsed_ms: float = 0.0,
 ) -> None:
     layer_key = _resolve_layer_key(data, "ALLOW", expected_layer)
+    timing = f"  [dim cyan]{_fmt_elapsed(elapsed_ms)}[/]" if elapsed_ms else ""
     if layer_key == "ai_guardian":
-        title = "[bold green]🧠  IntentFrame  ·  ✅  ALLOWED BY AI GUARDIAN[/]"
+        title = f"[bold green]🧠  IntentFrame  ·  ✅  ALLOWED BY AI GUARDIAN[/]{timing}"
     else:
-        title = "[bold green]⚡  IntentFrame  ·  ✅  ALLOWED BY DETERMINISTIC STATIC RULE[/]"
+        title = f"[bold green]⚡  IntentFrame  ·  ✅  ALLOWED BY DETERMINISTIC GUARDIAN (NO AI)[/]{timing}"
 
     output = (data.get("content") or data.get("stdout") or "").strip()
     body = Text()
@@ -383,17 +397,19 @@ def _print_allow_panel(
 def _print_block_panel(
     data: Dict[str, Any],
     expected_layer: str,
+    elapsed_ms: float = 0.0,
 ) -> None:
     layer_key = _resolve_layer_key(data, "BLOCK", expected_layer)
     reason = str(data.get("reason") or "").strip()
+    timing = f"  [dim cyan]{_fmt_elapsed(elapsed_ms)}[/]" if elapsed_ms else ""
 
     if layer_key == "ai_guardian":
-        title = "[bold red]🧠  IntentFrame  ·  ❌  BLOCKED BY AI GUARDIAN[/]"
+        title = f"[bold red]🧠  IntentFrame  ·  ❌  BLOCKED BY AI GUARDIAN[/]{timing}"
         body = Text()
         body.append("Decision ", style="dim")
         body.append("Semantic policy evaluation\n", style="red")
     else:
-        title = "[bold red]⚡  IntentFrame  ·  ❌  BLOCKED BY DETERMINISTIC STATIC RULE[/]"
+        title = f"[bold red]⚡  IntentFrame  ·  ❌  BLOCKED BY DETERMINISTIC GUARDIAN (NO AI)[/]{timing}"
         body = Text()
         body.append("Decision ", style="dim")
         if layer_key == "command_shield":
@@ -440,7 +456,7 @@ async def _run_submission(
         reason=submission["reason"],
     )
 
-    result = await _submit_with_spinner(agent, {
+    result, elapsed_ms = await _submit_with_spinner(agent, {
         "action": "RUN_COMMAND",
         "data":   {"command": submission["command"]},
         "reason": submission["reason"],
@@ -450,9 +466,9 @@ async def _run_submission(
     expected_layer = submission.get("expected_layer", "ai_guardian")
 
     if decision == "BLOCK" or not result.success:
-        _print_block_panel(data, expected_layer=expected_layer)
+        _print_block_panel(data, expected_layer=expected_layer, elapsed_ms=elapsed_ms)
     else:
-        _print_allow_panel(data, dry_run=dry_run, expected_layer=expected_layer)
+        _print_allow_panel(data, dry_run=dry_run, expected_layer=expected_layer, elapsed_ms=elapsed_ms)
 
     time.sleep(_POST_DECISION_GAP)
 
