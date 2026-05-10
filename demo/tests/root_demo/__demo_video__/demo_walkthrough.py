@@ -303,6 +303,22 @@ def _typewrite(msg: str) -> None:
     console.print()
 
 
+def _wait_for_menu_return() -> None:
+    console.print("  [dim]── Press Enter to return to menu ──[/]", end="")
+    while True:
+        ch = _getch()
+        if ch in ("\r", "\n"):
+            break
+        if ch == "\x03":
+            raise KeyboardInterrupt
+
+    # The prompt is a transient affordance for the recording, not part of
+    # the transcript. Keep the cursor on this line and clear it before the
+    # next menu renders.
+    console.file.write("\r\033[2K")
+    console.file.flush()
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Rich panel renderers
 # ─────────────────────────────────────────────────────────────────────────
@@ -562,6 +578,12 @@ def _print_attempt_separator(label: str) -> None:
     console.print()
 
 
+def _print_turn_end_separator() -> None:
+    console.print()
+    console.print(Rule(style="bright_black"))
+    console.print()
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Async core
 # ─────────────────────────────────────────────────────────────────────────
@@ -621,7 +643,8 @@ async def _run_turn(
             show_intent_panel_label=sub["label"] if multi else "Agent Tool Call",
         )
 
-    console.input("  [dim]── Press Enter to return to menu ──[/]")
+    # _print_turn_end_separator()
+    _wait_for_menu_return()
 
 
 async def _startup(
