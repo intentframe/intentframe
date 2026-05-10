@@ -413,10 +413,9 @@ def _print_menu(mode_label: str) -> str:
         body.append("\u201c", style="bold bright_white")
         body.append(prompt, style="bold bright_white")
         body.append("\u201d", style="bold bright_white")
-        body.append("  ")
-        body.append("(expected: ", style="dim")
-        body.append(expected, style=verdict_color)
-        body.append(")", style="dim")
+        body.append(Text.from_markup(
+            f"  [dim](expected: [{verdict_color}]{expected}[/])[/]"
+        ))
 
         if is_block:
             attack = (turn.get("attack_hint") or "").strip()
