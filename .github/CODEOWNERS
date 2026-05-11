@@ -1,0 +1,82 @@
+# IntentFrame repository ownership.
+# GitHub requests review from these owners when matching paths change.
+# Enforcement requires branch protection with "Require review from Code Owners".
+
+# Default owner for the whole repository.
+* @maniotrix
+
+# Repository governance and public release metadata.
+/.github/ @maniotrix
+/.github/CODEOWNERS @maniotrix
+/.github/FUNDING.yml @maniotrix
+/.github/ISSUE_TEMPLATE/ @maniotrix
+/.github/pull_request_template.md @maniotrix
+/.github/workflows/ @maniotrix
+/.gitattributes @maniotrix
+/.gitignore @maniotrix
+/.python-version @maniotrix
+/CHANGELOG.md @maniotrix
+/CITATION.cff @maniotrix
+/CLA.md @maniotrix
+/CODE_OF_CONDUCT.md @maniotrix
+/CONTRIBUTING.md @maniotrix
+/COPYRIGHT @maniotrix
+/LICENSE @maniotrix
+/README.md @maniotrix
+/SECURITY.md @maniotrix
+/SUPPORT.md @maniotrix
+
+# Packaging, dependency, and workspace metadata.
+/pyproject.toml @maniotrix
+/uv.lock @maniotrix
+/version.json @maniotrix
+/conftest.py @maniotrix
+/intentframe.egg-info/ @maniotrix
+
+# Security-critical runtime boundary.
+/action_registry/ @maniotrix
+/command_shield/ @maniotrix
+/executor/ @maniotrix
+/executor_client/ @maniotrix
+/intentframe_actor/ @maniotrix
+/intentframe_components/ @maniotrix
+/intentframe_core/ @maniotrix
+/policy_registry/ @maniotrix
+/resource_registry/ @maniotrix
+/supervisor/ @maniotrix
+
+# Gateway, server, CLI, and dashboard surfaces.
+/intentframe_cli/ @maniotrix
+/intentframe_dashboard/ @maniotrix
+/intentframe_gateway/ @maniotrix
+/intentframe_server/ @maniotrix
+
+# Credentials, external ingestion, and external-agent integrations.
+/external_agents/ @maniotrix
+/external_data_ingestion/ @maniotrix
+/intentframe_credentials/ @maniotrix
+
+# Reference assistant and communication bridges.
+/jarvis_pa/ @maniotrix
+/jarvis_telegram/ @maniotrix
+
+# macOS native platform integration.
+/macos-appkit-server/ @maniotrix
+
+# Setup, uninstall, and maintenance scripts.
+/intentframe_setup.sh @maniotrix
+/intentframe_setup_root_demo.sh @maniotrix
+/intentframe_uninstall.sh @maniotrix
+/intentframe_uninstall_root_demo.sh @maniotrix
+/scripts/ @maniotrix
+
+# Public demos, root-demo evidence, and launch assets.
+/assets/ @maniotrix
+/demo/ @maniotrix
+/GATEWAY_RUNTIME_MONITORING.md @maniotrix
+
+# Documentation, roadmap, planning notes, and tests.
+/docs/ @maniotrix
+/roadmap/ @maniotrix
+/TODO/ @maniotrix
+/tests/ @maniotrix
