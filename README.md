@@ -37,7 +37,8 @@
   <a href="docs/autonomy.md">Why this exists</a> •
   <a href="docs/evidence.md">Proof</a> •
   <a href="docs/threat-model.md">Threat model</a> •
-  <a href="docs/faq.md">FAQ</a>
+  <a href="docs/faq.md">FAQ</a> •
+  <a href="https://x.com/intent_frame">X/Twitter</a>
 </p>
 
 ---
@@ -559,6 +560,7 @@ Honest about it. The architecture is settled, the core pipeline is stable, the t
 - **Funding, sponsorship, and early support:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com). IntentFrame does not have GitHub Sponsors or a separate funding page yet.
 - **Commercial licensing, partnerships, and deployment conversations:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com).
 - **Security reports:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com) and do not open a public issue.
+- **Updates:** follow [`@intent_frame`](https://x.com/intent_frame) on X/Twitter.
 
 IntentFrame is AGPL-3.0-only for open-source use. Commercial licensing is available for organizations that want to use or embed IntentFrame without AGPL obligations.
 
