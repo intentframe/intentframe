@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/if-favicon/intentframe-logo.png" width="96" alt="IntentFrame logo">
+  <img src="assets/if-favicon/intentframe-logo.png" width="48" alt="IntentFrame logo">
 </p>
 
 <h1 align="center">IntentFrame</h1>
