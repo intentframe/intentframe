@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/intentframe/intentframe/security/policy
+    about: Please do not open public issues for vulnerabilities or exploitable policy bypasses.
+  - name: Questions and integration help
+    url: https://github.com/intentframe/intentframe/discussions
+    about: Use Discussions for setup questions, design questions, and agent integration help.
+  - name: Commercial licensing and partnerships
+    url: mailto:intentframe@gmail.com
+    about: For commercial licensing, deployment, partnership, investor, or press inquiries.

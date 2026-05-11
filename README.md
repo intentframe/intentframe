@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/if-favicon/intentframe-logo.png" width="96" alt="IntentFrame logo">
+</p>
+
 <h1 align="center">IntentFrame</h1>
 
 <p align="center">
@@ -14,6 +18,7 @@
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
   <img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha">
   <img src="https://img.shields.io/badge/runtime-AI%20security-red.svg" alt="AI Security Runtime">
+  <a href="https://github.com/intentframe/intentframe/stargazers"><img src="https://img.shields.io/github/stars/intentframe/intentframe?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -409,6 +414,8 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
 | Looking for common objections answered | [`docs/faq.md`](docs/faq.md) |
+| Need help, commercial licensing, or security contacts | [`SUPPORT.md`](SUPPORT.md) → [`SECURITY.md`](SECURITY.md) |
+| Tracking release history | [`CHANGELOG.md`](CHANGELOG.md) |
 | All public docs in one place | [`docs/README.md`](docs/README.md) |
 
 ---
@@ -532,11 +539,31 @@ Honest about it. The architecture is settled, the core pipeline is stable, the t
 
 ---
 
+## 🤝 Community, Support & Commercial Use
+
+- **General questions:** use [GitHub Discussions](https://github.com/intentframe/intentframe/discussions) so other builders can learn from the answer.
+- **Bugs and docs issues:** open a GitHub issue with the relevant template.
+- **Commercial licensing, partnerships, and deployment conversations:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com).
+- **Security reports:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com) and do not open a public issue.
+
+IntentFrame is AGPL-3.0-only for open-source use. Commercial licensing is available for organizations that want to use or embed IntentFrame without AGPL obligations.
+
+---
+
 ## 📜 Contributing, Security & License
 
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Support: [`SUPPORT.md`](SUPPORT.md)
 - Reporting a vulnerability: [`SECURITY.md`](SECURITY.md) — please don't open a public issue for security findings
 - License: Copyright (c) 2026 IntentFrame Contributors. AGPL-3.0-only ([`LICENSE`](LICENSE)). Commercial licensing available for organizations that don't want AGPL terms.
+
+---
+
+## 👋 About the Repo and Organization
+
+IntentFrame is built and maintained by **Prince** ([`@maniotrix`](https://github.com/maniotrix)) under the **IntentFrame** organization ([`@intentframe`](https://github.com/intentframe)).
+
+Contact email: - intentframe@gmail.com
 
 ---
 
