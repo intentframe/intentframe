@@ -13,14 +13,14 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE">
+  <a href="https://youtu.be/zG7hdU0p4KI">
     <img src="assets/host_exec_2.gif" alt="Watch how IntentFrame blocks a compromised AI agent operating as root on a real Mac" width="720">
   </a>
 </p>
 
 <p align="center">
-  <strong><a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE">Watch the 1:45 demo</a></strong><br>
-  <em>Watch a compromised AI agent attack a real Mac with root-capable execution enabled, and see IntentFrame stop the malicious actions before execution.</em>
+  <strong><a href="https://youtu.be/zG7hdU0p4KI">Watch the full YouTube video</a></strong><br>
+  <em>A compromised AI agent. Root access. A real Mac. Blocked before execution.</em>
 </p>
 
 <p align="center">
