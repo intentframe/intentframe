@@ -13,6 +13,17 @@
 </p>
 
 <p align="center">
+  <a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE">
+    <img src="assets/host_exec_2.gif" alt="Watch how IntentFrame blocks a compromised AI agent operating as root on a real Mac" width="720">
+  </a>
+</p>
+
+<p align="center">
+  <strong><a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE">Watch the 1:45 demo</a></strong><br>
+  <em>Watch a compromised AI agent attack a real Mac with root-capable execution enabled, and see IntentFrame stop the malicious actions before execution.</em>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0">
   <img src="https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.14+">
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
