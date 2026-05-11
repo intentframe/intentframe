@@ -1,0 +1,5 @@
+# GitHub renders these links in the repository "Sponsor" button.
+# IntentFrame does not have GitHub Sponsors or a maintained funding page yet,
+# so route visitors back to the repo funding/contact section.
+custom:
+  - "https://github.com/intentframe/intentframe#funding-and-contact"

@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use IntentFrame in research, security analysis, or public writing, please cite this repository."
+title: "IntentFrame"
+abstract: "A hybrid deterministic and LLM security runtime for AI agents that validates proposed actions before they touch files, credentials, networks, APIs, or money."
+version: "0.1.0-alpha.2"
+date-released: "2026-05-08"
+type: software
+license: "AGPL-3.0-only"
+repository-code: "https://github.com/intentframe/intentframe"
+url: "https://www.intentframe.com"
+keywords:
+  - ai-agents
+  - ai-security
+  - agent-runtime
+  - llm-security
+  - policy-engine
+  - sandboxing
+  - zero-trust
+authors:
+  - name: "IntentFrame Contributors"

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/if-favicon/intentframe-logo.png" width="96" alt="IntentFrame logo">
+</p>
+
 <h1 align="center">IntentFrame</h1>
 
 <p align="center">
@@ -14,6 +18,7 @@
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
   <img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha">
   <img src="https://img.shields.io/badge/runtime-AI%20security-red.svg" alt="AI Security Runtime">
+  <a href="https://github.com/intentframe/intentframe/stargazers"><img src="https://img.shields.io/github/stars/intentframe/intentframe?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -146,7 +151,7 @@ Here are the exact seven rules used in the test:
 
 **Result: 100 of 100 still blocked, through the AI layer alone.** The semantic layer caught attacks like ARP spoofing and time-sync hijacks that no keyword rule would have matched — the agent never reached the kernel, never reached our DNS.
 
-Every result is reproducible from a fresh clone. Raw logs and the full failure-then-fix incident report are in [`docs/evidence.md`](docs/evidence.md) and [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md).
+Every result is reproducible from a fresh clone. Raw logs, OWASP LLM / Agentic Top 10 coverage mapping, and the full failure-then-fix incident report are in [`docs/evidence.md`](docs/evidence.md) and [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md).
 
 ---
 
@@ -340,7 +345,11 @@ Some of it does. The Analysis Engine and Guardian use OpenAI models (`gpt-4o-min
 <details>
 <summary><strong>"What does this cost to run?"</strong></summary>
 
-The AI calls themselves are short — a proposed action and a policy snippet, not your whole conversation. In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
+The AI calls themselves are focused — a proposed action and a policy snippet, not your whole conversation. Two small-model calls (Analysis Engine + AI Guardian) run for consequential actions, adding roughly 8–15 seconds at current API response times. Fast-path actions — reads, known-safe commands, obvious blocks — add nothing. 
+
+For an autonomous agent working in the background, 10 seconds of safety review before a write or destructive action is the same tradeoff as a careful human pausing before deleting something. 
+
+In local testing, an average day with Jarvis costs cents, not dollars. A heavy day with lots of new actions can hit a few dollars. There is no IntentFrame subscription. You pay only for the underlying API.
 
 </details>
 
@@ -405,6 +414,8 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
 | Looking for common objections answered | [`docs/faq.md`](docs/faq.md) |
+| Need help, commercial licensing, or security contacts | [`SUPPORT.md`](SUPPORT.md) → [`SECURITY.md`](SECURITY.md) |
+| Tracking release history | [`CHANGELOG.md`](CHANGELOG.md) |
 | All public docs in one place | [`docs/README.md`](docs/README.md) |
 
 ---
@@ -528,11 +539,34 @@ Honest about it. The architecture is settled, the core pipeline is stable, the t
 
 ---
 
+<a id="funding-and-contact"></a>
+
+## 🤝 Funding, Community, Support & Commercial Use
+
+- **General questions:** use [GitHub Discussions](https://github.com/intentframe/intentframe/discussions) so other builders can learn from the answer.
+- **Bugs and docs issues:** open a GitHub issue with the relevant template.
+- **Funding, sponsorship, and early support:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com). IntentFrame does not have GitHub Sponsors or a separate funding page yet.
+- **Commercial licensing, partnerships, and deployment conversations:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com).
+- **Security reports:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com) and do not open a public issue.
+
+IntentFrame is AGPL-3.0-only for open-source use. Commercial licensing is available for organizations that want to use or embed IntentFrame without AGPL obligations.
+
+---
+
 ## 📜 Contributing, Security & License
 
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Support: [`SUPPORT.md`](SUPPORT.md)
 - Reporting a vulnerability: [`SECURITY.md`](SECURITY.md) — please don't open a public issue for security findings
 - License: Copyright (c) 2026 IntentFrame Contributors. AGPL-3.0-only ([`LICENSE`](LICENSE)). Commercial licensing available for organizations that don't want AGPL terms.
+
+---
+
+## 👋 About the Repo and Organization
+
+IntentFrame is built and maintained by **Prince** ([`@maniotrix`](https://github.com/maniotrix)) under the **IntentFrame** organization ([`@intentframe`](https://github.com/intentframe)).
+
+Contact email: - intentframe@gmail.com
 
 ---
 

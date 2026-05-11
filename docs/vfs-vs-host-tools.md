@@ -57,6 +57,45 @@ Characteristics:
 Host file tools are especially natural alongside shell-style workflows,
 because both operate on the real filesystem vocabulary.
 
+### What host file tools cannot handle: root's home directory
+
+The `HostFilesAdapter` runs inside the executor server process, which in
+the default and root-demo deployment runs as a **normal (non-root) user**.
+This means the Python adapter is subject to standard OS permission checks.
+
+Paths inside the root user's home directory — specifically `/var/root` and
+its canonical alias `/private/var/root` on macOS — are mode `750` owned by
+`root:wheel`. An unprivileged process gets `PermissionError` trying to stat,
+read, or list anything inside that directory.
+
+Observed failure modes:
+
+| Action | What the adapter reports |
+|---|---|
+| `LIST_HOST_DIRECTORY /var/root` | Raises `PermissionError` inside `p.iterdir()`, caught by `safe_execute`, surfaced as `"LIST_HOST_DIRECTORY is temporarily unavailable."` |
+| `READ_HOST_FILE /var/root/file.txt` | `p.exists()` returns `False` (can't stat through permission barrier), surfaced as `"host_files: file not found: /private/var/root/file.txt"` |
+
+Both error messages are misleading: the first sounds transient, the second
+sounds like the file doesn't exist. Neither tells the LLM the real cause is
+privilege, not availability or absence.
+
+**The correct tool for `/var/root` or any root-filesystem operation is
+`run_command`.** In the root-demo deployment, `run_command` subprocesses are
+escalated via `sudo -n` (configured in `jarvis_pa/executor_root.yaml` under
+`sandbox.escalate: sudo`), so they actually execute as root and succeed.
+
+**Routing rule for agents and prompts:**
+
+- Host file tools (`read_host_file`, `list_host_directory`, `write_host_file`,
+  `delete_host_file`) → user-space files: `~/Documents/...`, `/tmp/...`,
+  normal user-owned paths.
+- `run_command` → root/admin filesystem operations: anything under `/var/root`,
+  `/private/var/root`, or other paths that require root privilege.
+
+Do not use host file tools as a first attempt and fall back to `run_command`
+on failure. Route to `run_command` directly when the path is known to be under
+root's home or requires elevated access.
+
 ---
 
 ## Why they should not be used together
@@ -117,6 +156,27 @@ workspace path vocabulary and a shell path vocabulary.
 That does **not** mean every shell-enabled product must expose host file
 tools. It means a product team should choose one filesystem mental model
 deliberately, not mix both by default.
+
+### `RUN_COMMAND` as the privileged path complement
+
+In the root-demo profile, `RUN_COMMAND` is the **only** tool that can
+successfully operate on root-owned paths such as `/var/root`. This is
+because the executor sandboxes shell subprocesses with `sudo -n` escalation
+(see `jarvis_pa/executor_root.yaml` → `sandbox.escalate: sudo`), whereas
+the `HostFilesAdapter` Python code runs in the non-root server process.
+
+This creates a deliberate privilege split:
+
+| Tool family | Runs as | Can reach `/var/root` |
+|---|---|---|
+| `HostFilesAdapter` (host file tools) | executor server process — normal user | No — `PermissionError` |
+| `RUN_COMMAND` subprocesses | escalated via `sudo -n` — root | Yes |
+
+LLM routing guidance that accompanies a root-demo profile should make
+this split explicit. "Do not use host file tools for `/var/root` or
+`/private/var/root`; use `run_command` instead" is the precise rule, not
+the vaguer "root-owned paths" (which would incorrectly block normal reads
+of `/etc/hosts`, `/usr/bin/python3`, etc.).
 
 ---
 
