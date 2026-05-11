@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/if-favicon/intentframe-logo.png" width="96" alt="IntentFrame logo">
+  <img src="assets/if-favicon/intentframe-logo.png" width="48" alt="IntentFrame logo">
 </p>
 
 <h1 align="center">IntentFrame</h1>
@@ -10,6 +10,17 @@
 
 <p align="center">
   <strong>Real autonomy for AI agents — earned the same way every trusted profession earns it: through structural supervision, not constant approval clicks.</strong>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/zG7hdU0p4KI">
+    <img src="assets/host_exec_2.gif" alt="Watch how IntentFrame blocks a compromised AI agent operating as root on a real Mac" width="720">
+  </a>
+</p>
+
+<p align="center">
+  <strong><a href="https://youtu.be/zG7hdU0p4KI">Watch the full YouTube video</a></strong><br>
+  <em>A compromised AI agent. Root access. A real Mac. Blocked before execution.</em>
 </p>
 
 <p align="center">
