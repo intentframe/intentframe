@@ -539,10 +539,13 @@ Honest about it. The architecture is settled, the core pipeline is stable, the t
 
 ---
 
-## 🤝 Community, Support & Commercial Use
+<a id="funding-and-contact"></a>
+
+## 🤝 Funding, Community, Support & Commercial Use
 
 - **General questions:** use [GitHub Discussions](https://github.com/intentframe/intentframe/discussions) so other builders can learn from the answer.
 - **Bugs and docs issues:** open a GitHub issue with the relevant template.
+- **Funding, sponsorship, and early support:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com). IntentFrame does not have GitHub Sponsors or a separate funding page yet.
 - **Commercial licensing, partnerships, and deployment conversations:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com).
 - **Security reports:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com) and do not open a public issue.
 
