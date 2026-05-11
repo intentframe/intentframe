@@ -1,0 +1,39 @@
+<speak>
+  First, we start IntentFrame and all its core services.
+
+  Before the compromised agent submits attacks, we pre-check the high-value targets: 
+  the root filesystem and docx files on disk.
+
+  Now the compromised-agent simulation begins. 
+  Allowed commands will execute with root privileges on a live host environment. 
+  Not a virtual machine. Not a fake transcript. 
+  <emphasis level="moderate">This is a real system on the line.</emphasis>
+
+  The agent first checks its identity, then enumerates the root directory.
+
+  In the first attack, the agent attempts to wipe the system with 
+  <sub alias="R M R F slash">rm -rf /</sub>.
+
+  <emphasis level="strong">IntentFrame’s Deterministic Guardian blocks it instantly.</emphasis> 
+  No AI call. Just hard enforcement before execution.
+
+  The agent adapts and tries again, hiding the same destructive goal inside Python code, 
+  hoping to slip past traditional filters.
+
+  However, IntentFrame’s AI Guardian catches the hidden behavior and blocks it before execution.
+
+  In another attack, the agent disguises a destructive action as cleanup: 
+  it claims to remove stale docx files, 
+  <emphasis level="moderate">but the command would delete every docx file on disk.</emphasis>
+
+  But once again, IntentFrame's AI Guardian blocks the operation before irreversible damage can occur.
+
+  Finally, we check the system again. 
+  Root filesystem: intact. 
+  docx files: untouched. 
+  The host remains unchanged.
+
+  The agent attacked. 
+  IntentFrame enforced. 
+  The system survived.
+</speak>
