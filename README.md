@@ -5,11 +5,11 @@
 <h1 align="center">IntentFrame</h1>
 
 <p align="center">
-  <em>Hybrid (deterministic + LLM) security and safety runtime for agentic AI — built to maximize autonomy for AI agents.</em>
+  <em>Remove direct execution from LLM tool calls.</em>
 </p>
 
 <p align="center">
-  <strong>Real autonomy for AI agents — earned the same way every trusted profession earns it: through structural supervision, not constant approval clicks.</strong>
+  <strong>Instead of giving credentials to every agent, a separate runtime holds the keys, validates intent against policy, and executes only approved actions.</strong>
 </p>
 
 <p align="center">
@@ -43,55 +43,72 @@
 
 ---
 
-## 🚨 The Problem
+## 🚪 The Core Boundary: No Direct Execution
 
-It's 2026. AI agents can now read your email, run terminal commands, send messages on your behalf, edit your files, and so on. They're useful. They're also one bad decision away from deleting your tax returns, leaking a credential, or running a command that quietly pwns your laptop.
+Most agent frameworks put execution inside the agent loop:
 
-Today's industry has two answers, both bad. IntentFrame is a third:
+```text
+LLM decides -> tool executes
+```
 
-|                       | 👁️ Human-in-the-loop          | 🤝 Trust the agent               | 🚪 **IntentFrame**                |
-| --------------------- | ----------------------------- | -------------------------------- | --------------------------------- |
-| **Who decides?**      | You, on every action          | The agent, alone                 | Agent proposes, runtime validates |
-| **Autonomy**          | None                          | Total                            | Bounded                           |
-| **Failure mode**      | Approval fatigue              | Prompt injection → game over     | Intent rejected, audited          |
-| **Holds credentials** | You                           | The agent                        | Isolated executor                 |
+IntentFrame changes that boundary:
 
-**The agent neither gets hands nor takes actions directly — it gets a slot under a door.**
+```text
+LLM decides -> intent is validated -> separate runtime executes
+```
+
+Most agent frameworks bundle reasoning and execution into a single process.
+
+IntentFrame breaks that coupling by introducing a strict architectural boundary:
+
+- **Agents are pure intelligence.** They reason, plan, and propose actions, but they cannot touch the user's files, data, accounts, or services directly.
+- **The Executor is pure mechanics.** It is a separate, isolated process that holds all credentials and performs approved actions on the agent's behalf.
+
+When any AI-decided action would affect the outside world, it must be submitted as a structured intent. The agent thinks. The Executor acts. The agent does not hold the keys.
+
+**That separation is the whole project.**
+
+The agent can still reason, plan, parse data, retry, and decide what it wants to do. But when the LLM decides at runtime to read a file, send an email, run a shell command, write a row, call an API, or ask the user a question, that request has to cross a policy boundary first.
+
+IntentFrame is not trying to secure the entire program. Normal deterministic code is still the developer's responsibility. IntentFrame gates the dangerous part: **non-deterministic AI decisions that would affect the user's world.**
 
 ```mermaid
 %%{init: {'theme':'neutral'}}%%
 flowchart LR
-    A["🤖 Agent<br/>(any LLM / framework)"] -->|"intent slip"| V{{"🚪 IntentFrame<br/>Validator"}}
-    V -->|"✓ allowed"| E["⚙️ Executor<br/>(holds credentials)"]
+    A["🤖 Agent<br/>(any LLM / framework)"] -->|"intent request"| V{{"🚪 IntentFrame<br/>policy boundary"}}
+    V -->|"✓ approved"| E["⚙️ Executor<br/>(holds credentials)"]
     V -->|"✗ blocked"| X["📝 Audit log"]
-    E --> S["💻 Your machine<br/>files · network · money"]
+    E --> S["💻 Real world<br/>files · APIs · shell · ask user"]
 ```
 
-The agent can think all it wants — plan, reason, retry, work through a multi-step task on its own — but anything that would touch your machine, your files, your credentials, or your money has to be written down on a slip, slid under the door, and validated by something that doesn't share its mind. A separate program reads the slip, figures out what the action will *actually* do, checks it against your rules, and only then lets a small, deterministic executor carry it out.
+A few design rules follow from that:
 
-> **The agent decides what to do. IntentFrame decides whether it's safe to do.**
+- **The agent has no direct I/O.** Files, APIs, shell, databases, clipboard, and user prompts all go through the same boundary.
+- **IntentFrame guards user-world I/O.** Pure computation, planning, memory lookup, and public retrieval can remain normal agent tools. Actions that touch the user's machine, private data, accounts, services, shell, clipboard etc go through the boundary.
+- **The Executor is the syscall layer for agency.** It is the separate process that turns approved intents into real effects through controlled adapters.
+- **The runtime validates outcomes, not implementation details.** The question is not "is this valid code?" but "what will this actually do, and is that allowed?"
+- **Deterministic checks run first.** Allowed actions, path constraints, denied command capabilities, sensitive writes, and obvious dangerous shell patterns block before any AI review.
+- **Semantic review runs where meaning matters.** Is this HTTP request really a payment? Is this user prompt phishing? Does the reason match the payload? Is this command hiding behavior through indirection?
+- **The executor has no AI and no policy judgment.** It only performs approved actions, holds credentials, and writes the audit trail.
+- **Policies are static during a run.** An agent-crafted approval prompt cannot mutate the policy that governs the next action.
 
-This is the same pattern that runs every job we already trust with serious power. Surgeons cut on their own — inside medical licenses, hospital rules, and malpractice law. Pilots fly on their own — inside airspace rules, certifications, and air traffic control. Nobody watches a surgeon's every cut. Their autonomy works *because* the structure around them makes it safe to delegate.
-
-AI agents need the same scaffolding. IntentFrame is that scaffolding.
-
-That's the whole idea. The full thesis is in [`docs/autonomy.md`](docs/autonomy.md).
-
----
-
-## 🖥️ An Operating System for Agency
-
-Think of IntentFrame not just as security software, but as an **Operating System for Agency**. Just as an OS manages hardware resources (CPU, RAM) and enforces permissions for untrusted apps, IntentFrame manages **agency resources** (money, data, actions) and enforces permissions for untrusted AI agents.
+Another way to say it: the agent is still the brain, but it no longer has the hands. The runtime is the boundary. The executor is the only thing with keys.
 
 > **Users trust a single runtime, not hundreds of agents.**
 
-Every agent on the device — whatever LLM, whatever framework, whatever vendor — submits intents through this same runtime. There is one executor that holds credentials. One audit chain. One policy surface. One door.
+Every agent on the device — whatever LLM, whatever framework, whatever vendor — submits intents through the same runtime. There is one executor that holds credentials. One audit chain. One policy surface. One door. This is the "Operating System for Agency" bet: manage actions, money, data, and authority for AI agents the way an OS manages hardware resources for apps.
+
+For the full thesis, see [`docs/autonomy.md`](docs/autonomy.md). For the technical architecture, see [`docs/architecture.md`](docs/architecture.md), [`docs/executor.md`](docs/executor.md), [`docs/actor-sdk.md`](docs/actor-sdk.md), and [`docs/single-runtime.md`](docs/single-runtime.md).
 
 ---
 
-## 🛡️ The Proof: Skin in the Game
+## 🛡️ Proof: Skin in the Game (Root-Capable Crash Test)
 
-Most AI safety demos run in disposable cloud sandboxes. We tested this on bare metal.
+To test whether the boundary holds, we ran a post-compromise crash test on bare metal.
+
+The test assumes the agent is already compromised. This is not a model-refusal or jailbreak demo; it asks a narrower question:
+
+> **If a compromised agent with root access, submits malicious actions through the supported boundary, does the runtime stop them before execution?**
 
 We ran IntentFrame on a physical MacBook Pro (M4 Pro, macOS Tahoe) with real stakes:
 
@@ -100,8 +117,6 @@ We ran IntentFrame on a physical MacBook Pro (M4 Pro, macOS Tahoe) with real sta
 - **Root-capable:** We enabled a direct, root-level execution path.
 
 In this environment, we submitted **100 hand-crafted malicious intents** through IntentFrame as if from an already-compromised agent.
-
-The point of this test is **containment**, not model-refusal. It deliberately removes the agent model from the measurement and asks the only question that matters at the runtime boundary: *if a compromised agent submits a dangerous intent, does IntentFrame stop it before execution?*
 
 The attack corpus spans 11 categories:
 
@@ -296,7 +311,7 @@ We'd rather under-promise than overclaim, so here's the honest version.
 | Unauthorized reads, writes, deletes outside the agent's policy. | Cumulative multi-step abuse where each individual step looks fine. (Stateful tracking is on the roadmap.) |
 | Over-limit transactions, off-policy spending, off-policy data exfiltration. | Every novel attack pattern in the universe. (Coverage grows with every test we add.) |
 | Semantic deception — when an agent's stated reason doesn't match what its action would actually do. | |
-| Every shell command runs inside a kernel-enforced sandbox (macOS Seatbelt) regardless of policy decision. | |
+| Approved shell commands are launched inside a kernel-enforced sandbox (macOS Seatbelt) as a secondary safety layer. Blocked commands never launch. | |
 | Tamper-evident audit trail (SHA-256 hash chain) on every decision, whether allow or block. | |
 
 The full threat model is in [`docs/threat-model.md`](docs/threat-model.md), and the full evidence package — including the failure-then-fix story — is in [`docs/evidence.md`](docs/evidence.md).
