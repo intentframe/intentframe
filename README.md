@@ -83,8 +83,8 @@ flowchart LR
 
 A few design rules follow from that:
 
-- **IntentFrame guards user-world actions.** Pure computation, planning, memory lookup, and public retrieval can remain normal agent tools. Actions that touch the user's machine, private data, accounts, services, shell, clipboard, etc. go through the boundary.
-- **The Executor is the syscall layer for agency.** It is a separate process that turns approved intents into real effects through controlled adapters. It holds all credentials, contains no AI, and writes the audit trail.
+- **IntentFrame guards external-agent actions that affect the user's world.** Pure computation, planning, memory lookup, and public retrieval can remain normal agent tools. Actions that touch the user's machine, private data, accounts, services, shell, clipboard, etc. go through the boundary.
+- **The Executor is the syscall layer for agency.** It is a separate IntentFrame-controlled process that turns approved intents into real effects through controlled adapters. It holds all credentials, contains no AI, writes the audit trail, and is not controlled by the agent or its developer.
 - **The runtime validates outcomes, not implementation details.** The question is not "is this valid code?" but "what will this actually do, and is that allowed?"
 - **Deterministic checks run first.** Allowed actions, path constraints, denied command capabilities, sensitive writes, and obvious dangerous shell patterns block before any AI review.
 - **Semantic review runs where meaning matters.** Is this HTTP request really a payment? Is this user prompt phishing? Does the reason match the payload? Is this command hiding behavior through indirection?
