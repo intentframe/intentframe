@@ -302,7 +302,7 @@ We'd rather under-promise than overclaim, so here's the honest version.
 | Unauthorized reads, writes, deletes outside the agent's policy. | Cumulative multi-step abuse where each individual step looks fine. (Stateful tracking is on the roadmap.) |
 | Over-limit transactions, off-policy spending, off-policy data exfiltration. | Every novel attack pattern in the universe. (Coverage grows with every test we add.) |
 | Semantic deception — when an agent's stated reason doesn't match what its action would actually do. | |
-| Every shell command runs inside a kernel-enforced sandbox (macOS Seatbelt) regardless of policy decision. | |
+| Approved shell commands are launched inside a kernel-enforced sandbox (macOS Seatbelt) as a secondary safety layer. Blocked commands never launch. | |
 | Tamper-evident audit trail (SHA-256 hash chain) on every decision, whether allow or block. | |
 
 The full threat model is in [`docs/threat-model.md`](docs/threat-model.md), and the full evidence package — including the failure-then-fix story — is in [`docs/evidence.md`](docs/evidence.md).
