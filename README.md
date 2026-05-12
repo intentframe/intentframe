@@ -57,11 +57,18 @@ IntentFrame changes that boundary:
 LLM decides -> intent is validated -> separate runtime executes
 ```
 
+Most agent frameworks bundle reasoning and execution into a single process.
+
+IntentFrame breaks that coupling by introducing a strict architectural boundary:
+
+- **Agents are pure intelligence.** They reason, plan, and propose actions, but they cannot touch the user's files, data, accounts, or services directly.
+- **The Executor is pure mechanics.** It is a separate, isolated process that holds all credentials and performs approved actions on the agent's behalf.
+
+When any AI-decided action would affect the outside world, it must be submitted as a structured intent. The agent thinks. The Executor acts. The agent does not hold the keys.
+
+**That separation is the whole project.**
+
 The agent can still reason, plan, parse data, retry, and decide what it wants to do. But when the LLM decides at runtime to read a file, send an email, run a shell command, write a row, call an API, or ask the user a question, that request has to cross a policy boundary first.
-
-The separate runtime holds the credentials and performs the action only if the intent is approved. The agent does not hold the keys.
-
-That distinction is the whole project.
 
 IntentFrame is not trying to secure the entire program. Normal deterministic code is still the developer's responsibility. IntentFrame gates the dangerous part: **non-deterministic AI decisions that would affect the user's world.**
 
@@ -71,12 +78,14 @@ flowchart LR
     A["🤖 Agent<br/>(any LLM / framework)"] -->|"intent request"| V{{"🚪 IntentFrame<br/>policy boundary"}}
     V -->|"✓ approved"| E["⚙️ Executor<br/>(holds credentials)"]
     V -->|"✗ blocked"| X["📝 Audit log"]
-    E --> S["💻 Real world<br/>files · APIs · shell · user prompts"]
+    E --> S["💻 Real world<br/>files · APIs · shell · ask user"]
 ```
 
 A few design rules follow from that:
 
 - **The agent has no direct I/O.** Files, APIs, shell, databases, clipboard, and user prompts all go through the same boundary.
+- **IntentFrame guards user-world I/O.** Pure computation, planning, memory lookup, and public retrieval can remain normal agent tools. Actions that touch the user's machine, private data, accounts, services, shell, clipboard etc go through the boundary.
+- **The Executor is the syscall layer for agency.** It is the separate process that turns approved intents into real effects through controlled adapters.
 - **The runtime validates outcomes, not implementation details.** The question is not "is this valid code?" but "what will this actually do, and is that allowed?"
 - **Deterministic checks run first.** Allowed actions, path constraints, denied command capabilities, sensitive writes, and obvious dangerous shell patterns block before any AI review.
 - **Semantic review runs where meaning matters.** Is this HTTP request really a payment? Is this user prompt phishing? Does the reason match the payload? Is this command hiding behavior through indirection?
