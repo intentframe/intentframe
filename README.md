@@ -45,26 +45,26 @@
 
 ## 🚪 The Core Boundary: No Direct Execution
 
-Most agent frameworks put execution inside the agent loop:
+Most agent frameworks bundle reasoning and execution into a single process:
 
 ```text
-LLM decides -> tool executes
+LLM decides -> action executes directly
 ```
 
-IntentFrame changes that boundary:
+IntentFrame changes that:
 
 ```text
 LLM decides -> intent is validated -> separate runtime executes
 ```
 
-Most agent frameworks bundle reasoning and execution into a single process.
-
-IntentFrame breaks that coupling by introducing a strict architectural boundary:
+It breaks the coupling by introducing a strict architectural boundary:
 
 - **Agents are pure intelligence.** They reason, plan, and propose actions, but they cannot touch the user's files, data, accounts, or services directly.
 - **The Executor is pure mechanics.** It is a separate, isolated process that holds all credentials and performs approved actions on the agent's behalf.
 
-When any AI-decided action would affect the outside world, it must be submitted as a structured intent. The agent thinks. The Executor acts. The agent does not hold the keys.
+When any AI-decided action would affect the user's world, it must be submitted as a structured intent. 
+
+The agent only thinks. The Executor only acts.
 
 **That separation is the whole project.**
 
@@ -83,13 +83,11 @@ flowchart LR
 
 A few design rules follow from that:
 
-- **The agent has no direct I/O.** Files, APIs, shell, databases, clipboard, and user prompts all go through the same boundary.
-- **IntentFrame guards user-world I/O.** Pure computation, planning, memory lookup, and public retrieval can remain normal agent tools. Actions that touch the user's machine, private data, accounts, services, shell, clipboard etc go through the boundary.
-- **The Executor is the syscall layer for agency.** It is the separate process that turns approved intents into real effects through controlled adapters.
+- **IntentFrame guards user-world actions.** Pure computation, planning, memory lookup, and public retrieval can remain normal agent tools. Actions that touch the user's machine, private data, accounts, services, shell, clipboard, etc. go through the boundary.
+- **The Executor is the syscall layer for agency.** It is a separate process that turns approved intents into real effects through controlled adapters. It holds all credentials, contains no AI, and writes the audit trail.
 - **The runtime validates outcomes, not implementation details.** The question is not "is this valid code?" but "what will this actually do, and is that allowed?"
 - **Deterministic checks run first.** Allowed actions, path constraints, denied command capabilities, sensitive writes, and obvious dangerous shell patterns block before any AI review.
 - **Semantic review runs where meaning matters.** Is this HTTP request really a payment? Is this user prompt phishing? Does the reason match the payload? Is this command hiding behavior through indirection?
-- **The executor has no AI and no policy judgment.** It only performs approved actions, holds credentials, and writes the audit trail.
 - **Policies are static during a run.** An agent-crafted approval prompt cannot mutate the policy that governs the next action.
 
 Another way to say it: the agent is still the brain, but it no longer has the hands. The runtime is the boundary. The executor is the only thing with keys.
