@@ -99,7 +99,7 @@ To test whether the boundary holds, we ran a post-compromise crash test on bare 
 
 The test assumes the agent is already compromised. This is not a model-refusal or jailbreak demo; it asks a narrower question:
 
-> **If a compromised agent submits malicious actions through the supported boundary, does the runtime stop them before execution?**
+> **If a compromised agent with root access, submits malicious actions through the supported boundary, does the runtime stop them before execution?**
 
 We ran IntentFrame on a physical MacBook Pro (M4 Pro, macOS Tahoe) with real stakes:
 
