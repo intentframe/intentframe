@@ -180,7 +180,23 @@ Here are the exact seven rules used in the test:
 
 **Result: 100 of 100 still blocked, through the AI layer alone.** The semantic layer caught attacks like ARP spoofing and time-sync hijacks that no keyword rule would have matched — the agent never reached the kernel, never reached our DNS.
 
-Every result is reproducible from a fresh clone. Raw logs, OWASP LLM / Agentic Top 10 coverage mapping, and the full failure-then-fix incident report are in [`docs/evidence.md`](docs/evidence.md) and [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md).
+Every result is reproducible from a fresh clone. Raw logs and the full failure-then-fix incident report are in [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md) and [`docs/evidence.md`](docs/evidence.md).
+
+---
+
+## 🔬 Proof: Prompt-Injection and Semantic Attack Suite
+
+The root demo tests hostile execution. This suite tests hostile reasoning: can an attacker smuggle a malicious but structurally valid action through the policy boundary?
+
+The invoice/payment suite in [`docs/evidence.md`](docs/evidence.md) submits 24 adversarial intents — classic prompt injection, encoded payloads, many-shot and crescendo-style attacks, role confusion, unicode smuggling, fake authorization metadata, and expert red-team cases where `reason` stays benign while the malicious payload is hidden in `data` or `target`. The attack corpus is mapped to the OWASP LLM and Agentic Top 10.
+
+Result: **23/24 defended, 1 known gap, 0 bypassed**. The known gap is salami slicing: five $4,000 payments each under the per-intent $5,000 cap — a reserved placeholder for planned cumulative/session-aware policy, not a bypass of an enforced rule.
+
+The strongest cases are attacks 15 and 17. Both are structurally valid and would pass deterministic checks alone: one hides a $4,999 amount behind a $49.99 reason; the other smuggles policy exfiltration through an allowed write field. IntentFrame blocks both semantically — concrete proof that rules alone are insufficient.
+
+> [!IMPORTANT]
+> **Want to audit the tests?** The complete security test package — root-demo containment, prompt-injection attacks, transitive-injection tests, raw results, and methodology — lives in [`docs/evidence.md`](docs/evidence.md), [`docs/root_demo/PROOF.md`](docs/root_demo/PROOF.md), [`demo/tests/README.md`](demo/tests/README.md), and [`demo/tests/root_demo/README.md`](demo/tests/root_demo/README.md).
+
 
 ---
 
