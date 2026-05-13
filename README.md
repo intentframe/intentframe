@@ -5,11 +5,15 @@
 <h1 align="center">IntentFrame</h1>
 
 <p align="center">
-  <em>Remove direct execution from LLM tool calls.</em>
+  <em>Structural security and execution for AI agents.</em>
 </p>
 
 <p align="center">
-  <strong>Instead of giving credentials to every agent, a separate runtime holds the keys, validates intent against policy, and executes only approved actions.</strong>
+  <strong>IntentFrame removes direct execution from LLM tool calls: agents propose actions, policy validates intent, and a separate Executor performs approved actions.</strong>
+</p>
+
+<p align="center">
+  Real autonomy for AI agents comes from automated structural supervision, not constant approval clicks.
 </p>
 
 <p align="center">
@@ -62,7 +66,7 @@ It breaks the coupling by introducing a strict architectural boundary:
 - **Agents are pure intelligence.** They reason, plan, and propose actions, but they cannot touch the user's files, data, accounts, or services directly.
 - **The Executor is pure mechanics.** It is a separate, isolated process that holds all credentials and performs approved actions on the agent's behalf.
 
-When any AI-decided action would affect the user's world, it must be submitted as a structured intent. 
+When any AI-decided action would affect the user's world, it must be submitted as a structured intent.
 
 The agent only thinks. The Executor only acts.
 
