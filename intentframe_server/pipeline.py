@@ -198,15 +198,20 @@ class IntentFrameRuntime:
             logger.debug("Could not write to executor action log", exc_info=True)
 
     def _resolve_user_context(self, user_context: UserContext) -> UserContext:
-        """Look up the user's real policies from the policy registry.
+        """Look up the (user, agent) policy from the policy registry.
 
-        The agent only sends user_id — the server is the authority
-        on allowed actions and their constraints.
+        The agent only sends ``user_id`` and ``agent_id`` — the server
+        is the authority on allowed actions and their constraints.
+        Lookup is keyed on the ``(user_id, agent_id)`` pair so two
+        agents owned by the same user have isolated policies.
         """
         try:
-            policy = self._policy_client.get_user_policy(user_context.user_id)
+            policy = self._policy_client.get_user_policy(
+                user_context.user_id, user_context.agent_id
+            )
             return UserContext(
                 user_id=policy.user_id,
+                agent_id=policy.agent_id,
                 allowed_actions=policy.allowed_actions,
                 intent_limits=policy.intent_limits,
                 domain_constraints=policy.domain_constraints,
@@ -214,8 +219,9 @@ class IntentFrameRuntime:
             )
         except KeyError:
             logger.warning(
-                "No policy found for user '%s' — using defaults",
+                "No policy found for user=%r agent=%r — using defaults",
                 user_context.user_id,
+                user_context.agent_id,
             )
             return user_context
 
@@ -334,6 +340,7 @@ class IntentFrameRuntime:
 
             context = RuntimeContext(
                 user_id=user_context.user_id,
+                agent_id=user_context.agent_id,
                 allowed_actions=user_context.allowed_actions,
                 metadata=user_context.metadata,
                 guardrails=[],

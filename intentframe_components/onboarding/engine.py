@@ -347,6 +347,7 @@ Resource Needs: {', '.join(capabilities.resource_needs) if capabilities.resource
 ## USER POLICIES
 
 User ID: {user_context.user_id}
+Agent ID: {user_context.agent_id}
 Allowed Actions: {', '.join(allowed_list)}
 Safe (fast-path) Actions: {', '.join(sorted(safe_list)) if safe_list else 'None'}
 
@@ -394,6 +395,7 @@ Do not list concrete email addresses from resolved policies in the guardrails.""
 
         return RuntimeContext(
             user_id=user_context.user_id,
+            agent_id=user_context.agent_id,
             allowed_actions=user_context.allowed_actions,
             metadata=user_context.metadata,
 

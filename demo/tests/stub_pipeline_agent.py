@@ -22,6 +22,13 @@ from intentframe_core.types import AgentCapabilities, ExecutionResult, RuntimeCo
 
 _INTENTS_DIR = Path(__file__).resolve().parents[2] / "demo" / "demo_data" / "attack_intents"
 
+#: Stable agent id this stub presents to IntentFrame.  Single source of
+#: truth: the demo policy loaders default to this value when seeding so
+#: the registry's ``(user_id, agent_id)`` slot the policy lives in
+#: matches what ``Actor`` sends during handshake — otherwise lookups
+#: miss and every action is denied with "no policy for user/agent".
+STUB_PIPELINE_AGENT_ID = "stub_pipeline_agent"
+
 
 def load_attack_submissions(attack_num: int) -> list[dict[str, Any]]:
     """Load the intent fixture for *attack_num* from the JSON data directory.
@@ -90,7 +97,7 @@ class StubPipelineAgent:
     async def _run_all(self, submissions: list[dict[str, Any]]) -> list[ExecutionResult]:
         """Handshake, submit everything, close — all on one event loop."""
         actor = Actor(
-            agent_id="stub_pipeline_agent",
+            agent_id=STUB_PIPELINE_AGENT_ID,
             user_id=self._user_id,
             socket_path=self._socket_path,
         )
@@ -132,7 +139,7 @@ class StubPipelineAgent:
         self._user_id = user_id
         self._socket_path = socket_path
         self._actor = Actor(
-            agent_id="stub_pipeline_agent",
+            agent_id=STUB_PIPELINE_AGENT_ID,
             user_id=user_id,
             socket_path=socket_path,
         )

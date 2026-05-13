@@ -8,11 +8,19 @@ Consumers (IntentFrame's Guardian, other apps) read from it.
     User ──► PolicyRegistry ──► Guardian (reads policies, decides)
                              ──► Analysis Engine (reads policies, adjusts depth)
 
+Identity model
+--------------
+Policies are keyed on the ``(user_id, agent_id)`` pair.  One operator
+running multiple agents (``jarvis``, ``invoice_bot``, ...) gets one
+isolated policy slot per agent — they never collide and never fall
+back to each other.
+
 In the demo this runs in-process with an in-memory store.
 In production it becomes its own microservice backed by a database,
 with a user-facing API (dashboard, CLI, SDK).
 
 Usage (demo):
+
     from policy_registry import PolicyRegistry, UserPolicy, ActionPermission
     from policy_registry.constraints import FileConstraints
 
@@ -20,23 +28,18 @@ Usage (demo):
 
     registry.set_user_policy(UserPolicy(
         user_id="finance_001",
+        agent_id="invoice_bot",
         allowed_actions={
             "READ_FILE": ActionPermission(
                 safe=True,
                 constraints=FileConstraints(allowed_paths=["/invoices/"]),
             ),
-            "LIST_DIRECTORY": ActionPermission(safe=True),
             "ASK_USER": ActionPermission(safe=True),
-            "SHOW_MESSAGE": ActionPermission(safe=True),
-            "APPEND_ROW": ActionPermission(
-                safe=False,
-                constraints=FileConstraints(allowed_paths=["/expense_tracker.md"]),
-            ),
             "PAY_INVOICE": ActionPermission(safe=False),
         },
     ))
 
-    policy = registry.get_user_policy("finance_001")
+    policy = registry.get_user_policy("finance_001", "invoice_bot")
 """
 
 from __future__ import annotations
@@ -67,46 +70,87 @@ SYSTEM_TERMINAL_BLOCKED_PATTERNS: tuple[str, ...] = (
 )
 
 
+# Composite (user_id, agent_id) key used internally.
+PolicyKey = tuple[str, str]
+
+
+def _key_of(policy: UserPolicy) -> PolicyKey:
+    return (policy.user_id, policy.agent_id)
+
+
+def _clone_policy(
+    base: UserPolicy,
+    *,
+    allowed_actions: dict[str, ActionPermission] | None = None,
+) -> UserPolicy:
+    """Shallow clone of ``base`` with optional ``allowed_actions`` swap.
+
+    Centralises the field list so future additions to :class:`UserPolicy`
+    only need updating in one place.
+    """
+    return UserPolicy(
+        user_id=base.user_id,
+        agent_id=base.agent_id,
+        intentframe_schema_version=base.intentframe_schema_version,
+        allowed_actions=(
+            allowed_actions if allowed_actions is not None else base.allowed_actions
+        ),
+        intent_limits=base.intent_limits,
+        domain_constraints=base.domain_constraints,
+        metadata=base.metadata,
+        created_at=base.created_at,
+    )
+
+
 class PolicyRegistry:
     """In-memory policy registry.
 
-    Stores per-user policies and exposes simple query methods.
+    Stores per-(user, agent) policies and exposes simple query methods.
     The store is pluggable -- swap ``_policies`` with a DB-backed
     dict-like object for production.
 
     Source resolution: when a policy contains RecipientSource or
-    ContactSource rules, get_user_policy() resolves them into flat
-    lists via the PlatformContactsClient before returning.
+    ContactSource rules, get_user_policy_resolved() resolves them into
+    flat lists via the PlatformContactsClient before returning.
     """
 
     def __init__(self) -> None:
-        self._policies: dict[str, UserPolicy] = {}
+        self._policies: dict[PolicyKey, UserPolicy] = {}
         self._contacts_client = PlatformContactsClient()
 
     # ── CRUD ──────────────────────────────────────────────────────────
 
     def set_user_policy(self, policy: UserPolicy) -> None:
-        """Create or replace the policy set for a user."""
-        self._policies[policy.user_id] = policy
+        """Create or replace the policy for a (user, agent) pair.
+
+        The key is derived from ``policy.user_id`` and ``policy.agent_id``.
+        """
+        key = _key_of(policy)
+        self._policies[key] = policy
         logger.info(
-            "Policy set for user '%s': %d allowed actions",
+            "Policy set for user=%r agent=%r: %d allowed actions",
             policy.user_id,
+            policy.agent_id,
             len(policy.allowed_actions),
         )
 
-    def get_user_policy(self, user_id: str) -> UserPolicy:
-        """Retrieve the raw (unresolved) policy set for a user.
+    def get_user_policy(self, user_id: str, agent_id: str) -> UserPolicy:
+        """Retrieve the raw (unresolved) policy for a (user, agent) pair.
 
         Raises:
-            KeyError: If no policies exist for the user.
+            KeyError: If no policy exists for the pair.
         """
         try:
-            return self._policies[user_id]
+            return self._policies[(user_id, agent_id)]
         except KeyError:
-            raise KeyError(f"No policy found for user '{user_id}'") from None
+            raise KeyError(
+                f"No policy found for user={user_id!r} agent={agent_id!r}"
+            ) from None
 
-    async def get_user_policy_resolved(self, user_id: str) -> UserPolicy:
-        """Retrieve the policy set with system floors enforced and sources resolved.
+    async def get_user_policy_resolved(
+        self, user_id: str, agent_id: str
+    ) -> UserPolicy:
+        """Retrieve the policy with system floors enforced and sources resolved.
 
         1. Merges system-level defaults (blocked patterns, etc.) that users
            cannot remove — only append to.
@@ -115,7 +159,7 @@ class PolicyRegistry:
 
         Consumers (Guardian, Analysis Engine, etc.) only see resolved data.
         """
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         policy = self._enforce_system_floor(policy)
         return await self._resolve_sources(policy)
 
@@ -152,14 +196,7 @@ class PolicyRegistry:
         updated_actions = dict(policy.allowed_actions)
         updated_actions["RUN_COMMAND"] = updated_perm
 
-        return UserPolicy(
-            user_id=policy.user_id,
-            allowed_actions=updated_actions,
-            intent_limits=policy.intent_limits,
-            domain_constraints=policy.domain_constraints,
-            metadata=policy.metadata,
-            created_at=policy.created_at,
-        )
+        return _clone_policy(policy, allowed_actions=updated_actions)
 
     async def _resolve_sources(self, policy: UserPolicy) -> UserPolicy:
         """Walk allowed_actions and resolve any source-backed constraints."""
@@ -204,38 +241,33 @@ class PolicyRegistry:
         if not changed:
             return policy
 
-        return UserPolicy(
-            user_id=policy.user_id,
-            allowed_actions=updated_actions,
-            intent_limits=policy.intent_limits,
-            domain_constraints=policy.domain_constraints,
-            metadata=policy.metadata,
-            created_at=policy.created_at,
-        )
+        return _clone_policy(policy, allowed_actions=updated_actions)
 
-    def delete_user_policy(self, user_id: str) -> None:
-        """Remove all policies for a user."""
-        self._policies.pop(user_id, None)
+    def delete_user_policy(self, user_id: str, agent_id: str) -> None:
+        """Remove the policy for a (user, agent) pair."""
+        self._policies.pop((user_id, agent_id), None)
 
-    def list_users(self) -> list[str]:
-        """Return all user IDs that have policies configured."""
+    def list_users(self) -> list[PolicyKey]:
+        """Return all ``(user_id, agent_id)`` pairs that have policies configured."""
         return list(self._policies.keys())
 
     # ── Query helpers (data retrieval, not decisions) ─────────────────
 
     def get_permission(
-        self, user_id: str, action_type: str
+        self, user_id: str, agent_id: str, action_type: str
     ) -> Optional[ActionPermission]:
         """Get the permission for a specific action, or None if blocked.
 
         The caller is responsible for interpreting the result.
         """
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         return policy.get_permission(action_type)
 
-    def is_action_allowed(self, user_id: str, action_type: str) -> bool:
+    def is_action_allowed(
+        self, user_id: str, agent_id: str, action_type: str
+    ) -> bool:
         """Check whether an action is in the user's allowed set."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         return policy.is_allowed(action_type)
 
     # ── Recipient / Source Management ──────────────────────────────────
@@ -243,37 +275,36 @@ class PolicyRegistry:
     def _update_action_constraints(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         new_constraints,
     ) -> None:
-        """Replace constraints for a single action in the user's policy."""
-        policy = self.get_user_policy(user_id)
+        """Replace constraints for a single action in the (user, agent) policy."""
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None:
-            raise KeyError(f"Action '{action}' not in policy for user '{user_id}'")
+            raise KeyError(
+                f"Action '{action}' not in policy for user={user_id!r} agent={agent_id!r}"
+            )
 
         updated_perm = ActionPermission(safe=perm.safe, constraints=new_constraints)
         updated_actions = dict(policy.allowed_actions)
         updated_actions[action] = updated_perm
 
-        self._policies[user_id] = UserPolicy(
-            user_id=policy.user_id,
-            allowed_actions=updated_actions,
-            intent_limits=policy.intent_limits,
-            domain_constraints=policy.domain_constraints,
-            metadata=policy.metadata,
-            created_at=policy.created_at,
+        self._policies[(user_id, agent_id)] = _clone_policy(
+            policy, allowed_actions=updated_actions
         )
 
     def patch_email_recipients(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         add: list[str] | None = None,
         remove: list[str] | None = None,
     ) -> EmailConstraints:
         """Add or remove explicit email recipients."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None or not isinstance(perm.constraints, EmailConstraints):
             raise KeyError(f"No EmailConstraints found for {action}")
@@ -288,17 +319,18 @@ class PolicyRegistry:
             allowed_recipients=current,
             recipient_sources=list(perm.constraints.recipient_sources),
         )
-        self._update_action_constraints(user_id, action, new_constraints)
+        self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
     def add_email_source(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         source: RecipientSource,
     ) -> EmailConstraints:
         """Add a recipient source rule to email constraints."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None or not isinstance(perm.constraints, EmailConstraints):
             raise KeyError(f"No EmailConstraints found for {action}")
@@ -308,18 +340,19 @@ class PolicyRegistry:
             allowed_recipients=list(perm.constraints.allowed_recipients),
             recipient_sources=sources,
         )
-        self._update_action_constraints(user_id, action, new_constraints)
+        self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
     def remove_email_source(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         source_type: str,
         source_filter: str = "",
     ) -> EmailConstraints:
         """Remove a recipient source by type and filter."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None or not isinstance(perm.constraints, EmailConstraints):
             raise KeyError(f"No EmailConstraints found for {action}")
@@ -332,18 +365,19 @@ class PolicyRegistry:
             allowed_recipients=list(perm.constraints.allowed_recipients),
             recipient_sources=sources,
         )
-        self._update_action_constraints(user_id, action, new_constraints)
+        self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
     def patch_message_contacts(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         add: list[str] | None = None,
         remove: list[str] | None = None,
     ) -> MessageConstraints:
         """Add or remove explicit message contacts."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None or not isinstance(perm.constraints, MessageConstraints):
             raise KeyError(f"No MessageConstraints found for {action}")
@@ -358,17 +392,18 @@ class PolicyRegistry:
             allowed_contacts=current,
             contact_sources=list(perm.constraints.contact_sources),
         )
-        self._update_action_constraints(user_id, action, new_constraints)
+        self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
     def add_message_source(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         source: ContactSource,
     ) -> MessageConstraints:
         """Add a contact source rule to message constraints."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None or not isinstance(perm.constraints, MessageConstraints):
             raise KeyError(f"No MessageConstraints found for {action}")
@@ -378,18 +413,19 @@ class PolicyRegistry:
             allowed_contacts=list(perm.constraints.allowed_contacts),
             contact_sources=sources,
         )
-        self._update_action_constraints(user_id, action, new_constraints)
+        self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
     def remove_message_source(
         self,
         user_id: str,
+        agent_id: str,
         action: str,
         source_type: str,
         source_filter: str = "",
     ) -> MessageConstraints:
         """Remove a contact source by type and filter."""
-        policy = self.get_user_policy(user_id)
+        policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
         if perm is None or not isinstance(perm.constraints, MessageConstraints):
             raise KeyError(f"No MessageConstraints found for {action}")
@@ -402,5 +438,5 @@ class PolicyRegistry:
             allowed_contacts=list(perm.constraints.allowed_contacts),
             contact_sources=sources,
         )
-        self._update_action_constraints(user_id, action, new_constraints)
+        self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints

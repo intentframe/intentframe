@@ -9,7 +9,7 @@ over the registry clients.
 Supervisor/gateway preconditions are the caller's responsibility.  Either:
   * ``intentframe-gateway-cli --profile root`` (see intentframe_cli/README.md)
   * or a direct ``python -m supervisor.main start`` with
-    ``INTENTFRAME_PROFILE=root``, ``EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml``,
+    ``JARVIS_VARIANT=root``, ``EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml``,
     and ``INTENTFRAME_ESCALATION_ARMED=1`` when root-demo is installed
     (see ``docs/executor-root-mode.md``, section 2a).
 

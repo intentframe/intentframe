@@ -364,6 +364,7 @@ def test_serialization_roundtrip():
 
     policy = UserPolicy(
         user_id="test_user",
+        agent_id="domain-hardening-test",
         domain_constraints={
             "finance": FinanceConstraints(
                 max_amount=5000.0,

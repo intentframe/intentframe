@@ -227,7 +227,7 @@ def _print_executor_alert() -> None:
         print("#    intentframe-gateway-cli --profile root")
         print("#")
         print("#  OR (DEV LOOP, BYPASSES GATEWAY):")
-        print("#    INTENTFRAME_PROFILE=root \\")
+        print("#    JARVIS_VARIANT=root \\")
         print("#    EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \\")
         print("#    INTENTFRAME_ESCALATION_ARMED=1 \\")
         print("#    python -m supervisor.main start")

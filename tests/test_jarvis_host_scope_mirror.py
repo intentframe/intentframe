@@ -1,9 +1,10 @@
-"""Mirror-invariant test: ``jarvis_pa/executor.yaml`` ↔ ``intentframe_gateway/bootstrap.py``.
+"""Mirror-invariant test: ``jarvis_pa/executor.yaml`` ↔ Jarvis user-mode policy seed.
 
 The executor YAML's ``host_files.allowed_write_paths`` is the adapter's
-hard ceiling.  ``intentframe_gateway/bootstrap.py`` is the runtime
-policy seeder (invoked by ``Bootstrapper.reconcile`` on every gateway
-startup) and authors the user's per-action
+hard ceiling.  The runtime policy seed (loaded from
+``jarvis_pa/jarvis/policies/jarvis.yaml`` via
+``intentframe_gateway.bootstrap._build_default_policy()`` on every
+gateway startup) authors the user's per-action
 ``HostFileConstraints.allowed_host_paths`` that the guardian checks
 earlier in the pipeline.  If the two drift apart:
 
@@ -19,13 +20,11 @@ strict set equality (reads and writes both).  The invariant is relaxed
 only if the policy later grows finer-grained sub-allowlists (out of
 scope for this plan).
 
-Note: ``jarvis_pa/seed_policies.py`` is a hand-runnable mirror of this
-same policy across both profiles (``user`` and ``root``), kept in
-lockstep with bootstrap intentionally.  This test pins the *runtime*
-path — the gateway bootstrap against ``jarvis_pa/executor.yaml`` (user
-profile) — so drift there cannot slip past CI.  Bootstrap-vs-seeder
-parity (including the root profile) is covered by the ``Mirror check``
-snippet in ``docs/action-family-wiring.md``.
+Both ``intentframe_gateway/bootstrap.py`` and ``jarvis_pa/seed_policies.py``
+load the same packaged YAML through ``policy_registry.seeds.load_policy_seed``,
+so seeder-vs-bootstrap drift is structurally impossible.  This test
+pins the YAML against the *executor adapter*'s allowlist for the
+user-mode Jarvis variant.
 """
 
 from __future__ import annotations

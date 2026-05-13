@@ -472,8 +472,15 @@ class UserContext(BaseModel):
 
     No separate approval_limit or allowed_paths — those are now
     embedded in per-category constraints.
+
+    Identity model:
+        ``user_id`` is the operator the request is on behalf of.
+        ``agent_id`` is the agent making the request (e.g. ``jarvis``).
+        Registry lookup uses the ``(user_id, agent_id)`` pair so
+        one operator running multiple agents has isolated policies.
     """
     user_id: str = ""
+    agent_id: str = ""
     allowed_actions: Dict[str, ActionPermission] = Field(default_factory=dict)
     intent_limits: List[SemanticIntentLimit] = Field(default_factory=list)
     domain_constraints: Dict[str, DomainConstraintTypes] = Field(default_factory=dict)
@@ -520,6 +527,7 @@ class RuntimeContext(BaseModel):
     Resource Registry so the agent knows its filesystem vocabulary.
     """
     user_id: str = ""
+    agent_id: str = ""
     allowed_actions: Dict[str, ActionPermission] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 

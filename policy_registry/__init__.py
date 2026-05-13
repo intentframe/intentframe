@@ -12,6 +12,7 @@ Usage:
     registry = PolicyRegistry()
     registry.set_user_policy(UserPolicy(
         user_id="finance_001",
+        agent_id="invoice_bot",
         allowed_actions={
             "READ_FILE": ActionPermission(
                 safe=True,
@@ -21,11 +22,17 @@ Usage:
     ))
 """
 
-from policy_registry.models import ActionPermission, SemanticIntentLimit, UserPolicy
+from policy_registry.models import (
+    INTENTFRAME_POLICY_SCHEMA_VERSION,
+    ActionPermission,
+    SemanticIntentLimit,
+    UserPolicy,
+)
 from policy_registry.registry import PolicyRegistry
 
 __all__ = [
     "ActionPermission",
+    "INTENTFRAME_POLICY_SCHEMA_VERSION",
     "PolicyRegistry",
     "SemanticIntentLimit",
     "UserPolicy",

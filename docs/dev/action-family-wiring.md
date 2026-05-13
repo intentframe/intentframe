@@ -82,8 +82,31 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 
 ### 7. Policy seed (the runtime truth)
 
-- `intentframe_gateway/bootstrap.py` — the **runtime** policy seeder. Add the actions to `SAFE_ACTIONS` / `UNSAFE_ACTIONS`. Wire the new constraint into `_build_default_policy()` with the correct disjoint field name. This is the file the gateway actually runs on startup.
-- `jarvis_pa/seed_policies.py` — the manual mirror script. Keep it equivalent to `bootstrap.py` across **both profiles** (`user` and `root`): SAFE/UNSAFE sets, per-action constraints, intent limits, and workspace mounts must match. The script reads `INTENTFRAME_PROFILE` and `JARVIS_USER_ID` from env just like bootstrap, and is idempotent (GET-first, skip if present). See "Drift hotspots" below.
+The default Jarvis policy lives in YAML at `jarvis_pa/jarvis/policies/<variant>.yaml`
+and is loaded by `policy_registry.seeds.load_policy_seed`. Both the
+gateway bootstrap and the dev seed CLI go through that one loader, so
+there is exactly one place to edit per variant:
+
+- `jarvis_pa/jarvis/policies/jarvis.yaml` — user-mode Jarvis (host paths `~/*`, `agent_id: jarvis`).
+- `jarvis_pa/jarvis/policies/jarvis_root.yaml` — root-mode Jarvis (host paths `/*`, `agent_id: jarvis_root`).
+  Mirror the user variant except for the host-path scope and the
+  `agent_id`; both YAMLs must keep the same
+  `RUN_COMMAND.deny_capabilities` set (pinned by `tests/test_seed_capability_parity.py`).
+- `intentframe_gateway/bootstrap.py` — orchestrator. Adds runtime
+  overlays (`user_id` from gateway config, `agent_id` from the resolved
+  Jarvis variant, `metadata.note` stamp) and POSTs to the policy +
+  resource registries. The legacy `SAFE_ACTIONS`, `UNSAFE_ACTIONS`,
+  `INTENT_LIMITS`, `_build_default_policy()`, and `_build_jarvis_policy(...)`
+  symbols are preserved as derived re-exports so external callers keep
+  working; edit the YAML, not these.
+- `jarvis_pa/seed_policies.py` — thin dev CLI on top of the same
+  loader. Idempotent (GET-first, skip if present). Variant-aware via
+  `JARVIS_VARIANT` (default `user`).
+
+End users override either Jarvis variant by dropping a YAML at
+`~/.intentframe/policies/<agent_id>.yaml` (e.g.
+`~/.intentframe/policies/jarvis.yaml`); the loader picks it up on
+next gateway restart.
 
 ### 8. Tests
 
@@ -102,10 +125,10 @@ These are the files that **must** stay in sync but have no compiler-enforced rel
 
 | Pair | What drifts | Symptom |
 |---|---|---|
-| `bootstrap.py::SAFE_ACTIONS` ↔ `ActionType` enum | Bootstrap missing new actions | Handshake total count is lower than enum size; agent sees tool, policy denies at runtime |
+| `jarvis_pa/jarvis/policies/jarvis.yaml::allowed_actions` ↔ `ActionType` enum | YAML missing new actions | Handshake total count is lower than enum size; agent sees tool, policy denies at runtime |
 | `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` ↔ `tools.py::ALL_TOOLS` | Agent advertises fewer actions than it can call | Onboarding prompt has no guardrails for the missing actions; agent still calls them, no policy-side guidance |
-| `bootstrap.py` ↔ `jarvis_pa/seed_policies.py` | Manual mirror falls behind runtime | Dev runs `seed_policies.py` expecting parity, gets stale behaviour |
-| `executor.yaml::host_files.allowed_write_paths` ↔ `bootstrap.py::host_constraint` | Adapter ceiling and policy allowlist disagree | "Guardian approved, executor refused" inconsistency, and vice versa |
+| `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
+| `executor.yaml::host_files.allowed_write_paths` ↔ `jarvis.yaml::READ_HOST_FILE.constraints.allowed_host_paths` | Adapter ceiling and policy allowlist disagree | "Guardian approved, executor refused" inconsistency, and vice versa |
 | `_PASSIVE_READ_ACTIONS` ↔ `CRITICAL_ACTIONS` ↔ `prompt/strategy.py` | One says passive, another says critical | Action takes a different lane than its risk warrants; AE or AIGuardian is skipped when it shouldn't be, or runs when it doesn't need to |
 | `DENY_WRITE_PREFIXES` ↔ canonicalizer used by that family | Deny list stores canonical form, checker compares raw form (or vice versa) | `/etc/sudoers` blocked but `/private/etc/sudoers` allowed, or similar macOS-only asymmetries |
 | Constraint field names across families | Two constraints share a field name | Pydantic Union misroutes payloads to a sibling checker silently |
@@ -122,25 +145,14 @@ A good rule: whenever you add or rename a list that enumerates action types, ask
   ```
   Compare to "Allowed Actions: N" in the handshake banner. They must match.
 
-- **Mirror check.** `bootstrap.py` vs `seed_policies.py` (covers both
-  profiles and the shared constants):
+- **Mirror check.** `bootstrap.py` and `seed_policies.py` now both
+  load through the same `policy_registry.seeds.load_policy_seed`, so
+  the historical drift between them cannot occur.  What can still
+  drift is the YAML vs the named capability constant — pinned by
+  `tests/test_seed_capability_parity.py`.  Run it directly when in
+  doubt:
   ```bash
-  python -c "
-  from intentframe_gateway import bootstrap as b
-  from jarvis_pa import seed_policies as s
-  assert set(b.SAFE_ACTIONS) == set(s.SAFE_ACTIONS)
-  assert set(b.UNSAFE_ACTIONS) == set(s.UNSAFE_ACTIONS)
-  assert b.INTENT_LIMITS == s.INTENT_LIMITS
-  assert b.WORKSPACE_MOUNTS == s.WORKSPACE_MOUNTS
-  assert b.ROOT_WORKSPACE_MOUNTS == s.ROOT_WORKSPACE_MOUNTS
-  for profile in ('user', 'root'):
-      bp = b._build_policy(profile)['allowed_actions']
-      sp = s._build_policy(profile)['allowed_actions']
-      assert set(bp) == set(sp), profile
-      for k in bp:
-          assert bp[k]['constraints'] == sp[k]['constraints'], (profile, k)
-  print('mirror OK')
-  "
+  python -m pytest tests/test_seed_capability_parity.py -v
   ```
 
 - **Agent advertisement vs tool surface.** Compare `_ACTION_TYPES` in `jarvis_pa/jarvis/agent.py` to the `function_tool` wrappers in `jarvis_pa/jarvis/tools.py`. Any tool whose underlying action is not in `_ACTION_TYPES` will be invisible to onboarding.
