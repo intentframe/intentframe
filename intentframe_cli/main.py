@@ -12,18 +12,18 @@ provides a two-mode REPL:
     Chat with Jarvis (default), manage services, credentials,
     EDI accounts, app preferences, audit, policies, and more.
 
-Profile selection:
-  ``--profile root`` asks the CLI to spawn the gateway with the root
-  profile (root-scoped policy + ``jarvis_pa/executor_root.yaml``).  The
-  flag is translated into two environment variables the gateway and
-  supervisor already understand:
+Variant selection:
+  ``--profile root`` asks the CLI to spawn the gateway with the
+  root-mode Jarvis variant (root-scoped policy + ``jarvis_pa/executor_root.yaml``).
+  The flag is translated into two environment variables the gateway and
+  supervisor consume:
 
-    INTENTFRAME_PROFILE=root
+    JARVIS_VARIANT=root
     EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml   (only when unset)
 
   The flag is only effective when the CLI actually spawns the gateway.
   If a gateway is already running, the flag is ignored (with a warning)
-  — restart is required to change profile.
+  — restart is required to change variant.
 """
 
 from __future__ import annotations
@@ -93,16 +93,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _apply_profile_env(profile: str | None) -> None:
     """Translate ``--profile`` into env vars the gateway already consumes.
 
-    * ``INTENTFRAME_PROFILE`` is always set when a profile is given; the
-      gateway's bootstrap reads it to pick the right policy and
-      workspace shape.
+    * ``JARVIS_VARIANT`` is always set when a profile is given; the
+      gateway's bootstrap reads it to pick the right Jarvis policy YAML
+      (``jarvis.yaml`` vs ``jarvis_root.yaml``) and workspace shape.
     * ``EXECUTOR_CONFIG`` is only set for ``--profile root`` and only
       when the operator has not already set it explicitly — never
       override an explicit override.
     """
     if profile is None:
         return
-    os.environ["INTENTFRAME_PROFILE"] = profile
+    os.environ["JARVIS_VARIANT"] = profile
     if profile == "root" and not os.environ.get("EXECUTOR_CONFIG"):
         os.environ["EXECUTOR_CONFIG"] = _ROOT_EXECUTOR_CONFIG
 

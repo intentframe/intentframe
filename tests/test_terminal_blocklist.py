@@ -67,6 +67,7 @@ class TestPolicyRegistryFloor:
             )
         return UserPolicy(
             user_id="test",
+            agent_id="terminal-test",
             allowed_actions={
                 "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
             },
@@ -77,10 +78,11 @@ class TestPolicyRegistryFloor:
         registry = PolicyRegistry()
         policy = UserPolicy(
             user_id="test",
+            agent_id="terminal-test",
             allowed_actions={"RUN_COMMAND": ActionPermission(safe=False)},
         )
         registry.set_user_policy(policy)
-        resolved = _run(registry.get_user_policy_resolved("test"))
+        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
         perm = resolved.allowed_actions["RUN_COMMAND"]
         assert isinstance(perm.constraints, TerminalConstraints)
@@ -93,7 +95,7 @@ class TestPolicyRegistryFloor:
         registry.set_user_policy(self._make_policy(
             blocked_patterns=["curl", "wget"],
         ))
-        resolved = _run(registry.get_user_policy_resolved("test"))
+        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
         patterns = resolved.allowed_actions["RUN_COMMAND"].constraints.blocked_patterns
         for sys_pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
@@ -105,7 +107,7 @@ class TestPolicyRegistryFloor:
         """Even if user sets empty blocked_patterns, system floor is merged back."""
         registry = PolicyRegistry()
         registry.set_user_policy(self._make_policy(blocked_patterns=[]))
-        resolved = _run(registry.get_user_policy_resolved("test"))
+        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
         patterns = resolved.allowed_actions["RUN_COMMAND"].constraints.blocked_patterns
         for sys_pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
@@ -118,7 +120,7 @@ class TestPolicyRegistryFloor:
             blocked_patterns=[],
             allowed_commands=["ls *", "pwd"],
         ))
-        resolved = _run(registry.get_user_policy_resolved("test"))
+        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
         constraints = resolved.allowed_actions["RUN_COMMAND"].constraints
         assert "ls *" in constraints.allowed_commands
@@ -130,7 +132,7 @@ class TestPolicyRegistryFloor:
         registry.set_user_policy(self._make_policy(
             blocked_patterns=["sudo", "custom_pattern"],
         ))
-        resolved = _run(registry.get_user_policy_resolved("test"))
+        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
         patterns = resolved.allowed_actions["RUN_COMMAND"].constraints.blocked_patterns
         assert patterns.count("sudo") == 1

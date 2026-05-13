@@ -140,7 +140,7 @@ intentframe-gateway-cli --profile root
 
 The CLI translates that into:
 
-- `INTENTFRAME_PROFILE=root`
+- `JARVIS_VARIANT=root`
 - `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` (only if the operator did not already set `EXECUTOR_CONFIG`)
 
 ### 2a. (Alternative) Launch supervisor directly (faster dev loop)
@@ -156,7 +156,7 @@ successfully on this machine — otherwise `sandbox.escalate: sudo` in
 `executor_root.yaml` will not have a working `sudo -n` path.
 
 ```bash
-INTENTFRAME_PROFILE=root \
+JARVIS_VARIANT=root \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
 python -m supervisor.main start
@@ -184,11 +184,12 @@ registry state the gateway would create (e.g. other profiles or
 services), use:
 
 ```bash
-INTENTFRAME_PROFILE=root python jarvis_pa/seed_policies.py
+JARVIS_VARIANT=root python jarvis_pa/seed_policies.py
 ```
 
-The script honors the same `INTENTFRAME_PROFILE` and `JARVIS_USER_ID`
-env vars as bootstrap and is idempotent (GET-first, skip if present),
+The script honors the same `JARVIS_VARIANT`, `INTENTFRAME_USER_ID`
+(and the back-compat `JARVIS_USER_ID`) env vars as bootstrap and is
+idempotent (GET-first, skip if present),
 so running it after an auto-seeded gateway is a no-op. The
 `demo/tests/root_demo/` Python harnesses seed their own test policy
 and workspace in-process, so they can run against a supervisor started

@@ -40,6 +40,12 @@
 # ``tests/test_python_shell_only_policy.py::TestClassifierAgreesWithPolicy``.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+intentframe_schema_version: 1
+# Matches StubPipelineRootAgent's hardcoded Actor agent_id so the
+# registry's (user_id, agent_id) slot lines up with the handshake.
+# load_root_demo_policy() also defaults agent_id to this value.
+agent_id: stub_pipeline_agent
+
 allowed_actions:
   RUN_COMMAND:
     safe: false

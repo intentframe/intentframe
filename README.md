@@ -550,13 +550,16 @@ The dashboard registers a demo user and workspace, installs the `invoice_bot` ag
 
 ---
 
-## 🔧 Customizing Policies
+## 🔧 Customizing Jarvis
 
-Jarvis (the local personal-assistant stack) ships with a default set of allowed and blocked actions, path constraints, and intent limits. The runtime default is seeded at gateway startup from hardcoded values in `intentframe_gateway/bootstrap.py`. `jarvis_pa/seed_policies.py` is kept as a manual mirror of the same defaults for dev workflows — profile-aware (`INTENTFRAME_PROFILE=user|root`) and idempotent, so reruns are safe and the root-profile shape is seeded identically to bootstrap.
+Jarvis ships with safe defaults for everything. Two YAML files let you change the defaults without touching source code:
 
-There is currently no file-based or CLI-based way to customize policies without editing those source files directly and re-running bootstrap. The gateway exposes a read-only `/policies` endpoint; writes are not routed through it.
+- **What Jarvis is allowed to do** — drop a file at `~/.intentframe/policies/jarvis.yaml`. The default policy that ships with Jarvis is at [`jarvis_pa/jarvis/policies/jarvis.yaml`](jarvis_pa/jarvis/policies/jarvis.yaml) — read it to see exactly what is allowed and blocked out of the box. For the full YAML reference (every action, every constraint, every capability tag) see [`docs/user_policy_yaml_guide.md`](docs/user_policy_yaml_guide.md).
+- **How Jarvis runs** (model, memory, heartbeat, etc.) — `~/.jarvis/config.yaml`. Jarvis ships with built-in defaults for everything; you only need this file if you want to change something. See [`docs/jarvis_config_yaml_guide.md`](docs/jarvis_config_yaml_guide.md) for every supported setting.
 
-A full policy-editing surface — via a web app, the CLI, or a macOS app — is planned for a future release.
+Neither file needs to exist to run Jarvis. When you create one, it overrides the packaged default. Restart the gateway after editing.
+
+A richer policy management surface (validate, show, diff, reset, third-party agent install) is planned — see [`todo/policy-cli-pane-todo.md`](todo/policy-cli-pane-todo.md).
 
 IntentFrame supports two filesystem tool families: workspace/VFS tools (`READ_FILE`, `WRITE_FILE`, etc.) and host file tools (`READ_HOST_FILE`, `WRITE_HOST_FILE`, etc.). The runtime can enforce either family, but real product profiles should usually expose only one family to a given LLM tool list. See [`docs/vfs-vs-host-tools.md`](docs/vfs-vs-host-tools.md) for the design guidance, trade-offs, and test harness modes.
 

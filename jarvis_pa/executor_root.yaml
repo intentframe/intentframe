@@ -2,8 +2,8 @@
 # Jarvis PA — Executor Configuration (root profile)
 #
 # Root-scoped variant of ``jarvis_pa/executor.yaml``.  Used when the gateway
-# is started under the ``root`` profile (``intentframe-gateway-cli --profile
-# root`` → ``INTENTFRAME_PROFILE=root`` + ``EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml``).
+# is started under the root-mode Jarvis variant (``intentframe-gateway-cli
+# --profile root`` → ``JARVIS_VARIANT=root`` + ``EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml``).
 #
 # Only three things differ from the default profile:
 #
@@ -23,7 +23,7 @@
 # including ``unrestricted``.
 #
 # Usage (supervisor only — see docs/executor-root-mode.md section 2a):
-#   INTENTFRAME_PROFILE=root \
+#   JARVIS_VARIANT=root \
 #   EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 #   INTENTFRAME_ESCALATION_ARMED=1 \
 #   python -m supervisor.main start
@@ -74,8 +74,9 @@ adapters:
 # /etc sensitive files, sudoers, sshd_config, PAM, kexts, Keychains,
 # Messages, Mail, ~/.ssh, ~/.gnupg, and shell rc files regardless of what
 # this allow-list says.
-# Keep this mirror in sync with the host_constraint emitted by the
-# ``root``-profile branch in ``intentframe_gateway/bootstrap.py``.
+# Keep this mirror in sync with the host-file ``allowed_host_paths``
+# declared in ``jarvis_pa/jarvis/policies/jarvis_root.yaml`` (the runtime
+# policy seed for the root-mode Jarvis variant).
 host_files:
   allowed_read_paths:
     - /

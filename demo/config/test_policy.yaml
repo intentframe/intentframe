@@ -4,11 +4,19 @@
 #
 # Common user policy for attack and red-team test suites.
 # Tests load this via policy_loader.load_test_policy(), which injects
-# the suite-specific user_id and optional metadata overrides.
+# the suite-specific user_id and optional metadata overrides.  The
+# ``agent_id`` below matches what StubPipelineAgent (the harness behind
+# every demo suite) hardcodes on its Actor so the registry's
+# ``(user_id, agent_id)`` slot lines up with the handshake.  The
+# loader's default already passes the same value — the field is kept
+# here so the YAML is independently inspectable / loadable.
 #
 # This mirrors the policy structure in dashboard.yaml but is tuned for
 # adversarial testing — no ASK_USER / SHOW_MESSAGE actions, tighter limits.
 # ═══════════════════════════════════════════════════════════════════════════════
+
+intentframe_schema_version: 1
+agent_id: stub_pipeline_agent
 
 allowed_actions:
   READ_FILE:

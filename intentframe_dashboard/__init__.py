@@ -76,7 +76,7 @@ class IntentFrameDashboard:
 
         self._manifests: Dict[str, AgentManifest] = {}
         self._installed: Dict[str, AgentManifest] = {}
-        self._users: Dict[str, UserPolicy] = {}
+        self._users: Dict[tuple[str, str], UserPolicy] = {}
 
         self._agent_dir: Path | None = None
         if agent_dir is not None:
@@ -101,28 +101,37 @@ class IntentFrameDashboard:
     def register_user(
         self,
         user_id: str,
+        agent_id: str,
         allowed_actions: Dict[str, ActionPermission],
         intent_limits: List[SemanticIntentLimit] | None = None,
         domain_constraints: Dict[str, DomainConstraints] | None = None,
         metadata: Dict[str, Any] | None = None,
     ) -> UserPolicy:
-        """Register a user with their security policies."""
+        """Register a (user, agent) policy with the registry.
+
+        ``agent_id`` is required because the policy registry keys on the
+        ``(user_id, agent_id)`` pair — one operator can run multiple
+        agents with isolated policies.  The dashboard's local cache uses
+        the same composite key.
+        """
         policy = UserPolicy(
             user_id=user_id,
+            agent_id=agent_id,
             allowed_actions=allowed_actions,
             intent_limits=intent_limits or [],
             domain_constraints=domain_constraints or {},
             metadata=metadata or {},
         )
         self._policy_client.set_user_policy(policy)
-        stored = self._policy_client.get_user_policy(user_id)
-        self._users[user_id] = stored
+        stored = self._policy_client.get_user_policy(user_id, agent_id)
+        self._users[(user_id, agent_id)] = stored
         return stored
 
-    def get_user(self, user_id: str) -> UserPolicy:
-        if user_id in self._users:
-            return self._users[user_id]
-        return self._policy_client.get_user_policy(user_id)
+    def get_user(self, user_id: str, agent_id: str) -> UserPolicy:
+        key = (user_id, agent_id)
+        if key in self._users:
+            return self._users[key]
+        return self._policy_client.get_user_policy(user_id, agent_id)
 
     # ── Workspace Management ─────────────────────────────────────────
 
@@ -207,6 +216,7 @@ class IntentFrameDashboard:
         env = {
             "INTENTFRAME_SOCKET": self._socket_path,
             "INTENTFRAME_USER_ID": user_id,
+            "INTENTFRAME_AGENT_ID": agent,
             "INTENTFRAME_WORKSPACE": workspace_id,
             "INTENTFRAME_TASK": task,
         }
@@ -252,6 +262,13 @@ def run_config(
 
     with IntentFrameDashboard(agent_dir=agent_dir) as dashboard:
         # ── Register users ───────────────────────────────────────
+        # Each policy registers against the (user_id, agent_id) pair the
+        # tasks declare it runs against.  A user that drives N agents is
+        # registered N times — one slot per agent.
+        agents_per_user: Dict[str, set[str]] = {}
+        for t in cfg.tasks:
+            agents_per_user.setdefault(t.user, set()).add(t.agent)
+
         for user_id, user_cfg in cfg.users.items():
             allowed_actions: Dict[str, ActionPermission] = {}
             for action, perm_cfg in user_cfg.allowed_actions.items():
@@ -286,15 +303,18 @@ def run_config(
                     }
                     domain_constraints[domain_name] = constraint_cls(**dc_dict)
 
-            dashboard.register_user(
-                user_id=user_id,
-                allowed_actions=allowed_actions,
-                intent_limits=intent_limits,
-                domain_constraints=domain_constraints,
-                metadata=user_cfg.metadata,
-            )
-            if verbose:
-                print(f"  [OK] User '{user_id}' registered")
+            agent_ids = agents_per_user.get(user_id) or {user_id}
+            for agent_id in sorted(agent_ids):
+                dashboard.register_user(
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    allowed_actions=allowed_actions,
+                    intent_limits=intent_limits,
+                    domain_constraints=domain_constraints,
+                    metadata=user_cfg.metadata,
+                )
+                if verbose:
+                    print(f"  [OK] Policy registered for user='{user_id}' agent='{agent_id}'")
 
         # ── Register workspaces ──────────────────────────────────
         for ws_id, ws_cfg in cfg.workspaces.items():

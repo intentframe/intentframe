@@ -1,0 +1,341 @@
+# =============================================================================
+# Jarvis — root-mode policy
+# =============================================================================
+#
+# Root-scoped variant of `jarvis_pa/policies/jarvis.yaml`.  Used when
+# the gateway / supervisor seeds the root variant of Jarvis (a separate
+# `agent_id` so the two coexist without colliding in the registry).
+# See that file for the full per-action breakdown and customisation
+# guidance.
+#
+# Differences from the user-mode policy (intentionally small)
+# -----------------------------------------------------------
+# * Host-file `allowed_host_paths` broadened from `~/*` to `/*` to mirror
+#   `jarvis_pa/executor_root.yaml::host_files.allowed_{read,write}_paths`.
+# * `agent_id` is `jarvis_root`.
+# * `RUN_COMMAND.constraints.deny_capabilities` is intentionally identical
+#   to the user-mode policy — the language surface IntentFrame is willing
+#   to reason about doesn't change just because the executor runs as
+#   root.  `sudo` stays in `blocked_patterns` for the same reason: the
+#   demo stance is "executor already runs as root; agents must not
+#   attempt privilege escalation".
+#
+# Mirror invariants identical to `jarvis.yaml`; pinned by:
+#   * `tests/test_seed_capability_parity.py`            (deny_capabilities)
+#   * `tests/test_policy_host_constraints_roundtrip.py` (constraint dispatch)
+# =============================================================================
+
+intentframe_schema_version: 1
+agent_id: jarvis_root
+
+metadata:
+  note: Auto-seeded from packaged Jarvis (root) policy
+
+allowed_actions:
+
+  # ── Safe: host-file reads (path-constrained to root) ──────────────
+  READ_HOST_FILE:
+    safe: true
+    constraints:
+      allowed_host_paths:
+        - "/*"
+  LIST_HOST_DIRECTORY:
+    safe: true
+    constraints:
+      allowed_host_paths:
+        - "/*"
+
+  # ── Safe: user IO ─────────────────────────────────────────────────
+  ASK_USER:
+    safe: true
+  SHOW_MESSAGE:
+    safe: true
+  GET_CONFIRMATION:
+    safe: true
+  SHOW_OPTIONS:
+    safe: true
+
+  # ── Safe: clipboard ───────────────────────────────────────────────
+  GET_CLIPBOARD:
+    safe: true
+  SET_CLIPBOARD:
+    safe: true
+
+  # ── Safe: search & notifications ──────────────────────────────────
+  SEARCH_SPOTLIGHT:
+    safe: true
+  SHOW_NOTIFICATION:
+    safe: true
+
+  # ── Safe: calendar (reads) ────────────────────────────────────────
+  LIST_CALENDARS:
+    safe: true
+  LIST_EVENTS:
+    safe: true
+  SEARCH_EVENTS:
+    safe: true
+
+  # ── Safe: reminders (reads) ───────────────────────────────────────
+  LIST_REMINDER_LISTS:
+    safe: true
+  LIST_REMINDERS:
+    safe: true
+
+  # ── Safe: notes (reads) ───────────────────────────────────────────
+  LIST_NOTES:
+    safe: true
+  READ_NOTE:
+    safe: true
+
+  # ── Safe: messages (reads) ────────────────────────────────────────
+  READ_MESSAGES:
+    safe: true
+
+  # ── Safe: contacts (reads) ────────────────────────────────────────
+  SEARCH_CONTACTS:
+    safe: true
+  GET_CONTACT:
+    safe: true
+
+  # ── Safe: browser (reads) ─────────────────────────────────────────
+  GET_PAGE_CONTENT:
+    safe: true
+
+  # ── Safe: email (reads) ───────────────────────────────────────────
+  SEARCH_EMAIL:
+    safe: true
+  READ_EMAIL:
+    safe: true
+  GET_EMAIL:
+    safe: true
+  DOWNLOAD_ATTACHMENT:
+    safe: true
+
+  # ── Safe: HTTP (reads) ────────────────────────────────────────────
+  HTTP_GET:
+    safe: true
+
+  # ── Safe: system (reads) ──────────────────────────────────────────
+  GET_SYSTEM_INFO:
+    safe: true
+  GET_BRIGHTNESS:
+    safe: true
+  GET_VOLUME:
+    safe: true
+  GET_MUTE:
+    safe: true
+  GET_DARK_MODE:
+    safe: true
+
+  # ── Unsafe: host-file writes (path-constrained to root) ───────────
+  WRITE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "/*"
+  DELETE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "/*"
+
+  # ── Unsafe: terminal (python + shell language clamp + sensitive surfaces) ─
+  # Identical to `jarvis.yaml`; `deny_capabilities` MUST equal
+  # sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES); pinned by
+  # `tests/test_seed_capability_parity.py`.
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"
+        - mkfs
+        - "dd if="
+        - "> /dev/"
+        - "chmod 777"
+      deny_capabilities:
+        - "capability:compilation"
+        - "capability:data_read:auth_authority"
+        - "capability:data_read:browser_cookies"
+        - "capability:data_read:browser_profile_data"
+        - "capability:data_read:browser_session_data"
+        - "capability:data_read:cloud_tokens"
+        - "capability:data_read:credential_material"
+        - "capability:data_read:db_client_history"
+        - "capability:data_read:dotfile_secrets"
+        - "capability:data_read:mail_store"
+        - "capability:data_read:messaging_history"
+        - "capability:data_read:password_manager_export"
+        - "capability:data_read:personal_records"
+        - "capability:data_read:process_env"
+        - "capability:data_read:process_memory"
+        - "capability:data_read:shell_history"
+        - "capability:data_read:ssh_known_hosts"
+        - "capability:network_exfil:cloud_upload"
+        - "capability:network_exfil:file_transfer_outbound"
+        - "capability:network_exfil:http_upload"
+        - "capability:network_exfil:ssh_tunnel"
+        - "capability:package_install:cargo"
+        - "capability:package_install:composer"
+        - "capability:package_install:gem"
+        - "capability:package_install:go"
+        - "capability:package_install:npm"
+        - "capability:script_execution:deno_bun"
+        - "capability:script_execution:dotnet"
+        - "capability:script_execution:go"
+        - "capability:script_execution:java"
+        - "capability:script_execution:julia"
+        - "capability:script_execution:local_binary"
+        - "capability:script_execution:lua"
+        - "capability:script_execution:node"
+        - "capability:script_execution:perl"
+        - "capability:script_execution:php"
+        - "capability:script_execution:r"
+        - "capability:script_execution:ruby"
+        - "capability:script_execution:swift"
+        - "capability:stdin_exec:node"
+        - "capability:stdin_exec:perl"
+        - "capability:stdin_exec:php"
+        - "capability:stdin_exec:ruby"
+        - "capability:system_mutate:audit_log"
+        - "capability:system_mutate:backup"
+        - "capability:system_mutate:boot_policy"
+        - "capability:system_mutate:browser_extension"
+        - "capability:system_mutate:browser_security_pref"
+        - "capability:system_mutate:ca_trust"
+        - "capability:system_mutate:cron_mutation"
+        - "capability:system_mutate:disk_encryption"
+        - "capability:system_mutate:firewall"
+        - "capability:system_mutate:history_tamper"
+        - "capability:system_mutate:host_network_config"
+        - "capability:system_mutate:hostname"
+        - "capability:system_mutate:hosts_file"
+        - "capability:system_mutate:installer_pkg"
+        - "capability:system_mutate:kernel_extension"
+        - "capability:system_mutate:kernel_tunable"
+        - "capability:system_mutate:launchd_mutation"
+        - "capability:system_mutate:mdm_profile"
+        - "capability:system_mutate:persistence"
+        - "capability:system_mutate:print_config"
+        - "capability:system_mutate:privilege_config"
+        - "capability:system_mutate:radio_power"
+        - "capability:system_mutate:remote_access"
+        - "capability:system_mutate:screen_sharing"
+        - "capability:system_mutate:security_daemon"
+        - "capability:system_mutate:service_mgmt"
+        - "capability:system_mutate:shell_init"
+        - "capability:system_mutate:tcc_privacy"
+        - "capability:system_mutate:time_sync"
+        - "capability:system_mutate:user_account"
+
+  # ── Unsafe: email (writes — recipient-constrained) ────────────────
+  SEND_EMAIL:
+    safe: false
+    constraints:
+      allowed_recipients: []
+      recipient_sources:
+        - source: contacts_all
+          filter: ""
+          enabled: true
+  REPLY_EMAIL:
+    safe: false
+    constraints:
+      allowed_recipients: []
+      recipient_sources:
+        - source: contacts_all
+          filter: ""
+          enabled: true
+  FORWARD_EMAIL:
+    safe: false
+    constraints:
+      allowed_recipients: []
+      recipient_sources:
+        - source: contacts_all
+          filter: ""
+          enabled: true
+  MARK_READ_EMAIL:
+    safe: false
+  MOVE_EMAIL:
+    safe: false
+  DELETE_EMAIL:
+    safe: false
+
+  # ── Unsafe: calendar (writes) ─────────────────────────────────────
+  CREATE_EVENT:
+    safe: false
+  UPDATE_EVENT:
+    safe: false
+  DELETE_EVENT:
+    safe: false
+
+  # ── Unsafe: reminders (writes) ────────────────────────────────────
+  CREATE_REMINDER:
+    safe: false
+  UPDATE_REMINDER:
+    safe: false
+  COMPLETE_REMINDER:
+    safe: false
+  DELETE_REMINDER:
+    safe: false
+
+  # ── Unsafe: notes (writes) ────────────────────────────────────────
+  CREATE_NOTE:
+    safe: false
+  DELETE_NOTE:
+    safe: false
+
+  # ── Unsafe: contacts (writes) ─────────────────────────────────────
+  ADD_CONTACT:
+    safe: false
+  UPDATE_CONTACT:
+    safe: false
+  DELETE_CONTACT:
+    safe: false
+
+  # ── Unsafe: messages (writes — contact-constrained) ───────────────
+  SEND_MESSAGE:
+    safe: false
+    constraints:
+      allowed_contacts: []
+      contact_sources:
+        - source: contacts_all
+          filter: ""
+          enabled: true
+
+  # ── Unsafe: browser (writes) ──────────────────────────────────────
+  OPEN_URL:
+    safe: false
+
+  # ── Unsafe: HTTP (writes) ─────────────────────────────────────────
+  HTTP_POST:
+    safe: false
+  HTTP_PUT:
+    safe: false
+  HTTP_DELETE:
+    safe: false
+
+  # ── Unsafe: system (writes) ───────────────────────────────────────
+  SET_VOLUME:
+    safe: false
+  SET_BRIGHTNESS:
+    safe: false
+  TOGGLE_MUTE:
+    safe: false
+  TOGGLE_DARK_MODE:
+    safe: false
+
+intent_limits:
+  - limit_id: max-spend-per-txn
+    domain: spending
+    description: Maximum $500 per transaction
+    raw: Don't spend more than $500 on a single thing without asking me
+    threshold: 500.0
+    effect: block
+    scope: per_action
+
+  - limit_id: confirm-before-delete
+    domain: deletion
+    description: Always confirm before deleting
+    raw: Ask me before deleting anything I can't get back
+    effect: require_confirmation
+    scope: per_action

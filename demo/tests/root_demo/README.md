@@ -153,7 +153,7 @@ is already installed** — otherwise the env var is a lie and `sudo -n` will
 fail at runtime with a cryptic "password required" error:
 
 ```bash
-INTENTFRAME_PROFILE=root \
+JARVIS_VARIANT=root \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
 python -m supervisor.main start
@@ -175,7 +175,7 @@ ps ewwp $(pgrep -f "uvicorn executor.server") | tr ' ' '\n' | grep INTENTFRAME
 Expected output:
 
 ```
-INTENTFRAME_PROFILE=root
+JARVIS_VARIANT=root
 INTENTFRAME_ESCALATION_ARMED=1
 ```
 

@@ -6,6 +6,19 @@
 # The dashboard reads this, seeds the registries, installs the agents
 # referenced by tasks, and executes each task in order.
 #
+# Policy keying — read this before adding a second task
+# ─────────────────────────────────────────────────────
+# The policy registry keys on the (user_id, agent_id) pair so one
+# operator can run multiple agents with isolated policies.  This file
+# only declares per-user policy blocks; the dashboard derives the
+# agent_id side of the key from ``tasks[].agent`` and registers one
+# slot per (user, agent) pair it finds — every slot for a given user
+# gets the *same* policy from ``users[<user>]``.  If you want
+# per-agent variation under one user (e.g. a tighter policy for a
+# less-trusted agent), register them programmatically via
+# ``IntentFrameDashboard.register_user(user_id=..., agent_id=...)``;
+# this YAML schema does not (yet) express that.
+#
 # Policy has two layers — defense in depth:
 #
 #   allowed_actions  — Deterministic. Which actions the agent can use, with

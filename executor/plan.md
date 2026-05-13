@@ -1219,9 +1219,9 @@ Jarvis's default policy surface now covers all 67 currently declared actions
 
 At runtime, the default policy is seeded from
 `intentframe_gateway/bootstrap.py`. `jarvis_pa/seed_policies.py` is kept as a
-manual mirror of the same defaults for dev workflows — profile-aware
-(`INTENTFRAME_PROFILE=user|root`) and idempotent, so it seeds the same
-user- or root-profile shape as bootstrap and is safe to rerun.
+manual mirror of the same defaults for dev workflows — variant-aware
+(`JARVIS_VARIANT=user|root`) and idempotent, so it seeds the same
+user- or root-mode Jarvis policy as bootstrap and is safe to rerun.
 
 ### What this enables next
 

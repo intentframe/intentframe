@@ -186,9 +186,12 @@ uvicorn intentframe_gateway.server:app --uds /tmp/gateway.sock --log-level info
 | `INTENTFRAME_LOG_DIR` | `~/.intentframe/logs` | Directory containing `{service}.log` files |
 | `INTENTFRAME_FRONTEND_MODE` | unset | Set to `1` for JSON progress on stdout (native frontend) |
 | `PLATFORM_SERVER_APP` | auto-detected | Path to `macos-appkit-server.app` bundle |
-| `INTENTFRAME_PROFILE` | `user` | Set to `root` to activate the Jarvis root demo profile (controls bootstrap and `EXECUTOR_CONFIG` default). Normally set by the CLI via `--profile root`. |
-| `EXECUTOR_CONFIG` | `jarvis_pa/executor.yaml` | Path to the executor YAML config file. Overridden to `jarvis_pa/executor_root.yaml` when `INTENTFRAME_PROFILE=root` and the operator has not set it explicitly. |
-| `JARVIS_USER_ID` | (set by gateway) | Profile-scoped policy identity passed to Jarvis. The user profile uses the base id (for example `jarvis_default`); the root profile uses the suffixed id (for example `jarvis_default_root`) so Jarvis loads the same policy record that bootstrap seeded. |
+| `JARVIS_VARIANT` | `user` | Set to `root` to activate the Jarvis root-mode variant (controls bootstrap and `EXECUTOR_CONFIG` default). Normally set by the CLI via `--profile root`. |
+| `EXECUTOR_CONFIG` | `jarvis_pa/executor.yaml` | Path to the executor YAML config file. Overridden to `jarvis_pa/executor_root.yaml` when `JARVIS_VARIANT=root` and the operator has not set it explicitly. |
+| `INTENTFRAME_USER_ID` | (set by gateway) | Operator/owner id passed to Jarvis (and any other child agent). Comes from `~/.intentframe/gateway.yaml::identity.user_id`. The Actor SDK uses `(INTENTFRAME_USER_ID, INTENTFRAME_AGENT_ID)` to look up the policy slot the gateway seeded. |
+| `INTENTFRAME_AGENT_ID` | (set by gateway) | Agent identity for the spawned Jarvis process — `jarvis` for the user variant, `jarvis_root` for the root variant. The policy registry keys on this together with `INTENTFRAME_USER_ID`. |
+| `JARVIS_USER_ID` | (set by gateway) | Back-compat alias for `INTENTFRAME_USER_ID` (one release). `JarvisConfig` (pydantic-settings, `env_prefix="JARVIS_"`) reads this directly. |
+| `JARVIS_AGENT_ID` | (set by gateway) | Back-compat alias for `INTENTFRAME_AGENT_ID` (one release). `JarvisConfig.agent_id` reads this directly — without it the root variant would silently default `agent_id` to `jarvis` and the policy registry lookup would miss. |
 | `INTENTFRAME_ESCALATION_ARMED` | (set by gateway) | Injected by the gateway into the supervisor/executor env at startup. `1` if root-demo is installed and armed (`/etc/sudoers.d/intentframe-run` + `~/.intentframe/state/root-demo.json` both present), `0` otherwise. The executor's `MacOSSandboxEngine` reads this to decide whether to prepend `sudo -n` to `sandbox-exec`. Never set this manually. |
 
 ## Module Structure

@@ -27,8 +27,16 @@ _MANAGED_SERVICES = frozenset({"jarvis", "edi", "telegram"})
 
 
 async def _build_combined_env(request: Request) -> dict[str, str]:
-    """Build the merged config-YAML + vault-secrets env dict for child processes."""
-    from intentframe_gateway.bootstrap import policy_user_id_for_current_profile
+    """Build the merged config-YAML + vault-secrets env dict for child processes.
+
+    Child processes (Jarvis, Telegram bridge) read
+    ``INTENTFRAME_USER_ID`` / ``INTENTFRAME_AGENT_ID`` so the Actor SDK
+    looks up the same ``(user_id, agent_id)`` policy slot the
+    Bootstrapper seeded.  ``JARVIS_USER_ID`` is set to the same value
+    for one release as a back-compat alias for older code that still
+    reads the legacy env var.
+    """
+    from intentframe_gateway.bootstrap import current_jarvis_identity
     from intentframe_gateway.config_loader import build_config_env
     config_env = build_config_env()
     vault_client = getattr(request.app.state, "vault_client", None)
@@ -39,7 +47,15 @@ async def _build_combined_env(request: Request) -> dict[str, str]:
     else:
         runtime_env = {}
     merged = {**config_env, **runtime_env}
-    merged["JARVIS_USER_ID"] = policy_user_id_for_current_profile()
+    user_id, agent_id = current_jarvis_identity()
+    merged["INTENTFRAME_USER_ID"] = user_id
+    merged["INTENTFRAME_AGENT_ID"] = agent_id
+    # Back-compat aliases for one release: JarvisConfig (pydantic-settings,
+    # env_prefix="JARVIS_") reads JARVIS_USER_ID / JARVIS_AGENT_ID directly.
+    # Without these the root variant would silently default agent_id to
+    # "jarvis" and the registry lookup would miss.
+    merged["JARVIS_USER_ID"] = user_id
+    merged["JARVIS_AGENT_ID"] = agent_id
     return merged
 
 
@@ -163,10 +179,10 @@ async def aggregated_health(request: Request):
     # call because the installer/uninstaller can run while the gateway
     # is up; the marker/sudoers state is cheap to re-stat.
     escalation = detect_escalation_state()
-    profile = os.environ.get("INTENTFRAME_PROFILE", "user")
+    variant = os.environ.get("JARVIS_VARIANT", "user")
     executor_running_as_root = (os.geteuid() == 0) or escalation.armed
     root_demo = {
-        "profile": profile,
+        "variant": variant,
         **escalation.as_health_payload(),
         "executor_running_as_root": executor_running_as_root,
     }

@@ -2,7 +2,8 @@
 Policy Registry -- HTTP client over Unix Domain Socket.
 
 Drop-in replacement for the in-process PolicyRegistry.
-Same method signatures, but calls the policy-registry service over HTTP/UDS.
+Same method signatures as the in-memory variant; calls the
+policy-registry service over HTTP/UDS.
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ class PolicyRegistryClient:
     """HTTP client that mirrors the PolicyRegistry interface.
 
     Uses httpx with UDS transport to talk to the policy-registry service.
+    All read/delete methods take the ``(user_id, agent_id)`` pair so the
+    registry can isolate policies per agent for the same operator.
     """
 
     def __init__(self, socket_path: str = DEFAULT_SOCKET) -> None:
@@ -43,30 +46,35 @@ class PolicyRegistryClient:
         self.close()
 
     def set_user_policy(self, policy: UserPolicy) -> None:
+        """Upsert a policy.  Server keys it on ``(policy.user_id, policy.agent_id)``."""
         resp = self._client.post("/policies", json=policy.model_dump(mode="json"))
         resp.raise_for_status()
 
-    def get_user_policy(self, user_id: str) -> UserPolicy:
-        resp = self._client.get(f"/policies/{user_id}")
+    def get_user_policy(self, user_id: str, agent_id: str) -> UserPolicy:
+        resp = self._client.get(f"/policies/{user_id}/{agent_id}")
         if resp.status_code == 404:
-            raise KeyError(f"No policy found for user '{user_id}'")
+            raise KeyError(
+                f"No policy found for user={user_id!r} agent={agent_id!r}"
+            )
         resp.raise_for_status()
         return UserPolicy.model_validate(resp.json())
 
-    def delete_user_policy(self, user_id: str) -> None:
-        resp = self._client.delete(f"/policies/{user_id}")
+    def delete_user_policy(self, user_id: str, agent_id: str) -> None:
+        resp = self._client.delete(f"/policies/{user_id}/{agent_id}")
         resp.raise_for_status()
 
-    def list_users(self) -> list[str]:
+    def list_users(self) -> list[tuple[str, str]]:
         resp = self._client.get("/policies")
         resp.raise_for_status()
-        return resp.json()
+        # FastAPI serialises tuples as JSON arrays; normalise back.
+        return [tuple(item) for item in resp.json()]
 
     def get_permission(
-        self, user_id: str, action_type: str
+        self, user_id: str, agent_id: str, action_type: str
     ) -> Optional[ActionPermission]:
         resp = self._client.get(
-            f"/policies/{user_id}/permission", params={"action": action_type}
+            f"/policies/{user_id}/{agent_id}/permission",
+            params={"action": action_type},
         )
         if resp.status_code == 404:
             return None

@@ -34,6 +34,7 @@ _BASE_BLOCKED: list[str] = ["sudo ", "rm -rf /", "mkfs", "dd if=", "chmod 777"]
 def _user(constraints: TerminalConstraints) -> UserContext:
     return UserContext(
         user_id="dg-accuracy",
+        agent_id="dg-accuracy-agent",
         allowed_actions={
             "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
         },
@@ -121,7 +122,11 @@ def python_shell_only() -> UserContext:
 
 def no_run_command() -> UserContext:
     """RUN_COMMAND not in allowed_actions \u2014 permission-gate BLOCK on everything."""
-    return UserContext(user_id="dg-accuracy-no-rc", allowed_actions={})
+    return UserContext(
+        user_id="dg-accuracy-no-rc",
+        agent_id="dg-accuracy-agent",
+        allowed_actions={},
+    )
 
 
 PROFILES: dict[str, Callable[[], UserContext]] = {

@@ -82,6 +82,7 @@ class TestJsonRoundtrip:
     def test_host_file_constraints_survive_user_policy_roundtrip(self):
         original = UserPolicy(
             user_id="u1",
+            agent_id="roundtrip-test",
             allowed_actions={
                 "READ_HOST_FILE": ActionPermission(
                     safe=True,

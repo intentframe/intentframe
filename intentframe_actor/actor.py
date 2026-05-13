@@ -23,6 +23,7 @@ accepts IntentFrames from certified Actors (verified signatures).
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -38,6 +39,43 @@ from intentframe_core.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_user_id(explicit: str | None) -> str:
+    """Pick the operator/owner id, preferring explicit > env > error.
+
+    Env precedence: ``INTENTFRAME_USER_ID`` first; ``JARVIS_USER_ID`` is
+    honoured as a one-release fallback so existing setup scripts keep
+    working.  Raises if nothing is supplied — agents must not run with
+    an implicit / empty owner.
+    """
+    if explicit:
+        return explicit
+    env = os.environ.get("INTENTFRAME_USER_ID") or os.environ.get("JARVIS_USER_ID")
+    if env:
+        return env
+    raise ValueError(
+        "Actor: no user_id provided. Pass user_id=... or set "
+        "INTENTFRAME_USER_ID in the agent's environment."
+    )
+
+
+def _resolve_agent_id(explicit: str | None) -> str:
+    """Pick the agent id, preferring explicit > env > error.
+
+    External agents must declare their identity — implicit / empty
+    agent ids would silently miss the wrong policy slot in the
+    registry, so we fail loudly instead.
+    """
+    if explicit:
+        return explicit
+    env = os.environ.get("INTENTFRAME_AGENT_ID")
+    if env:
+        return env
+    raise ValueError(
+        "Actor: no agent_id provided. Pass agent_id=... or set "
+        "INTENTFRAME_AGENT_ID in the agent's environment."
+    )
 
 
 class Actor:
@@ -62,12 +100,27 @@ class Actor:
 
     def __init__(
         self,
-        agent_id: str,
-        user_id: str,
+        agent_id: str | None = None,
+        user_id: str | None = None,
         socket_path: str = "~/.intentframe/run/intentframe.sock",
     ) -> None:
-        self.agent_id = agent_id
-        self.user_id = user_id
+        """
+        Args:
+            agent_id: Identifier of this agent (e.g. ``"jarvis"``,
+                ``"invoice_bot"``).  Falls back to ``INTENTFRAME_AGENT_ID``
+                env var when omitted.  Required — raises if neither is set.
+            user_id: Operator/owner id this agent runs on behalf of.
+                Falls back to ``INTENTFRAME_USER_ID`` (and, for one
+                release, ``JARVIS_USER_ID``).  Required — raises if
+                neither is set.
+            socket_path: UDS path to the IntentFrame Runtime.
+
+        The ``(user_id, agent_id)`` pair is used by the gateway to look
+        up the correct policy slot, so empty/None values are rejected
+        loudly rather than silently routing to the wrong policy.
+        """
+        self.user_id = _resolve_user_id(user_id)
+        self.agent_id = _resolve_agent_id(agent_id)
         self.runtime_context: Optional[RuntimeContext] = None
         self.agent_capabilities: Optional[AgentCapabilities] = None
 
@@ -87,14 +140,14 @@ class Actor:
         Perform handshake with IntentFrame Runtime.
 
         Sends agent_id, user_id, and capabilities. The server looks up
-        the user's real policies from the policy registry — Actor never
-        knows or sends policy data.
+        the policy registered against the ``(user_id, agent_id)`` pair
+        — Actor never knows or sends policy data.
 
         Returns:
             RuntimeContext that the agent can use in its system prompt.
         """
         client = self._get_client()
-        ctx = await client.handshake(capabilities, self.user_id)
+        ctx = await client.handshake(capabilities, self.user_id, self.agent_id)
         self.runtime_context = ctx
         self.agent_capabilities = capabilities
         return ctx
@@ -121,7 +174,7 @@ class Actor:
         self._sequence_id += 1
         intent = self._build_intent(agent_request)
         client = self._get_client()
-        return await client.process_intent(intent, self.user_id)
+        return await client.process_intent(intent, self.user_id, self.agent_id)
 
     # ── Close ─────────────────────────────────────────────────────────
 

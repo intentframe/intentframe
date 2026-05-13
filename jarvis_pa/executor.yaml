@@ -49,8 +49,9 @@ adapters:
 # Use plain roots like ``~/`` or ``~/Documents``.
 # Do not use globs here. ``~/Documents`` already covers files under it.
 # ``~/Documents/`` works the same as ``~/Documents``.
-# Keep this in sync with ``intentframe_gateway/bootstrap.py`` and
-# ``jarvis_pa/seed_policies.py``.
+# Keep this in sync with the host-file ``allowed_host_paths`` declared in
+# ``jarvis_pa/jarvis/policies/jarvis.yaml`` (the runtime policy seed).
+# Pinned by ``tests/test_jarvis_host_scope_mirror.py``.
 host_files:
   allowed_read_paths:
     - ~/

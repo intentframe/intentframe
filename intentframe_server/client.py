@@ -60,10 +60,11 @@ class IntentFrameClient:
         self,
         capabilities: AgentCapabilities,
         user_id: str,
+        agent_id: str,
     ) -> RuntimeContext:
         payload = {
             "capabilities": capabilities.model_dump(mode="json"),
-            "user_context": {"user_id": user_id},
+            "user_context": {"user_id": user_id, "agent_id": agent_id},
         }
         resp = self._client.post("/handshake", json=payload)
         resp.raise_for_status()
@@ -73,10 +74,11 @@ class IntentFrameClient:
         self,
         intent: IntentFrame,
         user_id: str,
+        agent_id: str,
     ) -> ExecutionResult:
         payload = {
             "intent": intent.model_dump(mode="json"),
-            "user_context": {"user_id": user_id},
+            "user_context": {"user_id": user_id, "agent_id": agent_id},
         }
         resp = self._client.post("/process", json=payload)
         resp.raise_for_status()
@@ -124,10 +126,11 @@ class AsyncIntentFrameClient:
         self,
         capabilities: AgentCapabilities,
         user_id: str,
+        agent_id: str,
     ) -> RuntimeContext:
         payload = {
             "capabilities": capabilities.model_dump(mode="json"),
-            "user_context": {"user_id": user_id},
+            "user_context": {"user_id": user_id, "agent_id": agent_id},
         }
         resp = await self._client.post("/handshake", json=payload)
         resp.raise_for_status()
@@ -137,10 +140,11 @@ class AsyncIntentFrameClient:
         self,
         intent: IntentFrame,
         user_id: str,
+        agent_id: str,
     ) -> ExecutionResult:
         payload = {
             "intent": intent.model_dump(mode="json"),
-            "user_context": {"user_id": user_id},
+            "user_context": {"user_id": user_id, "agent_id": agent_id},
         }
         resp = await self._client.post("/process", json=payload)
         resp.raise_for_status()
