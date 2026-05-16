@@ -210,6 +210,65 @@ What singletonness *gives* in return is the property no per-agent model gives: c
 
 ---
 
+## Q13. Why not just validate inline and execute in the same process?
+
+You can. Most guardrail libraries work this way: `validate(action)` then `execute(action)` in the same tool body. For a single team with a vetted tool set where the threat model is "prevent accidents," it is sufficient.
+
+Where inline validation fails structurally:
+
+1. **The verdict is just a return value.** "If validator says no, skip execution" is enforced by code discipline. A forgotten `if`, a compromised dependency, a refactor, an exception handler that falls through — any of these can ignore the verdict. With a separate executor, the agent process has no path to credentials or I/O surfaces other than through the runtime.
+
+2. **Intent ≠ implementation.** When `validate({SEND_EMAIL, to: alice})` returns OK and the tool then calls `smtp.send(...)`, nothing guarantees the validated payload matches what was sent. With a separate executor, the validated structured intent is the unit that travels and gets executed — the bytes the policy saw are the bytes that hit the wire.
+
+3. **Credential reach.** In-process execution means the agent process holds credentials. Any reflection path — `os.environ`, `__import__('keyring')`, `ctypes`, a malicious transitive dependency — can siphon them. With a separate executor, the LLM-adjacent process never held the credentials. This is an address-space property, not a code-discipline property.
+
+4. **N tools = N places to get it wrong.** Inline validation pushes the burden onto every tool author. Out-of-process execution turns "did you call the validator correctly?" into "did you submit an intent at all?" — and there's no other interface.
+
+The analogy: inline validation is to the separate executor what client-side `if (user.isAdmin) deleteUser()` is to a server-side authorization check. Both look identical until an attacker calls the underlying primitive directly.
+
+If your threat model includes prompt injection, compromised dependencies, or supply-chain attacks on the agent process, inline validation is insufficient regardless of how carefully tool authors write code.
+
+---
+
+## Q14. The executor is deterministic code — why does the process boundary matter?
+
+Determinism describes what code computes. The process boundary describes what code is allowed to touch and who can interfere. Those are orthogonal.
+
+What a separate process provides that a function call cannot:
+
+- **Address-space isolation.** The agent cannot mutate the executor's policy module, replace its function table, or read its credential cache. In Python, `sys.modules`, `gc.get_objects()`, and import hooks make in-process "isolation" fictional against a motivated attacker.
+- **Distinct OS-level identity.** The executor can run under a different Seatbelt/AppArmor profile or UID. You cannot apply different OS privileges to two function calls in the same process.
+- **Serialization as enforcement.** IPC forces values to be serializable and schema-conformant. The executor cannot be given a closure, a callback, or a file descriptor the agent smuggles across. Structural anti-confused-deputy property.
+- **Policy immutability.** Policy is loaded in the executor's memory — unreachable from the agent process. `policy.allow_all = True` in agent code does nothing.
+- **Audit integrity.** Records are written by the executor as a side-effect of execution. The agent cannot suppress or forge them.
+- **Failure containment.** Agent crashes, OOM, infinite loops — none take the executor down. Audit keeps flowing.
+
+The process boundary is not there because the executor is clever. It is there because the boundary itself carries guarantees no in-process design can match.
+
+---
+
+## Q15. I can build this myself — subprocess for tools, a skeptical-agent monitor, credentials in env. Why IntentFrame?
+
+For a single agent with a known tool set in a controlled environment, you should probably build it yourself. IntentFrame does not try to convince you otherwise for that case.
+
+What IntentFrame buys over DIY:
+
+1. **A red-teamed attack corpus.** 100 attacks, 9 initially missed, remediated, re-run. That failure-then-fix iteration — covering ARP spoofing, base64 indirection, unicode smuggling, time-sync hijacks — is work your hand-rolled monitor has not been through.
+
+2. **A shared pattern across multiple agents.** One agent = DIY is fine. Five agents on the same machine/system = you want one runtime, one audit chain, one policy surface. Same reason no one runs five independent authentication systems in production.
+
+3. **Audit chain integrity.** "Subprocess + log writes" doesn't give you a tamper-evident SHA-256 hash chain. You can build one; most teams don't.
+
+4. **Outsourced security research.** Every new attack class, every new prompt-injection trick, becomes someone else's problem to add to the corpus. Same reason you don't write your own crypto or your own OAuth library.
+
+5. **Policy vocabulary that survives refactors.** Hand-rolled if-this-then-that checks drift over time. A framework with a real policy DSL tends to keep its invariants.
+
+**On "credentials in env are safe enough":** env vars protect against accidentally committing secrets to git. They do nothing against prompt injection that convinces the agent to emit `subprocess.run("env", capture_output=True)`. If your agent reads external content (email, web, docs), you're one injected instruction away from exfiltration via the agent's own tool-call path. Out-of-process credential isolation eliminates that entire surface.
+
+**When DIY genuinely beats IntentFrame today:** single agent, single tool set, no untrusted external content, macOS not required, you need it shipped this week, or your tool set is outside current adapter coverage.
+
+---
+
 ## Related Documents
 
 - [docs/threat-model.md](threat-model.md) — full threat model with in-scope / out-of-scope
