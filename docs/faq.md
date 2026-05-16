@@ -253,15 +253,11 @@ For a single agent with a known tool set in a controlled environment, you should
 
 What IntentFrame buys over DIY:
 
-1. **A red-teamed attack corpus.** 100 attacks, 9 initially missed, remediated, re-run. That failure-then-fix iteration — covering ARP spoofing, base64 indirection, unicode smuggling, time-sync hijacks — is work your hand-rolled monitor has not been through.
-
-2. **A shared pattern across multiple agents.** One agent = DIY is fine. Five agents on the same machine/system = you want one runtime, one audit chain, one policy surface. Same reason no one runs five independent authentication systems in production.
-
-3. **Audit chain integrity.** "Subprocess + log writes" doesn't give you a tamper-evident SHA-256 hash chain. You can build one; most teams don't.
-
-4. **Outsourced security research.** Every new attack class, every new prompt-injection trick, becomes someone else's problem to add to the corpus. Same reason you don't write your own crypto or your own OAuth library.
-
-5. **Policy vocabulary that survives refactors.** Hand-rolled if-this-then-that checks drift over time. A framework with a real policy DSL tends to keep its invariants.
+1. **A red-teamed attack corpus.** 100 attacks, 9 initially missed, fixed, re-run. That failure-then-fix iteration is the thing your hand-rolled monitor has not been through. Most homegrown "skeptical-agent monitors" pass a few obvious tests and silently miss ARP spoofing, time-sync hijacks, base64 indirection, and unicode smuggling. The value is not the architecture; it's the **attack/defense iteration you dont need to do yourself.**
+2. **A shared pattern across multiple agents.** If your company will eventually have 1 agent, build it yourself. If it will have 5+ (and almost every company will, within 18 months), you want one runtime, one audit chain, one policy surface, one place a security team can review — for the same reason no one runs five different authentication systems in production.
+3. **A policy vocabulary that survives refactors.** A homegrown "if-this-then-that" check drifts. A framework with a real policy DSL (even an imperfect one) tends to keep its invariants over time. This is the same argument for using a real authz library vs. hand-rolled `if user.role == 'admin'` scattered across a codebase.
+4. **Audit chain integrity.** "Subprocess + log writes" doesn't get you a tamper-evident hash chain. You can build one. Most teams don't.
+5. **Outsourced security research labor.** Every new attack class published, every new prompt-injection trick, becomes someone else's problem to add to the corpus. That's the same reason you don't write your own crypto or your own OAuth library.
 
 **On "credentials in env are safe enough":** env vars protect against accidentally committing secrets to git. They do nothing against prompt injection that convinces the agent to emit `subprocess.run("env", capture_output=True)`. If your agent reads external content (email, web, docs), you're one injected instruction away from exfiltration via the agent's own tool-call path. Out-of-process credential isolation eliminates that entire surface.
 
