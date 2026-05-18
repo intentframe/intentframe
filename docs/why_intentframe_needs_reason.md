@@ -69,6 +69,44 @@ Tool-calling agents that emit only mechanical parameters face no obligation to a
 
 This is not a guarantee of honesty. It is a guarantee of *articulation*. Articulation is the precondition for everything in the previous three sections — policies keyed on purpose, evaluators that compare stated against inferred, audits and dashboards that record intent alongside effect, reviewers who can scan intent before approving.
 
+## Why this matters in practice: shrinking the human-approval queue
+
+The four functions above describe what `reason` enables. The reason they matter — the operational payoff — becomes clear when you ask what a governance layer in front of an agent is actually *for*.
+
+Every action an agent proposes falls into one of three buckets:
+
+- **Obviously safe.** Reading a public file, fetching a calendar entry, listing items in an allow-listed scope. Deterministic rules decide it. No human needed.
+- **Obviously dangerous.** Spending above a hard cap, writing to a sensitive system path, calling a denied capability. Deterministic rules decide it. No human needed.
+- **The ambiguous middle.** Sending an email. Updating a database row. Issuing a refund. Replying to a customer. The mechanics are inside the allowed envelope; whether the action is *appropriate* depends on what the agent is trying to do.
+
+Without a place for the agent to declare its purpose, the ambiguous middle has only two outcomes: rubber-stamp it, which under-blocks off-purpose work, or escalate it to a human, which doesn't scale. Most agent pilots stall here, because the interesting work *is* the middle, and neither outcome is acceptable for it.
+
+`reason` is the field that lets the substrate aka intentframe, make a third choice: decide the case automatically against a purpose-keyed rule, with the semantic evaluator checking that the agent's stated purpose matches what the action will actually do. The four functions cooperate to make that decision possible:
+
+- Function 1 lets a human write a rule that distinguishes on-purpose from off-purpose uses of the same action class.
+- Function 2 lets the evaluator flag any gap between the stated purpose and the inferred effect.
+- Function 3 lets a human review thousands of records after the fact by scanning purposes, not parameter dumps.
+- Function 4 forces the agent to declare a purpose at all, so the other three have something to work on.
+
+The combined effect is that the substrate decides most of the ambiguous middle on its own. Only the genuinely unclear cases — conflicting evidence, low-confidence policy match, novel patterns — escalate. The human's job shifts from approving every action to writing the policy, reading the audit log, and adjudicating the residue.
+
+A concrete shape. The agent is a customer-support assistant for a car dealership; the action under review is `SEND_EMAIL` to a customer. The mechanical action is identical in three cases:
+
+| `reason` value | What policy decides without a human |
+|---|---|
+| *"reply to customer confirming appointment for booking #4827"* | Allow. Matches a purpose-keyed rule for known-booking replies. |
+| *"reply to customer offering a 10% discount"* | Block or escalate. Matches a rule that commercial offers require dealer approval. |
+| *"reply to customer with the delivery date for booking #4827"* | Conditional. Allow if the evaluator confirms the date appears in the booking record; otherwise escalate. |
+
+Same action class. Same mechanics. Different decision, because the stated purpose is different. Without `reason`, the substrate has to either allow all three (and trust the agent not to invent discounts or dates) or block all customer emails (and defeat the agent's purpose). With `reason`, the substrate decides each case against the right rule, automatically.
+
+Two honest caveats on this payoff:
+
+- The substrate does not decide by *trusting* `reason`. It decides by *comparing* `reason` against the action's actual effect (Function 2) and against the policy that applies to that stated purpose (Function 1). The trust is in the comparison, not in the field.
+- How much human-approval load this saves depends on how much of the operator's mental policy is written as purpose-keyed rules. Teams that write only structural rules (amount caps, domain allowlists) keep a larger escalation queue than teams that also write purpose-keyed rules. `reason` is the *enabler*; the operator's policy work is what *realises* the saving.
+
+This is also the reason `reason` is upstream of the "delegatable autonomy" story for agents. Deterministic rules alone keep an agent safe by *narrowing* what it can do. Purpose-aware policy keyed on `reason` keeps an agent safe while *widening* what it can do without a human, by letting the substrate distinguish appropriate uses of an action from inappropriate ones. The first posture caps an agent at "useful for trivial work." The second is what lets an agent cross into "trusted for consequential work, unattended."
+
 ## Who consumes the field
 
 Within a layered governance pipeline, the field is consumed differently by different components:
