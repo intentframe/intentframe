@@ -174,11 +174,10 @@ class TestPassiveReadFastPath:
         )
         assert result.decision is DeterministicDecision.UNDECIDED
 
-    def test_passive_read_set_matches_ae_passive_set(self):
-        """DG and AE must agree on what counts as a passive read
-        so their fast-path universes stay aligned."""
-        from intentframe_components.analysis.engine import AIAnalysisEngine
-        assert _PRE_AE_SAFE_READS == frozenset(AIAnalysisEngine._PASSIVE_READ_ACTIONS)
+    def test_passive_read_set_is_canonical(self):
+        """Passive read ALLOW is owned by the passive_read action bundle."""
+        from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
+        assert _PRE_AE_SAFE_READS == PASSIVE_READ_ACTIONS
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -272,10 +271,10 @@ class TestReadOnlyFastPath:
         # not an ALLOW.
         assert result.decision is DeterministicDecision.BLOCK
 
-    def test_command_intel_none_skips_fast_path(self):
-        """Without CommandIntel, the fast-path cannot fire."""
+    def test_empty_command_skips_read_only_allow(self):
+        """Without a command string, shield produces no intel and read-only cannot ALLOW."""
         result = self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="ls"),
+            _intent(ActionType.RUN_COMMAND, target=""),
             _user(RUN_COMMAND=self.perm),
             command_intel=None,
         )
@@ -533,9 +532,9 @@ class TestFailClosedExceptionHandling:
         def raise_boom(*args, **kwargs):
             raise RuntimeError("boom")
 
-        from intentframe_components.guardian import deterministic as dgmod
+        from intentframe_components.guardian import checkers as checkers_mod
         monkeypatch.setattr(
-            dgmod,
+            checkers_mod,
             "CONSTRAINT_CHECKERS",
             {TerminalConstraints: type("Bad", (), {"check": raise_boom})()},
         )

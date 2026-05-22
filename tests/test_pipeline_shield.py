@@ -27,6 +27,7 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
+from intentframe_bundle_sdk.types import AnalysisContext
 from intentframe_server.pipeline import IntentFrameRuntime
 from policy_registry.models import ActionPermission
 
@@ -142,7 +143,7 @@ class TestCatastrophicRejection:
         result = _run(runtime.process_intent(_intent("sudo rm -rf /"), _user_context()))
 
         assert not result.success
-        assert "command_shield" in result.error.lower()
+        assert result.data.get("layer") == "command_shield"
         runtime.analysis_engine.analyze.assert_not_called()
         runtime.guardian.validate.assert_not_called()
         runtime.executor.execute.assert_not_called()
@@ -152,7 +153,7 @@ class TestCatastrophicRejection:
         result = _run(runtime.process_intent(_intent(":(){ :|:& };:"), _user_context()))
 
         assert not result.success
-        assert "command_shield" in result.error.lower()
+        assert result.data.get("layer") == "command_shield"
 
     def test_audit_log_recorded(self):
         runtime = _make_runtime()
@@ -182,7 +183,7 @@ class TestCatastrophicRejection:
         runtime = _make_runtime()
         result = _run(runtime.process_intent(_intent(cmd), _user_context()))
         assert not result.success
-        assert "command_shield" in result.error.lower()
+        assert result.data.get("layer") == "command_shield"
         runtime.analysis_engine.analyze.assert_not_called()
 
 
@@ -225,7 +226,7 @@ class TestSafeFlow:
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        assert "terminal_command_signals" in call_kwargs.kwargs
+        assert "analysis_context" in call_kwargs.kwargs
 
     def test_non_run_command_skips_shield(self):
         """Non-RUN_COMMAND intents bypass command_shield entirely.
@@ -264,7 +265,9 @@ class TestNeedsReviewFlow:
         ))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        signals = call_kwargs.kwargs.get("terminal_command_signals", ())
+        ctx = call_kwargs.kwargs.get("analysis_context")
+        assert ctx is not None
+        signals = ctx.terminal_command_signals
         assert len(signals) > 0
 
     def test_needs_review_still_reaches_guardian(self):
@@ -285,7 +288,9 @@ class TestNeedsReviewFlow:
         ))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        signals = call_kwargs.kwargs.get("terminal_command_signals", ())
+        ctx = call_kwargs.kwargs.get("analysis_context")
+        assert ctx is not None
+        signals = ctx.terminal_command_signals
         for sig in signals:
             assert isinstance(sig, Signal)
             assert sig.check
@@ -316,7 +321,7 @@ class TestPipelineEdgeCases:
         )
         result = _run(runtime.process_intent(intent, _user_context()))
         assert not result.success
-        assert "command_shield" in result.error.lower()
+        assert result.data.get("layer") == "command_shield"
 
     def test_request_counter_incremented(self):
         runtime = _make_runtime()
@@ -406,8 +411,8 @@ class TestExecutionContextPlumbing:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestCommandIntelPlumbing:
-    """Pipeline always builds CommandIntel for RUN_COMMAND and forwards
-    it to both AE and AIGuardian when they're invoked.
+    """Pipeline forwards bundle ``AnalysisContext`` to AE and AIGuardian
+    when DG returns UNDECIDED.
 
     After the pre-AE deterministic pass, AE + AIGuardian are only called
     when DG returns UNDECIDED.  We use ``CMD_UNDECIDED`` for assertions
@@ -415,25 +420,27 @@ class TestCommandIntelPlumbing:
     skip both (that's the whole point — no AE call to inspect).
     """
 
-    def _intel_from(self, engine_or_guardian) -> CommandIntel | None:
+    def _ctx_from(self, engine_or_guardian) -> AnalysisContext | None:
         call_kwargs = engine_or_guardian.call_args
-        return call_kwargs.kwargs.get("command_intel")
+        return call_kwargs.kwargs.get("analysis_context")
 
     def test_undecided_command_forwards_command_intel_to_ae(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
-        intel = self._intel_from(runtime.analysis_engine.analyze)
-        assert intel is not None
-        assert intel.verdict == Verdict.SAFE.value
+        ctx = self._ctx_from(runtime.analysis_engine.analyze)
+        assert ctx is not None
+        assert ctx.command_intel is not None
+        assert ctx.command_intel.verdict == Verdict.SAFE.value
 
     def test_undecided_command_forwards_command_intel_to_guardian(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
-        intel = self._intel_from(runtime.guardian.validate)
-        assert intel is not None
-        assert intel.verdict == Verdict.SAFE.value
+        ctx = self._ctx_from(runtime.guardian.validate)
+        assert ctx is not None
+        assert ctx.command_intel is not None
+        assert ctx.command_intel.verdict == Verdict.SAFE.value
 
     def test_needs_review_forwards_command_intel(self):
         runtime = _make_runtime()
@@ -442,26 +449,25 @@ class TestCommandIntelPlumbing:
             _user_context(),
         ))
 
-        intel_ae = self._intel_from(runtime.analysis_engine.analyze)
-        intel_gu = self._intel_from(runtime.guardian.validate)
-        assert intel_ae is not None
-        assert intel_gu is not None
-        assert intel_ae.verdict == intel_gu.verdict
+        ctx_ae = self._ctx_from(runtime.analysis_engine.analyze)
+        ctx_gu = self._ctx_from(runtime.guardian.validate)
+        assert ctx_ae is not None and ctx_ae.command_intel is not None
+        assert ctx_gu is not None and ctx_gu.command_intel is not None
+        assert ctx_ae.command_intel.verdict == ctx_gu.command_intel.verdict
 
     def test_undecided_signals_forwarded_to_ae(self):
         """SAFE-verdict UNDECIDED commands still route their signals
-        through to AE — Gap 1 forwards them regardless of verdict,
-        and DG's UNDECIDED path doesn't eat them."""
+        through to AE — bundle context forwards them on the UNDECIDED path."""
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        assert "terminal_command_signals" in call_kwargs.kwargs
+        ctx = call_kwargs.kwargs.get("analysis_context")
+        assert ctx is not None
 
     def test_non_run_command_does_not_build_command_intel(self):
-        """Non-RUN_COMMAND intents never pay the shield cost.
-        Use safe=False so DG falls through to AE and we can observe
-        the command_intel kwarg."""
+        """Non-terminal intents never attach command intel to analysis context.
+        Use safe=False so DG falls through to AE and we can observe the ctx."""
         runtime = _make_runtime()
         intent = IntentFrame(
             action=ActionType.READ_FILE,
@@ -475,8 +481,8 @@ class TestCommandIntelPlumbing:
         )
         _run(runtime.process_intent(intent, user))
 
-        intel = self._intel_from(runtime.analysis_engine.analyze)
-        assert intel is None
+        ctx = self._ctx_from(runtime.analysis_engine.analyze)
+        assert ctx is None or ctx.command_intel is None
 
     def test_command_intel_is_bounded(self):
         huge_caps = tuple(f"capability:x{i}:y" for i in range(5000))
@@ -599,14 +605,13 @@ class TestDeterministicGuardianPipelineFlow:
         runtime.guardian.validate.assert_called_once()
         runtime.executor.execute.assert_called_once()
 
-    def test_catastrophic_still_blocks_before_dg(self):
-        """command_shield CATASTROPHIC pre-empts DG entirely."""
+    def test_catastrophic_blocked_by_bundle_prepare(self):
+        """CATASTROPHIC commands BLOCK during bundle prepare_evidence (matched_gate=command_shield)."""
         runtime = _make_runtime()
         result = _run(runtime.process_intent(_intent("sudo rm -rf /"), _user_context()))
 
         assert not result.success
         entry = runtime.audit_log[-1]
-        # command_shield path, not deterministic — CATASTROPHIC fires first
         assert entry["decision_path"] == "command_shield"
 
     def test_dg_allow_produces_synthetic_analysis_report(self):

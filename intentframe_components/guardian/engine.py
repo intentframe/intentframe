@@ -40,6 +40,7 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
+from intentframe_bundle_sdk.types import AnalysisContext, resolve_analysis_context
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.guardian.domains import DOMAIN_MODULES
@@ -263,6 +264,7 @@ class AIGuardian(Guardian):
         execution_context: ExecutionContext | None = None,
         command_intel: CommandIntel | None = None,
         file_intel: FileIntel | None = None,
+        analysis_context: AnalysisContext | None = None,
     ) -> ValidationResult:
         """
         Validate intent against user policies.
@@ -282,6 +284,14 @@ class AIGuardian(Guardian):
         # previous request never leak into audit on deterministic
         # BLOCK or fast-path ALLOW cases.
         self.last_prompt_id = None
+
+        ctx = resolve_analysis_context(
+            analysis_context,
+            command_intel=command_intel,
+            file_intel=file_intel,
+        )
+        command_intel = ctx.command_intel
+        file_intel = ctx.file_intel
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:

@@ -23,9 +23,12 @@ import pytest
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry, SYSTEM_TERMINAL_BLOCKED_PATTERNS
+from intentframe_action_bundle.terminal.ae_fast_path import (
+    CATASTROPHIC_COMMAND_PATTERNS,
+    try_catastrophic_report,
+)
 from intentframe_components.guardian.checkers.base import CheckContext
 from intentframe_components.guardian.checkers.terminal import TerminalChecker
-from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_core.enums import RiskLevel, Reversibility
 from intentframe_core.types import CommandIntel
 from action_registry.types import ActionType
@@ -142,59 +145,55 @@ class TestPolicyRegistryFloor:
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# LAYER 2: Analysis Engine — own catastrophic command recognition
+# Terminal bundle — catastrophic pattern helpers (legacy AE backup)
 # ═════════════════════════════════════════════════════════════════════════
 
-class TestAnalysisEngineCatastrophic:
-    """AE returns deterministic CRITICAL report for catastrophic commands."""
-
-    engine = AIAnalysisEngine(verbose=False)
+class TestTerminalCatastrophicPatterns:
+    """Catastrophic substring patterns live in the terminal bundle."""
 
     def test_sudo_returns_critical(self):
-        report = self.engine._try_catastrophic_report(_make_intent("sudo reboot"))
+        report = try_catastrophic_report(_make_intent("sudo reboot"))
         assert report is not None
         assert report.risk_factors["overall"] == RiskLevel.CRITICAL
         assert report.reversibility == Reversibility.IRREVERSIBLE
         assert report.confidence == 1.0
 
     def test_rm_rf_root_returns_critical(self):
-        report = self.engine._try_catastrophic_report(_make_intent("rm -rf /"))
+        report = try_catastrophic_report(_make_intent("rm -rf /"))
         assert report is not None
         assert report.risk_factors["overall"] == RiskLevel.CRITICAL
 
     def test_mkfs_returns_critical(self):
-        report = self.engine._try_catastrophic_report(_make_intent("mkfs.ext4 /dev/sda"))
+        report = try_catastrophic_report(_make_intent("mkfs.ext4 /dev/sda"))
         assert report is not None
         assert "format" in report.actual_behaviors[0]["actual_behavior"].lower()
 
     def test_dd_returns_critical(self):
-        report = self.engine._try_catastrophic_report(_make_intent("dd if=/dev/zero of=/dev/sda"))
+        report = try_catastrophic_report(_make_intent("dd if=/dev/zero of=/dev/sda"))
         assert report is not None
 
     def test_dev_write_returns_critical(self):
-        report = self.engine._try_catastrophic_report(_make_intent("echo x > /dev/sda"))
+        report = try_catastrophic_report(_make_intent("echo x > /dev/sda"))
         assert report is not None
 
     def test_chmod_777_returns_critical(self):
-        report = self.engine._try_catastrophic_report(_make_intent("chmod 777 /etc/passwd"))
+        report = try_catastrophic_report(_make_intent("chmod 777 /etc/passwd"))
         assert report is not None
 
     def test_safe_command_returns_none(self):
-        """Safe commands return None — full AI analysis needed."""
-        report = self.engine._try_catastrophic_report(_make_intent("echo hello"))
+        report = try_catastrophic_report(_make_intent("echo hello"))
         assert report is None
 
     def test_non_run_command_returns_none(self):
-        """Only RUN_COMMAND triggers catastrophic check."""
         intent = MagicMock()
         intent.action = ActionType.READ_FILE
         intent.target = "/etc/passwd"
         intent.data = {}
-        report = self.engine._try_catastrophic_report(intent)
+        report = try_catastrophic_report(intent)
         assert report is None
 
     def test_pattern_list_not_empty(self):
-        assert len(AIAnalysisEngine._CATASTROPHIC_COMMAND_PATTERNS) >= 6
+        assert len(CATASTROPHIC_COMMAND_PATTERNS) >= 6
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -540,8 +539,9 @@ class TestComponentIndependence:
         # Policy Registry floor
         assert "sudo" in SYSTEM_TERMINAL_BLOCKED_PATTERNS
 
-        # Analysis Engine
-        assert "sudo" in AIAnalysisEngine._CATASTROPHIC_COMMAND_PATTERNS
+        # Terminal bundle catastrophic patterns
+        from intentframe_action_bundle.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
+        assert "sudo" in CATASTROPHIC_COMMAND_PATTERNS
 
         # Guardian (via TerminalConstraints with system defaults)
         checker = TerminalChecker()
@@ -559,11 +559,13 @@ class TestComponentIndependence:
         assert report.is_catastrophic
 
     def test_each_layer_covers_original_six_patterns(self):
-        """Policy registry, analysis engine, and command_shield all know the original six."""
+        """Policy registry, terminal bundle, and command_shield all know the original six."""
+        from intentframe_action_bundle.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
+
         expected = {"sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777"}
 
         assert expected <= set(SYSTEM_TERMINAL_BLOCKED_PATTERNS)
-        assert expected <= set(AIAnalysisEngine._CATASTROPHIC_COMMAND_PATTERNS.keys())
+        assert expected <= set(CATASTROPHIC_COMMAND_PATTERNS.keys())
         # command_shield covers far more than 6 patterns
         assert len(COMPILED_PATTERNS) >= len(expected)
 

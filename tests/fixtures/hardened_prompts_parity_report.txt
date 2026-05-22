@@ -1,0 +1,74 @@
+HARDENED PROMPTS PARITY REPORT
+========================================================================
+Generated:        2026-05-22 11:24:01 UTC
+Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/hardened_prompts_legacy_baseline.txt
+Legacy commit:      ee04d7f
+Inspect script:     tests/inspect_hardened_prompts.py
+Normalization:      32-hex boundary tokens → <BOUNDARY>_UNTRUSTED_*
+
+OVERALL:            PASS  (12/12 sections match)
+
+SECTION DETAILS
+------------------------------------------------------------------------
+[PASS] 1. ANALYSIS ENGINE — SYSTEM PROMPT (agent.instructions)
+       baseline sha256: 8c769e968bc091694e613bad054bb904799ae690fd67d9a06eb49f9d24e3e6af
+       current  sha256: 8c769e968bc091694e613bad054bb904799ae690fd67d9a06eb49f9d24e3e6af
+       chars: baseline=5,135  current=5,135
+
+[PASS] 2. ANALYSIS ENGINE — PER-REQUEST PROMPT (_build_analysis_prompt)
+       baseline sha256: d734ca21423425ad34ccca92a525a384d3a2abb4e700844d820772e2ec0cf00d
+       current  sha256: d734ca21423425ad34ccca92a525a384d3a2abb4e700844d820772e2ec0cf00d
+       chars: baseline=1,224  current=1,224
+
+[PASS] 3. ANALYSIS ENGINE — WITH TERMINAL COMMAND SIGNALS
+       baseline sha256: a48b4c6092fbab7bd0af95580be95a9b1b0b747dc9ea37a29331370b349130d1
+       current  sha256: a48b4c6092fbab7bd0af95580be95a9b1b0b747dc9ea37a29331370b349130d1
+       chars: baseline=1,460  current=1,460
+
+[PASS] 3b. ANALYSIS ENGINE — RUN_COMMAND SYSTEM PROMPT (critical_network_probe)
+       baseline sha256: a9d41e5d8bcdf5e924daee801555ec9b488366cf87e005921d5eb29a08e5eb07
+       current  sha256: a9d41e5d8bcdf5e924daee801555ec9b488366cf87e005921d5eb29a08e5eb07
+       chars: baseline=7,066  current=7,066
+
+[PASS] 4. GUARDIAN — SYSTEM PROMPT (agent.instructions)
+       baseline sha256: 3face7e94586634bfaa5dd291039226b47881d300a14882ec459c94818599430
+       current  sha256: 3face7e94586634bfaa5dd291039226b47881d300a14882ec459c94818599430
+       chars: baseline=4,927  current=4,927
+
+[PASS] 4b. GUARDIAN — RUN_COMMAND SYSTEM PROMPT (critical)
+       baseline sha256: 3face7e94586634bfaa5dd291039226b47881d300a14882ec459c94818599430
+       current  sha256: 3face7e94586634bfaa5dd291039226b47881d300a14882ec459c94818599430
+       chars: baseline=4,927  current=4,927
+
+[PASS] 5. GUARDIAN — PER-REQUEST PROMPT (_build_validation_prompt)
+       baseline sha256: 71957d975cdcab86292d134c5a18154d19e00543029349f5c2987572f6bd8af7
+       current  sha256: 71957d975cdcab86292d134c5a18154d19e00543029349f5c2987572f6bd8af7
+       chars: baseline=2,822  current=2,822
+
+[PASS] 6. ANALYSIS ENGINE — WRITE_FILE PER-REQUEST PROMPT (with file_intel)
+       baseline sha256: c1e26ae0556d058c5fc3021e11b512fafb64c3218d64113d8dc52ca08536b6dc
+       current  sha256: c1e26ae0556d058c5fc3021e11b512fafb64c3218d64113d8dc52ca08536b6dc
+       chars: baseline=2,357  current=2,357
+
+[PASS] 6b. ANALYSIS ENGINE — WRITE_FILE SYSTEM PROMPT (critical_write_file)
+       baseline sha256: e23dd1e7c9f1df50ccd59f65cec3a2508c9945a5ccc95c7f0cf185aae43d8bcd
+       current  sha256: e23dd1e7c9f1df50ccd59f65cec3a2508c9945a5ccc95c7f0cf185aae43d8bcd
+       chars: baseline=14,697  current=14,697
+
+[PASS] 7. GUARDIAN — WRITE_FILE PER-REQUEST PROMPT (_build_validation_prompt)
+       baseline sha256: 622cfaaf39793edb34c243919216ca75ce5880fbcbaa0fe5a9603a388fabeac2
+       current  sha256: 622cfaaf39793edb34c243919216ca75ce5880fbcbaa0fe5a9603a388fabeac2
+       chars: baseline=3,150  current=3,150
+
+[PASS] 7b. GUARDIAN — WRITE_FILE SYSTEM PROMPT (standard)
+       baseline sha256: 3face7e94586634bfaa5dd291039226b47881d300a14882ec459c94818599430
+       current  sha256: 3face7e94586634bfaa5dd291039226b47881d300a14882ec459c94818599430
+       chars: baseline=4,927  current=4,927
+
+[PASS] SUMMARY
+       baseline sha256: d05fb7af9c1200ab4b209e1fdf63ecd894ccea4beef3b6619c371971fca2f3a5
+       current  sha256: d05fb7af9c1200ab4b209e1fdf63ecd894ccea4beef3b6619c371971fca2f3a5
+       chars: baseline=850  current=850
+
+All sections match after boundary-token normalization.
+Prompt content parity with legacy ee04d7f is VERIFIED.
