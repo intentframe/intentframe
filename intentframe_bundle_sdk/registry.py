@@ -46,3 +46,8 @@ def all_action_bundles() -> tuple[ActionBundle, ...]:
 
 def all_domain_bundles() -> tuple[DomainBundle, ...]:
     return tuple(_DOMAIN_BY_TYPE.values())
+
+
+def registered_checker_constraint_types() -> frozenset[type]:
+    """Constraint types with a registered action bundle (for invariant tests)."""
+    return frozenset(_CHECKER_BY_TYPE.keys())

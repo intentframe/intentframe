@@ -224,7 +224,7 @@ class IntentFrameRuntime:
 
     @staticmethod
     def _enrichment_audit_fields(det_result) -> dict:
-        """Host enrichment ledger for audit (submitted vs effective target)."""
+        """Bundle context audit: enrichment ledger + constraint-checker skip."""
         from intentframe_bundle_sdk.types import enrichment_audit_fields
 
         return enrichment_audit_fields(
@@ -518,6 +518,8 @@ class IntentFrameRuntime:
                 "executed": False,
                 **self._enrichment_audit_fields(det_result),
             }
+            if det_result.dg_exception:
+                audit_entry["dg_exception"] = det_result.dg_exception
             self.audit_log.append(audit_entry)
             if self.verbose:
                 print(f"")

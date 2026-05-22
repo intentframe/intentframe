@@ -634,5 +634,42 @@ class TestDeterministicGuardianPipelineFlow:
         assert entry["confidence"] == 1.0
 
 
+class TestDgExceptionFailClosed:
+    """Bundle/checker crashes must BLOCK fail-closed — no AI degradation."""
+
+    def test_dg_exception_blocks_without_ai_and_audits_dg_exception(self, monkeypatch):
+        from intentframe_components.guardian import checkers as checkers_mod
+        from policy_registry.constraints.terminal import TerminalConstraints
+
+        def raise_boom(*args, **kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(
+            checkers_mod,
+            "CONSTRAINT_CHECKERS",
+            {TerminalConstraints: type("Bad", (), {"check": raise_boom})()},
+        )
+
+        constraints = TerminalConstraints(blocked_patterns=["sudo"])
+        runtime = _make_runtime()
+        ctx = _user_context(
+            extra={"RUN_COMMAND": ActionPermission(safe=False, constraints=constraints)},
+        )
+        result = _run(runtime.process_intent(_intent("ls"), ctx))
+
+        assert not result.success
+        assert result.data["matched_gate"] == "exception"
+        assert result.data["decision"] == "BLOCK"
+        runtime.analysis_engine.analyze.assert_not_called()
+        runtime.guardian.validate.assert_not_called()
+        runtime.executor.execute.assert_not_called()
+
+        entry = runtime.audit_log[-1]
+        assert entry["decision"] == "BLOCK"
+        assert entry["matched_gate"] == "exception"
+        assert entry["dg_exception"] == "RuntimeError('boom')"
+        assert entry["decision_path"] == "deterministic"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

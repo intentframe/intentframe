@@ -88,14 +88,28 @@ class ActionBundle(ABC):
         intent: IntentFrame,
         permission,
         ctx: BundleContext,
+        *,
+        verbose: bool = False,
     ) -> BundlePhaseOutcome:
         if permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
 
         from intentframe_components.guardian.checkers import CheckContext, CONSTRAINT_CHECKERS
+        from intentframe_bundle_sdk.constraint_checker_skip import (
+            note_missing_constraint_checker,
+        )
 
-        checker = CONSTRAINT_CHECKERS.get(type(permission.constraints))
+        constraint_type = type(permission.constraints)
+        checker = CONSTRAINT_CHECKERS.get(constraint_type)
         if checker is None:
+            # Constraint defined, no checker in manifest/bundle — continue (no BLOCK).
+            # UNDECIDED → AE + Guardian; audit via constraint_checker_skipped.
+            note_missing_constraint_checker(
+                ctx,
+                constraint_type,
+                phase="deterministic_check_policy",
+                verbose=verbose,
+            )
             return BundlePhaseOutcome.continue_(ctx)
 
         check_ctx = CheckContext(
@@ -182,7 +196,13 @@ class ActionBundle(ABC):
 
 
 class NullActionBundle(ActionBundle):
-    """No-op bundle for actions without a registered family."""
+    """No-op bundle for actions without a registered family.
+
+    ``check_policy`` still runs on the base class: if permission carries a
+    constraint type with no ``CONSTRAINT_CHECKERS`` entry (e.g.
+    ``CalendarConstraints``), the runner continues without BLOCK — see §8.2
+    in ``deterministic-enforcement-map.md``.
+    """
 
     bundle_id = "null"
     action_ids = frozenset()

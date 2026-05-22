@@ -215,7 +215,8 @@ class AIGuardian(Guardian):
         constraints = permission.constraints
         if constraints is None:
             return True, ""
-        checker = CONSTRAINT_CHECKERS.get(type(constraints))
+        constraint_type = type(constraints)
+        checker = CONSTRAINT_CHECKERS.get(constraint_type)
         if checker:
             context = CheckContext(
                 command_intel=(
@@ -226,6 +227,25 @@ class AIGuardian(Guardian):
                 ),
             )
             return checker.check(intent, constraints, context)
+        # Same gap as ActionBundle.check_policy: constraint in YAML, no checker wired.
+        # Does not BLOCK — Guardian falls through to semantic validation; LLM may read
+        # raw constraint JSON in the prompt when summarize() is unavailable.
+        if bundle_context is not None:
+            from intentframe_bundle_sdk.constraint_checker_skip import (
+                note_missing_constraint_checker,
+            )
+
+            note_missing_constraint_checker(
+                bundle_context,
+                constraint_type,
+                phase="guardian_check_constraints",
+                verbose=self.verbose,
+            )
+        elif self.verbose:
+            print(
+                f"    │  ⚠ constraint checker skipped: "
+                f"{constraint_type.__name__} (guardian_check_constraints)"
+            )
         return True, ""
 
     # ── Risk Flag Check ────────────────────────────────────────────

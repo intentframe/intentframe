@@ -421,6 +421,95 @@ Always **UNDECIDED** at DG → AE inspects prompt content → Guardian rubric fo
 
 ---
 
+## 8.1 Exception policy (bundle refactor — post-`66e567c`)
+
+**Question:** When a bundle hook or checker raises, should DG fall through to AE + AI Guardian?
+
+**Answer: No — BLOCK fail-closed.** Do not re-litigate this as “helpful UX.”
+
+```
+  bundle phase raises
+        |
+        v
+  DG.decide_async except handler
+        |
+        v
+  BLOCK  matched_gate="exception"
+         dg_exception=<repr> on audit
+         decision_path="deterministic"
+        |
+        v
+  pipeline stops (no AE, no Guardian, no executor)
+```
+
+### Why not UNDECIDED → AI (legacy `66e567c` behavior)?
+
+| Concern | BLOCK | UNDECIDED → AI |
+|---------|-------|----------------|
+| Constraint YAML may not have run | Safe — no execution | Policy bypass risk |
+| `command_intel` / `file_intel` may be missing | Safe | AE runs on weaker context |
+| Audit meaning | Clear infra failure | Looks like normal AI review |
+| Substrate contract | Host failed → refuse | Host failed → ask LLM |
+
+An exception means **deterministic machinery broke its contract**, not “semantic ambiguity.”
+UNDECIDED is reserved for phases that **completed** and found no short-circuit.
+
+### Implementation anchors
+
+- `intentframe_components/guardian/deterministic.py` — `decide_async` except → `DeterministicDecision.BLOCK`
+- `intentframe_server/pipeline.py` — BLOCK audit includes `dg_exception` when set
+- Tests: `TestFailClosedExceptionHandling`, `TestDgExceptionFailClosed`, `test_bundle_constraint_registry`
+
+### Dev-only escape hatch (not shipped)
+
+A staging flag to revert to UNDECIDED for debugging is acceptable **only** if explicitly env-gated
+and never enabled for root/production profiles. Default remains BLOCK.
+
+---
+
+## 8.2 Missing constraint checker (constraint defined, not wired)
+
+**Example:** `LIST_CALENDARS` + `CalendarConstraints` in YAML — no calendar bundle, no
+`CONSTRAINT_CHECKERS[CalendarConstraints]`.
+
+**Short answer:** Does **not** BLOCK deterministically; does **not** skip straight to executor.
+Falls through to **AE + AI Guardian**; executor only if AI path → ALLOW.
+
+```
+1. Permission          → pass
+2. Bundle lookup       → NullActionBundle (no calendar bundle)
+3. prepare_evidence    → no-op
+4. enrich              → no-op
+5. check_policy        → CONSTRAINT_CHECKERS.get(CalendarConstraints) → None
+                         → continue (no BLOCK)
+                         → constraint_checker_skipped on BundleContext + log warning
+6. domain              → skip (not a domain action)
+7. structural / allow  → passive ALLOW if safe=True, else no-op
+8. DG                  → ALLOW or UNDECIDED
+
+9. Analysis Engine     → skipped on DG ALLOW; else runs
+10. AI Guardian        → _check_constraints: no checker → continue + same audit field
+11. Executor           → only if Guardian → ALLOW
+```
+
+Enforcement for unmapped types is **not** deterministic — Guardian may expose raw constraint
+JSON in the prompt (`str(constraints)` when `summarize()` is unavailable). That is LLM context,
+not a gate.
+
+**Runtime signals (post-refactor):**
+
+- `logging.warning` from `intentframe_bundle_sdk.constraint_checker_skip`
+- `verbose=True` → pipeline prints `⚠ constraint checker skipped: …`
+- Audit: `constraint_checker_skipped: "CalendarConstraints"` on `audit_entry`
+
+**CI:** `tests/test_bundle_constraint_registry.py` fails if a *new* constraint type is unmapped;
+`CalendarConstraints` is explicitly allowlisted until a checker ships.
+
+**Anchors:** `ActionBundle.check_policy`, `AIGuardian._check_constraints`,
+`BundleContext.constraint_checker_skipped`, `enrichment_audit_fields()`.
+
+---
+
 ## 9. Duplication map (same check, multiple places)
 
 ```
@@ -549,6 +638,8 @@ This map describes **legacy** scattering. The intended consolidation (your menta
 ```
 
 Until bundles own `deterministic()`, moving pipeline blocks alone only relocates **L2** fragments — DG/AE/Guardian/executor deterministic pieces listed above remain separate.
+
+**Post-refactor (current):** `DeterministicRunner` in `intentframe_bundle_sdk` owns gate order; bundle hooks replace inline DG steps. Exception policy is §8.1 (BLOCK, not AI fallback).
 
 ---
 

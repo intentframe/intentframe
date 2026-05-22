@@ -8,6 +8,9 @@ Fixed order (legacy 66e567c, permission-first):
     2. prepare_evidence → enrich → check_policy → domain → structural → allow
     3. UNDECIDED → AI path
 
+Bundle/checker exceptions → BLOCK (``matched_gate="exception"``,
+``dg_exception`` on audit). Fail-closed; no AI degradation.
+
 Authors implement bundle hooks only; they do not choose global order.
 """
 
@@ -40,6 +43,7 @@ class DeterministicResult:
     decision_path: str = "deterministic"
     bundle_context: BundleContext | None = None
     analysis_context: AnalysisContext | None = None
+    dg_exception: str = ""
 
 
 class DeterministicGuardian:
@@ -68,12 +72,17 @@ class DeterministicGuardian:
                 verbose=verbose,
             )
         except Exception as exc:  # noqa: BLE001
+            # Policy: bundle/checker crash → BLOCK fail-closed, not UNDECIDED→AI
+            # (deterministic-enforcement-map.md §8.1). Legacy 66e567c used UNDECIDED.
+            exc_repr = repr(exc)
             if verbose:
-                print(f"    │  DG exception: {exc!r} — UNDECIDED")
+                print(f"    │  DG exception: {exc_repr} — BLOCK (fail-closed)")
             return DeterministicResult(
-                decision=DeterministicDecision.UNDECIDED,
-                reason=f"deterministic guardian error: {exc!r}",
+                decision=DeterministicDecision.BLOCK,
+                reason=f"deterministic guardian error: {exc_repr}",
                 matched_gate="exception",
+                decision_path="deterministic",
+                dg_exception=exc_repr,
             )
 
     async def _decide_inner(

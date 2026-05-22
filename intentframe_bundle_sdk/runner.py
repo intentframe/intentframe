@@ -61,7 +61,7 @@ class DeterministicRunner:
         ctx = enriched.context
         record_enrichment(ctx, bundle_id=bundle.bundle_id)
 
-        pol = bundle.check_policy(intent, permission, ctx)
+        pol = bundle.check_policy(intent, permission, ctx, verbose=verbose)
         if pol.terminal:
             return bundle._phase_to_result(pol)
         ctx = pol.context

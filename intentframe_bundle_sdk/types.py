@@ -38,6 +38,9 @@ class BundleContext:
     terminal_command_signals: tuple = ()
     enriched_intent: IntentFrame | None = None
     enrichment: EnrichmentRecord | None = None
+    # Set when permission.constraints is present but CONSTRAINT_CHECKERS has no entry
+    # (e.g. CalendarConstraints). Does not BLOCK — see constraint_checker_skip.py.
+    constraint_checker_skipped: str | None = None
 
     @property
     def intent_submitted(self) -> IntentFrame:
@@ -57,6 +60,12 @@ class BundleContext:
             "enrichment_bundle_id": self.enrichment.bundle_id,
             "target_submitted": self.enrichment.target_submitted,
         }
+
+    def constraint_checker_audit_fields(self) -> dict[str, object]:
+        """Audit when YAML constraints were not checked deterministically."""
+        if not self.constraint_checker_skipped:
+            return {}
+        return {"constraint_checker_skipped": self.constraint_checker_skipped}
 
 
 def enrichment_changed(submitted: IntentFrame, effective: IntentFrame) -> bool:
@@ -85,10 +94,13 @@ def record_enrichment(
 
 
 def enrichment_audit_fields(ctx: BundleContext | None) -> dict[str, object]:
-    """Merge into pipeline ``audit_entry`` dicts."""
+    """Merge enrichment + constraint-checker skip fields into pipeline audit dicts."""
     if ctx is None:
         return {}
-    return ctx.enrichment_audit_fields()
+    return {
+        **ctx.enrichment_audit_fields(),
+        **ctx.constraint_checker_audit_fields(),
+    }
 
 
 @dataclass(frozen=True)

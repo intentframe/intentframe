@@ -17,7 +17,7 @@ benignness under an adversarial agent.
 
 Also covers:
 
-  - Fail-closed exception path (UNDECIDED, never ALLOW)
+  - Fail-closed exception path (BLOCK + matched_gate=exception, never ALLOW/AI)
   - deny_capabilities blocks the read-only fast-path
   - Incompatible capability tags disqualify the read-only fast-path
   - Code-intel findings / edge signals disqualify the fast-path
@@ -522,15 +522,15 @@ class TestUndecidedDefault:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Fail-closed: exceptions → UNDECIDED (never ALLOW)
+# Fail-closed: exceptions → BLOCK (never ALLOW, never AI degradation)
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestFailClosedExceptionHandling:
 
-    def test_exception_yields_undecided_not_allow(self, monkeypatch):
-        """If a checker raises, DG must fall back to UNDECIDED so the
-        AI path still runs.  It must NOT swallow the error as an
-        implicit ALLOW.
+    def test_exception_yields_block_not_allow_or_undecided(self, monkeypatch):
+        """If a checker raises, DG must BLOCK fail-closed with
+        matched_gate=exception and dg_exception set — not fall through
+        to the AI path.
         """
         dg = DeterministicGuardian()
 
@@ -552,8 +552,10 @@ class TestFailClosedExceptionHandling:
             _intel("capability:read_only:filesystem_list"),
             dg,
         )
-        assert result.decision is DeterministicDecision.UNDECIDED
+        assert result.decision is DeterministicDecision.BLOCK
         assert result.matched_gate == "exception"
+        assert result.dg_exception == "RuntimeError('boom')"
+        assert result.decision_path == "deterministic"
 
 
 if __name__ == "__main__":
