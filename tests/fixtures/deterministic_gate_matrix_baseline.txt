@@ -1,0 +1,26 @@
+DETERMINISTIC GATE MATRIX
+========================================================================
+Legacy commit: 66e567c
+
+GATE ROWS
+------------------------------------------------------------------------
+gate|decision|matched_gate|fixture
+permission|BLOCK|permission|READ_FILE denied
+constraint|BLOCK|constraint|RUN_COMMAND sudo blocked_pattern
+domain|BLOCK|domain|DELETE_FILE irreversible
+command_shield|BLOCK|command_shield|RUN_COMMAND catastrophic
+write_file_sensitive_path|BLOCK|write_file_sensitive_path|WRITE_FILE ~/.zshrc
+write_host_file_floor|BLOCK|write_host_file_floor|WRITE_HOST_FILE /etc/sudoers
+delete_host_file_floor|BLOCK|delete_host_file_floor|DELETE_HOST_FILE /etc/sudoers
+passive_read|ALLOW|passive_read|READ_FILE safe=True
+run_command_read_only|ALLOW|run_command_read_only|RUN_COMMAND read_only cap
+
+RUNNER PHASE ORDER
+------------------------------------------------------------------------
+ordered=yes
+  bundle\.prepare_evidence
+  bundle\.enrich
+  bundle\.check_policy
+  _run_domain\(
+  bundle\.structural_gates
+  bundle\.allow_gates
