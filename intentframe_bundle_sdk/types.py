@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from intentframe_core.types import CommandIntel, FileIntel, IntentFrame
+from intentframe_action_bundle.evidence import CommandIntel, FileIntel
+from intentframe_core.types import IntentFrame
 
 
 class PhaseDecision(str, Enum):
@@ -29,7 +30,7 @@ class EnrichmentRecord:
 
 @dataclass
 class BundleContext:
-    """Mutable evidence bag passed through action-bundle phases."""
+    """Mutable evidence bag passed through action-bundle phases (bundle-internal)."""
 
     intent: IntentFrame
     command_intel: CommandIntel | None = None
@@ -139,27 +140,15 @@ class BundleDeterministicResult:
 
 @dataclass
 class AnalysisContext:
-    """Typed, labeled evidence for the AI path (UNDECIDED only)."""
+    """Bundle-produced trusted prompt sections for the AI path (UNDECIDED only)."""
 
-    command_intel: CommandIntel | None = None
-    file_intel: FileIntel | None = None
-    terminal_command_signals: tuple = ()
     trusted_sections: dict[str, str] = field(default_factory=dict)
+    terminal_command_signals: tuple = ()
+    ae_prompt_id: str | None = None
     extras: dict[str, Any] = field(default_factory=dict)
 
 
-def resolve_analysis_context(
-    analysis_context: AnalysisContext | None = None,
-    *,
-    terminal_command_signals: tuple = (),
-    command_intel: CommandIntel | None = None,
-    file_intel: FileIntel | None = None,
+def analysis_context_or_empty(
+    analysis_context: AnalysisContext | None,
 ) -> AnalysisContext:
-    """Build a single evidence bag from context and/or legacy kwargs."""
-    if analysis_context is not None:
-        return analysis_context
-    return AnalysisContext(
-        command_intel=command_intel,
-        file_intel=file_intel,
-        terminal_command_signals=terminal_command_signals,
-    )
+    return analysis_context if analysis_context is not None else AnalysisContext()

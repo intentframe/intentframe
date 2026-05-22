@@ -360,10 +360,22 @@ class TestAnalysisEnginePrompt:
         return IntentFrame(**defaults)
 
     def _build_prompt(self, intent=None, signals=()):
+        from intentframe_action_bundle.prompt_trusted import build_ae_trusted_sections
         from intentframe_components.analysis.engine import AIAnalysisEngine
+        from intentframe_bundle_sdk.types import AnalysisContext, BundleContext
+
+        intent = intent or self._make_intent()
+        bundle_ctx = BundleContext(
+            intent=intent,
+            terminal_command_signals=tuple(signals),
+        )
+        analysis_context = AnalysisContext(
+            trusted_sections=build_ae_trusted_sections(intent, bundle_ctx),
+            terminal_command_signals=tuple(signals),
+        )
         engine = AIAnalysisEngine.__new__(AIAnalysisEngine)
         engine._hardener = PromptHardening()
-        return engine._build_analysis_prompt(intent or self._make_intent(), signals)
+        return engine._build_analysis_prompt(intent, analysis_context)
 
     def _get_system_prompt(self):
         from intentframe_components.analysis.engine import AIAnalysisEngine

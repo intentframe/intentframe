@@ -30,7 +30,7 @@ from intentframe_action_bundle.terminal.ae_fast_path import (
 from intentframe_components.guardian.checkers.base import CheckContext
 from intentframe_components.guardian.checkers.terminal import TerminalChecker
 from intentframe_core.enums import RiskLevel, Reversibility
-from intentframe_core.types import CommandIntel
+from intentframe_action_bundle.evidence import CommandIntel
 from action_registry.types import ActionType
 from executor.platforms.macos.adapters.terminal import TerminalAdapter
 from command_shield import quick_check

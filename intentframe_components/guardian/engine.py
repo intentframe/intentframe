@@ -33,14 +33,12 @@ from agents import Agent, ModelSettings, Runner
 from action_registry.types import ACTION_DOMAINS, DomainType
 from intentframe_core.types import (
     AnalysisReport,
-    CommandIntel,
     ExecutionContext,
-    FileIntel,
     IntentFrame,
     UserContext,
     ValidationResult,
 )
-from intentframe_bundle_sdk.types import AnalysisContext, resolve_analysis_context
+from intentframe_bundle_sdk.types import BundleContext
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.guardian.domains import DOMAIN_MODULES
@@ -209,20 +207,9 @@ class AIGuardian(Guardian):
         self,
         intent: IntentFrame,
         permission: ActionPermission,
-        command_intel: CommandIntel | None = None,
-        file_intel: FileIntel | None = None,
+        bundle_context: BundleContext | None = None,
     ) -> tuple[bool, str]:
-        """Evaluate per-category constraints against the intent.
-
-        Dispatches to the registered ConstraintChecker for the constraint type.
-        Returns (passed, reason).
-
-        ``command_intel`` and ``file_intel`` are forwarded as
-        ``CheckContext`` fields to checkers that can consume them
-        (TerminalChecker uses ``command_intel``; a future payload-aware
-        FileChecker would use ``file_intel``).  Checkers that don't
-        care simply ignore the context.
-        """
+        """Evaluate per-category constraints (bundle evidence via CheckContext)."""
         from intentframe_components.guardian.checkers.base import CheckContext
 
         constraints = permission.constraints
@@ -231,8 +218,12 @@ class AIGuardian(Guardian):
         checker = CONSTRAINT_CHECKERS.get(type(constraints))
         if checker:
             context = CheckContext(
-                command_intel=command_intel,
-                file_intel=file_intel,
+                command_intel=(
+                    bundle_context.command_intel if bundle_context else None
+                ),
+                file_intel=(
+                    bundle_context.file_intel if bundle_context else None
+                ),
             )
             return checker.check(intent, constraints, context)
         return True, ""
@@ -260,38 +251,15 @@ class AIGuardian(Guardian):
         intent: IntentFrame,
         analysis: AnalysisReport,
         user_context: UserContext,
+        *,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
-        command_intel: CommandIntel | None = None,
-        file_intel: FileIntel | None = None,
-        analysis_context: AnalysisContext | None = None,
+        bundle_context: BundleContext | None = None,
     ) -> ValidationResult:
-        """
-        Validate intent against user policies.
-
-        Three-step pipeline:
-        1. Permission check  → BLOCK if action not in allowed_actions
-        2. Constraint check  → BLOCK if per-category constraints violated
-        3. Safety routing    → fast ALLOW or AI validation
-
-        ``command_intel`` carries deterministic command_shield facts
-        (verdict, capability tags).  It is consumed by per-category
-        checkers (see TerminalChecker) and otherwise ignored here.
-        """
+        """Validate intent against user policies (AI path after DG UNDECIDED)."""
         action = intent.action.value
 
-        # Reset before any early return so stale prompt ids from a
-        # previous request never leak into audit on deterministic
-        # BLOCK or fast-path ALLOW cases.
         self.last_prompt_id = None
-
-        ctx = resolve_analysis_context(
-            analysis_context,
-            command_intel=command_intel,
-            file_intel=file_intel,
-        )
-        command_intel = ctx.command_intel
-        file_intel = ctx.file_intel
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
@@ -309,9 +277,7 @@ class AIGuardian(Guardian):
 
         # ── Step 2: Constraint check (deterministic) ───────────────
         passed, reason = self._check_constraints(
-            intent, permission,
-            command_intel=command_intel,
-            file_intel=file_intel,
+            intent, permission, bundle_context=bundle_context
         )
         if not passed:
             if self.verbose:
@@ -363,9 +329,7 @@ class AIGuardian(Guardian):
             execution_context=execution_context,
         )
 
-        prompt_id = self._resolve_prompt_id(
-            intent, analysis, command_intel, file_intel,
-        )
+        prompt_id = self._resolve_prompt_id(intent, analysis)
         self.last_prompt_id = prompt_id
         agent = self._agents[prompt_id]
 
@@ -381,19 +345,10 @@ class AIGuardian(Guardian):
         self,
         intent: IntentFrame,
         analysis: AnalysisReport,
-        command_intel: CommandIntel | None,
-        file_intel: FileIntel | None = None,
     ) -> str:
-        """Ask the strategy for a Guardian prompt id, fail-closed.
-
-        Unknown / erroring ids are downgraded to ``standard`` with a
-        warning.  Raising inside a Guardian AI call would turn a
-        config bug into a policy outage, so we explicitly avoid it.
-        """
+        """Ask the strategy for a Guardian prompt id, fail-closed."""
         try:
-            pid = self._prompt_strategy.select_guardian_prompt_id(
-                intent, analysis, command_intel, file_intel,
-            )
+            pid = self._prompt_strategy.select_guardian_prompt_id(intent, analysis)
         except Exception:
             logger.exception("Guardian prompt strategy raised; falling back to 'standard'")
             return "standard"

@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-from intentframe_core.types import CommandIntel, FileIntel, IntentFrame
-
 from intentframe_action_bundle.taxonomy import is_critical
+from intentframe_bundle_sdk.types import BundleContext
 
 
-def select_ae_prompt_id(
-    intent: IntentFrame,
-    command_intel: CommandIntel | None,
-    file_intel: FileIntel | None = None,
-) -> str | None:
-    del command_intel, file_intel
-    if is_critical(intent.action.value):
+def select_ae_prompt_id(ctx: BundleContext) -> str | None:
+    if is_critical(ctx.effective_intent.action.value):
         return "critical_generic"
     return None

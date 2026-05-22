@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from intentframe_core.types import CommandIntel, ExecutionResult, FileIntel, IntentFrame
+from intentframe_action_bundle.evidence import CommandIntel, FileIntel
+from intentframe_core.types import ExecutionResult, IntentFrame
 
 
 class BundleGateDecision(str, Enum):

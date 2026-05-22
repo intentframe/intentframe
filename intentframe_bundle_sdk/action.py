@@ -148,11 +148,14 @@ class ActionBundle(ABC):
         permission,
         ctx: BundleContext,
     ) -> AnalysisContext:
-        del intent, permission
+        del permission
+        from intentframe_action_bundle.prompt_trusted import build_ae_trusted_sections
+        from intentframe_action_bundle.prompts.registry import select_ae_prompt_id
+
         return AnalysisContext(
-            command_intel=ctx.command_intel,
-            file_intel=ctx.file_intel,
+            trusted_sections=build_ae_trusted_sections(intent, ctx),
             terminal_command_signals=ctx.terminal_command_signals,
+            ae_prompt_id=select_ae_prompt_id(ctx),
         )
 
     @staticmethod

@@ -20,7 +20,12 @@ pipeline would construct from a real agent request.
 from __future__ import annotations
 
 from action_registry.types import ActionType
-from intentframe_core.types import IntentFrame, AnalysisReport, UserContext, CommandIntel
+from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.files.file_intel import build_file_intel
+from intentframe_action_bundle.prompt_trusted import build_ae_trusted_sections
+from intentframe_action_bundle.prompts.registry import select_ae_prompt_id
+from intentframe_bundle_sdk.types import AnalysisContext, BundleContext
+from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
 from intentframe_core.enums import RiskLevel, Reversibility
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 from command_shield.verdict import Signal
@@ -28,7 +33,6 @@ from command_shield.verdict import Signal
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_server.pipeline import IntentFrameRuntime
-from intentframe_server.file_intel import build_file_intel
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -107,6 +111,15 @@ ae = AIAnalysisEngine(verbose=False)
 gu = AIGuardian(verbose=False)
 
 
+def _analysis_context(intent: IntentFrame, **ctx_fields) -> AnalysisContext:
+    bundle_ctx = BundleContext(intent=intent, **ctx_fields)
+    return AnalysisContext(
+        trusted_sections=build_ae_trusted_sections(intent, bundle_ctx),
+        terminal_command_signals=bundle_ctx.terminal_command_signals,
+        ae_prompt_id=select_ae_prompt_id(bundle_ctx),
+    )
+
+
 def section(title: str) -> None:
     print(f"\n{SEPARATOR}")
     print(f"  {title}")
@@ -123,7 +136,9 @@ print(ae._agent.instructions)
 
 section("2. ANALYSIS ENGINE — PER-REQUEST PROMPT (_build_analysis_prompt)")
 print()
-ae_prompt = ae._build_analysis_prompt(intent, active_domains=active_domains)
+ae_prompt = ae._build_analysis_prompt(
+    intent, _analysis_context(intent), active_domains=active_domains
+)
 print(ae_prompt)
 
 # ── 3. Analysis Engine per-request prompt WITH terminal signals ───────
@@ -174,11 +189,16 @@ run_cmd_analysis = AnalysisReport(
     confidence=0.95,
     recommendation="Shell execution with outbound network retrieval.",
 )
-ae_run_cmd_prompt_id = ae._resolve_prompt_id(run_cmd_intent, run_cmd_intel)
-gu_run_cmd_prompt_id = gu._resolve_prompt_id(run_cmd_intent, run_cmd_analysis, run_cmd_intel)
+run_cmd_ae_ctx = _analysis_context(
+    run_cmd_intent,
+    command_intel=run_cmd_intel,
+    terminal_command_signals=signals,
+)
+ae_run_cmd_prompt_id = run_cmd_ae_ctx.ae_prompt_id or "standard"
+gu_run_cmd_prompt_id = gu._resolve_prompt_id(run_cmd_intent, run_cmd_analysis)
 ae_prompt_signals = ae._build_analysis_prompt(
     run_cmd_intent,
-    terminal_command_signals=signals,
+    run_cmd_ae_ctx,
     active_domains=active_domains,
 )
 print(ae_prompt_signals)
@@ -275,16 +295,15 @@ write_file_analysis = AnalysisReport(
         "subprocess invocation once run."
     ),
 )
-ae_write_file_prompt_id = ae._resolve_prompt_id(
-    write_file_intent, None, write_file_intel,
-)
+write_ae_ctx = _analysis_context(write_file_intent, file_intel=write_file_intel)
+ae_write_file_prompt_id = write_ae_ctx.ae_prompt_id or "standard"
 gu_write_file_prompt_id = gu._resolve_prompt_id(
-    write_file_intent, write_file_analysis, None, write_file_intel,
+    write_file_intent, write_file_analysis
 )
 ae_prompt_write_file = ae._build_analysis_prompt(
     write_file_intent,
+    write_ae_ctx,
     active_domains=active_domains,
-    file_intel=write_file_intel,
 )
 print(ae_prompt_write_file)
 

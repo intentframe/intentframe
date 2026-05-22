@@ -15,7 +15,7 @@ After permission (DeterministicGuardian):
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from action_registry.types import ACTION_DOMAINS
 from intentframe_bundle_sdk.registry import action_bundle_for, domain_bundle_for
@@ -26,7 +26,7 @@ from intentframe_bundle_sdk.types import (
 )
 
 if TYPE_CHECKING:
-    from intentframe_core.types import CommandIntel, IntentFrame, UserContext
+    from intentframe_core.types import IntentFrame, UserContext
 
 
 class DeterministicRunner:
@@ -41,14 +41,8 @@ class DeterministicRunner:
         user_context: UserContext,
         *,
         verbose: bool = False,
-        command_intel: Optional[CommandIntel] = None,
     ) -> BundleDeterministicResult:
         """Execute evidence → enrich → policy → domain → structural → allow."""
-        if command_intel is not None:
-            return await cls._run_with_seeded_intel(
-                bundle, intent, permission, user_context, command_intel
-            )
-
         ctx = BundleContext(intent=intent.model_copy(deep=True))
 
         evidence = await bundle.prepare_evidence(
@@ -66,38 +60,6 @@ class DeterministicRunner:
             )
         ctx = enriched.context
         record_enrichment(ctx, bundle_id=bundle.bundle_id)
-
-        pol = bundle.check_policy(intent, permission, ctx)
-        if pol.terminal:
-            return bundle._phase_to_result(pol)
-        ctx = pol.context
-
-        domain_outcome = cls._run_domain(intent, user_context, ctx)
-        if domain_outcome is not None:
-            return domain_outcome
-
-        struct = bundle.structural_gates(intent, permission, ctx)
-        if struct.terminal:
-            return bundle._phase_to_result(struct)
-        ctx = struct.context
-
-        allow = bundle.allow_gates(intent, permission, ctx)
-        if allow.terminal:
-            return bundle._phase_to_result(allow)
-
-        return BundleDeterministicResult(decision="UNDECIDED", context=ctx)
-
-    @classmethod
-    async def _run_with_seeded_intel(
-        cls,
-        bundle,
-        intent: IntentFrame,
-        permission,
-        user_context: UserContext,
-        command_intel: CommandIntel,
-    ) -> BundleDeterministicResult:
-        """Test path: skip evidence/enrich, seed CommandIntel."""
-        ctx = BundleContext(intent=intent.model_copy(deep=True), command_intel=command_intel)
 
         pol = bundle.check_policy(intent, permission, ctx)
         if pol.terminal:

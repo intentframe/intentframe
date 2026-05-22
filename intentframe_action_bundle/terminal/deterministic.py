@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from action_registry.types import ActionType
-from intentframe_core.types import CommandIntel, IntentFrame
+from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_core.types import IntentFrame
 from policy_registry.constraints.terminal import TerminalConstraints
 
 from intentframe_action_bundle.terminal._read_only import is_read_only_fast_path

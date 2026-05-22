@@ -31,7 +31,7 @@ from action_registry.types import ActionType
 from command_shield import inspect_command
 from intentframe_components.guardian.checkers.base import CheckContext
 from intentframe_components.guardian.checkers.terminal import TerminalChecker
-from intentframe_core.types import CommandIntel
+from intentframe_action_bundle.evidence import CommandIntel
 from policy_registry.constraints.terminal import TerminalConstraints
 
 

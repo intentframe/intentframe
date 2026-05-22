@@ -568,7 +568,6 @@ class IntentFrameRuntime:
 
             analysis = await self.analysis_engine.analyze(
                 intent,
-                safe_actions=safe_actions,
                 active_domains=active_domains,
                 execution_context=self._execution_context,
                 analysis_context=analysis_context,
@@ -600,10 +599,12 @@ class IntentFrameRuntime:
                 print(f"    │  (Checks authority, NOT business logic)                  │")
 
             validation = await self.guardian.validate(
-                intent, analysis, user_context,
+                intent,
+                analysis,
+                user_context,
                 active_domains=active_domains,
                 execution_context=self._execution_context,
-                analysis_context=analysis_context,
+                bundle_context=det_result.bundle_context,
             )
         
         # ═══════════════════════════════════════════════════════════════

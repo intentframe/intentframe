@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from intentframe_core.types import FileIntel, IntentFrame
+from intentframe_action_bundle.evidence import FileIntel
+from intentframe_core.types import IntentFrame
 
 from intentframe_action_bundle.files.actions import WRITE_FILE_ACTIONS
 from intentframe_action_bundle.files.file_intel import build_file_intel

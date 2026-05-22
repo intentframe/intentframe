@@ -25,10 +25,13 @@ from intentframe_components.prompt.library import (
     ANALYSIS_PROMPT_IDS,
     GUARDIAN_PROMPT_IDS,
 )
+from intentframe_action_bundle.evidence import CommandIntel, FileIntel
+from intentframe_action_bundle.prompts.registry import select_ae_prompt_id
+from intentframe_bundle_sdk.types import BundleContext
 from intentframe_components.prompt.strategy import DefaultPromptStrategy
 from intentframe_components.routing.criticality import CRITICAL_ACTIONS, is_critical
 from intentframe_core.enums import Reversibility, RiskLevel
-from intentframe_core.types import AnalysisReport, CommandIntel, FileIntel, IntentFrame
+from intentframe_core.types import AnalysisReport, IntentFrame
 
 
 # ───────────────────────────── helpers ─────────────────────────────
@@ -83,15 +86,26 @@ def _analysis() -> AnalysisReport:
 STRATEGY = DefaultPromptStrategy()
 
 
+def _bundle_ctx(
+    intent: IntentFrame,
+    *,
+    command_intel: CommandIntel | None = None,
+    file_intel: FileIntel | None = None,
+) -> BundleContext:
+    return BundleContext(
+        intent=intent,
+        command_intel=command_intel,
+        file_intel=file_intel,
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # AE routing
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestAERouting:
     def test_non_critical_action_routes_to_standard(self):
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.LIST_CALENDARS), None,
-        ) == "standard"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.LIST_CALENDARS))) == "standard"
 
     def test_write_file_with_no_file_intel_routes_to_critical_write_file(self):
         # Fail-closed: a missing FileIntel on WRITE_FILE means upstream
@@ -99,9 +113,7 @@ class TestAERouting:
         # whenever ``data.content`` is a string).  Safer default is
         # the payload-aware overlay than the standard prompt — the
         # symmetric stance for RUN_COMMAND with no CommandIntel below.
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/tmp/x"), None,
-        ) == "critical_write_file"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.WRITE_FILE, "/tmp/x"))) == "critical_write_file"
 
     @pytest.mark.parametrize("action", [
         ActionType.PAY_INVOICE,
@@ -116,15 +128,13 @@ class TestAERouting:
         ActionType.HTTP_POST,
     ])
     def test_non_run_critical_actions_route_to_critical_generic(self, action):
-        assert STRATEGY.select_ae_prompt_id(_intent(action), None) == "critical_generic"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(action))) == "critical_generic"
 
     def test_write_host_file_routes_to_critical_write_file_lane(self):
         # WRITE_HOST_FILE shares the dedicated critical_write_file lane
         # with WRITE_FILE so the payload-aware prompt is used for both
         # virtual- and real-path writes.
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_HOST_FILE, "~/Documents/x.md"), None,
-        ) == "critical_write_file"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.WRITE_HOST_FILE, "~/Documents/x.md"))) == "critical_write_file"
 
     @pytest.mark.parametrize("action", [
         ActionType.READ_HOST_FILE,
@@ -135,46 +145,33 @@ class TestAERouting:
         # strategy returns "standard" (the DG passive-read fast-path is
         # what actually skips AE for these — the strategy is defense-in-
         # depth for direct callers).
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(action, "~/Documents/"), None,
-        ) == "standard"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(action, "~/Documents/"))) == "standard"
 
     def test_run_command_with_no_intel_routes_to_critical_run_command(self):
         # Fail-closed: a missing CommandIntel on RUN_COMMAND means
         # upstream plumbing is broken; the safer default is the
         # command-specific body, not the standard prompt.
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "ls -la"), None,
-        ) == "critical_run_command"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "ls -la"))) == "critical_run_command"
 
     def test_run_command_with_empty_caps_routes_to_critical_run_command(self):
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "do thing"), _intel(),
-        ) == "critical_run_command"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "do thing"), command_intel=_intel())) == "critical_run_command"
 
     def test_run_command_with_unrelated_caps_routes_to_critical_run_command(self):
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "do thing"),
-            _intel("capability:filesystem_write"),
-        ) == "critical_run_command"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "do thing"), command_intel=_intel("capability:filesystem_write"))) == "critical_run_command"
 
     # ── network_probe sub-routing ───────────────────────────────────
 
     @pytest.mark.parametrize("sub", ["icmp", "trace", "dns", "whois", "http_get"])
     def test_network_probe_subtags_route_to_probe_lane(self, sub):
         caps = _intel(f"capability:network_probe:{sub}")
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), caps,
-        ) == "critical_network_probe"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "cmd"), command_intel=caps)) == "critical_network_probe"
 
     @pytest.mark.parametrize("sub", [
         "http_mutate", "http_download", "port_scan", "file_transfer",
     ])
     def test_network_mutation_subtags_route_to_mutation_lane(self, sub):
         caps = _intel(f"capability:network_probe:{sub}")
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), caps,
-        ) == "critical_network_mutation"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "cmd"), command_intel=caps)) == "critical_network_mutation"
 
     def test_mutation_beats_probe_when_both_present(self):
         # Precedence: mutation > probe > critical_generic > standard.
@@ -182,9 +179,7 @@ class TestAERouting:
             "capability:network_probe:dns",
             "capability:network_probe:http_mutate",
         )
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), caps,
-        ) == "critical_network_mutation"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "cmd"), command_intel=caps)) == "critical_network_mutation"
 
     def test_mutation_wins_even_with_read_only_and_probe_caps(self):
         caps = _intel(
@@ -192,18 +187,14 @@ class TestAERouting:
             "capability:network_probe:http_get",
             "capability:network_probe:port_scan",
         )
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), caps,
-        ) == "critical_network_mutation"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "cmd"), command_intel=caps)) == "critical_network_mutation"
 
     def test_unrelated_capability_not_matching_subtag_falls_through(self):
         # A network_probe:* tag we don't recognise (newer classifier,
         # older strategy) must not silently route to probe lane.
         # Falls through to the command-specific base body.
         caps = _intel("capability:network_probe:experimental_new_thing")
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), caps,
-        ) == "critical_run_command"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.RUN_COMMAND, "cmd"), command_intel=caps)) == "critical_run_command"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -223,21 +214,15 @@ class TestAERouting:
 class TestWriteFileAERouting:
     def test_binary_payload_routes_to_critical_write_file(self):
         fi = _file_intel(language="binary", is_binary=True, size_bytes=1024)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, fi,
-        ) == "critical_write_file"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.WRITE_FILE, "/home/documents/x.md"), file_intel=fi)) == "critical_write_file"
 
     def test_oversized_payload_routes_to_critical_write_file(self):
         fi = _file_intel(is_oversized=True, size_bytes=10_000_000)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, fi,
-        ) == "critical_write_file"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.WRITE_FILE, "/home/documents/x.md"), file_intel=fi)) == "critical_write_file"
 
     def test_missing_file_intel_routes_to_critical_write_file(self):
         # Fail-closed: no deterministic evidence about the payload.
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, "/home/documents/x.md"), None, None,
-        ) == "critical_write_file"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.WRITE_FILE, "/home/documents/x.md"))) == "critical_write_file"
 
     # ── destination-side defense in depth ───────────────────────
     # In the main pipeline these destinations are BLOCKed pre-AE by
@@ -261,9 +246,7 @@ class TestWriteFileAERouting:
     ])
     def test_sensitive_path_destinations_route_to_critical(self, target):
         fi = _file_intel(language=None, size_bytes=10)
-        assert STRATEGY.select_ae_prompt_id(
-            _intent(ActionType.WRITE_FILE, target), None, fi,
-        ) == "critical_write_file"
+        assert select_ae_prompt_id(_bundle_ctx(_intent(ActionType.WRITE_FILE, target), file_intel=fi)) == "critical_write_file"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -272,34 +255,27 @@ class TestWriteFileAERouting:
 
 class TestGuardianRouting:
     def test_non_critical_action_routes_to_standard(self):
-        assert STRATEGY.select_guardian_prompt_id(
-            _intent(ActionType.LIST_CALENDARS), _analysis(), None,
-        ) == "standard"
+        assert STRATEGY.select_guardian_prompt_id(_intent(ActionType.LIST_CALENDARS), _analysis()) == "standard"
 
     def test_run_command_routes_to_critical(self):
         assert STRATEGY.select_guardian_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), _analysis(), None,
+            _intent(ActionType.RUN_COMMAND, "cmd"), _analysis(),
         ) == "critical"
 
     def test_pay_invoice_routes_to_critical(self):
-        assert STRATEGY.select_guardian_prompt_id(
-            _intent(ActionType.PAY_INVOICE), _analysis(), None,
-        ) == "critical"
+        assert STRATEGY.select_guardian_prompt_id(_intent(ActionType.PAY_INVOICE), _analysis()) == "critical"
 
     def test_send_email_routes_to_critical(self):
         assert STRATEGY.select_guardian_prompt_id(
             _intent(ActionType.SEND_EMAIL, "bob@example.com"),
             _analysis(),
-            None,
         ) == "critical"
 
     def test_guardian_ignores_command_intel_and_analysis(self):
         # Guardian routing is purely action-type driven.
         # Passing analysis / command_intel must not change the outcome.
         caps = _intel("capability:network_probe:http_mutate")
-        assert STRATEGY.select_guardian_prompt_id(
-            _intent(ActionType.LIST_CALENDARS), _analysis(), caps,
-        ) == "standard"
+        assert STRATEGY.select_guardian_prompt_id(_intent(ActionType.LIST_CALENDARS), _analysis()) == "standard"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -313,7 +289,7 @@ class TestLibraryIntegrity:
         # fail-closed fallback, but the default strategy must
         # never need to trigger it.
         for action in ActionType:
-            pid = STRATEGY.select_ae_prompt_id(_intent(action, "x"), None)
+            pid = select_ae_prompt_id(_bundle_ctx(_intent(action, "x")))
             assert pid in ANALYSIS_PROMPT_IDS, (
                 f"AE strategy returned unknown id {pid!r} for {action.value}"
             )
@@ -321,7 +297,7 @@ class TestLibraryIntegrity:
     def test_guardian_strategy_returns_only_known_ids(self):
         for action in ActionType:
             pid = STRATEGY.select_guardian_prompt_id(
-                _intent(action, "x"), _analysis(), None,
+                _intent(action, "x"), _analysis(),
             )
             assert pid in GUARDIAN_PROMPT_IDS, (
                 f"Guardian strategy returned unknown id {pid!r} for {action.value}"
@@ -356,51 +332,43 @@ class TestCriticalityDriftGuard:
 # Engine fail-closed behaviour on bad strategies
 # ═══════════════════════════════════════════════════════════════════════
 
-class _BadStrategy:
-    """Strategy that returns an id unknown to the library."""
-
-    def select_ae_prompt_id(self, intent, command_intel, file_intel=None):
-        return "not_a_real_id"
-
-    def select_guardian_prompt_id(self, intent, analysis, command_intel, file_intel=None):
+class _BadGuardianStrategy:
+    def select_guardian_prompt_id(self, intent, analysis):
         return "also_bogus"
 
 
-class _RaisingStrategy:
-    """Strategy whose selector raises — simulates a plugin bug."""
-
-    def select_ae_prompt_id(self, intent, command_intel, file_intel=None):
-        raise RuntimeError("boom")
-
-    def select_guardian_prompt_id(self, intent, analysis, command_intel, file_intel=None):
+class _RaisingGuardianStrategy:
+    def select_guardian_prompt_id(self, intent, analysis):
         raise RuntimeError("boom")
 
 
 class TestEngineFailClosedOnBadStrategy:
-    def test_ae_engine_downgrades_unknown_id_to_standard(self):
-        engine = AIAnalysisEngine(verbose=False, prompt_strategy=_BadStrategy())
-        assert engine._resolve_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), None,
-        ) == "standard"
+    def test_ae_engine_downgrades_unknown_bundle_prompt_id_to_standard(self):
+        from intentframe_bundle_sdk.types import AnalysisContext
 
-    def test_ae_engine_downgrades_raising_strategy_to_standard(self):
-        engine = AIAnalysisEngine(verbose=False, prompt_strategy=_RaisingStrategy())
-        assert engine._resolve_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), None,
-        ) == "standard"
+        engine = AIAnalysisEngine(verbose=False)
+        assert engine._resolve_prompt_id(AnalysisContext(ae_prompt_id="not_a_real_id")) == "standard"
+
+    def test_ae_engine_defaults_missing_prompt_id_to_standard(self):
+        from intentframe_bundle_sdk.types import AnalysisContext
+
+        engine = AIAnalysisEngine(verbose=False)
+        assert engine._resolve_prompt_id(AnalysisContext()) == "standard"
 
     def test_guardian_engine_downgrades_unknown_id_to_standard(self):
         from intentframe_components.guardian.engine import AIGuardian
-        guardian = AIGuardian(verbose=False, prompt_strategy=_BadStrategy())
+
+        guardian = AIGuardian(verbose=False, prompt_strategy=_BadGuardianStrategy())
         assert guardian._resolve_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), _analysis(), None,
+            _intent(ActionType.RUN_COMMAND, "cmd"), _analysis()
         ) == "standard"
 
     def test_guardian_engine_downgrades_raising_strategy_to_standard(self):
         from intentframe_components.guardian.engine import AIGuardian
-        guardian = AIGuardian(verbose=False, prompt_strategy=_RaisingStrategy())
+
+        guardian = AIGuardian(verbose=False, prompt_strategy=_RaisingGuardianStrategy())
         assert guardian._resolve_prompt_id(
-            _intent(ActionType.RUN_COMMAND, "cmd"), _analysis(), None,
+            _intent(ActionType.RUN_COMMAND, "cmd"), _analysis()
         ) == "standard"
 
 

@@ -20,7 +20,6 @@ from command_shield.verdict import Signal
 from intentframe_core.enums import Decision, RiskLevel, Reversibility
 from intentframe_core.types import (
     AnalysisReport,
-    CommandIntel,
     ExecutionContext,
     ExecutionResult,
     IntentFrame,
@@ -424,25 +423,25 @@ class TestCommandIntelPlumbing:
         call_kwargs = engine_or_guardian.call_args
         return call_kwargs.kwargs.get("analysis_context")
 
-    def test_undecided_command_forwards_command_intel_to_ae(self):
+    def test_undecided_command_forwards_trusted_context_to_ae(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         ctx = self._ctx_from(runtime.analysis_engine.analyze)
         assert ctx is not None
-        assert ctx.command_intel is not None
-        assert ctx.command_intel.verdict == Verdict.SAFE.value
+        assert "Context" in ctx.trusted_sections
+        assert "RUN_COMMAND" in ctx.trusted_sections["Context"]
 
-    def test_undecided_command_forwards_command_intel_to_guardian(self):
+    def test_undecided_command_forwards_bundle_context_to_guardian(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
-        ctx = self._ctx_from(runtime.guardian.validate)
-        assert ctx is not None
-        assert ctx.command_intel is not None
-        assert ctx.command_intel.verdict == Verdict.SAFE.value
+        call_kwargs = runtime.guardian.validate.call_args.kwargs
+        assert call_kwargs.get("bundle_context") is not None
+        assert call_kwargs["bundle_context"].command_intel is not None
+        assert call_kwargs["bundle_context"].command_intel.verdict == Verdict.SAFE.value
 
-    def test_needs_review_forwards_command_intel(self):
+    def test_needs_review_forwards_bundle_evidence(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(
             _intent(CMD_NEEDS_REVIEW),
@@ -450,10 +449,10 @@ class TestCommandIntelPlumbing:
         ))
 
         ctx_ae = self._ctx_from(runtime.analysis_engine.analyze)
-        ctx_gu = self._ctx_from(runtime.guardian.validate)
-        assert ctx_ae is not None and ctx_ae.command_intel is not None
-        assert ctx_gu is not None and ctx_gu.command_intel is not None
-        assert ctx_ae.command_intel.verdict == ctx_gu.command_intel.verdict
+        bundle_ctx = runtime.guardian.validate.call_args.kwargs.get("bundle_context")
+        assert ctx_ae is not None
+        assert bundle_ctx is not None
+        assert bundle_ctx.command_intel is not None
 
     def test_undecided_signals_forwarded_to_ae(self):
         """SAFE-verdict UNDECIDED commands still route their signals
@@ -465,9 +464,8 @@ class TestCommandIntelPlumbing:
         ctx = call_kwargs.kwargs.get("analysis_context")
         assert ctx is not None
 
-    def test_non_run_command_does_not_build_command_intel(self):
-        """Non-terminal intents never attach command intel to analysis context.
-        Use safe=False so DG falls through to AE and we can observe the ctx."""
+    def test_non_run_command_has_no_terminal_evidence_in_trusted_context(self):
+        """Non-terminal intents do not attach command_shield intel to AE context."""
         runtime = _make_runtime()
         intent = IntentFrame(
             action=ActionType.READ_FILE,
@@ -482,14 +480,19 @@ class TestCommandIntelPlumbing:
         _run(runtime.process_intent(intent, user))
 
         ctx = self._ctx_from(runtime.analysis_engine.analyze)
-        assert ctx is None or ctx.command_intel is None
+        assert ctx is not None
+        assert "TERMINAL COMMAND" not in ctx.trusted_sections.get("Context", "")
 
     def test_command_intel_is_bounded(self):
+        from intentframe_action_bundle.evidence import CommandIntel
+
         huge_caps = tuple(f"capability:x{i}:y" for i in range(5000))
         intel = CommandIntel(capabilities=huge_caps)
         assert len(intel.capabilities) <= 64
 
     def test_command_intel_is_frozen(self):
+        from intentframe_action_bundle.evidence import CommandIntel
+
         intel = CommandIntel(verdict="SAFE")
         with pytest.raises(Exception):
             intel.verdict = "CATASTROPHIC"

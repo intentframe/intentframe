@@ -19,7 +19,8 @@ from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
-from intentframe_core.types import CommandIntel, IntentFrame, UserContext
+from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_core.types import IntentFrame, UserContext
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission
 
@@ -123,8 +124,8 @@ def test_allow_capabilities_no_op_on_empty_caps() -> None:
         reason="precedence test",
         agent_id="precedence",
     )
-    result = DeterministicGuardian().decide(
-        intent, _ctx(constraints), command_intel=intel
+    result = run_dg_with_intel(
+        "mkdir some_directory", _ctx(constraints), intel
     )
     assert result.decision is DeterministicDecision.UNDECIDED
 
@@ -146,9 +147,7 @@ def test_missing_intel_cannot_allow() -> None:
         reason="precedence test",
         agent_id="precedence",
     )
-    result = DeterministicGuardian().decide(
-        intent, _ctx(constraints), command_intel=None
-    )
+    result, _ = run_dg("", _ctx(constraints))
     assert result.decision is DeterministicDecision.UNDECIDED
 
 

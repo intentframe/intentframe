@@ -19,13 +19,11 @@ from agents import Agent, ModelSettings, Runner
 
 from intentframe_core.types import (
     AnalysisReport,
-    CommandIntel,
     ExecutionContext,
-    FileIntel,
     IntentFrame,
 )
 from intentframe_core.enums import Reversibility, RiskLevel
-from intentframe_bundle_sdk.types import AnalysisContext, resolve_analysis_context
+from intentframe_bundle_sdk.types import AnalysisContext, analysis_context_or_empty
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
@@ -224,53 +222,37 @@ class AIAnalysisEngine(AnalysisEngine):
     async def analyze(
         self,
         intent: IntentFrame,
-        safe_actions: set[str] | None = None,
-        terminal_command_signals: tuple = (),
+        *,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
-        command_intel: CommandIntel | None = None,
-        file_intel: FileIntel | None = None,
         analysis_context: AnalysisContext | None = None,
     ) -> AnalysisReport:
         """
         Analyze what an intent will REALLY do via full AI analysis.
 
         Called only when DeterministicGuardian returned UNDECIDED.
-        ``safe_actions`` is accepted for API compatibility but ignored —
-        passive-read ALLOW is handled by the passive_read action bundle.
-
-        terminal_command_signals applies to RUN_COMMAND intents and is
-        injected into the AI prompt for richer context.
-
-        active_domains are domain strings the user has active rules for.
-        execution_context carries immutable server-side executor facts.
+        Trusted deterministic context is supplied by the action bundle
+        via ``analysis_context`` (``trusted_sections``).
         """
-        del safe_actions
         self.last_prompt_id = None
 
-        ctx = resolve_analysis_context(
-            analysis_context,
-            terminal_command_signals=terminal_command_signals,
-            command_intel=command_intel,
-            file_intel=file_intel,
-        )
+        ctx = analysis_context_or_empty(analysis_context)
         terminal_command_signals = ctx.terminal_command_signals
-        command_intel = ctx.command_intel
-        file_intel = ctx.file_intel
 
-        # ── AI path: full semantic analysis ──────────────────────────
         if terminal_command_signals and self.verbose:
-            print(f"    │  Terminal command signals ({len(terminal_command_signals)}) — enriching AI prompt")
+            print(
+                f"    │  Terminal command signals ({len(terminal_command_signals)}) "
+                f"— enriching AI prompt"
+            )
 
         prompt = self._build_analysis_prompt(
             intent,
-            terminal_command_signals=terminal_command_signals,
+            ctx,
             active_domains=active_domains,
             execution_context=execution_context,
-            file_intel=file_intel,
         )
 
-        prompt_id = self._resolve_prompt_id(intent, command_intel, file_intel)
+        prompt_id = self._resolve_prompt_id(ctx)
         self.last_prompt_id = prompt_id
         agent = self._agents[prompt_id]
 
@@ -285,171 +267,29 @@ class AIAnalysisEngine(AnalysisEngine):
             terminal_command_signals=terminal_command_signals,
         )
 
-    def _resolve_prompt_id(
-        self,
-        intent: IntentFrame,
-        command_intel: CommandIntel | None,
-        file_intel: FileIntel | None = None,
-    ) -> str:
-        """Ask the strategy for a prompt id, fail-closed on unknowns.
-
-        A strategy that returns an id we don't know about (typo,
-        third-party extension lagging behind a prompt-library bump)
-        is downgraded to ``standard`` with a warning log rather than
-        raising.  Hard-crashing the AE on an unknown id would turn a
-        config bug into a safety incident; ``standard`` is safe by
-        construction.
-        """
-        try:
-            pid = self._prompt_strategy.select_ae_prompt_id(
-                intent, command_intel, file_intel,
-            )
-        except Exception:
-            logger.exception("AE prompt strategy raised; falling back to 'standard'")
+    def _resolve_prompt_id(self, analysis_context: AnalysisContext) -> str:
+        """Use bundle-selected prompt id when set; else ``standard``."""
+        pid = analysis_context.ae_prompt_id
+        if pid is None:
             return "standard"
-
         if pid not in ANALYSIS_PROMPT_IDS:
             logger.warning(
-                "AE prompt strategy returned unknown id %r; falling back to 'standard'",
+                "Bundle returned unknown AE prompt id %r; falling back to 'standard'",
                 pid,
             )
             return "standard"
         return pid
-    
+
     def _build_analysis_prompt(
         self,
         intent: IntentFrame,
-        terminal_command_signals: tuple = (),
+        analysis_context: AnalysisContext,
+        *,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
-        file_intel: FileIntel | None = None,
     ) -> str:
-        """Build a hardened prompt for the AI agent.
-
-        Trusted section: action (enum-validated), agent metadata,
-        task description, active domains, terminal command signals
-        (from command_shield), execution privilege level, and — for
-        WRITE_FILE intents — a deterministic payload-intel summary
-        from :func:`command_shield.inspect_code`.
-        Untrusted section: target, reason, data — the fields the agent
-        LLM actually controls.
-        """
-        # ── Trusted sections (pipeline-controlled) ────────────────
-        trusted_sections: dict[str, str] = {}
-
-        context_lines = [
-            f"Action: {intent.action.value}",
-            f"Agent: {intent.agent_type or intent.agent_id}",
-            f"Task: {intent.task_description or 'Not specified'}",
-        ]
-
-        if terminal_command_signals:
-            context_lines.append(
-                "\nTERMINAL COMMAND — STRUCTURAL SIGNALS:\n"
-                "Before this command reached you, deterministic static analysis "
-                "(AST parsing, pattern matching, normalisation) detected the "
-                "following structural concerns. Factor them into your risk "
-                "assessment and hidden-behavior analysis:"
-            )
-            for sig in terminal_command_signals:
-                line = f"  - [{sig.check}:{sig.signal_id}] {sig.description}"
-                if sig.evidence:
-                    line += f"  (evidence: {sig.evidence[:120]})"
-                context_lines.append(line)
-
-        if file_intel is not None:
-            # Inject deterministic facts as TRUSTED context, partitioned
-            # into three labeled subsections the ``_CRITICAL_WRITE_FILE``
-            # prompt body can cite by name.  The block is scoped to
-            # WRITE_FILE / WRITE_HOST_FILE payloads; once an intent
-            # routes to ``critical_write_file``, the rubric relies on
-            # these subsections so reasoning stays grounded in
-            # deterministic output rather than the LLM re-sniffing the
-            # raw bytes or guessing at destination state.
-            #
-            # Ordering and field shape here are part of the contract the
-            # prompt body references — do NOT reorder or rename without
-            # updating ``_CRITICAL_WRITE_FILE`` in lockstep.
-
-            # ── Subsection 1: payload signals ─────────────────────
-            context_lines.append(
-                "\nWRITE_FILE — PAYLOAD SIGNALS:\n"
-                "Deterministic code inspection of the write PAYLOAD "
-                "(language sniff, binary guard, AST / regex analyzers) "
-                "produced the facts below.  Factor them into your "
-                "hidden-behavior and risk analysis — especially findings "
-                "on code payloads and oversized / binary content:"
-            )
-            context_lines.append(
-                f"  - language={file_intel.language or 'unknown'} "
-                f"is_binary={file_intel.is_binary} "
-                f"is_oversized={file_intel.is_oversized} "
-                f"size_bytes={file_intel.size_bytes}"
-            )
-            if file_intel.signal_ids:
-                context_lines.append(
-                    f"  - signals: {', '.join(file_intel.signal_ids)}"
-                )
-            if file_intel.has_code_intel_findings:
-                ids = ", ".join(file_intel.code_intel_finding_ids) or "(unnamed)"
-                context_lines.append(f"  - code-intel findings: {ids}")
-
-            # ── Subsection 2: destination signals ─────────────────
-            # Describes what is at the target RIGHT NOW.  The
-            # ``destination_exists`` field is tri-state — True / False /
-            # unknown — and the rubric uses all three distinctly to
-            # classify creation vs overwrite vs unknown.  The renderer
-            # emits ``unknown`` explicitly (not ``None``) so the LLM
-            # reads a human word, not a Python-ish sentinel.
-            context_lines.append(
-                "\nWRITE_FILE — DESTINATION SIGNALS:\n"
-                "Deterministic probe of the TARGET path.  "
-                "``destination_exists`` is tri-state: ``true`` = present, "
-                "``false`` = absent, ``unknown`` = could not check.  Apply "
-                "the reversibility / deletion rules accordingly:"
-            )
-            exists_str = (
-                "unknown"
-                if file_intel.destination_exists is None
-                else str(file_intel.destination_exists).lower()
-            )
-            kind_str = file_intel.destination_kind or "unknown"
-            context_lines.append(
-                f"  - destination_exists={exists_str} "
-                f"destination_kind={kind_str}"
-            )
-            symlink_target = (
-                file_intel.symlink_target_real_path
-                if file_intel.symlink_target_real_path
-                else "n/a"
-            )
-            context_lines.append(
-                f"  - is_symlink={str(file_intel.is_symlink).lower()} "
-                f"symlink_target_real_path={symlink_target}"
-            )
-            parent_str = file_intel.parent_kind or "unknown"
-            context_lines.append(f"  - parent_kind={parent_str}")
-
-            # ── Subsection 3: path semantics ──────────────────────
-            # What the destination MEANS, independent of whether
-            # anything exists there today.  ``path_category`` is always
-            # populated (falls back to ``unknown``); ``hits_floor_deny_prefix``
-            # tells the rubric the write would be refused at the floor
-            # regardless of policy breadth.
-            context_lines.append(
-                "\nWRITE_FILE — PATH SEMANTICS:\n"
-                "Deterministic classification of the target PATH, "
-                "independent of what is at the destination today:"
-            )
-            context_lines.append(
-                f"  - path_category={file_intel.path_category or 'unknown'} "
-                f"hits_floor_deny_prefix="
-                f"{str(file_intel.hits_floor_deny_prefix).lower()}"
-            )
-            ext_str = file_intel.extension or "none"
-            context_lines.append(f"  - extension={ext_str}")
-
-        trusted_sections["Context"] = "\n".join(context_lines)
+        """Build a hardened prompt — bundle supplies action-specific trusted text."""
+        trusted_sections = dict(analysis_context.trusted_sections)
 
         if active_domains:
             domains_str = ", ".join(sorted(active_domains))

@@ -1,20 +1,21 @@
-"""Helpers for DG accuracy tests.
-
-Exercises the full Bundle SDK lifecycle: permission → prepare_evidence →
-enrich → check_policy → domain → structural_gates → allow_gates.
-"""
+"""Helpers for DG accuracy tests — full Bundle SDK lifecycle."""
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from unittest.mock import patch
 
 from action_registry.types import ActionType
 from command_shield import Verdict, inspect_command
+from intentframe_action_bundle.bundles.terminal import TerminalActionBundle
+from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_bundle_sdk.types import BundlePhaseOutcome
 from intentframe_components.guardian.deterministic import (
     DeterministicGuardian,
     DeterministicResult,
 )
-from intentframe_core.types import CommandIntel, IntentFrame, UserContext
+from intentframe_core.types import IntentFrame, UserContext
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,24 @@ def build_command_intel(command: str) -> tuple[CommandIntel | None, ShieldView]:
     return intel, view
 
 
+async def decide_dg(
+    dg: DeterministicGuardian,
+    intent: IntentFrame,
+    user_context: UserContext,
+) -> DeterministicResult:
+    """Await production DG API (tests only)."""
+    return await dg.decide_async(intent, user_context)
+
+
+def decide_dg_sync(
+    dg: DeterministicGuardian,
+    intent: IntentFrame,
+    user_context: UserContext,
+) -> DeterministicResult:
+    """Sync wrapper for pytest without a running loop."""
+    return asyncio.run(decide_dg(dg, intent, user_context))
+
+
 def run_dg(
     command: str,
     user_context: UserContext,
@@ -84,23 +103,24 @@ def run_dg(
         reason="accuracy test",
         agent_id="dg_accuracy",
     )
-    result = dg.decide(intent, user_context, command_intel=None)
+    result = decide_dg_sync(dg, intent, user_context)
     return result, view
 
 
 def run_dg_with_intel(
     command: str,
     user_context: UserContext,
-    command_intel,
+    command_intel: CommandIntel,
     dg: DeterministicGuardian | None = None,
 ) -> DeterministicResult:
-    """Drive DG check_policy + gates only (skip evidence/enrich) — for gate-order pins."""
+    """Pin checker gates with seeded command_intel (skips real shield)."""
+
+    async def seed_prepare(self, intent, permission, ctx, *, verbose=False):
+        del intent, permission, verbose
+        ctx.command_intel = command_intel
+        return BundlePhaseOutcome.continue_(ctx)
+
     dg = dg or DeterministicGuardian()
-    intent = IntentFrame(
-        action=ActionType.RUN_COMMAND,
-        target=command,
-        data=None,
-        reason="accuracy test",
-        agent_id="dg_accuracy",
-    )
-    return dg.decide(intent, user_context, command_intel=command_intel)
+    with patch.object(TerminalActionBundle, "prepare_evidence", seed_prepare):
+        result, _ = run_dg(command, user_context, dg)
+    return result

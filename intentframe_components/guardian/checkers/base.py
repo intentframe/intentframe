@@ -18,7 +18,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from intentframe_core.types import CommandIntel, FileIntel, IntentFrame
+from intentframe_action_bundle.evidence import CommandIntel, FileIntel
+from intentframe_core.types import IntentFrame
 
 
 @dataclass(frozen=True)
