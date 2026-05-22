@@ -83,7 +83,7 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | The pipeline building blocks: `analysis/` (Analysis Engine), `guardian/` (deterministic + AI Guardian), `onboarding/` (agent handshake), `executor/` (executor base ABC), `heuristics/` (intent shaping). |
+| **What** | The pipeline building blocks: `analysis/` (Analysis Engine), `guardian/` (deterministic + AI Guardian), `onboarding/` (agent handshake), `executor/` (executor base ABC). Action-family path/vocabulary rules live in `intentframe_action_bundle/`. |
 | **Why** | Each layer of the pipeline gets its own sub-package with a base class plus a default AI implementation, so you can swap the AI implementation without touching pipeline assembly. |
 | **Where** | `intentframe_components/` |
 | **Process** | None directly — used by `intentframe_server`. The `intentframe-core` process imports from here. |

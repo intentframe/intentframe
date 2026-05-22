@@ -9,7 +9,7 @@ from pathlib import Path
 
 from action_registry.types import ActionType
 from command_shield import inspect_code as shield_inspect_code
-from intentframe_components.heuristics.file_payload import classify_path_category
+from intentframe_action_bundle.files.path_heuristics import classify_path_category
 from intentframe_action_bundle.evidence import (
     FILE_DESTINATION_KIND,
     FILE_PARENT_KIND,

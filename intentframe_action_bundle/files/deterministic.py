@@ -9,7 +9,7 @@ from intentframe_action_bundle.types import BundleGateDecision, BundleGateResult
 
 
 def decide_write_file_sensitive_path(intent: IntentFrame) -> BundleGateResult | None:
-    from intentframe_components.heuristics import is_sensitive_write_path
+    from intentframe_action_bundle.files.path_heuristics import is_sensitive_write_path
 
     if intent.action.value != ActionType.WRITE_FILE.value:
         return None

@@ -33,11 +33,6 @@ from intentframe_components.prompt.library import (
 )
 from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
-from intentframe_components.prompt.strategy import (
-    DefaultPromptStrategy,
-    PromptStrategy,
-)
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -170,11 +165,9 @@ class AIAnalysisEngine(AnalysisEngine):
         self,
         model: str = "gpt-4o-mini",
         verbose: bool = True,
-        prompt_strategy: PromptStrategy | None = None,
     ):
         self.model = model
         self.verbose = verbose
-        self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
 
         # Build one Agent per prompt id.  N is tiny (4 in the current library), Agents
         # are cheap, and this keeps per-request selection an O(1) dict

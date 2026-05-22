@@ -141,4 +141,3 @@ def classify_path_category(target: str | None) -> FILE_PATH_CATEGORY:
             if frag.lower() in lowered:
                 return category
     return "unknown"
-
