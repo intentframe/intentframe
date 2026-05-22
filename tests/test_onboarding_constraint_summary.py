@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import pytest
 
+from intentframe_action_bundle.onboarding import build_onboarding_instructions
 from intentframe_components.onboarding.engine import AIOnboardingEngine
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import SemanticIntentLimit
@@ -260,12 +261,7 @@ class TestBuildInstructionsMetaPromptContract:
     """
 
     def _instructions(self) -> str:
-        # Avoid constructing the real OpenAI Agent (needs API key) —
-        # we only care about the static instructions string, which
-        # does not depend on any instance state in ``__init__``.
-        return AIOnboardingEngine._build_instructions(
-            AIOnboardingEngine.__new__(AIOnboardingEngine)
-        )
+        return build_onboarding_instructions()
 
     def test_instructions_forbid_vague_pointer_bullets(self) -> None:
         """'avoid denied capabilities' / 'avoid script execution from
@@ -387,9 +383,7 @@ class TestBuildOnboardingPromptCustomUserRules:
     """
 
     def _instructions(self) -> str:
-        return AIOnboardingEngine._build_instructions(
-            AIOnboardingEngine.__new__(AIOnboardingEngine)
-        )
+        return build_onboarding_instructions()
 
     def test_instructions_contain_custom_user_rules_heading(self) -> None:
         assert "Custom User Rules" in self._instructions()
