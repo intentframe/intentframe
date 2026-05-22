@@ -34,10 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from action_registry.types import ActionType
-from command_shield import Verdict, inspect_command as shield_inspect
-from intentframe_server.enrichers.email import enrich_intent as enrich_email_intent
-from intentframe_server.file_intel import build_file_intel
+from intentframe_action_bundle.pre_pipeline import run_pre_pipeline
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
@@ -478,132 +475,17 @@ class IntentFrameRuntime:
             print(f"    ╚══════════════════════════════════════════════════════════╝")
         
         # ═══════════════════════════════════════════════════════════════
-        # LAYER 2: COMMAND SHIELD - Deterministic structural pre-check
+        # LAYER 2: Action bundle pre-pipeline (shield, file intel, enrich)
         # ═══════════════════════════════════════════════════════════════
-        terminal_command_signals: tuple = ()
-        command_intel: CommandIntel | None = None
-        if intent.action.value == ActionType.RUN_COMMAND.value:
-            command = intent.target or (intent.data or {}).get("command", "")
-            if command:
-                report = shield_inspect(command)
-
-                if self.verbose:
-                    print(f"    ┌──────────────────────────────────────────────────────────┐")
-                    print(f"    │  COMMAND SHIELD: Deterministic structural analysis        │")
-                    print(f"    │  Verdict: {report.verdict.value:<47} │")
-                    if report.signals:
-                        print(f"    │  Signals: {len(report.signals):<48} │")
-                    if report.capabilities:
-                        caps_preview = ", ".join(report.capabilities[:3])
-                        print(f"    │  Capabilities: {caps_preview[:43]:<43} │")
-                    print(f"    └──────────────────────────────────────────────────────────┘")
-
-                if report.verdict == Verdict.CATASTROPHIC:
-                    reason = "; ".join(
-                        s.description for s in report.signals[:3]
-                    ) or "catastrophic command detected"
-
-                    if self.verbose:
-                        print(f"")
-                        print(f"    ╔══════════════════════════════════════════════════════════╗")
-                        print(f"    ║  COMMAND SHIELD: CATASTROPHIC — REJECTED                 ║")
-                        print(f"    ╠══════════════════════════════════════════════════════════╣")
-                        print(f"    ║  {reason[:56]:<56} ║")
-                        print(f"    ╚══════════════════════════════════════════════════════════╝")
-                        print(f"")
-
-                    audit_entry = {
-                        "action": intent.action.value,
-                        "target": intent.target,
-                        "data": intent.data,
-                        "reason": intent.reason,
-                        "decision": "BLOCK",
-                        "message": f"command_shield: {reason}",
-                        "decision_path": "command_shield",
-                        "executed": False,
-                    }
-                    self.audit_log.append(audit_entry)
-
-                    return ExecutionResult(
-                        success=False,
-                        error=f"Blocked by command_shield: {reason}",
-                        data={
-                            "decision": "BLOCK",
-                            "reason": reason,
-                            "layer": "command_shield",
-                        },
-                    )
-
-                # Forward signals for SAFE and NEEDS_REVIEW verdicts
-                # (Gap 1).  Previously gated by NEEDS_REVIEW only —
-                # SAFE commands with meaningful capability tags were
-                # silently discarded.
-                terminal_command_signals = report.signals
-
-                # Build a bounded CommandIntel side-channel carrying
-                # the capability tags and code-intel summary for
-                # downstream consumers (Phase 1 plumbing — no consumer
-                # yet; TerminalChecker reads it in Phase 3).
-                code_intel = report.code_intel
-                finding_ids: tuple[str, ...] = ()
-                if code_intel is not None and code_intel.findings:
-                    finding_ids = tuple(
-                        getattr(f, "finding_id", "") for f in code_intel.findings
-                    )
-                has_edge_signals = any(
-                    s.check == "edge" or s.signal_id.startswith("edge:")
-                    for s in report.signals
-                )
-                command_intel = CommandIntel(
-                    verdict=report.verdict.value,
-                    capabilities=tuple(report.capabilities),
-                    has_code_intel_findings=bool(finding_ids),
-                    code_intel_finding_ids=finding_ids,
-                    has_edge_signals=has_edge_signals,
-                )
-
-        # ═══════════════════════════════════════════════════════════════
-        # LAYER 2b: FILE SHIELD - Deterministic payload inspection
-        # ═══════════════════════════════════════════════════════════════
-        # Symmetric with the RUN_COMMAND CommandIntel block above, but
-        # for WRITE_FILE.  Calls ``command_shield.inspect_code`` on the
-        # payload to derive a bounded ``FileIntel`` summary (language,
-        # binary / oversized flags, findings).  The full ``CodeReport``
-        # stays pipeline-local; downstream consumers (DG, AE, strategy)
-        # only see the summary.
-        #
-        # Cheap by design: inspect_code is sync, no LLM, and runs on
-        # the payload the agent is already sending.  No inspection for
-        # absent / non-string content — FileIntel stays ``None`` and
-        # downstream "missing intel on a WRITE_FILE" heuristics (the
-        # critical-payload fail-closed in DefaultPromptStrategy) handle
-        # that case.
-        file_intel: FileIntel | None = None
-        if intent.action.value in {
-            ActionType.WRITE_FILE.value,
-            ActionType.WRITE_HOST_FILE.value,
-        }:
-            data = intent.data or {}
-            content = data.get("content")
-            if isinstance(content, str):
-                file_intel = build_file_intel(
-                    content, intent.target, intent.action.value
-                )
-
-                if self.verbose and file_intel is not None:
-                    print(f"    ┌──────────────────────────────────────────────────────────┐")
-                    print(f"    │  FILE SHIELD: Deterministic payload inspection           │")
-                    print(f"    │  Language: {(file_intel.language or 'unknown'):<45} │")
-                    print(f"    │  Binary: {str(file_intel.is_binary):<8} Oversized: {str(file_intel.is_oversized):<8} Size: {file_intel.size_bytes:<14} │")
-                    if file_intel.has_code_intel_findings:
-                        ids = ", ".join(file_intel.code_intel_finding_ids)[:40]
-                        print(f"    │  Findings: {ids:<45} │")
-                    print(f"    └──────────────────────────────────────────────────────────┘")
-
-        # ═══════════════════════════════════════════════════════════════
-        # CONTEXT ENRICHMENT — deterministic metadata from system sources
-        # ═══════════════════════════════════════════════════════════════
-        intent = await enrich_email_intent(intent)
+        pre = await run_pre_pipeline(intent, verbose=self.verbose)
+        if pre.audit_entry is not None:
+            self.audit_log.append(pre.audit_entry)
+        if pre.early_block is not None:
+            return pre.early_block
+        intent = pre.intent
+        command_intel = pre.command_intel
+        file_intel = pre.file_intel
+        terminal_command_signals = pre.terminal_command_signals
 
         safe_actions = self._extract_safe_actions(user_context)
         active_domains = self._extract_active_domains(user_context)

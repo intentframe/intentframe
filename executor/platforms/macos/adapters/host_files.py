@@ -36,7 +36,7 @@ from action_registry import ActionType
 from executor.adapters.base import CapabilityAdapter
 from executor.config.schema import HostFilesConfig
 from executor.models import AdapterManifest, ExecutionResult
-from resource_registry.floor import canonicalize_real_path, match_deny_prefix
+from resource_registry.floor import canonicalize_real_path
 
 # MIME types we refuse up-front rather than surfacing cryptic decode
 # errors.  Mirrors LocalVirtualFileSystem._BINARY_UNSUPPORTED so the
@@ -141,7 +141,9 @@ class HostFilesAdapter(CapabilityAdapter):
             ActionType.WRITE_HOST_FILE.value,
             ActionType.DELETE_HOST_FILE.value,
         }:
-            matched = match_deny_prefix(canonical)
+            from intentframe_action_bundle.executor.floors import check_host_file_floor
+
+            matched = check_host_file_floor(canonical, action)
             if matched is not None:
                 return ExecutionResult(
                     success=False,

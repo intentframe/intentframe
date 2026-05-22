@@ -22,7 +22,6 @@ import logging
 import os
 
 from action_registry import ActionType
-from command_shield import quick_check
 from command_shield.env import clean_env
 from executor.adapters.base import CapabilityAdapter
 from executor.models import AdapterManifest, ExecutionResult
@@ -67,7 +66,9 @@ class TerminalAdapter(CapabilityAdapter):
         if not command:
             return ExecutionResult(success=False, error="No command provided")
 
-        report = quick_check(command)
+        from intentframe_action_bundle.executor.floors import check_terminal_execute
+
+        report = check_terminal_execute(command)
         if report.is_catastrophic:
             matched = report.signals[0].signal_id if report.signals else "unknown"
             logger.warning("Blocked catastrophic command: pattern=%r command=%s", matched, command[:120])

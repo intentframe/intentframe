@@ -22,7 +22,7 @@ from executor.services.virtual_filesystem import (
     MountPointResolver,
     VirtualFileSystem,
 )
-from resource_registry.floor import match_deny_prefix
+from intentframe_action_bundle.executor.floors import check_vfs_write_floor
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ class LocalVirtualFileSystem(VirtualFileSystem):
             )
 
         canonical = _canonical_real_path(real_path)
-        matched = match_deny_prefix(canonical)
+        matched = check_vfs_write_floor(canonical)
         if matched is not None:
             logger.warning(
                 "WRITE_FILE blocked by deny-write floor: virtual=%r real=%r prefix=%r",
@@ -235,7 +235,7 @@ class LocalVirtualFileSystem(VirtualFileSystem):
             )
 
         canonical = _canonical_real_path(real_path)
-        matched = match_deny_prefix(canonical)
+        matched = check_vfs_write_floor(canonical)
         if matched is not None:
             logger.warning(
                 "DELETE_FILE blocked by deny-write floor: virtual=%r real=%r prefix=%r",

@@ -402,7 +402,7 @@ class TestBuildFileIntel:
             raise RuntimeError("inspector exploded")
 
         with patch(
-            "intentframe_server.file_intel.shield_inspect_code",
+            "intentframe_action_bundle.files.file_intel.shield_inspect_code",
             side_effect=_raising,
         ):
             intel = build_file_intel(

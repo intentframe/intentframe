@@ -41,19 +41,23 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from action_registry.types import ACTION_DOMAINS, ActionType
+from action_registry.types import ACTION_DOMAINS
 from intentframe_core.types import (
     CommandIntel,
     ExecutionContext,
     IntentFrame,
     UserContext,
 )
+from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
+from intentframe_action_bundle.registry import run_bundle_deterministic
+from intentframe_action_bundle.terminal._read_only import (
+    READ_ONLY_INCOMPATIBLE as _READ_ONLY_INCOMPATIBLE,
+    is_read_only_fast_path,
+)
+from intentframe_action_bundle.types import BundleDeterministicContext
 from intentframe_components.guardian.checkers import CheckContext, CONSTRAINT_CHECKERS
 from intentframe_components.guardian.domains import DOMAIN_MODULES
-from intentframe_components.heuristics import is_sensitive_write_path
-from policy_registry.constraints._capability_match import any_tag_matches
 from policy_registry.constraints.terminal import TerminalConstraints
-from resource_registry.floor import canonicalize_real_path, match_deny_prefix
 
 
 class DeterministicDecision(str, Enum):
@@ -79,59 +83,8 @@ class DeterministicResult:
     matched_gate: str = ""
 
 
-# Actions that are "passive system reads" — no user-facing content,
-# no state mutation, no side-effecting IO.  Sourced directly from
-# :pydata:`AIAnalysisEngine._PASSIVE_READ_ACTIONS` so AE's internal
-# fast-path and DG's pre-AE ALLOW cover exactly the same universe.
-# Keeping a single source of truth removes the drift risk that
-# duplicating the list would introduce.  User-facing IO (ASK_USER,
-# SHOW_MESSAGE, GET_CONFIRMATION) is deliberately excluded there —
-# prompt contents must be AE-inspected.
-from intentframe_components.analysis.engine import AIAnalysisEngine as _AIAnalysisEngine
-
-_PRE_AE_SAFE_READS: frozenset[str] = frozenset(_AIAnalysisEngine._PASSIVE_READ_ACTIONS)
-
-
-# Capability tags that disqualify a RUN_COMMAND from the read-only
-# fast-path even when a read_only:* tag is also present.  command_shield's
-# structural gate already keeps these families mutually exclusive on the
-# same command — this set is belt-and-braces on the consumer side.
-#
-# Only *base* capability IDs that command_shield emits as bare tags belong
-# here (the intersection check below is literal equality).  Refined-only
-# families — ``capability:data_read:*``, ``capability:system_mutate:*``,
-# ``capability:network_probe:*`` — never materialise a bare base tag, so
-# they are handled by explicit ``startswith`` checks in
-# ``_is_read_only_fast_path`` instead.
-_READ_ONLY_INCOMPATIBLE: frozenset[str] = frozenset({
-    "capability:filesystem_write",
-    "capability:stdin_exec",
-    "capability:network_bind",
-    "capability:background_exec",
-    "capability:download_and_exec",
-    "capability:process_signal",
-    "capability:spawns_process",
-})
-
-
-# WRITE_FILE intents do NOT get a deterministic ALLOW in DG.  Every
-# write mutates device state, and agent-provided extension / target
-# strings are not trustworthy under prompt injection — "looks like a
-# .md" is an attacker-controlled claim, not evidence.  The only
-# deterministic decision DG makes about a WRITE_FILE is:
-#
-#   - BLOCK when the virtual destination is a sensitive system location
-#     (shell startup files, credential stores, privilege config,
-#     persistence daemons, Python runtime hooks — rule 3 below).
-#     Deterministic deny based on a curated list — peer to the VFS
-#     floor at ``resource_registry.floor``, which catches the same
-#     families on the canonicalized real path at I/O time.  DG blocks
-#     on the virtual path pre-AE so agents do not even get an LLM
-#     round-trip for a write we will refuse at I/O anyway.
-#
-# Any other WRITE_FILE falls through UNDECIDED to AE + AIGuardian.
-# There is no content-based fast-path — the LLM layer is the only
-# route to ALLOW for a mutating write.
+# Passive-read actions — canonical list lives in intentframe_action_bundle.
+_PRE_AE_SAFE_READS: frozenset[str] = PASSIVE_READ_ACTIONS
 
 
 class DeterministicGuardian:
@@ -235,90 +188,11 @@ class DeterministicGuardian:
                         matched_gate="domain",
                     )
 
-        # ── 3. WRITE_FILE sensitive destination BLOCK ──────────────
-        # Non-negotiable deny for virtual paths that map to sensitive
-        # system locations (shell startup files, credential stores,
-        # privilege config, persistence daemons, Python runtime hooks).
-        # Fires even when user policy nominally allows the destination —
-        # a broad ``allowed_paths`` policy must not license writes into
-        # files the system re-reads on every new shell / login / boot.
-        # Pair of the VFS floor at
-        # ``resource_registry.floor.DENY_WRITE_PREFIXES`` which
-        # enforces the same families on the canonicalized real path at
-        # I/O time; DG blocks on the virtual path so agents don't even
-        # reach the AE round-trip for a write we will refuse anyway.
-        if action == ActionType.WRITE_FILE.value and \
-                is_sensitive_write_path(intent.target):
-            return DeterministicResult(
-                decision=DeterministicDecision.BLOCK,
-                reason=(
-                    f"Write to sensitive system location is not permitted: "
-                    f"{intent.target!r}"
-                ),
-                matched_gate="write_file_sensitive_path",
-            )
-
-        # ── 3b. HOST_FILE mutation floor BLOCK ─────────────────────
-        # Parallel to rule 3, but for the HOST_FILE family which speaks
-        # canonicalized real paths directly (no VFS mount indirection).
-        # Uses the shared floor list via ``match_deny_prefix`` — the
-        # exact same primitive the VFS adapter calls post-mount-resolve
-        # for WRITE_FILE / DELETE_FILE / APPEND_ROW.  Running it here
-        # pre-AE means a host-file write/delete aimed at a launchd
-        # plist / shell rc / keychain / ``~/.ssh`` is refused without
-        # an LLM round-trip, matching the WRITE_FILE short-circuit.
-        #
-        # Separate matched_gate ids on purpose: the WRITE_FILE rule is
-        # a virtual-path heuristic (``is_sensitive_write_path``); these
-        # two rules are the canonical-real-path floor.  Audit logs must
-        # distinguish the two signals.
-        if action == ActionType.WRITE_HOST_FILE.value:
-            canonical = canonicalize_real_path(intent.target)
-            matched = match_deny_prefix(canonical)
-            if matched is not None:
-                return DeterministicResult(
-                    decision=DeterministicDecision.BLOCK,
-                    reason=(
-                        f"Write to deny-floor host path is not permitted: "
-                        f"{matched!r}"
-                    ),
-                    matched_gate="write_host_file_floor",
-                )
-
-        if action == ActionType.DELETE_HOST_FILE.value:
-            canonical = canonicalize_real_path(intent.target)
-            matched = match_deny_prefix(canonical)
-            if matched is not None:
-                return DeterministicResult(
-                    decision=DeterministicDecision.BLOCK,
-                    reason=(
-                        f"Delete of deny-floor host path is not permitted: "
-                        f"{matched!r}"
-                    ),
-                    matched_gate="delete_host_file_floor",
-                )
-
-        # ── 4. Passive-read ALLOW short-circuit ────────────────────
-        # Same semantics as AE's _PASSIVE_READ_ACTIONS fast-path, but
-        # skips AE + AIGuardian entirely.  Requires permission.safe
-        # so a user who explicitly marked a read action as "needs AI
-        # review" (safe=False) still gets one.
-        if action in _PRE_AE_SAFE_READS and permission.safe:
-            return DeterministicResult(
-                decision=DeterministicDecision.ALLOW,
-                reason=f"Permitted (deterministic: passive read): {action}",
-                matched_gate="passive_read",
-            )
-
-        # ── 5. RUN_COMMAND read-only ALLOW short-circuit ───────────
-        if action == ActionType.RUN_COMMAND.value and command_intel is not None:
-            deny_caps = self._deny_capabilities(permission.constraints)
-            if self._is_read_only_fast_path(command_intel, deny_caps):
-                return DeterministicResult(
-                    decision=DeterministicDecision.ALLOW,
-                    reason="Permitted (deterministic: read-only command)",
-                    matched_gate="run_command_read_only",
-                )
+        # ── 3–5. Bundle deterministic gates (family-specific) ───────
+        bundle_ctx = BundleDeterministicContext(command_intel=command_intel)
+        bundle_result = run_bundle_deterministic(intent, permission, bundle_ctx)
+        if bundle_result is not None:
+            return bundle_result
 
         # ── 6. Otherwise → AI decides ──────────────────────────────
         # Every mutating write (WRITE_FILE, DELETE_FILE, etc.), every
@@ -364,41 +238,8 @@ class DeterministicGuardian:
         intel: CommandIntel,
         deny_caps: frozenset[str],
     ) -> bool:
-        """Return True iff the RUN_COMMAND qualifies for ALLOW without AE.
-
-        The checks mirror the TODO design literally; each one is a
-        structural exclusion, and a command must clear every one.
-        """
-        if intel.verdict != "SAFE":
-            return False
-        caps = set(intel.capabilities)
-        if not any(c.startswith("capability:read_only:") for c in caps):
-            return False
-        if caps & _READ_ONLY_INCOMPATIBLE:
-            return False
-        # Defensive: network-probe and read-only are disjoint at the
-        # shield-classifier level.  Re-check here so a future family
-        # interaction cannot silently license outbound traffic.
-        if any(c.startswith("capability:network_probe:") for c in caps):
-            return False
-        # Defensive: sensitive data reads and host-state mutations must
-        # never ride a read-only fast-path.  classifier.py's Option-A
-        # gate (``_safe_for_read_only``) already suppresses
-        # ``read_only:*`` on the same command when any ``data_read:*``
-        # or ``system_mutate:*`` tag is emitted; this second layer is
-        # belt-and-braces so a future classifier bug cannot silently
-        # license a sensitive read / host mutation without AE review.
-        if any(c.startswith("capability:data_read:") for c in caps):
-            return False
-        if any(c.startswith("capability:system_mutate:") for c in caps):
-            return False
-        if deny_caps and any_tag_matches(caps, deny_caps) is not None:
-            return False
-        if intel.has_edge_signals:
-            return False
-        if intel.has_code_intel_findings:
-            return False
-        return True
+        """Delegate to terminal bundle read-only helper (tests import this)."""
+        return is_read_only_fast_path(intel, deny_caps)
 
 
 __all__ = [

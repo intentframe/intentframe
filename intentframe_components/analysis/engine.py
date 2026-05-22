@@ -25,6 +25,11 @@ from pydantic import BaseModel, Field, StringConstraints
 from agents import Agent, ModelSettings, Runner
 
 from action_registry.types import ActionType
+from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
+from intentframe_action_bundle.terminal.ae_fast_path import (
+    CATASTROPHIC_COMMAND_PATTERNS,
+    try_catastrophic_report,
+)
 from intentframe_core.types import (
     AnalysisReport,
     CommandIntel,
@@ -168,56 +173,10 @@ class AIAnalysisEngine(AnalysisEngine):
     for phishing / social engineering.  Guardian depends on this.
     """
 
-    # Patterns the Analysis Engine already understands — no AI needed.
-    # These are the engine's own knowledge, not imported from Guardian
-    # or Policy. Each component independently knows what's dangerous.
-    _CATASTROPHIC_COMMAND_PATTERNS: dict[str, str] = {
-        "sudo":       "Privilege escalation — runs command as superuser",
-        "rm -rf /":   "Recursive forced deletion of root filesystem",
-        "mkfs":       "Filesystem format — destroys all data on target device",
-        "dd if=":     "Raw disk write — overwrites device blocks directly",
-        "> /dev/":    "Direct write to device file — bypasses filesystem",
-        "chmod 777":  "World-writable permissions — removes all access control",
-    }
+    _PASSIVE_READ_ACTIONS: set[str] = set(PASSIVE_READ_ACTIONS)
 
-    _PASSIVE_READ_ACTIONS: set[str] = {
-        # File
-        ActionType.READ_FILE.value,
-        ActionType.LIST_DIRECTORY.value,
-        # Host file (real-path parallel family)
-        ActionType.READ_HOST_FILE.value,
-        ActionType.LIST_HOST_DIRECTORY.value,
-        # Calendar
-        ActionType.LIST_CALENDARS.value,
-        ActionType.LIST_EVENTS.value,
-        ActionType.SEARCH_EVENTS.value,
-        # Reminders
-        ActionType.LIST_REMINDERS.value,
-        ActionType.LIST_REMINDER_LISTS.value,
-        # Contacts
-        ActionType.SEARCH_CONTACTS.value,
-        ActionType.GET_CONTACT.value,
-        # Notes
-        ActionType.LIST_NOTES.value,
-        ActionType.READ_NOTE.value,
-        # Messages
-        ActionType.READ_MESSAGES.value,
-        # Email
-        ActionType.READ_EMAIL.value,
-        ActionType.SEARCH_EMAIL.value,
-        ActionType.GET_EMAIL.value,
-        ActionType.DOWNLOAD_ATTACHMENT.value,
-        # Clipboard
-        ActionType.GET_CLIPBOARD.value,
-        # Search
-        ActionType.SEARCH_SPOTLIGHT.value,
-        # System (read-only)
-        ActionType.GET_SYSTEM_INFO.value,
-        ActionType.GET_BRIGHTNESS.value,
-        ActionType.GET_VOLUME.value,
-        ActionType.GET_MUTE.value,
-        ActionType.GET_DARK_MODE.value,
-    }
+    # Back-compat alias — canonical patterns live in terminal bundle.
+    _CATASTROPHIC_COMMAND_PATTERNS: dict[str, str] = CATASTROPHIC_COMMAND_PATTERNS
 
     _hardener = PromptHardening()
 
@@ -337,44 +296,8 @@ class AIAnalysisEngine(AnalysisEngine):
     # ── Catastrophic command recognition ─────────────────────────────
 
     def _try_catastrophic_report(self, intent: IntentFrame) -> AnalysisReport | None:
-        """Return a deterministic CRITICAL report if the command is catastrophic.
-
-        The Analysis Engine already knows what 'sudo rm -rf /' does —
-        no LLM needed. This is the engine's own understanding, not
-        imported from Guardian or the policy registry.
-
-        Returns None when full AI analysis is required.
-        """
-        if intent.action.value != ActionType.RUN_COMMAND.value:
-            return None
-
-        command = intent.target or (intent.data or {}).get("command", "")
-        if not command:
-            return None
-
-        for pattern, description in self._CATASTROPHIC_COMMAND_PATTERNS.items():
-            if pattern in command:
-                return AnalysisReport(
-                    stated_intent=f"RUN_COMMAND: {command[:100]}",
-                    actual_behaviors=[{
-                        "action": "RUN_COMMAND",
-                        "actual_behavior": description,
-                        "matches_intent": True,
-                    }],
-                    requested_scope=[command],
-                    actual_scope=["system-wide"],
-                    scope_mismatch=False,
-                    predicted_outcomes={
-                        "risk_reason": f"Catastrophic operation: {description}",
-                    },
-                    hidden_behaviors=[],
-                    risk_factors={"overall": RiskLevel.CRITICAL},
-                    reversibility=Reversibility.IRREVERSIBLE,
-                    confidence=1.0,
-                    recommendation=f"Deterministic analysis: catastrophic command ({pattern}).",
-                )
-
-        return None
+        """Delegate to terminal bundle catastrophic fast-path."""
+        return try_catastrophic_report(intent)
 
     # ── Main analysis entry point ────────────────────────────────────
 
