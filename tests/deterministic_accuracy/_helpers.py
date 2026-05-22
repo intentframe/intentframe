@@ -1,14 +1,7 @@
 """Helpers for DG accuracy tests.
 
-Core contract: tests here never hand-construct ``CommandIntel``.  Every
-decision is driven by running the real :func:`command_shield.inspect_command`
-on the raw command string and building ``CommandIntel`` the same way
-:mod:`intentframe_server.pipeline` does — so the classifier and DG are
-exercised as a pair.
-
-That way a classifier miss (wrong verdict, missing capability tag,
-missed edge signal) surfaces here as a DG decision drift, not a silent
-pass.
+Exercises the full Bundle SDK lifecycle: permission → prepare_evidence →
+enrich → check_policy → domain → structural_gates → allow_gates.
 """
 
 from __future__ import annotations
@@ -26,8 +19,7 @@ from intentframe_core.types import CommandIntel, IntentFrame, UserContext
 
 @dataclass(frozen=True)
 class ShieldView:
-    """What command_shield saw — kept around so tests can assert on the
-    classifier's own output, not just DG's downstream decision."""
+    """What command_shield saw — kept for test assertions."""
 
     verdict: str
     capabilities: tuple[str, ...]
@@ -37,7 +29,7 @@ class ShieldView:
 
 
 def build_shield_view(command: str) -> ShieldView:
-    """Run the real inspect_command and summarize the way pipeline.py does."""
+    """Run the real inspect_command and summarize."""
     report = inspect_command(command)
 
     code_intel = report.code_intel
@@ -62,13 +54,7 @@ def build_shield_view(command: str) -> ShieldView:
 
 
 def build_command_intel(command: str) -> tuple[CommandIntel | None, ShieldView]:
-    """Build CommandIntel from the real classifier.
-
-    Returns ``(None, view)`` for CATASTROPHIC verdicts — the pipeline
-    would short-circuit at command_shield and DG would never see this
-    command.  Tests that focus on DG should skip those; the full-pipeline
-    catastrophic behavior is covered elsewhere.
-    """
+    """Build CommandIntel from classifier (None when CATASTROPHIC)."""
     view = build_shield_view(command)
     if view.verdict == Verdict.CATASTROPHIC.value:
         return None, view
@@ -88,13 +74,8 @@ def run_dg(
     user_context: UserContext,
     dg: DeterministicGuardian | None = None,
 ) -> tuple[DeterministicResult, ShieldView]:
-    """Drive DG for a RUN_COMMAND with real classifier output.
-
-    ``dg`` is optional so callers can share a single instance across a
-    parametrized run; a fresh one is created per call by default to
-    keep tests independent.
-    """
-    intel, view = build_command_intel(command)
+    """Drive full DG lifecycle for RUN_COMMAND with real command_shield."""
+    view = build_shield_view(command)
     dg = dg or DeterministicGuardian()
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
@@ -103,5 +84,23 @@ def run_dg(
         reason="accuracy test",
         agent_id="dg_accuracy",
     )
-    result = dg.decide(intent, user_context, command_intel=intel)
+    result = dg.decide(intent, user_context, command_intel=None)
     return result, view
+
+
+def run_dg_with_intel(
+    command: str,
+    user_context: UserContext,
+    command_intel,
+    dg: DeterministicGuardian | None = None,
+) -> DeterministicResult:
+    """Drive DG check_policy + gates only (skip evidence/enrich) — for gate-order pins."""
+    dg = dg or DeterministicGuardian()
+    intent = IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target=command,
+        data=None,
+        reason="accuracy test",
+        agent_id="dg_accuracy",
+    )
+    return dg.decide(intent, user_context, command_intel=command_intel)

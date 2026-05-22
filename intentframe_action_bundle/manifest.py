@@ -73,6 +73,14 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
     ),
     ActionBundleManifest(
         bundle_id="email",
+        action_ids=frozenset({
+            "SEND_EMAIL",
+            "REPLY_EMAIL",
+            "FORWARD_EMAIL",
+            "MARK_READ_EMAIL",
+            "MOVE_EMAIL",
+            "DELETE_EMAIL",
+        }),
         constraint_type=EmailConstraints,
     ),
     ActionBundleManifest(

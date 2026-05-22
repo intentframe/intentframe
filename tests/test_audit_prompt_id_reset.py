@@ -115,11 +115,11 @@ class _StubGuardian:
 
 def _make_runtime(deterministic_decide):
     """Build a runtime where the DeterministicGuardian is a MagicMock
-    whose ``decide`` side-effect is driven by ``deterministic_decide``
+    whose ``decide_async`` side-effect is driven by ``deterministic_decide``
     (called once per ``process_intent`` invocation)."""
 
     det_guardian = MagicMock()
-    det_guardian.decide = MagicMock(side_effect=deterministic_decide)
+    det_guardian.decide_async = AsyncMock(side_effect=deterministic_decide)
 
     executor = MagicMock()
     executor.execute = MagicMock(

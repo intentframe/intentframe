@@ -333,7 +333,8 @@ class TestCriticalityDriftGuard:
         # An action must never be both a critical-lane candidate AND a
         # passive-read fast-path candidate.  If this fails, someone
         # added a new action to one set and forgot the other.
-        passive = set(AIAnalysisEngine._PASSIVE_READ_ACTIONS)
+        from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
+        passive = set(PASSIVE_READ_ACTIONS)
         assert CRITICAL_ACTIONS.isdisjoint(passive), (
             "CRITICAL_ACTIONS overlaps _PASSIVE_READ_ACTIONS: "
             f"{CRITICAL_ACTIONS & passive}"

@@ -6,15 +6,8 @@ Uses OpenAI Agents to semantically understand what an intent will REALLY do.
 This is the "brain" of the system - it provides UNDERSTANDING, not decisions.
 Guardian uses this understanding to make policy decisions.
 
-Fast-path optimisation:
-    For actions that are pre-approved by user policy AND are inherently
-    passive system reads (READ_FILE, LIST_DIRECTORY etc.), the engine returns
-    a minimal deterministic AnalysisReport without calling AI.
-
-    User-facing IO actions (ASK_USER, SHOW_MESSAGE, GET_CONFIRMATION) are
-    NOT eligible for fast-path because their prompt content must be
-    analysed for social engineering / phishing patterns.  Guardian relies
-    on this analysis to protect the user.
+Deterministic ALLOW/BLOCK is handled by the Bundle SDK (DeterministicGuardian)
+before this engine runs.  The AE only executes on UNDECIDED intents.
 """
 
 from enum import IntEnum
@@ -24,12 +17,6 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from agents import Agent, ModelSettings, Runner
 
-from action_registry.types import ActionType
-from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
-from intentframe_action_bundle.terminal.ae_fast_path import (
-    CATASTROPHIC_COMMAND_PATTERNS,
-    try_catastrophic_report,
-)
 from intentframe_core.types import (
     AnalysisReport,
     CommandIntel,
@@ -38,6 +25,7 @@ from intentframe_core.types import (
     IntentFrame,
 )
 from intentframe_core.enums import Reversibility, RiskLevel
+from intentframe_bundle_sdk.types import AnalysisContext, resolve_analysis_context
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
@@ -157,26 +145,9 @@ class AIAnalysisEngine(AnalysisEngine):
     
     Does NOT make allow/block decisions - that's Guardian's job.
 
-    Supports two deterministic fast-paths that skip AI:
-
-    1. Safe passive reads — actions the user marked safe that are
-       inherently read-only. Returns a minimal LOW-risk report.
-
-    2. Catastrophic commands — RUN_COMMAND with patterns the engine
-       already understands (sudo, rm -rf /, mkfs, etc.). The engine
-       knows what these do without AI. Returns a deterministic
-       CRITICAL-risk IRREVERSIBLE report. Guardian will block these;
-       the engine's job is just to provide understanding, fast.
-
-    User-facing IO (ASK_USER, SHOW_MESSAGE, GET_CONFIRMATION) always
-    goes through full AI analysis so that prompt content is inspected
-    for phishing / social engineering.  Guardian depends on this.
+    Deterministic ALLOW/BLOCK is handled by action bundles via
+    DeterministicGuardian before this engine is invoked.
     """
-
-    _PASSIVE_READ_ACTIONS: set[str] = set(PASSIVE_READ_ACTIONS)
-
-    # Back-compat alias — canonical patterns live in terminal bundle.
-    _CATASTROPHIC_COMMAND_PATTERNS: dict[str, str] = CATASTROPHIC_COMMAND_PATTERNS
 
     _hardener = PromptHardening()
 
@@ -248,57 +219,6 @@ class AIAnalysisEngine(AnalysisEngine):
         """
         return ANALYSIS_PROMPTS["standard"]
 
-    # ── Fast-path logic ─────────────────────────────────────────────
-
-    def _try_fast_path(
-        self,
-        intent: IntentFrame,
-        safe_actions: set[str],
-    ) -> AnalysisReport | None:
-        """Return a minimal deterministic report if the action qualifies.
-
-        Qualifies when:
-        1. Action is marked ``safe`` in user policy
-        2. Action is a passive system read (no user-facing content)
-
-        User-facing IO (ASK_USER, SHOW_MESSAGE, GET_CONFIRMATION) never
-        qualifies because their prompt content must be inspected for
-        social engineering / phishing.
-
-        Returns None when full AI analysis is required.
-        """
-        action_value = intent.action.value
-
-        if action_value not in safe_actions:
-            return None
-
-        if action_value not in self._PASSIVE_READ_ACTIONS:
-            return None
-
-        return AnalysisReport(
-            stated_intent=f"{action_value} on {intent.target}",
-            actual_behaviors=[{
-                "action": action_value,
-                "actual_behavior": f"Standard {action_value.lower().replace('_', ' ')} operation",
-                "matches_intent": True,
-            }],
-            requested_scope=[intent.target],
-            actual_scope=[intent.target],
-            scope_mismatch=False,
-            predicted_outcomes={"risk_reason": "Pre-approved passive read"},
-            hidden_behaviors=[],
-            risk_factors={"overall": RiskLevel.LOW},
-            reversibility=Reversibility.FULLY_REVERSIBLE,
-            confidence=1.0,
-            recommendation=f"Deterministic analysis: {action_value} is a pre-approved passive read.",
-        )
-
-    # ── Catastrophic command recognition ─────────────────────────────
-
-    def _try_catastrophic_report(self, intent: IntentFrame) -> AnalysisReport | None:
-        """Delegate to terminal bundle catastrophic fast-path."""
-        return try_catastrophic_report(intent)
-
     # ── Main analysis entry point ────────────────────────────────────
 
     async def analyze(
@@ -310,46 +230,33 @@ class AIAnalysisEngine(AnalysisEngine):
         execution_context: ExecutionContext | None = None,
         command_intel: CommandIntel | None = None,
         file_intel: FileIntel | None = None,
+        analysis_context: AnalysisContext | None = None,
     ) -> AnalysisReport:
         """
-        Analyze what an intent will REALLY do.
+        Analyze what an intent will REALLY do via full AI analysis.
 
-        Tries deterministic paths first:
-        1. Safe passive reads → minimal LOW-risk report (no AI)
-        2. Catastrophic commands → CRITICAL-risk report (no AI)
-        Falls back to full AI analysis for everything else.
+        Called only when DeterministicGuardian returned UNDECIDED.
+        ``safe_actions`` is accepted for API compatibility but ignored —
+        passive-read ALLOW is handled by the passive_read action bundle.
 
-        terminal_command_signals only applies to RUN_COMMAND intents.
-        When present the signals are injected into the AI prompt for
-        richer context.  Fast-path decisions are unaffected — they
-        apply to their own intent types independently.
+        terminal_command_signals applies to RUN_COMMAND intents and is
+        injected into the AI prompt for richer context.
 
         active_domains are domain strings the user has active rules for.
-        Injected as trusted context so the AE knows which semantic
-        domains are relevant to this user's configuration.
-
-        execution_context carries immutable server-side facts about the
-        executor (e.g. running_as_root).  Injected into the AI prompt
-        as trusted context when the executor runs as root so the AE
-        accounts for elevated blast radius.
+        execution_context carries immutable server-side executor facts.
         """
-        # Reset before any early return so stale prompt ids from a
-        # previous request never leak into audit on fast-path cases.
+        del safe_actions
         self.last_prompt_id = None
 
-        # ── Fast path: safe read-only ────────────────────────────────
-        fast = self._try_fast_path(intent, safe_actions or set())
-        if fast is not None:
-            if self.verbose:
-                print(f"    │  ⚡ Fast-path analysis: {intent.action.value} (safe, passive read)")
-            return fast
-
-        # ── Fast path: catastrophic command (already understood) ─────
-        catastrophic = self._try_catastrophic_report(intent)
-        if catastrophic is not None:
-            if self.verbose:
-                print(f"    │  ⚡ Deterministic analysis: {intent.action.value} (catastrophic command)")
-            return catastrophic
+        ctx = resolve_analysis_context(
+            analysis_context,
+            terminal_command_signals=terminal_command_signals,
+            command_intel=command_intel,
+            file_intel=file_intel,
+        )
+        terminal_command_signals = ctx.terminal_command_signals
+        command_intel = ctx.command_intel
+        file_intel = ctx.file_intel
 
         # ── AI path: full semantic analysis ──────────────────────────
         if terminal_command_signals and self.verbose:

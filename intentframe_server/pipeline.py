@@ -4,13 +4,7 @@ IntentFrame Runtime - Stateless Security Gateway
 The Runtime receives pre-built IntentFrames (from Actor SDK over HTTP)
 and runs them through the security pipeline:
 
-    command_shield → context enrichment → AnalysisEngine → Guardian → Executor → Result
-
-For RUN_COMMAND intents, command_shield.inspect_command() runs first:
-- CATASTROPHIC: reject immediately, never enters the pipeline.
-- NEEDS_REVIEW: structural signals are passed to the Analysis Engine
-  so the AI has richer context.  Never fast-paths.
-- SAFE: normal pipeline flow.
+    DeterministicGuardian (bundles) → AnalysisEngine → Guardian → Executor → Result
 
 Runtime knows nothing about Actor.  Actor is an external SDK that agent
 developers use.  Runtime just receives signed IntentFrames.
@@ -34,15 +28,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from intentframe_action_bundle.pre_pipeline import run_pre_pipeline
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_core.types import (
     UserContext,
     AnalysisReport,
-    CommandIntel,
     ExecutionContext,
     ExecutionResult,
-    FileIntel,
     IntentFrame,
     AgentCapabilities,
     RuntimeContext,
@@ -230,6 +221,15 @@ class IntentFrameRuntime:
             for action, perm in user_context.allowed_actions.items()
             if perm.safe
         }
+
+    @staticmethod
+    def _enrichment_audit_fields(det_result) -> dict:
+        """Host enrichment ledger for audit (submitted vs effective target)."""
+        from intentframe_bundle_sdk.types import enrichment_audit_fields
+
+        return enrichment_audit_fields(
+            det_result.bundle_context if det_result is not None else None
+        )
 
     @staticmethod
     def _build_deterministic_report(
@@ -448,9 +448,11 @@ class IntentFrameRuntime:
             reason = intent.reason or ""
 
             subject = _banner_subject(intent)
+            started_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            intent_header = f"INTENT #{req_num}  ·  {started_at}"
 
             print(f"\n    ╔══════════════════════════════════════════════════════════╗")
-            print(f"    ║  INTENT #{req_num:<51} ║")
+            print(f"    ║  {intent_header:<58} ║")
             print(f"    ╠══════════════════════════════════════════════════════════╣")
             print(f"    ║  Agent: {intent.agent_id:<50} ║")
             print(f"    ║  Action: {intent.action.value:<49} ║")
@@ -475,34 +477,25 @@ class IntentFrameRuntime:
             print(f"    ╚══════════════════════════════════════════════════════════╝")
         
         # ═══════════════════════════════════════════════════════════════
-        # LAYER 2: Action bundle pre-pipeline (shield, file intel, enrich)
+        # LAYER 4a: DETERMINISTIC GUARDIAN (Bundle SDK lifecycle)
         # ═══════════════════════════════════════════════════════════════
-        pre = await run_pre_pipeline(intent, verbose=self.verbose)
-        if pre.audit_entry is not None:
-            self.audit_log.append(pre.audit_entry)
-        if pre.early_block is not None:
-            return pre.early_block
-        intent = pre.intent
-        command_intel = pre.command_intel
-        file_intel = pre.file_intel
-        terminal_command_signals = pre.terminal_command_signals
-
+        # Permission → action bundle (prepare / policy / gates) → domain
+        # bundle → BLOCK / ALLOW / UNDECIDED.  UNDECIDED falls through
+        # to AE + AIGuardian.
         safe_actions = self._extract_safe_actions(user_context)
         active_domains = self._extract_active_domains(user_context)
 
-        # ═══════════════════════════════════════════════════════════════
-        # LAYER 4a: DETERMINISTIC GUARDIAN (pre-AE pass)
-        # ═══════════════════════════════════════════════════════════════
-        # Splits Guardian's deterministic stage out so BLOCK / ALLOW can
-        # render BEFORE paying the AE LLM cost.  UNDECIDED falls through
-        # to the AI path (AE + AIGuardian) exactly as before.
-        det_result = self.deterministic_guardian.decide(
+        det_result = await self.deterministic_guardian.decide_async(
             intent,
             user_context,
-            active_domains=active_domains,
-            execution_context=self._execution_context,
-            command_intel=command_intel,
+            verbose=self.verbose,
         )
+        intent = (
+            det_result.bundle_context.effective_intent
+            if det_result.bundle_context is not None
+            else intent
+        )
+        analysis_context = det_result.analysis_context
         if self.verbose:
             print(f"    ┌──────────────────────────────────────────────────────────┐")
             print(f"    │  DETERMINISTIC GUARDIAN: pre-AE pass                     │")
@@ -512,7 +505,7 @@ class IntentFrameRuntime:
             print(f"    └──────────────────────────────────────────────────────────┘")
 
         if det_result.decision is DeterministicDecision.BLOCK:
-            # ───── Deterministic BLOCK — skip AE + AIGuardian ─────
+            decision_path = det_result.decision_path or "deterministic"
             audit_entry = {
                 "action": intent.action.value,
                 "target": intent.target,
@@ -520,9 +513,10 @@ class IntentFrameRuntime:
                 "reason": intent.reason,
                 "decision": "BLOCK",
                 "message": det_result.reason,
-                "decision_path": "deterministic",
+                "decision_path": decision_path,
                 "matched_gate": det_result.matched_gate,
                 "executed": False,
+                **self._enrichment_audit_fields(det_result),
             }
             self.audit_log.append(audit_entry)
             if self.verbose:
@@ -539,7 +533,7 @@ class IntentFrameRuntime:
                 data={
                     "decision": "BLOCK",
                     "reason": det_result.reason,
-                    "layer": "deterministic_guardian",
+                    "layer": decision_path,
                     "matched_gate": det_result.matched_gate,
                 },
             )
@@ -575,11 +569,9 @@ class IntentFrameRuntime:
             analysis = await self.analysis_engine.analyze(
                 intent,
                 safe_actions=safe_actions,
-                terminal_command_signals=terminal_command_signals,
                 active_domains=active_domains,
                 execution_context=self._execution_context,
-                command_intel=command_intel,
-                file_intel=file_intel,
+                analysis_context=analysis_context,
             )
 
             if self.verbose:
@@ -611,8 +603,7 @@ class IntentFrameRuntime:
                 intent, analysis, user_context,
                 active_domains=active_domains,
                 execution_context=self._execution_context,
-                command_intel=command_intel,
-                file_intel=file_intel,
+                analysis_context=analysis_context,
             )
         
         # ═══════════════════════════════════════════════════════════════
@@ -642,6 +633,7 @@ class IntentFrameRuntime:
             "decision_path": decision_path,
             "risk_level": str(analysis.risk_factors) if analysis.risk_factors else None,
             "confidence": analysis.confidence,
+            **self._enrichment_audit_fields(det_result),
         }
         if dg_matched_gate:
             audit_entry["matched_gate"] = dg_matched_gate
