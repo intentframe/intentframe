@@ -28,6 +28,7 @@ from intentframe_bundle_sdk.types import (
     BundleContext,
     bundle_ai_context_or_empty,
 )
+from intentframe_bundle_sdk.audit_dump import dump_bundle_ai_context
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
@@ -201,6 +202,7 @@ class AIAnalysisEngine(AnalysisEngine):
             prompt_source=prompt_source,
             prompt_label=prompt_label,
             system_prompt=agent.instructions,
+            bundle_ai_context=dump_bundle_ai_context(ai_ctx),
         )
         result = await Runner.run(agent, prompt)
 

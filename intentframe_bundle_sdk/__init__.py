@@ -11,6 +11,11 @@ from intentframe_bundle_sdk.registry import (
     register_domain_bundle,
 )
 from intentframe_bundle_sdk.runner import DeterministicRunner
+from intentframe_bundle_sdk.audit_dump import (
+    audit_dump,
+    dump_bundle_ai_context,
+    dump_bundle_context,
+)
 from intentframe_bundle_sdk.types import (
     BundleAIContext,
     BundleContext,
@@ -36,7 +41,10 @@ __all__ = [
     "action_bundle_for",
     "all_action_bundles",
     "all_domain_bundles",
+    "audit_dump",
     "domain_bundle_for",
+    "dump_bundle_ai_context",
+    "dump_bundle_context",
     "bundle_ai_context_or_empty",
     "enrichment_audit_fields",
     "record_enrichment",

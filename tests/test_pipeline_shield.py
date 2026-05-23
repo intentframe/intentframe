@@ -680,5 +680,31 @@ class TestDgExceptionFailClosed:
         assert entry["decision_path"] == "deterministic"
 
 
+class TestBundleSdkAuditFields:
+    def test_undecided_command_audit_includes_bundle_snapshots(self):
+        runtime = _make_runtime()
+        _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
+
+        entry = runtime.audit_log[-1]
+        assert entry["decision_path"] == "ai_path"
+        assert "bundle_context" in entry
+        assert "bundle_ai_context" in entry
+        assert entry["bundle_context"]["intent"]["action"] == "RUN_COMMAND"
+        assert entry["bundle_context"]["evidence"]["command_intel"]["verdict"] == "SAFE"
+        assert entry["bundle_ai_context"]["ae_prompt_label"] == "critical_run_command"
+        assert "ae_system_instructions" in entry["bundle_ai_context"]
+        assert "ae_external_context" in entry["bundle_ai_context"]
+
+    def test_deterministic_block_audit_includes_bundle_snapshots(self):
+        runtime = _make_runtime()
+        _run(runtime.process_intent(_intent("sudo reboot"), _user_context()))
+
+        entry = runtime.audit_log[-1]
+        assert entry["decision"] == "BLOCK"
+        assert entry["decision_path"] == "command_shield"
+        assert "bundle_context" in entry
+        assert entry["bundle_context"]["intent"]["action"] == "RUN_COMMAND"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

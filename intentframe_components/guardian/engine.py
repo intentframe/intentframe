@@ -39,6 +39,7 @@ from intentframe_core.types import (
     ValidationResult,
 )
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_ai_context_or_empty
+from intentframe_bundle_sdk.audit_dump import dump_bundle_ai_context
 from intentframe_action_bundle.evidence import CommandIntel, FileIntel
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
@@ -360,6 +361,7 @@ class AIGuardian(Guardian):
             prompt_source=prompt_source,
             prompt_label=prompt_label,
             system_prompt=agent.instructions,
+            bundle_ai_context=dump_bundle_ai_context(ai_ctx),
         )
         result = await Runner.run(agent, prompt)
 

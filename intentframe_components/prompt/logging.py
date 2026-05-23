@@ -30,6 +30,7 @@ def log_prompt_dump(
     prompt_label: str | None = None,
     prompt_source: str | None = None,
     system_prompt: str | None = None,
+    bundle_ai_context: dict[str, object] | None = None,
     verbose: bool = False,
 ) -> None:
     """Append one JSON line containing full prompt evidence."""
@@ -48,6 +49,7 @@ def log_prompt_dump(
         "prompt_label": prompt_label,
         "system_prompt": system_prompt,
         "request_prompt": prompt,
+        "bundle_ai_context": bundle_ai_context,
     }
     line = json.dumps(entry, default=str)
 

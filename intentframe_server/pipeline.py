@@ -232,6 +232,27 @@ class IntentFrameRuntime:
         )
 
     @staticmethod
+    def _bundle_sdk_audit_fields(det_result) -> dict:
+        """Full Bundle SDK forensic snapshot for audit logs."""
+        from intentframe_bundle_sdk.audit_dump import (
+            dump_bundle_ai_context,
+            dump_bundle_context,
+        )
+
+        fields: dict[str, object] = {}
+        bundle_context = dump_bundle_context(
+            det_result.bundle_context if det_result is not None else None
+        )
+        bundle_ai_context = dump_bundle_ai_context(
+            det_result.bundle_ai_context if det_result is not None else None
+        )
+        if bundle_context is not None:
+            fields["bundle_context"] = bundle_context
+        if bundle_ai_context is not None:
+            fields["bundle_ai_context"] = bundle_ai_context
+        return fields
+
+    @staticmethod
     def _add_prompt_audit_fields(audit_entry: dict, prefix: str, component) -> None:
         """Attach prompt source/label and full prompt content when an AI call ran."""
         prompt_label = getattr(component, "last_prompt_label", None)
@@ -534,6 +555,7 @@ class IntentFrameRuntime:
                 "matched_gate": det_result.matched_gate,
                 "executed": False,
                 **self._enrichment_audit_fields(det_result),
+                **self._bundle_sdk_audit_fields(det_result),
             }
             if det_result.dg_exception:
                 audit_entry["dg_exception"] = det_result.dg_exception
@@ -656,6 +678,7 @@ class IntentFrameRuntime:
             "risk_level": str(analysis.risk_factors) if analysis.risk_factors else None,
             "confidence": analysis.confidence,
             **self._enrichment_audit_fields(det_result),
+            **self._bundle_sdk_audit_fields(det_result),
         }
         if dg_matched_gate:
             audit_entry["matched_gate"] = dg_matched_gate
