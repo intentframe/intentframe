@@ -30,7 +30,7 @@ import pytest
 
 from action_registry.types import ActionType
 from intentframe_action_bundle.evidence import CommandIntel
-from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
+from intentframe_action_bundle import passive_read_action_ids
 from intentframe_action_bundle.terminal._read_only import READ_ONLY_INCOMPATIBLE
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
@@ -180,8 +180,8 @@ class TestPassiveReadFastPath:
         assert result.decision is DeterministicDecision.UNDECIDED
 
     def test_passive_read_set_is_canonical(self):
-        """Passive read ALLOW is owned by the passive_read action bundle."""
-        assert ActionType.READ_FILE.value in PASSIVE_READ_ACTIONS
+        """Passive read ALLOW is declared per owning bundle and enforced by SDK."""
+        assert ActionType.READ_FILE.value in passive_read_action_ids()
 
 
 # ═══════════════════════════════════════════════════════════════════════

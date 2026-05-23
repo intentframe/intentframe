@@ -21,12 +21,12 @@ def _register_bundles() -> None:
     ensure_bundles_registered()
 
 
-def test_domain_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Domain BLOCK must fire before passive-read ALLOW short-circuit."""
+def test_domain_runs_before_passive_read_allow(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Domain BLOCK must fire before SDK passive-read ALLOW short-circuit."""
     order: list[str] = []
-    from intentframe_action_bundle.bundles.passive_read import PassiveReadActionBundle
+    from intentframe_action_bundle.bundles.files import FilesActionBundle
 
-    bundle = PassiveReadActionBundle()
+    bundle = FilesActionBundle()
 
     from intentframe_bundle_sdk import runner as runner_mod
 
@@ -42,7 +42,7 @@ def test_domain_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -> None
     def track_allow(self, intent, permission, ctx):
         order.append("allow")
         return BundlePhaseOutcome.allow(
-            ctx, reason="should not run", matched_gate="passive_read"
+            ctx, reason="should not run", matched_gate="custom_allow"
         )
 
     monkeypatch.setattr(
@@ -50,7 +50,7 @@ def test_domain_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -> None
         "_run_domain",
         staticmethod(fake_domain),
     )
-    monkeypatch.setattr(PassiveReadActionBundle, "allow_gates", track_allow)
+    monkeypatch.setattr(FilesActionBundle, "allow_gates", track_allow)
 
     intent = IntentFrame(
         action=ActionType.READ_FILE,
@@ -77,6 +77,46 @@ def test_domain_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.decision == "BLOCK"
     assert result.matched_gate == "domain"
     assert order == ["domain"]
+
+
+def test_passive_read_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SDK passive-read ALLOW must fire before plugin allow_gates."""
+    order: list[str] = []
+    from intentframe_action_bundle.bundles.files import FilesActionBundle
+
+    bundle = FilesActionBundle()
+
+    def track_allow(self, intent, permission, ctx):
+        order.append("allow")
+        return BundlePhaseOutcome.continue_(ctx)
+
+    monkeypatch.setattr(FilesActionBundle, "allow_gates", track_allow)
+
+    intent = IntentFrame(
+        action=ActionType.READ_FILE,
+        target="/tmp/x",
+        data=None,
+        reason="order test",
+        agent_id="test",
+    )
+    permission = ActionPermission(safe=True)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"READ_FILE": permission},
+    )
+
+    result = asyncio.run(
+        DeterministicRunner.run_action_bundle(
+            bundle,
+            intent,
+            permission,
+            user_context,
+        )
+    )
+
+    assert result.decision == "ALLOW"
+    assert result.matched_gate == "passive_read"
+    assert order == []
 
 
 def test_email_bundle_selected_for_reply() -> None:

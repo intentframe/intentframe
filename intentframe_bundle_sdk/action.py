@@ -27,7 +27,9 @@ class ActionBundle(ABC):
         enrich()            — resolve opaque ids → ``enriched_intent``; never BLOCK
         check_policy()      — YAML constraints; BLOCK only (SDK default)
         structural_gates()  — family BLOCK floors
-        allow_gates()       — conditional ALLOW short-circuits
+        (runner) passive-read ALLOW — SDK standard fast path when
+            ``action in passive_read_action_ids`` and ``permission.safe``
+        allow_gates()       — plugin-specific ALLOW short-circuits
         build_ai_context()  — optional AE/Guardian prompt material for UNDECIDED
 
     Domain checks run in the runner between check_policy and structural_gates.
@@ -35,6 +37,7 @@ class ActionBundle(ABC):
 
     bundle_id: str
     action_ids: frozenset[str] = frozenset()
+    passive_read_action_ids: frozenset[str] = frozenset()
     constraint_type: type | None = None
 
     async def run_deterministic(

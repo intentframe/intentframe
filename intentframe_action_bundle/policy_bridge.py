@@ -21,13 +21,15 @@ def checker_for_permission(permission) -> object | None:
 
 def action_metadata(action_id: str) -> dict:
     """Summarize bundle metadata for an action (manifest + policy-agnostic tags)."""
+    from intentframe_action_bundle import passive_read_action_ids
+
     manifest = manifest_for(action_id)
     if manifest is None:
         return {"action_id": action_id, "bundle_id": None}
     return {
         "action_id": action_id,
         "bundle_id": manifest.bundle_id,
-        "passive_read": manifest.passive_read or action_id in manifest.action_ids,
+        "passive_read": action_id in passive_read_action_ids(),
         "critical": manifest.critical,
         "has_pre_pipeline": manifest.has_pre_pipeline,
         "has_executor_floor": manifest.has_executor_floor,

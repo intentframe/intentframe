@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from intentframe_action_bundle.critical.actions import CRITICAL_ONLY_ACTIONS
 from intentframe_action_bundle.host_files.deterministic import CRITICAL_ACTIONS as HOST_CRITICAL
-from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
 from intentframe_action_bundle.terminal import CRITICAL_ACTIONS as TERMINAL_CRITICAL
 
 CRITICAL_ACTIONS: frozenset[str] = (

@@ -65,9 +65,9 @@ def test_record_enrichment_populates_ledger() -> None:
 
 def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> None:
     """prepare_evidence runs before enrich; ledger after enrich."""
-    from intentframe_action_bundle.bundles.passive_read import PassiveReadActionBundle
+    from intentframe_action_bundle.bundles.files import FilesActionBundle
 
-    bundle = PassiveReadActionBundle()
+    bundle = FilesActionBundle()
     order: list[str] = []
     submitted = IntentFrame(
         action=ActionType.READ_FILE,
@@ -86,8 +86,8 @@ def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> N
         ctx.enriched_intent = intent.model_copy(update={"target": "/tmp/x-enriched"})
         return BundlePhaseOutcome.continue_(ctx)
 
-    monkeypatch.setattr(PassiveReadActionBundle, "prepare_evidence", track_evidence)
-    monkeypatch.setattr(PassiveReadActionBundle, "enrich", track_enrich)
+    monkeypatch.setattr(FilesActionBundle, "prepare_evidence", track_evidence)
+    monkeypatch.setattr(FilesActionBundle, "enrich", track_enrich)
 
     user_context = UserContext(
         user_id="u",
@@ -105,14 +105,14 @@ def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_enrich_must_not_return_terminal() -> None:
-    from intentframe_action_bundle.bundles.passive_read import PassiveReadActionBundle
+    from intentframe_action_bundle.bundles.files import FilesActionBundle
 
-    bundle = PassiveReadActionBundle()
+    bundle = FilesActionBundle()
 
     async def bad_enrich(self, intent, permission, ctx, *, verbose=False):
         return BundlePhaseOutcome.block(ctx, reason="nope", matched_gate="bad")
 
-    bundle.enrich = bad_enrich.__get__(bundle, PassiveReadActionBundle)
+    bundle.enrich = bad_enrich.__get__(bundle, FilesActionBundle)
 
     user_context = UserContext(
         user_id="u",

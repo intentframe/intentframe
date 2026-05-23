@@ -10,6 +10,13 @@ from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 from policy_registry.constraints.email import EmailConstraints
 
+_EMAIL_READ_ACTIONS = frozenset({
+    ActionType.READ_EMAIL.value,
+    ActionType.SEARCH_EMAIL.value,
+    ActionType.GET_EMAIL.value,
+    ActionType.DOWNLOAD_ATTACHMENT.value,
+})
+
 _EMAIL_BUNDLE_ACTIONS: frozenset[str] = frozenset(
     {
         ActionType.SEND_EMAIL.value,
@@ -19,12 +26,13 @@ _EMAIL_BUNDLE_ACTIONS: frozenset[str] = frozenset(
         ActionType.MOVE_EMAIL.value,
         ActionType.DELETE_EMAIL.value,
     }
-)
+) | _EMAIL_READ_ACTIONS
 
 
 class EmailActionBundle(ActionBundle):
     bundle_id = "email"
     action_ids = _EMAIL_BUNDLE_ACTIONS
+    passive_read_action_ids = _EMAIL_READ_ACTIONS
     constraint_type = EmailConstraints
 
     async def enrich(

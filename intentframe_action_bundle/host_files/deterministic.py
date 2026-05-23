@@ -9,6 +9,8 @@ from resource_registry.floor import canonicalize_real_path, match_deny_prefix
 from intentframe_action_bundle.types import BundleGateDecision, BundleGateResult
 
 HOST_FILE_ACTIONS = frozenset({
+    ActionType.READ_HOST_FILE.value,
+    ActionType.LIST_HOST_DIRECTORY.value,
     ActionType.WRITE_HOST_FILE.value,
     ActionType.DELETE_HOST_FILE.value,
 })

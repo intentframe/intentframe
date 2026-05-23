@@ -13,8 +13,20 @@ _NULL = NullActionBundle()
 
 
 def register_action_bundle(bundle: ActionBundle) -> ActionBundle:
+    extra_passive = bundle.passive_read_action_ids - bundle.action_ids
+    if extra_passive:
+        raise ValueError(
+            f"bundle {bundle.bundle_id!r}: passive_read_action_ids must be a "
+            f"subset of action_ids; unknown: {sorted(extra_passive)}"
+        )
     _ACTION_INSTANCES.append(bundle)
     for action_id in bundle.action_ids:
+        if action_id in _ACTION_BY_ID:
+            existing = _ACTION_BY_ID[action_id]
+            raise ValueError(
+                f"duplicate action_id {action_id!r}: "
+                f"{existing.bundle_id!r} and {bundle.bundle_id!r}"
+            )
         _ACTION_BY_ID[action_id] = bundle
     if bundle.constraint_type is not None:
         _CHECKER_BY_TYPE[bundle.constraint_type] = bundle
@@ -51,3 +63,11 @@ def all_domain_bundles() -> tuple[DomainBundle, ...]:
 def registered_checker_constraint_types() -> frozenset[type]:
     """Constraint types with a registered action bundle (for invariant tests)."""
     return frozenset(_CHECKER_BY_TYPE.keys())
+
+
+def all_passive_read_action_ids() -> frozenset[str]:
+    """Union of ``passive_read_action_ids`` across registered action bundles."""
+    result: set[str] = set()
+    for bundle in _ACTION_INSTANCES:
+        result.update(bundle.passive_read_action_ids)
+    return frozenset(result)

@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from action_registry.types import ActionType
+
 from intentframe_action_bundle.critical.actions import CRITICAL_ONLY_ACTIONS
-from intentframe_action_bundle.files.actions import WRITE_FILE_ACTIONS
 from intentframe_action_bundle.host_files.deterministic import HOST_FILE_ACTIONS
-from intentframe_action_bundle.passive_read.actions import PASSIVE_READ_ACTIONS
 from intentframe_action_bundle.terminal import ACTION_IDS as TERMINAL_ACTIONS
 from policy_registry.constraints import (
     ApiConstraints,
@@ -46,7 +46,11 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
     ),
     ActionBundleManifest(
         bundle_id="files",
-        action_ids=WRITE_FILE_ACTIONS,
+        action_ids=frozenset({
+            ActionType.WRITE_FILE.value,
+            ActionType.READ_FILE.value,
+            ActionType.LIST_DIRECTORY.value,
+        }),
         constraint_type=FileConstraints,
         has_pre_pipeline=True,
         has_executor_floor=True,
@@ -58,11 +62,6 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
         critical=True,
         has_pre_pipeline=True,
         has_executor_floor=True,
-    ),
-    ActionBundleManifest(
-        bundle_id="passive_read",
-        action_ids=PASSIVE_READ_ACTIONS,
-        passive_read=True,
     ),
     ActionBundleManifest(
         bundle_id="email",

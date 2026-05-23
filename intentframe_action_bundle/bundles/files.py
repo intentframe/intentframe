@@ -21,7 +21,15 @@ from intentframe_action_bundle.types import BundleGateDecision
 
 class FilesActionBundle(ActionBundle):
     bundle_id = "files"
-    action_ids = frozenset({ActionType.WRITE_FILE.value})
+    action_ids = frozenset({
+        ActionType.WRITE_FILE.value,
+        ActionType.READ_FILE.value,
+        ActionType.LIST_DIRECTORY.value,
+    })
+    passive_read_action_ids = frozenset({
+        ActionType.READ_FILE.value,
+        ActionType.LIST_DIRECTORY.value,
+    })
     constraint_type = None  # FileChecker wired via manifest for WRITE_FILE constraints
 
     def __init__(self) -> None:

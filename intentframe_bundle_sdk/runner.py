@@ -9,7 +9,8 @@ After permission (DeterministicGuardian):
     check_policy()         — YAML constraints
     domain()               — cross-action BLOCK only
     structural_gates()     — family BLOCK floors
-    allow_gates()          — conditional ALLOW
+    passive_read ALLOW     — SDK standard safe-read fast path
+    allow_gates()          — plugin-specific ALLOW
     UNDECIDED → AI path
 """
 
@@ -22,6 +23,7 @@ from intentframe_bundle_sdk.registry import action_bundle_for, domain_bundle_for
 from intentframe_bundle_sdk.types import (
     BundleContext,
     BundleDeterministicResult,
+    BundlePhaseOutcome,
     record_enrichment,
 )
 
@@ -75,6 +77,10 @@ class DeterministicRunner:
             return bundle._phase_to_result(struct)
         ctx = struct.context
 
+        passive = cls._try_passive_read_allow(bundle, intent, permission, ctx)
+        if passive is not None:
+            return bundle._phase_to_result(passive)
+
         allow = bundle.allow_gates(intent, permission, ctx)
         if allow.terminal:
             return bundle._phase_to_result(allow)
@@ -106,3 +112,22 @@ class DeterministicRunner:
     @staticmethod
     def resolve_bundle(action_id: str, permission) -> object:
         return action_bundle_for(action_id, permission)
+
+    @staticmethod
+    def _try_passive_read_allow(
+        bundle,
+        intent: IntentFrame,
+        permission,
+        ctx: BundleContext,
+    ) -> BundlePhaseOutcome | None:
+        """IntentFrame-wide safe passive-read ALLOW (legacy step 4)."""
+        action = intent.action.value
+        if action not in bundle.passive_read_action_ids:
+            return None
+        if not permission.safe:
+            return None
+        return BundlePhaseOutcome.allow(
+            ctx,
+            reason=f"Permitted (deterministic: passive read): {action}",
+            matched_gate="passive_read",
+        )

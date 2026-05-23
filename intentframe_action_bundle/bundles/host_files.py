@@ -25,6 +25,10 @@ from policy_registry.constraints.host_file import HostFileConstraints
 class HostFilesActionBundle(ActionBundle):
     bundle_id = "host_files"
     action_ids = HOST_FILE_ACTIONS
+    passive_read_action_ids = frozenset({
+        ActionType.READ_HOST_FILE.value,
+        ActionType.LIST_HOST_DIRECTORY.value,
+    })
     constraint_type = HostFileConstraints
 
     async def prepare_evidence(
