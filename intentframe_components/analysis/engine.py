@@ -23,29 +23,21 @@ from intentframe_core.types import (
     IntentFrame,
 )
 from intentframe_core.enums import Reversibility, RiskLevel
-from intentframe_bundle_sdk.types import AnalysisContext, analysis_context_or_empty
+from intentframe_bundle_sdk.types import (
+    BundleAIContext,
+    BundleContext,
+    bundle_ai_context_or_empty,
+)
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
-from intentframe_components.prompt.library import (
-    ANALYSIS_PROMPT_IDS,
-    ANALYSIS_PROMPTS,
-)
 from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
+from intentframe_prompt_library.library import DEFAULT_AE_SYSTEM_INSTRUCTIONS
 import logging
 
 logger = logging.getLogger(__name__)
 
-
-# ============================================================
-# AE Output Field Limits
-# ============================================================
-# OpenAI structured output enforces these via JSON Schema maxLength /
-# maxItems.  The model writes complete text within the budget — no
-# post-hoc truncation needed.  These limits are generous: legitimate
-# AE output rarely exceeds half the cap.  They exist to structurally
-# bound the surface available for a transitive injection payload.
 
 class AEFieldLimit(IntEnum):
     STATED_INTENT = 400
@@ -58,10 +50,6 @@ class AEFieldLimit(IntEnum):
     SEMANTIC_DOMAIN_ITEM = 80
     SEMANTIC_DOMAINS_MAX_ITEMS = 15
 
-
-# ============================================================
-# Structured Output for AI Analysis
-# ============================================================
 
 _BoundedBehavior = Annotated[str, StringConstraints(max_length=AEFieldLimit.HIDDEN_BEHAVIOR_ITEM)]
 _BoundedDomain = Annotated[str, StringConstraints(max_length=AEFieldLimit.SEMANTIC_DOMAIN_ITEM)]
@@ -122,44 +110,10 @@ class AIAnalysisOutput(BaseModel):
     )
 
 
-# ============================================================
-# AI Analysis Engine
-# ============================================================
-
 class AIAnalysisEngine(AnalysisEngine):
-    """
-    AI-powered Analysis Engine using OpenAI Agents.
-    
-    Provides deep semantic understanding of:
-    - What actions will ACTUALLY do
-    - Hidden or non-obvious behaviors
-    - Risk factors
-    - Reversibility
-    
-    Does NOT make allow/block decisions - that's Guardian's job.
-
-    Deterministic ALLOW/BLOCK is handled by action bundles via
-    DeterministicGuardian before this engine is invoked.
-    """
+    """AI-powered Analysis Engine using OpenAI Agents."""
 
     _hardener = PromptHardening()
-
-    # ── Model settings note ──────────────────────────────────────
-    # The Agents SDK passes ModelSettings fields to the OpenAI Responses
-    # API via a _non_null_or_omit() pattern: any field left as None is
-    # omitted from the request entirely, falling back to the API's own
-    # default (temperature=1.0, top_p=1.0, etc.).
-    #
-    # For standard completion models (gpt-4o-mini, gpt-4.1, etc.)
-    # temperature=0 gives greedy decoding — always picks the highest-
-    # probability token.  This is the single biggest lever for
-    # reproducibility (~95%+ identical outputs on identical inputs).
-    # OpenAI recommends not setting both temperature and top_p, and
-    # with temperature=0 top_p is irrelevant, so we leave it as None.
-    #
-    # GPT-5 family models are reasoning models and do NOT accept
-    # temperature — use ModelSettings(reasoning=Reasoning(effort=...))
-    # instead.  See the Guardian engine for that pattern.
 
     def __init__(
         self,
@@ -168,49 +122,30 @@ class AIAnalysisEngine(AnalysisEngine):
     ):
         self.model = model
         self.verbose = verbose
+        self._agents: dict[str, Agent] = {}
+        self._agent = self._get_agent(DEFAULT_AE_SYSTEM_INSTRUCTIONS)
+        self.last_prompt_source: str | None = None
+        self.last_prompt_label: str | None = None
+        self.last_system_prompt: str | None = None
+        self.last_request_prompt: str | None = None
 
-        # Build one Agent per prompt id.  N is tiny (4 in the current library), Agents
-        # are cheap, and this keeps per-request selection an O(1) dict
-        # lookup with zero allocation.  The role preamble and hardening
-        # wrapper are identical across ids — only the base_instructions
-        # body differs per lane.
-        self._agents: dict[str, Agent] = {
-            pid: Agent(
-                name=f"Analysis Engine ({pid})",
+    @staticmethod
+    def _base_instructions() -> str:
+        return DEFAULT_AE_SYSTEM_INSTRUCTIONS
+
+    def _get_agent(self, base_instructions: str) -> Agent:
+        if base_instructions not in self._agents:
+            self._agents[base_instructions] = Agent(
+                name="Analysis Engine",
                 instructions=self._hardener.harden_system_prompt(
-                    base_instructions=body,
+                    base_instructions=base_instructions,
                     role_preamble=ANALYSIS_ENGINE_ROLE,
                 ),
                 model=self.model,
                 output_type=AIAnalysisOutput,
                 model_settings=ModelSettings(temperature=0),
             )
-            for pid, body in ANALYSIS_PROMPTS.items()
-        }
-        # Back-compat: tests and callers that reach for `self._agent`
-        # get the standard lane.  The default for anything that doesn't
-        # know about prompt routing.
-        self._agent = self._agents["standard"]
-
-        # Last-used prompt id, populated by analyze().  The pipeline
-        # reads this for audit only; concurrent writes are bounded by
-        # the runtime's per-request asyncio.Lock.  Reset at the start
-        # of every analyze() call so stale values never leak across
-        # requests.
-        self.last_prompt_id: str | None = None
-
-    @staticmethod
-    def _base_instructions() -> str:
-        """Return the standard-lane AE system-prompt body.
-
-        Kept as a thin facade over :data:`ANALYSIS_PROMPTS` so existing
-        tests and external callers that reach for this static method
-        keep working unchanged.  The full set of lane bodies lives in
-        :mod:`intentframe_components.prompt.library.analysis`.
-        """
-        return ANALYSIS_PROMPTS["standard"]
-
-    # ── Main analysis entry point ────────────────────────────────────
+        return self._agents[base_instructions]
 
     async def analyze(
         self,
@@ -218,19 +153,19 @@ class AIAnalysisEngine(AnalysisEngine):
         *,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
-        analysis_context: AnalysisContext | None = None,
+        bundle_context: BundleContext | None = None,
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> AnalysisReport:
-        """
-        Analyze what an intent will REALLY do via full AI analysis.
+        """Analyze what an intent will REALLY do via full AI analysis."""
+        self.last_prompt_source = None
+        self.last_prompt_label = None
+        self.last_system_prompt = None
+        self.last_request_prompt = None
 
-        Called only when DeterministicGuardian returned UNDECIDED.
-        Trusted deterministic context is supplied by the action bundle
-        via ``analysis_context`` (``trusted_sections``).
-        """
-        self.last_prompt_id = None
-
-        ctx = analysis_context_or_empty(analysis_context)
-        terminal_command_signals = ctx.terminal_command_signals
+        ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
+        terminal_command_signals = ai_ctx.extras.get("terminal_command_signals", ())
+        if not isinstance(terminal_command_signals, tuple):
+            terminal_command_signals = ()
 
         if terminal_command_signals and self.verbose:
             print(
@@ -240,49 +175,75 @@ class AIAnalysisEngine(AnalysisEngine):
 
         prompt = self._build_analysis_prompt(
             intent,
-            ctx,
+            ai_ctx,
             active_domains=active_domains,
             execution_context=execution_context,
         )
 
-        prompt_id = self._resolve_prompt_id(ctx)
-        self.last_prompt_id = prompt_id
-        agent = self._agents[prompt_id]
+        system_instructions = self._resolve_system_instructions(ai_ctx)
+        prompt_source = self._resolve_prompt_source(ai_ctx)
+        prompt_label = self._resolve_prompt_label(ai_ctx)
+        self.last_prompt_source = prompt_source
+        self.last_prompt_label = prompt_label
+        self.last_request_prompt = prompt
+        agent = self._get_agent(system_instructions)
+        self.last_system_prompt = agent.instructions
 
         if self.verbose:
-            print(f"    │  AI analyzing: {intent.action.value} (prompt={prompt_id})...")
+            print(
+                f"    │  AI analyzing: {intent.action.value} "
+                f"(prompt={prompt_source}:{prompt_label})..."
+            )
 
-        log_prompt_dump("analysis", prompt, prompt_id=prompt_id)
+        log_prompt_dump(
+            "analysis",
+            prompt,
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+            system_prompt=agent.instructions,
+        )
         result = await Runner.run(agent, prompt)
 
         return self._convert_to_report(
-            intent, result.final_output,
+            intent,
+            result.final_output,
             terminal_command_signals=terminal_command_signals,
         )
 
-    def _resolve_prompt_id(self, analysis_context: AnalysisContext) -> str:
-        """Use bundle-selected prompt id when set; else ``standard``."""
-        pid = analysis_context.ae_prompt_id
-        if pid is None:
-            return "standard"
-        if pid not in ANALYSIS_PROMPT_IDS:
-            logger.warning(
-                "Bundle returned unknown AE prompt id %r; falling back to 'standard'",
-                pid,
-            )
-            return "standard"
-        return pid
+    @staticmethod
+    def _resolve_system_instructions(bundle_ai_context: BundleAIContext) -> str:
+        if bundle_ai_context.ae_system_instructions:
+            return bundle_ai_context.ae_system_instructions
+        return DEFAULT_AE_SYSTEM_INSTRUCTIONS
+
+    @staticmethod
+    def _resolve_prompt_source(bundle_ai_context: BundleAIContext) -> str:
+        return "bundle" if bundle_ai_context.ae_system_instructions else "fallback_default"
+
+    @staticmethod
+    def _resolve_prompt_label(bundle_ai_context: BundleAIContext) -> str:
+        return bundle_ai_context.ae_prompt_label or "fallback_default"
 
     def _build_analysis_prompt(
         self,
         intent: IntentFrame,
-        analysis_context: AnalysisContext,
+        bundle_ai_context: BundleAIContext,
         *,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
     ) -> str:
-        """Build a hardened prompt — bundle supplies action-specific trusted text."""
-        trusted_sections = dict(analysis_context.trusted_sections)
+        """Build hardened per-request prompt; bundle supplies external Context text."""
+        context_lines = [
+            f"Action: {intent.action.value}",
+            f"Agent: {intent.agent_type or intent.agent_id}",
+            f"Task: {intent.task_description or 'Not specified'}",
+        ]
+        if bundle_ai_context.ae_external_context:
+            context_lines.append(bundle_ai_context.ae_external_context)
+
+        trusted_sections: dict[str, str] = {
+            "Context": "\n".join(context_lines),
+        }
 
         if active_domains:
             domains_str = ", ".join(sorted(active_domains))
@@ -303,9 +264,7 @@ class AIAnalysisEngine(AnalysisEngine):
                 "in the command, flag it as a hidden behavior."
             )
 
-        # ── Untrusted: agent-controlled fields ────────────────────
         untrusted = {"Target": intent.target, "Reason": intent.reason}
-
         data_section = format_intent_data(intent.data)
         if data_section:
             untrusted["Data"] = data_section
@@ -315,7 +274,7 @@ class AIAnalysisEngine(AnalysisEngine):
             untrusted_fields=untrusted,
             closing_instruction="Analyze what this action will REALLY do.",
         )
-    
+
     _FIELD_BOUNDS: dict[str, int] = {
         "stated_intent": AEFieldLimit.STATED_INTENT,
         "actual_behavior": AEFieldLimit.ACTUAL_BEHAVIOR,
@@ -334,13 +293,6 @@ class AIAnalysisEngine(AnalysisEngine):
         ai_output: AIAnalysisOutput,
         terminal_command_signals: tuple = (),
     ) -> AnalysisReport:
-        """Convert AI output to AnalysisReport format.
-
-        Includes a deterministic backstop: if any field exceeds the
-        schema-defined bound (which should never happen when OpenAI
-        structured output is enforcing maxLength), the report is flagged
-        with ae_output_anomaly so Guardian treats it as elevated risk.
-        """
         anomaly = self._detect_overflow(ai_output)
 
         risk_level_map = {
@@ -400,7 +352,6 @@ class AIAnalysisEngine(AnalysisEngine):
         )
 
     def _detect_overflow(self, ai_output: AIAnalysisOutput) -> bool:
-        """Return True if any AI output field exceeds its schema bound."""
         for field_name, limit in self._FIELD_BOUNDS.items():
             if len(getattr(ai_output, field_name, "")) > limit:
                 return True

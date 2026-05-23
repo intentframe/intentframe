@@ -38,23 +38,17 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
-from intentframe_bundle_sdk.types import BundleContext
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_ai_context_or_empty
+from intentframe_action_bundle.evidence import CommandIntel, FileIntel
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.guardian.domains import DOMAIN_MODULES
 from intentframe_components.guardian.checkers import CONSTRAINT_CHECKERS
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
-from intentframe_components.prompt.library import (
-    GUARDIAN_PROMPT_IDS,
-    GUARDIAN_PROMPTS,
-)
 from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import GUARDIAN_ROLE
-from intentframe_components.prompt.strategy import (
-    DefaultPromptStrategy,
-    PromptStrategy,
-)
+from intentframe_prompt_library.library import DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 from policy_registry.models import ActionPermission
 from policy_registry.domains.base import DomainConstraints
 
@@ -145,50 +139,33 @@ class AIGuardian(Guardian):
         self,
         model: str = "gpt-5-mini-2025-08-07",
         verbose: bool = True,
-        prompt_strategy: PromptStrategy | None = None,
     ):
         self.model = model
         self.verbose = verbose
-        self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
+        self._agents: dict[str, Agent] = {}
+        self._agent = self._get_agent(DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS)
+        self.last_prompt_source: str | None = None
+        self.last_prompt_label: str | None = None
+        self.last_system_prompt: str | None = None
+        self.last_request_prompt: str | None = None
 
-        # Build one Agent per prompt id.  Guardian has coarser
-        # specialisation than AE (two ids: standard / critical).  The
-        # role preamble and hardening wrapper are identical across
-        # ids; only the base_instructions body differs.
-        self._agents: dict[str, Agent] = {
-            pid: Agent(
-                name=f"Policy Guardian ({pid})",
+    def _get_agent(self, base_instructions: str) -> Agent:
+        if base_instructions not in self._agents:
+            self._agents[base_instructions] = Agent(
+                name="Policy Guardian",
                 instructions=self._hardener.harden_system_prompt(
-                    base_instructions=body,
+                    base_instructions=base_instructions,
                     role_preamble=GUARDIAN_ROLE,
                 ),
                 model=self.model,
                 output_type=AIGuardianOutput,
-                # model_settings=ModelSettings(
-                #     reasoning=Reasoning(effort="high"),
-                # ),
             )
-            for pid, body in GUARDIAN_PROMPTS.items()
-        }
-        # Back-compat: tests and callers that reach for `self._agent`
-        # get the standard lane.
-        self._agent = self._agents["standard"]
-
-        # Last-used prompt id, populated by validate().  The pipeline
-        # reads this for audit only; concurrent writes are bounded by
-        # the runtime's per-request asyncio.Lock.
-        self.last_prompt_id: str | None = None
+        return self._agents[base_instructions]
 
     @staticmethod
     def _base_instructions() -> str:
-        """Return the standard-lane Guardian system-prompt body.
-
-        Thin facade over :data:`GUARDIAN_PROMPTS` so existing tests and
-        external callers that reach for this static method keep working
-        unchanged.  The full set of lane bodies lives in
-        :mod:`intentframe_components.prompt.library.guardian`.
-        """
-        return GUARDIAN_PROMPTS["standard"]
+        """Return the default Guardian system-prompt body."""
+        return DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 
     # ── Domain Constraint Lookup ─────────────────────────────────────
 
@@ -202,6 +179,20 @@ class AIGuardian(Guardian):
         return dc_map.get(domain.value)
 
     # ── Constraint Checking ─────────────────────────────────────────
+
+    @staticmethod
+    def _evidence_command_intel(bundle_context: BundleContext | None) -> CommandIntel | None:
+        if bundle_context is None:
+            return None
+        value = bundle_context.evidence.get("command_intel")
+        return value if isinstance(value, CommandIntel) else None
+
+    @staticmethod
+    def _evidence_file_intel(bundle_context: BundleContext | None) -> FileIntel | None:
+        if bundle_context is None:
+            return None
+        value = bundle_context.evidence.get("file_intel")
+        return value if isinstance(value, FileIntel) else None
 
     def _check_constraints(
         self,
@@ -219,12 +210,8 @@ class AIGuardian(Guardian):
         checker = CONSTRAINT_CHECKERS.get(constraint_type)
         if checker:
             context = CheckContext(
-                command_intel=(
-                    bundle_context.command_intel if bundle_context else None
-                ),
-                file_intel=(
-                    bundle_context.file_intel if bundle_context else None
-                ),
+                command_intel=self._evidence_command_intel(bundle_context),
+                file_intel=self._evidence_file_intel(bundle_context),
             )
             return checker.check(intent, constraints, context)
         # Same gap as ActionBundle.check_policy: constraint in YAML, no checker wired.
@@ -275,11 +262,15 @@ class AIGuardian(Guardian):
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
         bundle_context: BundleContext | None = None,
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> ValidationResult:
         """Validate intent against user policies (AI path after DG UNDECIDED)."""
         action = intent.action.value
 
-        self.last_prompt_id = None
+        self.last_prompt_source = None
+        self.last_prompt_label = None
+        self.last_system_prompt = None
+        self.last_request_prompt = None
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
@@ -343,43 +334,50 @@ class AIGuardian(Guardian):
             )
 
         # ── AI path: semantic validation ───────────────────────────
+        ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
+
         prompt = self._build_validation_prompt(
             intent, analysis, user_context, permission,
             active_domains=active_domains,
             execution_context=execution_context,
         )
 
-        prompt_id = self._resolve_prompt_id(intent, analysis)
-        self.last_prompt_id = prompt_id
-        agent = self._agents[prompt_id]
+        system_instructions = self._resolve_system_instructions(ai_ctx)
+        prompt_source = self._resolve_prompt_source(ai_ctx)
+        prompt_label = self._resolve_prompt_label(ai_ctx)
+        self.last_prompt_source = prompt_source
+        self.last_prompt_label = prompt_label
+        self.last_request_prompt = prompt
+        agent = self._get_agent(system_instructions)
+        self.last_system_prompt = agent.instructions
 
         if self.verbose:
-            print(f"    │  AI judging: {action} (prompt={prompt_id})...")
+            print(f"    │  AI judging: {action} (prompt={prompt_source}:{prompt_label})...")
 
-        log_prompt_dump("guardian", prompt, prompt_id=prompt_id)
+        log_prompt_dump(
+            "guardian",
+            prompt,
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+            system_prompt=agent.instructions,
+        )
         result = await Runner.run(agent, prompt)
 
         return self._convert_to_result(intent, analysis, result.final_output)
 
-    def _resolve_prompt_id(
-        self,
-        intent: IntentFrame,
-        analysis: AnalysisReport,
-    ) -> str:
-        """Ask the strategy for a Guardian prompt id, fail-closed."""
-        try:
-            pid = self._prompt_strategy.select_guardian_prompt_id(intent, analysis)
-        except Exception:
-            logger.exception("Guardian prompt strategy raised; falling back to 'standard'")
-            return "standard"
+    @staticmethod
+    def _resolve_system_instructions(bundle_ai_context: BundleAIContext) -> str:
+        if bundle_ai_context.guardian_system_instructions:
+            return bundle_ai_context.guardian_system_instructions
+        return DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 
-        if pid not in GUARDIAN_PROMPT_IDS:
-            logger.warning(
-                "Guardian prompt strategy returned unknown id %r; falling back to 'standard'",
-                pid,
-            )
-            return "standard"
-        return pid
+    @staticmethod
+    def _resolve_prompt_source(bundle_ai_context: BundleAIContext) -> str:
+        return "bundle" if bundle_ai_context.guardian_system_instructions else "fallback_default"
+
+    @staticmethod
+    def _resolve_prompt_label(bundle_ai_context: BundleAIContext) -> str:
+        return bundle_ai_context.guardian_prompt_label or "fallback_default"
 
     def _build_validation_prompt(
         self,

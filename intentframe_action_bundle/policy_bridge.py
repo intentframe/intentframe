@@ -20,7 +20,7 @@ def checker_for_permission(permission) -> object | None:
 
 
 def action_metadata(action_id: str) -> dict:
-    """Summarize routing metadata for an action (manifest + policy-agnostic tags)."""
+    """Summarize bundle metadata for an action (manifest + policy-agnostic tags)."""
     manifest = manifest_for(action_id)
     if manifest is None:
         return {"action_id": action_id, "bundle_id": None}
@@ -29,7 +29,6 @@ def action_metadata(action_id: str) -> dict:
         "bundle_id": manifest.bundle_id,
         "passive_read": manifest.passive_read or action_id in manifest.action_ids,
         "critical": manifest.critical,
-        "ae_prompt_ids": sorted(manifest.ae_prompt_ids),
         "has_pre_pipeline": manifest.has_pre_pipeline,
         "has_executor_floor": manifest.has_executor_floor,
         "constraint_type": (

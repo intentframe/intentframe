@@ -58,6 +58,7 @@ include = [
     "intentframe_action_bundle*",
     "intentframe_bundle_sdk*",
     "intentframe_core*",
+    "intentframe_prompt_library*",
     "intentframe_components*",
     "intentframe_server*",
     "intentframe_actor*",

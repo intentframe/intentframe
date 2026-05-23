@@ -26,7 +26,9 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
-from intentframe_bundle_sdk.types import AnalysisContext
+from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.terminal.evidence_keys import COMMAND_INTEL_KEY
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 from intentframe_server.pipeline import IntentFrameRuntime
 from policy_registry.models import ActionPermission
 
@@ -225,7 +227,8 @@ class TestSafeFlow:
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        assert "analysis_context" in call_kwargs.kwargs
+        assert "bundle_ai_context" in call_kwargs.kwargs
+        assert call_kwargs.kwargs["bundle_ai_context"] is not None
 
     def test_non_run_command_skips_shield(self):
         """Non-RUN_COMMAND intents bypass command_shield entirely.
@@ -264,9 +267,9 @@ class TestNeedsReviewFlow:
         ))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        ctx = call_kwargs.kwargs.get("analysis_context")
-        assert ctx is not None
-        signals = ctx.terminal_command_signals
+        ai_ctx = call_kwargs.kwargs.get("bundle_ai_context")
+        assert ai_ctx is not None
+        signals = ai_ctx.extras.get("terminal_command_signals", ())
         assert len(signals) > 0
 
     def test_needs_review_still_reaches_guardian(self):
@@ -287,9 +290,9 @@ class TestNeedsReviewFlow:
         ))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        ctx = call_kwargs.kwargs.get("analysis_context")
-        assert ctx is not None
-        signals = ctx.terminal_command_signals
+        ai_ctx = call_kwargs.kwargs.get("bundle_ai_context")
+        assert ai_ctx is not None
+        signals = ai_ctx.extras.get("terminal_command_signals", ())
         for sig in signals:
             assert isinstance(sig, Signal)
             assert sig.check
@@ -410,7 +413,7 @@ class TestExecutionContextPlumbing:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestCommandIntelPlumbing:
-    """Pipeline forwards bundle ``AnalysisContext`` to AE and AIGuardian
+    """Pipeline forwards bundle context and AI context to AE and AIGuardian
     when DG returns UNDECIDED.
 
     After the pre-AE deterministic pass, AE + AIGuardian are only called
@@ -419,27 +422,34 @@ class TestCommandIntelPlumbing:
     skip both (that's the whole point — no AE call to inspect).
     """
 
-    def _ctx_from(self, engine_or_guardian) -> AnalysisContext | None:
-        call_kwargs = engine_or_guardian.call_args
-        return call_kwargs.kwargs.get("analysis_context")
+    def _bundle_ctx_from(self, engine_or_guardian) -> BundleContext | None:
+        return engine_or_guardian.call_args.kwargs.get("bundle_context")
+
+    def _ai_ctx_from(self, analyze_mock) -> BundleAIContext | None:
+        return analyze_mock.call_args.kwargs.get("bundle_ai_context")
 
     def test_undecided_command_forwards_trusted_context_to_ae(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
-        ctx = self._ctx_from(runtime.analysis_engine.analyze)
-        assert ctx is not None
-        assert "Context" in ctx.trusted_sections
-        assert "RUN_COMMAND" in ctx.trusted_sections["Context"]
+        bundle_ctx = self._bundle_ctx_from(runtime.analysis_engine.analyze)
+        ai_ctx = self._ai_ctx_from(runtime.analysis_engine.analyze)
+        assert bundle_ctx is not None
+        assert ai_ctx is not None
+        assert ai_ctx.ae_prompt_label == "critical_run_command"
+        assert bundle_ctx.evidence.get(COMMAND_INTEL_KEY) is not None
+        assert ai_ctx.ae_system_instructions is not None
 
     def test_undecided_command_forwards_bundle_context_to_guardian(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.guardian.validate.call_args.kwargs
-        assert call_kwargs.get("bundle_context") is not None
-        assert call_kwargs["bundle_context"].command_intel is not None
-        assert call_kwargs["bundle_context"].command_intel.verdict == Verdict.SAFE.value
+        bundle_ctx = call_kwargs.get("bundle_context")
+        assert bundle_ctx is not None
+        cmd_intel = bundle_ctx.evidence.get(COMMAND_INTEL_KEY)
+        assert cmd_intel is not None
+        assert cmd_intel.verdict == Verdict.SAFE.value
 
     def test_needs_review_forwards_bundle_evidence(self):
         runtime = _make_runtime()
@@ -448,11 +458,11 @@ class TestCommandIntelPlumbing:
             _user_context(),
         ))
 
-        ctx_ae = self._ctx_from(runtime.analysis_engine.analyze)
-        bundle_ctx = runtime.guardian.validate.call_args.kwargs.get("bundle_context")
-        assert ctx_ae is not None
+        ai_ctx = self._ai_ctx_from(runtime.analysis_engine.analyze)
+        bundle_ctx = self._bundle_ctx_from(runtime.guardian.validate)
+        assert ai_ctx is not None
         assert bundle_ctx is not None
-        assert bundle_ctx.command_intel is not None
+        assert bundle_ctx.evidence.get(COMMAND_INTEL_KEY) is not None
 
     def test_undecided_signals_forwarded_to_ae(self):
         """SAFE-verdict UNDECIDED commands still route their signals
@@ -460,9 +470,8 @@ class TestCommandIntelPlumbing:
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
-        call_kwargs = runtime.analysis_engine.analyze.call_args
-        ctx = call_kwargs.kwargs.get("analysis_context")
-        assert ctx is not None
+        ai_ctx = self._ai_ctx_from(runtime.analysis_engine.analyze)
+        assert ai_ctx is not None
 
     def test_non_run_command_has_no_terminal_evidence_in_trusted_context(self):
         """Non-terminal intents do not attach command_shield intel to AE context."""
@@ -479,9 +488,9 @@ class TestCommandIntelPlumbing:
         )
         _run(runtime.process_intent(intent, user))
 
-        ctx = self._ctx_from(runtime.analysis_engine.analyze)
-        assert ctx is not None
-        assert "TERMINAL COMMAND" not in ctx.trusted_sections.get("Context", "")
+        ai_ctx = self._ai_ctx_from(runtime.analysis_engine.analyze)
+        assert ai_ctx is not None
+        assert "TERMINAL COMMAND" not in ai_ctx.ae_external_context
 
     def test_command_intel_is_bounded(self):
         from intentframe_action_bundle.evidence import CommandIntel

@@ -1,44 +1,13 @@
 """
-Guardian prompt bodies.
+Default Guardian prompt body shared by substrate and action bundles.
 
-``GUARDIAN_PROMPTS`` maps a prompt id to a system-instruction body.
-Guardian uses coarser specialisation than AE: two ids (``standard``
-and ``critical``).  Sub-routing by ``command_intel`` capabilities
-lives on the AE side — Guardian's job is policy enforcement, not
-command-shape reasoning, so an extra lane would dilute focus.
-
-Every prompt id must produce :class:`AIGuardianOutput`.
-
-Content policy — ``critical`` equals ``standard``
--------------------------------------------------
-``_CRITICAL`` is byte-identical to ``_STANDARD`` by deliberate design:
-Guardian's standard body is already enforcement-heavy (BLOCK on
-HIGH/CRITICAL risk, scope mismatch, hidden behaviours, limit
-violations).  A critical-specific overlay would be redundant and would
-risk drift between what the standard body teaches and what the
-overlay appends.  The routing plumbing is live (``DefaultPromptStrategy``
-selects ``critical`` for actions in :data:`CRITICAL_ACTIONS`, the
-Guardian engine holds one :class:`Agent` per id, ``last_prompt_id``
-feeds the audit log) so per-action-class bodies can be added later
-as full forks — the same pattern used by the AE's
-``critical_run_command`` and ``critical_write_file`` bodies — without
-touching any engine / strategy / audit code.
+Substrate uses ``DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS`` when a bundle does
+not provide ``BundleAIContext.guardian_system_instructions``.
 """
 
 from __future__ import annotations
 
-from types import MappingProxyType
-from typing import Mapping
-
-
-# ────────────────────────────────────────────────────────────────
-# STANDARD — byte-identical to the pre-specialisation baseline
-# ────────────────────────────────────────────────────────────────
-# If you're touching this string, you are changing the production
-# Guardian prompt.  tests/test_prompt_hardening.py asserts on a
-# subset of phrases — keep them green.
-
-_STANDARD = """You make ALLOW/BLOCK decisions by applying user policies.
+DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS = """You make ALLOW/BLOCK decisions by applying user policies.
 
 You receive:
 1. Context (task and agent identity) — in trusted pipeline tags
@@ -102,14 +71,3 @@ Intent Limits:
 - If no intent limits are provided, skip this check.
 
 Be brief and cite the specific concern that caused your decision."""
-
-
-_CRITICAL = _STANDARD
-
-
-GUARDIAN_PROMPTS: Mapping[str, str] = MappingProxyType({
-    "standard": _STANDARD,
-    "critical": _CRITICAL,
-})
-
-GUARDIAN_PROMPT_IDS: frozenset[str] = frozenset(GUARDIAN_PROMPTS.keys())

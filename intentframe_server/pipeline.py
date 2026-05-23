@@ -232,6 +232,22 @@ class IntentFrameRuntime:
         )
 
     @staticmethod
+    def _add_prompt_audit_fields(audit_entry: dict, prefix: str, component) -> None:
+        """Attach prompt source/label and full prompt content when an AI call ran."""
+        prompt_label = getattr(component, "last_prompt_label", None)
+        prompt_source = getattr(component, "last_prompt_source", None)
+        system_prompt = getattr(component, "last_system_prompt", None)
+        request_prompt = getattr(component, "last_request_prompt", None)
+
+        if not any((prompt_label, prompt_source, system_prompt, request_prompt)):
+            return
+
+        audit_entry[f"{prefix}_prompt_source"] = prompt_source
+        audit_entry[f"{prefix}_prompt_label"] = prompt_label
+        audit_entry[f"{prefix}_system_prompt"] = system_prompt
+        audit_entry[f"{prefix}_request_prompt"] = request_prompt
+
+    @staticmethod
     def _build_deterministic_report(
         intent: IntentFrame,
         det_result,
@@ -435,14 +451,15 @@ class IntentFrameRuntime:
         self._request_counter += 1
         req_num = self._request_counter
 
-        # Per-request invariant: every intent starts with a clean
-        # observability slate.  Engines only set ``last_prompt_id``
-        # when their AI path actually runs, so paths that short-circuit
-        # before AE / Guardian (deterministic ALLOW, command-shield
-        # catastrophic BLOCK, any future fast-path) must not inherit
-        # stale values from a prior request in the same runtime.
-        self.analysis_engine.last_prompt_id = None
-        self.guardian.last_prompt_id = None
+        # Per-request invariant: every intent starts with a clean prompt
+        # evidence slate.  Engines only populate these fields when their
+        # AI path actually runs, so paths that short-circuit before AE /
+        # Guardian must not inherit stale forensic data from a prior request.
+        for component in (self.analysis_engine, self.guardian):
+            component.last_prompt_source = None
+            component.last_prompt_label = None
+            component.last_system_prompt = None
+            component.last_request_prompt = None
 
         if self.verbose:
             reason = intent.reason or ""
@@ -495,7 +512,7 @@ class IntentFrameRuntime:
             if det_result.bundle_context is not None
             else intent
         )
-        analysis_context = det_result.analysis_context
+        bundle_ai_context = det_result.bundle_ai_context
         if self.verbose:
             print(f"    ┌──────────────────────────────────────────────────────────┐")
             print(f"    │  DETERMINISTIC GUARDIAN: pre-AE pass                     │")
@@ -572,7 +589,8 @@ class IntentFrameRuntime:
                 intent,
                 active_domains=active_domains,
                 execution_context=self._execution_context,
-                analysis_context=analysis_context,
+                bundle_context=det_result.bundle_context,
+                bundle_ai_context=bundle_ai_context,
             )
 
             if self.verbose:
@@ -607,6 +625,7 @@ class IntentFrameRuntime:
                 active_domains=active_domains,
                 execution_context=self._execution_context,
                 bundle_context=det_result.bundle_context,
+                bundle_ai_context=bundle_ai_context,
             )
         
         # ═══════════════════════════════════════════════════════════════
@@ -641,18 +660,11 @@ class IntentFrameRuntime:
         if dg_matched_gate:
             audit_entry["matched_gate"] = dg_matched_gate
 
-        # Prompt-lane audit — record which AE / Guardian prompt lane ran.
-        # `last_prompt_id` is populated by the engines when (and only
-        # when) an AI call was made; deterministic and fast-path
-        # outcomes leave it at None, so absent fields here correctly
-        # reflect "no AI prompt was used".  Audit-only — no change
-        # to AnalysisReport / ValidationResult surface.
-        ae_prompt_id = getattr(self.analysis_engine, "last_prompt_id", None)
-        if ae_prompt_id:
-            audit_entry["ae_prompt_id"] = ae_prompt_id
-        guardian_prompt_id = getattr(self.guardian, "last_prompt_id", None)
-        if guardian_prompt_id:
-            audit_entry["guardian_prompt_id"] = guardian_prompt_id
+        # Prompt forensic audit — record what source/label was used plus
+        # the exact system and request prompts sent to the model.  Fields
+        # are absent when a component did not make an AI call.
+        self._add_prompt_audit_fields(audit_entry, "ae", self.analysis_engine)
+        self._add_prompt_audit_fields(audit_entry, "guardian", self.guardian)
         
         if validation.decision == Decision.ALLOW:
             # ───────────────────────────────────────────────────────────

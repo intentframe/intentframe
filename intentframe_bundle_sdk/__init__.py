@@ -12,18 +12,19 @@ from intentframe_bundle_sdk.registry import (
 )
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import (
-    AnalysisContext,
+    BundleAIContext,
     BundleContext,
     BundleDeterministicResult,
     BundlePhaseOutcome,
     EnrichmentRecord,
+    bundle_ai_context_or_empty,
     enrichment_audit_fields,
     record_enrichment,
 )
 
 __all__ = [
     "ActionBundle",
-    "AnalysisContext",
+    "BundleAIContext",
     "BundleContext",
     "BundleDeterministicResult",
     "BundlePhaseOutcome",
@@ -36,6 +37,7 @@ __all__ = [
     "all_action_bundles",
     "all_domain_bundles",
     "domain_bundle_for",
+    "bundle_ai_context_or_empty",
     "enrichment_audit_fields",
     "record_enrichment",
     "register_action_bundle",

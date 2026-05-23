@@ -21,7 +21,7 @@ from enum import Enum
 
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.runner import DeterministicRunner
-from intentframe_bundle_sdk.types import AnalysisContext, BundleContext
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 from intentframe_core.types import IntentFrame, UserContext
 
 
@@ -42,7 +42,7 @@ class DeterministicResult:
     matched_gate: str = ""
     decision_path: str = "deterministic"
     bundle_context: BundleContext | None = None
-    analysis_context: AnalysisContext | None = None
+    bundle_ai_context: BundleAIContext | None = None
     dg_exception: str = ""
 
 
@@ -72,8 +72,6 @@ class DeterministicGuardian:
                 verbose=verbose,
             )
         except Exception as exc:  # noqa: BLE001
-            # Policy: bundle/checker crash → BLOCK fail-closed, not UNDECIDED→AI
-            # (deterministic-enforcement-map.md §8.1). Legacy 66e567c used UNDECIDED.
             exc_repr = repr(exc)
             if verbose:
                 print(f"    │  DG exception: {exc_repr} — BLOCK (fail-closed)")
@@ -130,13 +128,13 @@ class DeterministicGuardian:
                 bundle_context=ctx,
             )
 
-        analysis_ctx = bundle.build_analysis_context(intent, permission, ctx)
+        bundle_ai_ctx = bundle.build_ai_context(intent, permission, ctx)
 
         return DeterministicResult(
             decision=DeterministicDecision.UNDECIDED,
             matched_gate="undecided",
             bundle_context=ctx,
-            analysis_context=analysis_ctx,
+            bundle_ai_context=bundle_ai_ctx,
         )
 
 

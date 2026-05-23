@@ -11,7 +11,7 @@ from intentframe_core.types import (
     ExecutionContext,
     IntentFrame,
 )
-from intentframe_bundle_sdk.types import AnalysisContext
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 
 
 class AnalysisEngine(ABC):
@@ -29,7 +29,8 @@ class AnalysisEngine(ABC):
         *,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
-        analysis_context: AnalysisContext | None = None,
+        bundle_context: BundleContext | None = None,
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> AnalysisReport:
         """Analyze what an intent will REALLY do (UNDECIDED path only)."""
         pass

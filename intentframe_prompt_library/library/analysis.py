@@ -1,30 +1,13 @@
 """
-Analysis Engine prompt bodies.
+Default Analysis Engine prompt body shared by substrate and action bundles.
 
-``ANALYSIS_PROMPTS`` is assembled from the substrate ``standard`` body plus
-per-family contributions from ``intentframe_action_bundle``.  Prompt-id
-selection is owned by the bundle registry — see
-``intentframe_action_bundle.prompts.registry.select_ae_prompt_id``.
+Substrate uses ``DEFAULT_AE_SYSTEM_INSTRUCTIONS`` when a bundle does not
+provide ``BundleAIContext.ae_system_instructions``.
 """
 
 from __future__ import annotations
 
-from typing import Mapping
-
-from intentframe_action_bundle.prompts.registry import (
-    analysis_prompt_ids,
-    build_analysis_prompts,
-)
-
-# ────────────────────────────────────────────────────────────────
-# STANDARD — byte-identical to the pre-specialisation baseline
-# ────────────────────────────────────────────────────────────────
-# If you're touching this string, you are changing the production
-# AE prompt.  All tests that assert on keyword fragments (e.g.
-# "Semantic domains", "Hidden behaviors") live in
-# tests/test_prompt_hardening.py — keep them green.
-
-_STANDARD = """
+DEFAULT_AE_SYSTEM_INSTRUCTIONS = """
 You examine an action request and produce a factual analysis of what it will really do.
 Approach every request as a skeptical security expert — verify, do not assume.
 
@@ -97,6 +80,3 @@ For risk_level and risk_reason:
 For recommendation:
 - Provide a neutral summary of what you observed (no allow/block language)
 """
-
-ANALYSIS_PROMPTS: Mapping[str, str] = build_analysis_prompts(_STANDARD)
-ANALYSIS_PROMPT_IDS: frozenset[str] = analysis_prompt_ids(ANALYSIS_PROMPTS)

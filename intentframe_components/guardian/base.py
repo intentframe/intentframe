@@ -13,7 +13,7 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
-from intentframe_bundle_sdk.types import BundleContext
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 
 
 class Guardian(ABC):
@@ -29,6 +29,7 @@ class Guardian(ABC):
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
         bundle_context: BundleContext | None = None,
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> ValidationResult:
         """Validate intent against user policies using Analysis Report."""
         pass

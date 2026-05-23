@@ -115,9 +115,11 @@ def run_dg_with_intel(
 ) -> DeterministicResult:
     """Pin checker gates with seeded command_intel (skips real shield)."""
 
+    from intentframe_action_bundle.terminal.evidence_keys import COMMAND_INTEL_KEY
+
     async def seed_prepare(self, intent, permission, ctx, *, verbose=False):
         del intent, permission, verbose
-        ctx.command_intel = command_intel
+        ctx.evidence[COMMAND_INTEL_KEY] = command_intel
         return BundlePhaseOutcome.continue_(ctx)
 
     dg = dg or DeterministicGuardian()

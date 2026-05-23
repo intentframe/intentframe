@@ -28,7 +28,6 @@ class ActionBundleManifest:
     bundle_id: str
     action_ids: frozenset[str] = frozenset()
     constraint_type: type | None = None
-    ae_prompt_ids: frozenset[str] = frozenset()
     passive_read: bool = False
     critical: bool = False
     has_pre_pipeline: bool = False
@@ -41,11 +40,6 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
         bundle_id="terminal",
         action_ids=TERMINAL_ACTIONS,
         constraint_type=TerminalConstraints,
-        ae_prompt_ids=frozenset({
-            "critical_run_command",
-            "critical_network_probe",
-            "critical_network_mutation",
-        }),
         critical=True,
         has_pre_pipeline=True,
         has_executor_floor=True,
@@ -54,7 +48,6 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
         bundle_id="files",
         action_ids=WRITE_FILE_ACTIONS,
         constraint_type=FileConstraints,
-        ae_prompt_ids=frozenset({"critical_write_file"}),
         has_pre_pipeline=True,
         has_executor_floor=True,
     ),
@@ -94,13 +87,11 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
     ActionBundleManifest(
         bundle_id="api",
         constraint_type=ApiConstraints,
-        ae_prompt_ids=frozenset({"critical_generic"}),
         critical=True,
     ),
     ActionBundleManifest(
         bundle_id="critical",
         action_ids=CRITICAL_ONLY_ACTIONS,
-        ae_prompt_ids=frozenset({"critical_generic"}),
         critical=True,
     ),
 )

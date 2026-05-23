@@ -5,8 +5,9 @@ from __future__ import annotations
 from abc import ABC
 from typing import TYPE_CHECKING
 
+from intentframe_action_bundle.evidence import CommandIntel, FileIntel
 from intentframe_bundle_sdk.types import (
-    AnalysisContext,
+    BundleAIContext,
     BundleContext,
     BundleDeterministicResult,
     BundlePhaseOutcome,
@@ -27,6 +28,7 @@ class ActionBundle(ABC):
         check_policy()      — YAML constraints; BLOCK only (SDK default)
         structural_gates()  — family BLOCK floors
         allow_gates()       — conditional ALLOW short-circuits
+        build_ai_context()  — optional AE/Guardian prompt material for UNDECIDED
 
     Domain checks run in the runner between check_policy and structural_gates.
     """
@@ -67,7 +69,7 @@ class ActionBundle(ABC):
         *,
         verbose: bool = False,
     ) -> BundlePhaseOutcome:
-        """Collect deterministic evidence (command_shield, file_intel). May BLOCK."""
+        """Collect deterministic evidence. May BLOCK."""
         del intent, permission, verbose
         return BundlePhaseOutcome.continue_(ctx)
 
@@ -102,8 +104,6 @@ class ActionBundle(ABC):
         constraint_type = type(permission.constraints)
         checker = CONSTRAINT_CHECKERS.get(constraint_type)
         if checker is None:
-            # Constraint defined, no checker in manifest/bundle — continue (no BLOCK).
-            # UNDECIDED → AE + Guardian; audit via constraint_checker_skipped.
             note_missing_constraint_checker(
                 ctx,
                 constraint_type,
@@ -112,9 +112,16 @@ class ActionBundle(ABC):
             )
             return BundlePhaseOutcome.continue_(ctx)
 
+        command_intel = ctx.evidence.get("command_intel")
+        file_intel = ctx.evidence.get("file_intel")
+        if command_intel is not None and not isinstance(command_intel, CommandIntel):
+            command_intel = None
+        if file_intel is not None and not isinstance(file_intel, FileIntel):
+            file_intel = None
+
         check_ctx = CheckContext(
-            command_intel=ctx.command_intel,
-            file_intel=ctx.file_intel,
+            command_intel=command_intel,
+            file_intel=file_intel,
         )
         passed, reason = checker.check(
             ctx.effective_intent,
@@ -156,21 +163,15 @@ class ActionBundle(ABC):
         """Backward compat — delegates to allow_gates."""
         return self.allow_gates(intent, permission, ctx)
 
-    def build_analysis_context(
+    def build_ai_context(
         self,
         intent: IntentFrame,
         permission,
         ctx: BundleContext,
-    ) -> AnalysisContext:
-        del permission
-        from intentframe_action_bundle.prompt_trusted import build_ae_trusted_sections
-        from intentframe_action_bundle.prompts.registry import select_ae_prompt_id
-
-        return AnalysisContext(
-            trusted_sections=build_ae_trusted_sections(intent, ctx),
-            terminal_command_signals=ctx.terminal_command_signals,
-            ae_prompt_id=select_ae_prompt_id(ctx),
-        )
+    ) -> BundleAIContext:
+        """Return bundle-owned AI prompt material; default is substrate standard only."""
+        del intent, permission, ctx
+        return BundleAIContext()
 
     @staticmethod
     def _phase_to_result(phase: BundlePhaseOutcome) -> BundleDeterministicResult:
@@ -196,13 +197,7 @@ class ActionBundle(ABC):
 
 
 class NullActionBundle(ActionBundle):
-    """No-op bundle for actions without a registered family.
-
-    ``check_policy`` still runs on the base class: if permission carries a
-    constraint type with no ``CONSTRAINT_CHECKERS`` entry (e.g.
-    ``CalendarConstraints``), the runner continues without BLOCK — see §8.2
-    in ``deterministic-enforcement-map.md``.
-    """
+    """No-op bundle for actions without a registered family."""
 
     bundle_id = "null"
     action_ids = frozenset()

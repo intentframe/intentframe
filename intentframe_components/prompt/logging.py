@@ -27,10 +27,12 @@ def log_prompt_dump(
     component: PromptLogComponent,
     prompt: str,
     *,
-    prompt_id: str | None = None,
+    prompt_label: str | None = None,
+    prompt_source: str | None = None,
+    system_prompt: str | None = None,
     verbose: bool = False,
 ) -> None:
-    """Append one JSON line containing the full prompt string."""
+    """Append one JSON line containing full prompt evidence."""
     log_dir = Path(
         os.environ.get(
             "INTENTFRAME_LOG_DIR",
@@ -42,8 +44,10 @@ def log_prompt_dump(
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "component": component,
-        "prompt_id": prompt_id,
-        "prompt": prompt,
+        "prompt_source": prompt_source,
+        "prompt_label": prompt_label,
+        "system_prompt": system_prompt,
+        "request_prompt": prompt,
     }
     line = json.dumps(entry, default=str)
 

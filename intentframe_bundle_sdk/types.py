@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from intentframe_action_bundle.evidence import CommandIntel, FileIntel
 from intentframe_core.types import IntentFrame
 
 
@@ -30,12 +29,10 @@ class EnrichmentRecord:
 
 @dataclass
 class BundleContext:
-    """Mutable evidence bag passed through action-bundle phases (bundle-internal)."""
+    """Mutable lifecycle context passed through action-bundle phases."""
 
     intent: IntentFrame
-    command_intel: CommandIntel | None = None
-    file_intel: FileIntel | None = None
-    terminal_command_signals: tuple = ()
+    evidence: dict[str, Any] = field(default_factory=dict)
     enriched_intent: IntentFrame | None = None
     enrichment: EnrichmentRecord | None = None
     # Set when permission.constraints is present but CONSTRAINT_CHECKERS has no entry
@@ -66,6 +63,25 @@ class BundleContext:
         if not self.constraint_checker_skipped:
             return {}
         return {"constraint_checker_skipped": self.constraint_checker_skipped}
+
+
+@dataclass
+class BundleAIContext:
+    """Bundle-supplied AI prompt material for the UNDECIDED path."""
+
+    ae_system_instructions: str | None = None
+    ae_external_context: str = ""
+    guardian_system_instructions: str | None = None
+    guardian_external_context: str = ""
+    ae_prompt_label: str | None = None
+    guardian_prompt_label: str | None = None
+    extras: dict[str, Any] = field(default_factory=dict)
+
+
+def bundle_ai_context_or_empty(
+    bundle_ai_context: BundleAIContext | None,
+) -> BundleAIContext:
+    return bundle_ai_context if bundle_ai_context is not None else BundleAIContext()
 
 
 def enrichment_changed(submitted: IntentFrame, effective: IntentFrame) -> bool:
@@ -148,19 +164,3 @@ class BundleDeterministicResult:
     reason: str = ""
     matched_gate: str = ""
     decision_path: str = "deterministic"
-
-
-@dataclass
-class AnalysisContext:
-    """Bundle-produced trusted prompt sections for the AI path (UNDECIDED only)."""
-
-    trusted_sections: dict[str, str] = field(default_factory=dict)
-    terminal_command_signals: tuple = ()
-    ae_prompt_id: str | None = None
-    extras: dict[str, Any] = field(default_factory=dict)
-
-
-def analysis_context_or_empty(
-    analysis_context: AnalysisContext | None,
-) -> AnalysisContext:
-    return analysis_context if analysis_context is not None else AnalysisContext()
