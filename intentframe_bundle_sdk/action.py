@@ -1,4 +1,17 @@
-"""ActionBundle base class — hooks only; order owned by DeterministicRunner."""
+"""ActionBundle base class — hooks only; order owned by DeterministicRunner.
+
+Plugin layout conventions (first-party pattern):
+
+- One code folder per action family (``terminal/``, ``files/``, ``email/``, …).
+- Each family owns its action ids, constraint schema, evidence keys, gates,
+  and AI context. Register via ``register_action_bundle`` (loader in PR B).
+- Cross-family reuse is by explicit import between plugin packages (e.g.
+  ``host_files`` imports write tooling from ``files``). The SDK does not
+  provide a shared-kit module today; if multiple third-party plugins need
+  the same primitives, extract a neutral helper package both depend on.
+- SDK-standard behavior (fixed gate order, ``passive_read_action_ids``) lives
+  in ``DeterministicRunner`` — families declare eligibility, not enforcement.
+"""
 
 from __future__ import annotations
 

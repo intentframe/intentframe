@@ -1,4 +1,9 @@
-"""Bundle-owned deterministic evidence DTOs (command_shield / file_intel summaries)."""
+"""Bundle-owned deterministic evidence DTOs (command_shield / file_intel summaries).
+
+``FileIntel`` is shared by the virtual ``files/`` and ``host_files/`` families;
+``CommandIntel`` is owned by ``terminal/``. Family folders build these DTOs;
+the SDK stores them opaquely in ``BundleContext.evidence``.
+"""
 
 from __future__ import annotations
 

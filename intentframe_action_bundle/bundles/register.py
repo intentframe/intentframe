@@ -10,6 +10,7 @@ from intentframe_action_bundle.bundles.contacts import ContactsActionBundle
 from intentframe_action_bundle.bundles.domain import DeletionDomainBundle, FinanceDomainBundle
 from intentframe_action_bundle.bundles.email import EmailActionBundle
 from intentframe_action_bundle.bundles.files import FilesActionBundle
+from intentframe_action_bundle.bundles.finance import FinanceActionBundle
 from intentframe_action_bundle.bundles.host_files import HostFilesActionBundle
 from intentframe_action_bundle.bundles.message import MessageActionBundle
 from intentframe_action_bundle.bundles.notes import NotesActionBundle
@@ -38,6 +39,7 @@ def ensure_bundles_registered() -> None:
     register_action_bundle(MessageActionBundle())
     register_action_bundle(BrowserActionBundle())
     register_action_bundle(ApiActionBundle())
+    register_action_bundle(FinanceActionBundle())
     register_action_bundle(ClipboardActionBundle())
     register_action_bundle(SpotlightActionBundle())
     register_action_bundle(SystemActionBundle())

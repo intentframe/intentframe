@@ -15,11 +15,6 @@ HOST_FILE_ACTIONS = frozenset({
     ActionType.DELETE_HOST_FILE.value,
 })
 
-CRITICAL_ACTIONS = frozenset({
-    ActionType.DELETE_HOST_FILE.value,
-})
-
-
 def decide_host_file_floor(intent: IntentFrame) -> BundleGateResult | None:
     action = intent.action.value
 

@@ -7,7 +7,6 @@ from typing import Any
 
 from action_registry.types import ActionType
 
-from intentframe_action_bundle.critical.actions import CRITICAL_ONLY_ACTIONS
 from intentframe_action_bundle.host_files.deterministic import HOST_FILE_ACTIONS
 from intentframe_action_bundle.terminal import ACTION_IDS as TERMINAL_ACTIONS
 from policy_registry.constraints import (
@@ -29,7 +28,6 @@ class ActionBundleManifest:
     action_ids: frozenset[str] = frozenset()
     constraint_type: type | None = None
     passive_read: bool = False
-    critical: bool = False
     has_pre_pipeline: bool = False
     has_executor_floor: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
@@ -40,7 +38,6 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
         bundle_id="terminal",
         action_ids=TERMINAL_ACTIONS,
         constraint_type=TerminalConstraints,
-        critical=True,
         has_pre_pipeline=True,
         has_executor_floor=True,
     ),
@@ -50,6 +47,8 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
             ActionType.WRITE_FILE.value,
             ActionType.READ_FILE.value,
             ActionType.LIST_DIRECTORY.value,
+            ActionType.APPEND_ROW.value,
+            ActionType.DELETE_FILE.value,
         }),
         constraint_type=FileConstraints,
         has_pre_pipeline=True,
@@ -59,7 +58,6 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
         bundle_id="host_files",
         action_ids=HOST_FILE_ACTIONS,
         constraint_type=HostFileConstraints,
-        critical=True,
         has_pre_pipeline=True,
         has_executor_floor=True,
     ),
@@ -86,12 +84,11 @@ _MANIFESTS: tuple[ActionBundleManifest, ...] = (
     ActionBundleManifest(
         bundle_id="api",
         constraint_type=ApiConstraints,
-        critical=True,
     ),
     ActionBundleManifest(
-        bundle_id="critical",
-        action_ids=CRITICAL_ONLY_ACTIONS,
-        critical=True,
+        bundle_id="finance",
+        action_ids=frozenset({ActionType.PAY_INVOICE.value}),
+        constraint_type=ApiConstraints,
     ),
 )
 

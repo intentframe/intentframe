@@ -1,14 +1,18 @@
-"""First-party action bundles — lazy public exports only."""
+"""First-party action bundles — lazy public exports only.
+
+Plugin package layout: one folder per action family under
+``intentframe_action_bundle/``; bundle classes in ``bundles/`` (fold into
+``<family>/bundle.py`` in PR A). Shared code stays in the owning family —
+``files/`` owns file-write tooling; ``host_files/`` imports it. Other
+families keep their logic local. See ``files/__init__.py`` and
+``intentframe_bundle_sdk.action`` for the full convention.
+"""
 
 from __future__ import annotations
 
 __all__ = [
-    "CRITICAL_ACTIONS",
-    "is_critical",
     "passive_read_action_ids",
 ]
-
-from intentframe_action_bundle.taxonomy import CRITICAL_ACTIONS, is_critical
 
 
 def passive_read_action_ids() -> frozenset[str]:

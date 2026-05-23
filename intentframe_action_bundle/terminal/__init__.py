@@ -3,4 +3,3 @@
 from action_registry.types import ActionType
 
 ACTION_IDS = frozenset({ActionType.RUN_COMMAND.value})
-CRITICAL_ACTIONS = frozenset({ActionType.RUN_COMMAND.value})

@@ -1,4 +1,8 @@
-"""Files action bundle — WRITE_FILE family."""
+"""Files action bundle — virtual filesystem family.
+
+Registers VFS file action ids and wires hooks to ``intentframe_action_bundle.files``.
+See ``files/__init__.py`` for the shared write-tooling ownership rule.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +29,8 @@ class FilesActionBundle(ActionBundle):
         ActionType.WRITE_FILE.value,
         ActionType.READ_FILE.value,
         ActionType.LIST_DIRECTORY.value,
+        ActionType.APPEND_ROW.value,
+        ActionType.DELETE_FILE.value,
     })
     passive_read_action_ids = frozenset({
         ActionType.READ_FILE.value,

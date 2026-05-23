@@ -1,4 +1,10 @@
-"""Files bundle action ids."""
+"""Files bundle action ids.
+
+``WRITE_FILE_ACTIONS`` lists actions that run the shared write-payload
+pipeline (``pre_pipeline``, FileIntel). Includes ``WRITE_HOST_FILE`` so
+host writes reuse the same tooling; routing/ownership remains in
+``HostFilesActionBundle``.
+"""
 
 from __future__ import annotations
 

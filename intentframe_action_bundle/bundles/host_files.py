@@ -1,4 +1,9 @@
-"""Host files action bundle."""
+"""Host files action bundle — real-path file family.
+
+Registers host file action ids. Host-only gates live in ``host_files/``;
+write-payload hooks delegate to ``files/`` (canonical owner). See
+``host_files/__init__.py``.
+"""
 
 from __future__ import annotations
 

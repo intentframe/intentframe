@@ -30,7 +30,6 @@ def action_metadata(action_id: str) -> dict:
         "action_id": action_id,
         "bundle_id": manifest.bundle_id,
         "passive_read": action_id in passive_read_action_ids(),
-        "critical": manifest.critical,
         "has_pre_pipeline": manifest.has_pre_pipeline,
         "has_executor_floor": manifest.has_executor_floor,
         "constraint_type": (

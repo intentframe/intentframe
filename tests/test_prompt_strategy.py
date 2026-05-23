@@ -175,6 +175,6 @@ class TestEngineResolution:
 class TestPassiveReadDriftGuard:
     def test_terminal_and_passive_read_do_not_overlap(self):
         from intentframe_action_bundle import passive_read_action_ids
-        from intentframe_action_bundle.terminal import CRITICAL_ACTIONS as TERMINAL_CRITICAL
+        from intentframe_action_bundle.terminal import ACTION_IDS as TERMINAL_ACTIONS
 
-        assert TERMINAL_CRITICAL.isdisjoint(passive_read_action_ids())
+        assert TERMINAL_ACTIONS.isdisjoint(passive_read_action_ids())
