@@ -101,13 +101,10 @@ def load_policy_seed(
 
 
 def _validate_loaded_policy(policy: UserPolicy) -> None:
-    if not policy.domain_constraints:
-        return
-    from intentframe_native_bundles import ensure_bundles_registered
-    from intentframe_bundle_sdk.registry import validate_policy_domain_constraints
+    from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
 
-    ensure_bundles_registered()
-    validate_policy_domain_constraints(policy.domain_constraints)
+    ensure_loaded(["intentframe_native_bundles"])
+    validate_policy_against_registry(policy)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:

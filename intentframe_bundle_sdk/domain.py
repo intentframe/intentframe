@@ -1,4 +1,8 @@
-"""DomainBundle base class — cross-action deterministic structural enforcement."""
+"""DomainBundle base class — cross-action deterministic structural enforcement.
+
+Domain bundles do not know action ids; routing is declared separately via
+``register_domain_routes``. Hooks take opaque ``domain_constraints`` dict slices.
+"""
 
 from __future__ import annotations
 

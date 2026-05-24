@@ -1,4 +1,9 @@
-"""Host-only deterministic orchestration — fixed gate order (authors do not override)."""
+"""Host-only deterministic orchestration — fixed gate order (authors do not override).
+
+The runner is the sole runtime caller of bundle and domain hooks. Constraint
+prompt text is built here on the UNDECIDED path only; terminal ALLOW/BLOCK
+results carry no ``constraint_context``.
+"""
 
 from __future__ import annotations
 

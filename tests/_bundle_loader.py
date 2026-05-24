@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from intentframe_native_bundles import _ensure_first_party_bundles_loaded
+from intentframe_bundle_sdk.loader import ensure_loaded
+
+DEFAULT_TEST_PACKAGES = ["intentframe_native_bundles"]
 
 
 def ensure_test_bundles_loaded() -> None:
-    """Register native bundles once per process (shim until Wave D loader)."""
-    _ensure_first_party_bundles_loaded()
+    """Register native bundles once per process via the SDK loader."""
+    ensure_loaded(DEFAULT_TEST_PACKAGES)

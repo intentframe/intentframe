@@ -1,31 +1,15 @@
-"""First-party native bundles — lazy public exports and registration."""
+"""First-party native bundles — plugin registration entry point."""
 
 from __future__ import annotations
 
-from intentframe_bundle_sdk.registry import (
-    register_action_bundle,
-    register_domain_bundle,
-    register_domain_routes,
-)
-
-_BUNDLES_LOADED = False
-
-
-def ensure_bundles_registered() -> None:
-    """Load first-party bundles into the global SDK registry."""
-    _ensure_first_party_bundles_loaded()
-
-
 __all__ = [
     "register_bundles",
-    "ensure_bundles_registered",
-    "_ensure_first_party_bundles_loaded",
     "passive_read_action_ids",
 ]
 
 
 def register_bundles(registry) -> None:
-    """First-party register entry point."""
+    """First-party register entry point (called by :func:`ensure_loaded`)."""
     from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
     from intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
     from intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
@@ -69,27 +53,10 @@ def register_bundles(registry) -> None:
     registry.register_domain_routes(DOMAIN_ROUTES)
 
 
-def _ensure_first_party_bundles_loaded() -> None:
-    global _BUNDLES_LOADED
-    if _BUNDLES_LOADED:
-        return
-    register_bundles(
-        type(
-            "_RegistryShim",
-            (),
-            {
-                "register_action_bundle": staticmethod(register_action_bundle),
-                "register_domain_bundle": staticmethod(register_domain_bundle),
-                "register_domain_routes": staticmethod(register_domain_routes),
-            },
-        )()
-    )
-    _BUNDLES_LOADED = True
-
-
 def passive_read_action_ids() -> frozenset[str]:
     """Registered passive-read action ids (SDK-owned fast path)."""
+    from intentframe_bundle_sdk.loader import ensure_loaded
     from intentframe_bundle_sdk.registry import all_passive_read_action_ids
 
-    _ensure_first_party_bundles_loaded()
+    ensure_loaded(["intentframe_native_bundles"])
     return all_passive_read_action_ids()

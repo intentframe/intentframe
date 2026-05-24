@@ -1,4 +1,8 @@
-"""ActionBundle base class — hooks only; order owned by DeterministicRunner."""
+"""ActionBundle base class — hooks only; order owned by DeterministicRunner.
+
+Bundles never receive ``UserContext`` or ``UserPolicy``. Hooks take a deep-copied
+per-action :class:`ActionPermission` with opaque ``constraints`` dicts.
+"""
 
 from __future__ import annotations
 

@@ -1,7 +1,22 @@
-"""IntentFrame Bundle SDK — governed lifecycle for action and domain bundles."""
+"""IntentFrame Bundle SDK — governed lifecycle for action and domain bundles.
+
+Contract summary:
+
+- Async hooks (``prepare_evidence``, ``enrich``) are for I/O; sync hooks are
+  for pure compute.
+- Bundles receive a per-action :class:`ActionPermission` only — never
+  ``UserContext`` or ``UserPolicy``.
+- Constraint dicts are parsed fresh on each hook call; do not cache parsed
+  models on bundle classes.
+- :class:`DeterministicRunner` is the sole runtime caller of bundle hooks;
+  substrate reads :class:`BundleAIContext` prepared by the runner.
+- Plugin packages register via ``register_bundles(registry)``; use
+  :func:`ensure_loaded` as the single boot path.
+"""
 
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.domain import DomainBundle
+from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     all_action_bundles,
@@ -49,6 +64,7 @@ __all__ = [
     "EnrichmentRecord",
     "DeterministicRunner",
     "DomainBundle",
+    "ensure_loaded",
     "action_bundle_for",
     "action_permission_from_policy",
     "all_action_bundles",
@@ -68,4 +84,5 @@ __all__ = [
     "register_domain_routes",
     "routed_domain_ids",
     "validate_policy_domain_constraints",
+    "validate_policy_against_registry",
 ]

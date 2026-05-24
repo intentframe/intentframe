@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from intentframe_native_bundles import _ensure_first_party_bundles_loaded
+from intentframe_bundle_sdk.loader import ensure_loaded
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
@@ -36,9 +36,15 @@ class DeterministicResult:
 class DeterministicGuardian:
     """Pre-AE deterministic stage — permission + DeterministicRunner."""
 
-    def __init__(self, verbose: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        packages: list[str] | None = None,
+        verbose: bool = False,
+    ) -> None:
         self.verbose = verbose
-        _ensure_first_party_bundles_loaded()
+        self.packages = packages or ["intentframe_native_bundles"]
+        ensure_loaded(self.packages)
 
     async def decide_async(
         self,

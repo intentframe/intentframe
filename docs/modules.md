@@ -77,6 +77,32 @@ The rest of this doc walks each module in turn.
 
 ---
 
+## Plugin platform (bundles)
+
+### `intentframe_bundle_sdk/`
+
+| | |
+|---|---|
+| **What** | Bundle lifecycle contract: `ActionBundle` / `DomainBundle` hooks, `DeterministicRunner` (fixed gate order), registry + domain routes, `ensure_loaded(packages)` loader, opaque `ActionPermission` / `BundleAIContext` types. |
+| **Why** | Substrate orchestrates; plugins own action/domain logic. The SDK is action- and domain-agnostic — no family-specific constraint field names or industry vocabulary. |
+| **Where** | `intentframe_bundle_sdk/` |
+| **Process** | None — imported by `intentframe_components`, `intentframe_native_bundles`, and tests. |
+| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Module README** | Module docstrings in `loader.py`, `action.py`, `runner.py`. |
+
+### `intentframe_native_bundles/`
+
+| | |
+|---|---|
+| **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `domains/<domain>/` (domain overlays), `domain_routes.py` (routing manifest), `register_bundles(registry)` entry point. |
+| **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Domain bundles do not import action bundles; routing is separate metadata. |
+| **Where** | `intentframe_native_bundles/` |
+| **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_bundles"])`. |
+| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Module README** | None — see `register_bundles` in `__init__.py`. |
+
+---
+
 ## Pipeline (decision)
 
 ### `intentframe_components/`

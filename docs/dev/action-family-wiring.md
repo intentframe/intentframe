@@ -52,16 +52,19 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 - `executor/config/schema.py` — if the family needs config (allowed paths, blocked patterns, etc.), add a typed config block and attach it to `ExecutorConfig`.
 - `executor/config/executor.yaml` (and every downstream YAML: `demo/config/executor.yaml`, `demo/config/executor_attacks.yaml`, `jarvis_pa/executor.yaml`) — add the config section.
 
-### 3. Policy layer
+### 3. Plugin constraint schemas (policy storage stays opaque dicts)
 
-- `policy_registry/constraints/<family>.py` — a new `*Constraints` Pydantic model with `ConfigDict(extra="forbid")` and a **disjoint** field name from every other constraint type. Add a `field_validator` for any syntactic invariants (like rejecting trailing-slash shorthand).
-- `policy_registry/registry.py` (or equivalent) — register the constraint type in the Union so it round-trips through serialization.
-- `policy_registry/domains/<domain>.py` — if the action participates in a cross-family domain (e.g. `DELETION`), wire it there.
+- `intentframe_native_bundles/actions/<family>/constraints.py` — Pydantic models for action-level constraints (`FileConstraints`, `TerminalConstraints`, …). Use **disjoint field names** across families so validation is unambiguous.
+- `intentframe_native_bundles/domains/<domain>/constraints.py` — domain overlay schemas (`FinanceConstraints`, `DeletionConstraints`).
+- `policy_registry/models.py` — stores `ActionPermission.constraints` and `UserPolicy.domain_constraints` as opaque dicts only; no typed constraint unions in the registry layer.
+- `intentframe_bundle_sdk/loader.py` — single boot path: `ensure_loaded(packages)` registers bundles, then `validate_policy_against_registry(policy)` calls each bundle's `validate_constraints` / domain `validate` at startup.
 
-### 4. Guardian layer
+### 4. Bundle SDK + deterministic gate
 
-- `intentframe_components/guardian/checkers/<family>.py` — the checker that consumes the constraint and decides allow/deny. Register it in `CONSTRAINT_CHECKERS`.
-- `intentframe_components/guardian/deterministic.py` — if there is a deterministic gate (passive-read fast path, write-floor block, delete-floor block), add or extend it here.
+- `intentframe_bundle_sdk/` — `ActionBundle` / `DomainBundle` hook contract, `DeterministicRunner` (fixed gate order), registry + domain routes.
+- `intentframe_native_bundles/domain_routes.py` — routing manifest (`domain_id` → action ids); registered via `register_domain_routes`.
+- `intentframe_components/guardian/deterministic.py` — permission gate + `DeterministicRunner`; blocks `no_bundle` / `no_enforcement`.
+- `intentframe_components/guardian/engine.py` — AI Guardian reads `bundle_ai_context.constraint_context` only (no checker dispatch).
 - `resource_registry/floor.py` — if this family writes to the host filesystem, extend `DENY_WRITE_PREFIXES` with any non-negotiable deny roots.
 
 ### 5. Analysis Engine + prompt strategy
@@ -110,8 +113,8 @@ next gateway restart.
 
 ### 8. Tests
 
-- `tests/test_policy_<family>_constraints_roundtrip.py` — prove the Pydantic Union dispatches to your new constraint and not a sibling one.
-- `tests/test_<family>_checker.py` — positive and negative cases, including any syntactic validators.
+- `tests/test_bundle_constraint_registry.py` — every seeded allowed action resolves to a bundle; constrained actions override `enforce_constraints`.
+- `tests/test_bundle_loader.py` / `tests/test_bundle_sdk_invariants.py` — loader fail-closed, registry strictness, runner prompt context, substrate boundary.
 - `tests/test_deterministic_guardian.py` — any new gate (passive read, write floor, delete floor).
 - `tests/test_prompt_strategy.py` — prove the new actions route to the expected prompt lane.
 - `tests/test_<family>_adapter.py` — executor-side path handling.
@@ -173,7 +176,7 @@ When you see one of these, jump straight to the file named.
 | Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale | `jarvis_pa/jarvis/agent.py` |
 | Agent tool call returns "action not allowed by policy" | Policy seeded without that action | `intentframe_gateway/bootstrap.py::_build_default_policy` |
 | Guardian approves but executor refuses | Policy allowlist wider than executor ceiling | `executor.yaml` vs policy constraint |
-| Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `policy_registry/constraints/*.py` |
+| Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `intentframe_native_bundles/actions/*/constraints.py` |
 | Write-file action skipped the critical lane | Missing from `critical_write_file` route | `intentframe_components/prompt/strategy.py` |
 | Read action ran a full AE call it didn't need | Missing from `_PASSIVE_READ_ACTIONS` | `intentframe_components/analysis/engine.py` |
 | Delete action didn't require confirmation | Missing from `CRITICAL_ACTIONS` | `intentframe_components/routing/criticality.py` |

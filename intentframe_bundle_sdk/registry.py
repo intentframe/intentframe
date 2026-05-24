@@ -1,4 +1,9 @@
-"""Bundle registration and lookup."""
+"""Bundle registration and lookup.
+
+Registry keys are plain strings (``action_id``, ``domain_id``). Routing metadata
+is registered separately via :func:`register_domain_routes`; domain bundles do
+not declare which actions they apply to.
+"""
 
 from __future__ import annotations
 
