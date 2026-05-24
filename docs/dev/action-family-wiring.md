@@ -67,12 +67,21 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 - `intentframe_components/guardian/engine.py` — AI Guardian reads `bundle_ai_context.constraint_context` only (no checker dispatch).
 - `resource_registry/floor.py` — if this family writes to the host filesystem, extend `DENY_WRITE_PREFIXES` with any non-negotiable deny roots.
 
-### 5. Analysis Engine + prompt strategy
+### 5. Bundle lifecycle hooks (evidence, AI context, gates)
 
-- `intentframe_components/analysis/engine.py::_PASSIVE_READ_ACTIONS` — add read-only actions here so they skip full AE analysis.
-- `intentframe_components/routing/criticality.py::CRITICAL_ACTIONS` — add high-risk actions (deletes, privileged writes) so they take the critical AIGuardian lane.
-- `intentframe_components/prompt/strategy.py` — route write/delete actions to the right prompt template (`critical_write_file`, `standard`, etc.).
-- `intentframe_server/file_intel.py::build_file_intel` — if the family has a payload (write content), extend the `_HOST_PATH_ACTIONS` set and the action-value condition in `pipeline.py` that invokes `build_file_intel`.
+Post-refactor, family-specific deterministic and prompt logic lives on the **ActionBundle**, not in substrate checkers or pipeline pre-hooks.
+
+- `intentframe_native_bundles/actions/<family>/bundle.py` — implement hooks as needed:
+  - `prepare_evidence()` — e.g. command_shield BLOCK, file_intel (terminal/files)
+  - `enrich()` — e.g. email intent resolution
+  - `enforce_constraints()` — policy constraint enforcement
+  - `structural_gates()` — path/floor BLOCKs (files, host_files)
+  - `allow_gates()` — custom ALLOW fast paths (e.g. terminal read-only)
+  - `build_ai_context()` — AE system instructions + external context string
+  - `describe_constraints()` — optional; runner fallback is `str(constraints)`
+- `passive_read_action_ids` on the bundle — SDK-owned passive-read ALLOW (declare subset of `action_ids`)
+- `intentframe_prompt_library/` — substrate default prompt fragments; bundles override via `build_ai_context()`
+- See [\_internal\_/substrate-plugin-refactor.md](../_internal_/substrate-plugin-refactor.md) for gate order vs legacy `66e567c`.
 
 ### 6. Agent + onboarding (LLM-visible surface)
 
@@ -132,7 +141,7 @@ These are the files that **must** stay in sync but have no compiler-enforced rel
 | `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` ↔ `tools.py::ALL_TOOLS` | Agent advertises fewer actions than it can call | Onboarding prompt has no guardrails for the missing actions; agent still calls them, no policy-side guidance |
 | `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
 | `executor.yaml::host_files.allowed_write_paths` ↔ `jarvis.yaml::READ_HOST_FILE.constraints.allowed_host_paths` | Adapter ceiling and policy allowlist disagree | "Guardian approved, executor refused" inconsistency, and vice versa |
-| `_PASSIVE_READ_ACTIONS` ↔ `CRITICAL_ACTIONS` ↔ `prompt/strategy.py` | One says passive, another says critical | Action takes a different lane than its risk warrants; AE or AIGuardian is skipped when it shouldn't be, or runs when it doesn't need to |
+| `passive_read_action_ids` on bundle ↔ policy `safe: true` | Passive-read list out of sync with policy | Read action pays full AE when it should ALLOW deterministically, or vice versa |
 | `DENY_WRITE_PREFIXES` ↔ canonicalizer used by that family | Deny list stores canonical form, checker compares raw form (or vice versa) | `/etc/sudoers` blocked but `/private/etc/sudoers` allowed, or similar macOS-only asymmetries |
 | Constraint field names across families | Two constraints share a field name | Pydantic Union misroutes payloads to a sibling checker silently |
 
@@ -177,10 +186,10 @@ When you see one of these, jump straight to the file named.
 | Agent tool call returns "action not allowed by policy" | Policy seeded without that action | `intentframe_gateway/bootstrap.py::_build_default_policy` |
 | Guardian approves but executor refuses | Policy allowlist wider than executor ceiling | `executor.yaml` vs policy constraint |
 | Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `intentframe_native_bundles/actions/*/constraints.py` |
-| Write-file action skipped the critical lane | Missing from `critical_write_file` route | `intentframe_components/prompt/strategy.py` |
-| Read action ran a full AE call it didn't need | Missing from `_PASSIVE_READ_ACTIONS` | `intentframe_components/analysis/engine.py` |
-| Delete action didn't require confirmation | Missing from `CRITICAL_ACTIONS` | `intentframe_components/routing/criticality.py` |
-| New write action didn't get File Shield intel | `build_file_intel` / `_HOST_PATH_ACTIONS` condition too narrow | `intentframe_server/file_intel.py` |
+| Write action missing AE system prompt / external context | `build_ai_context()` not implemented or wrong bundle | `intentframe_native_bundles/actions/<family>/bundle.py` |
+| Read action ran full AE when policy marks it safe | Missing from `passive_read_action_ids` | Same bundle class |
+| RUN_COMMAND catastrophic not blocked pre-AE | `prepare_evidence()` not running shield | `actions/terminal/pre_pipeline.py` |
+| WRITE_FILE sensitive path not blocked | `structural_gates()` not wired | `actions/files/deterministic.py` |
 | `/etc/foo` blocked but `/private/etc/foo` allowed (macOS) | Canonicalizer / DENY list asymmetry | `resource_registry/floor.py` + relevant checker |
 | Mirror test green but runtime broken | Test pinning the wrong file | `tests/test_jarvis_host_scope_mirror.py` |
 | LLM keeps picking `RUN_COMMAND` over the structured tool | Tool docstring not discouraging shell alternatives | `jarvis_pa/jarvis/tools.py` |
@@ -212,6 +221,7 @@ The goal is for this doc to become the one place where the cross-cutting fan-out
 
 ## Related documents
 
+- [\_internal\_/substrate-plugin-refactor.md](../_internal_/substrate-plugin-refactor.md) — why and how the bundle SDK refactor was done; gate parity with legacy.
 - `TODO/shell-mode-host-file-tools-for-jarvis.md` — concrete walkthrough of a real action-family rollout (HOST_FILE).
 - `docs/vfs-vs-host-tools.md` — when to use VFS vs host file tools, and
   why a real product profile should usually expose only one family to a

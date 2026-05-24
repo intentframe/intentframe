@@ -1,7 +1,8 @@
 # Substrate vocabulary hygiene — remaining action literals in `intentframe_components`
 
-> Follow-up to PR A (path heuristics → files bundle) and PR B (onboarding → `intentframe_action_bundle.onboarding`).  
-> Pre-refactor baseline: `66e567c` (`pre-refactor` tag if created locally).
+> **Context:** [docs/_internal_/substrate-plugin-refactor.md](../../docs/_internal_/substrate-plugin-refactor.md) — completed bundle SDK refactor (May 2026).  
+> Follow-up to path heuristics → files bundle and onboarding → `intentframe_native_bundles.onboarding`.  
+> Pre-refactor baseline: `66e567c` (`pre-refactor` tag).
 
 ---
 

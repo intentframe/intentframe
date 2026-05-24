@@ -87,7 +87,7 @@ The rest of this doc walks each module in turn.
 | **Why** | Substrate orchestrates; plugins own action/domain logic. The SDK is action- and domain-agnostic — no family-specific constraint field names or industry vocabulary. |
 | **Where** | `intentframe_bundle_sdk/` |
 | **Process** | None — imported by `intentframe_components`, `intentframe_native_bundles`, and tests. |
-| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | Module docstrings in `loader.py`, `action.py`, `runner.py`. |
 
 ### `intentframe_native_bundles/`
@@ -98,7 +98,7 @@ The rest of this doc walks each module in turn.
 | **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Domain bundles do not import action bundles; routing is separate metadata. |
 | **Where** | `intentframe_native_bundles/` |
 | **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_bundles"])`. |
-| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | None — see `register_bundles` in `__init__.py`. |
 
 ---
@@ -120,7 +120,7 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | The pipeline runtime — `pipeline.py` (`IntentFrameRuntime`), `server.py` (FastAPI app), `client.py` (HTTP/UDS client used by the Actor SDK and Dashboard), `enrichers/`, `dry_run_executor.py`, `file_intel.py`. |
+| **What** | The pipeline runtime — `pipeline.py` (`IntentFrameRuntime`), `server.py` (FastAPI app), `client.py` (HTTP/UDS client used by the Actor SDK and Dashboard), `enrichers/`, `dry_run_executor.py`. File/command intel is built inside bundle `prepare_evidence()` hooks, not in this package. |
 | **Why** | The pipeline needs a service surface so the Actor SDK can submit intents from a different process. This is that service. |
 | **Where** | `intentframe_server/` |
 | **Process** | `intentframe-core` (uvicorn) on `~/.intentframe/run/intentframe.sock`, started by the supervisor. This is the process that calls OpenAI for AE + Guardian. |
