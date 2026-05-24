@@ -360,8 +360,8 @@ class TestAnalysisEnginePrompt:
         return IntentFrame(**defaults)
 
     def _build_prompt(self, intent=None, signals=()):
-        from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
-        from intentframe_action_bundle.terminal.evidence import TERMINAL_COMMAND_SIGNALS_KEY
+        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_bundles.actions.terminal.evidence import TERMINAL_COMMAND_SIGNALS_KEY
         from intentframe_components.analysis.engine import AIAnalysisEngine
         from intentframe_bundle_sdk.types import ActionPermission as SdkActionPermission
         from intentframe_bundle_sdk.types import BundleContext

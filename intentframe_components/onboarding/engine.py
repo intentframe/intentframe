@@ -4,7 +4,7 @@ AI-Powered Onboarding Engine
 Uses OpenAI Agents to dynamically generate context for any agent type.
 
 Substrate orchestration only — action-family vocabulary and constraint
-summaries live in ``intentframe_action_bundle.onboarding``.
+summaries live in ``intentframe_native_bundles.onboarding``.
 """
 
 from datetime import datetime, timezone
@@ -18,7 +18,7 @@ from agents import Agent, ModelSettings, Runner
 from intentframe_core.types import AgentCapabilities, ExecutionContext, RuntimeContext, UserContext
 from intentframe_components.onboarding.base import OnboardingEngine
 from intentframe_components.prompt.logging import log_prompt_dump
-from intentframe_action_bundle.onboarding import (
+from intentframe_native_bundles.onboarding import (
     build_onboarding_instructions,
     root_execution_environment_section,
     summarize_constraints_for_onboarding,

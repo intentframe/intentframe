@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from intentframe_action_bundle import _ensure_first_party_bundles_loaded
+from intentframe_native_bundles import _ensure_first_party_bundles_loaded
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.types import ActionPermission, action_permission_from_policy
 from policy_registry.models import ActionPermission as PolicyActionPermission

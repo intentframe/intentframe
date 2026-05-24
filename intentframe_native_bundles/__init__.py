@@ -1,4 +1,4 @@
-"""First-party action bundles — lazy public exports and registration."""
+"""First-party native bundles — lazy public exports and registration."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from intentframe_bundle_sdk.registry import (
 )
 
 _BUNDLES_LOADED = False
+
 
 def ensure_bundles_registered() -> None:
     """Load first-party bundles into the global SDK registry."""
@@ -24,26 +25,23 @@ __all__ = [
 
 def register_bundles(registry) -> None:
     """First-party register entry point."""
-    from intentframe_action_bundle.api.bundle import ApiActionBundle
-    from intentframe_action_bundle.browser.bundle import BrowserActionBundle
-    from intentframe_action_bundle.calendar.bundle import CalendarActionBundle
-    from intentframe_action_bundle.clipboard.bundle import ClipboardActionBundle
-    from intentframe_action_bundle.contacts.bundle import ContactsActionBundle
-    from intentframe_action_bundle.deletion.bundle import DeletionDomainBundle
-    from intentframe_action_bundle.email.bundle import EmailActionBundle
-    from intentframe_action_bundle.files.bundle import FilesActionBundle
-    from intentframe_action_bundle.finance.bundle import (
-        FinanceActionBundle,
-        FinanceDomainBundle,
-    )
-    from intentframe_action_bundle.host_files.bundle import HostFilesActionBundle
-    from intentframe_action_bundle.message.bundle import MessageActionBundle
-    from intentframe_action_bundle.notes.bundle import NotesActionBundle
-    from intentframe_action_bundle.reminders.bundle import RemindersActionBundle
-    from intentframe_action_bundle.spotlight.bundle import SpotlightActionBundle
-    from intentframe_action_bundle.system.bundle import SystemActionBundle
-    from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
-    from intentframe_action_bundle.user_io.bundle import UserIoActionBundle
+    from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+    from intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
+    from intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
+    from intentframe_native_bundles.actions.clipboard.bundle import ClipboardActionBundle
+    from intentframe_native_bundles.actions.contacts.bundle import ContactsActionBundle
+    from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+    from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+    from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
+    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+    from intentframe_native_bundles.actions.notes.bundle import NotesActionBundle
+    from intentframe_native_bundles.actions.reminders.bundle import RemindersActionBundle
+    from intentframe_native_bundles.actions.spotlight.bundle import SpotlightActionBundle
+    from intentframe_native_bundles.actions.system.bundle import SystemActionBundle
+    from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+    from intentframe_native_bundles.actions.user_io.bundle import UserIoActionBundle
+    from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 
     for bundle in (
         TerminalActionBundle(),
@@ -51,7 +49,6 @@ def register_bundles(registry) -> None:
         HostFilesActionBundle(),
         EmailActionBundle(),
         ApiActionBundle(),
-        FinanceActionBundle(),
         BrowserActionBundle(),
         MessageActionBundle(),
         CalendarActionBundle(),

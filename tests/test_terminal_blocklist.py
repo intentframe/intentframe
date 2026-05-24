@@ -23,12 +23,12 @@ import pytest
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry, SYSTEM_TERMINAL_BLOCKED_PATTERNS
-from intentframe_action_bundle.terminal.ae_fast_path import (
+from intentframe_native_bundles.actions.terminal.ae_fast_path import (
     CATASTROPHIC_COMMAND_PATTERNS,
     try_catastrophic_report,
 )
-from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
-from intentframe_action_bundle.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
+from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
 from intentframe_core.enums import RiskLevel, Reversibility
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import (
@@ -556,7 +556,7 @@ class TestComponentIndependence:
         assert "sudo" in SYSTEM_TERMINAL_BLOCKED_PATTERNS
 
         # Terminal bundle catastrophic patterns
-        from intentframe_action_bundle.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
+        from intentframe_native_bundles.actions.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
         assert "sudo" in CATASTROPHIC_COMMAND_PATTERNS
 
         # Terminal bundle constraint enforcement
@@ -575,7 +575,7 @@ class TestComponentIndependence:
 
     def test_each_layer_covers_original_six_patterns(self):
         """Policy registry, terminal bundle, and command_shield all know the original six."""
-        from intentframe_action_bundle.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
+        from intentframe_native_bundles.actions.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
 
         expected = {"sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777"}
 

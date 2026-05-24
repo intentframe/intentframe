@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from intentframe_action_bundle.files.evidence import FileIntel
+from intentframe_native_bundles.actions.files.evidence import FileIntel
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.files.actions import WRITE_FILE_ACTIONS
-from intentframe_action_bundle.files.file_intel import build_file_intel
+from intentframe_native_bundles.actions.files.actions import WRITE_FILE_ACTIONS
+from intentframe_native_bundles.actions.files.file_intel import build_file_intel
 
 
 def run_files_pre_pipeline(

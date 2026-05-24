@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from intentframe_action_bundle.terminal.evidence import CommandIntel
-from intentframe_action_bundle.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_bundles.actions.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
 
 
 def render_terminal_external_context(terminal_command_signals: tuple) -> str:

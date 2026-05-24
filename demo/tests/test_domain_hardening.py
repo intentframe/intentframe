@@ -27,11 +27,11 @@ from action_registry.types import DomainType, ACTION_DOMAINS
 from intentframe_core.types import IntentFrame
 from intentframe_core.domains import DOMAIN_SCHEMAS
 from policy_registry.models import UserPolicy
-from intentframe_action_bundle.deletion.bundle import DeletionDomainBundle
-from intentframe_action_bundle.deletion.constraints import DeletionConstraints
-from intentframe_action_bundle.domain_routes import DOMAIN_ROUTES
-from intentframe_action_bundle.finance.bundle import FinanceDomainBundle
-from intentframe_action_bundle.finance.constraints import FinanceConstraints
+from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
+from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
+from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+from intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
 from intentframe_bundle_sdk.types import PhaseDecision
 from policy_registry.domains.base import DomainConstraints
 

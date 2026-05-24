@@ -8,9 +8,9 @@ from dataclasses import replace
 import pytest
 
 from action_registry.types import ActionType, DomainType
-from intentframe_action_bundle import ensure_bundles_registered
-from intentframe_action_bundle.files.bundle import FilesActionBundle
-from intentframe_action_bundle.finance.bundle import FinanceDomainBundle
+from intentframe_native_bundles import ensure_bundles_registered
+from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 from intentframe_bundle_sdk.registry import action_bundle_for, domain_bundle_for
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
@@ -121,7 +121,7 @@ def test_passive_read_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_email_bundle_selected_for_reply() -> None:
-    from intentframe_action_bundle.email.bundle import EmailActionBundle
+    from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
 
     bundle = action_bundle_for(ActionType.REPLY_EMAIL.value)
     assert isinstance(bundle, EmailActionBundle)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from action_registry.types import ActionType
 
-from intentframe_action_bundle.onboarding.guardrail_sections import (
+from intentframe_native_bundles.onboarding.guardrail_sections import (
     guardrail_generation_sections,
 )
 

@@ -8,8 +8,8 @@ import re
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.email.constraints import EmailConstraints
-from intentframe_action_bundle.email.enrich import EMAIL_MESSAGE_ACTIONS, enrich_intent
+from intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_bundles.actions.email.enrich import EMAIL_MESSAGE_ACTIONS, enrich_intent
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,

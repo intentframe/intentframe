@@ -29,9 +29,9 @@ from __future__ import annotations
 import pytest
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.terminal.evidence import CommandIntel
-from intentframe_action_bundle import passive_read_action_ids
-from intentframe_action_bundle.terminal._read_only import READ_ONLY_INCOMPATIBLE
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_bundles import passive_read_action_ids
+from intentframe_native_bundles.actions.terminal._read_only import READ_ONLY_INCOMPATIBLE
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
@@ -541,7 +541,7 @@ class TestFailClosedExceptionHandling:
         """
         dg = DeterministicGuardian()
 
-        from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
         from policy_registry.constraints.terminal import TerminalConstraints
 
         def raise_boom(*args, **kwargs):

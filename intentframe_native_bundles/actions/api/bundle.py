@@ -7,7 +7,7 @@ import fnmatch
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,
@@ -19,6 +19,7 @@ from intentframe_bundle_sdk.types import (
 class ApiActionBundle(ActionBundle):
     bundle_id = "api"
     action_ids = frozenset({
+        ActionType.PAY_INVOICE.value,
         ActionType.HTTP_GET.value,
         ActionType.HTTP_POST.value,
         "HTTP_PUT",

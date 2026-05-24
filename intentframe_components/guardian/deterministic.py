@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from intentframe_action_bundle import _ensure_first_party_bundles_loaded
+from intentframe_native_bundles import _ensure_first_party_bundles_loaded
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext

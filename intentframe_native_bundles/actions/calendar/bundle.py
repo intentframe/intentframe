@@ -5,7 +5,7 @@ from __future__ import annotations
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.calendar.constraints import CalendarConstraints
+from intentframe_native_bundles.actions.calendar.constraints import CalendarConstraints
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,

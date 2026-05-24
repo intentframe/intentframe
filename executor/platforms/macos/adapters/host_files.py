@@ -141,7 +141,7 @@ class HostFilesAdapter(CapabilityAdapter):
             ActionType.WRITE_HOST_FILE.value,
             ActionType.DELETE_HOST_FILE.value,
         }:
-            from intentframe_action_bundle.executor.floors import check_host_file_floor
+            from intentframe_native_bundles.executor.floors import check_host_file_floor
 
             matched = check_host_file_floor(canonical, action)
             if matched is not None:

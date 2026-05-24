@@ -6,23 +6,23 @@ import fnmatch
 
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.terminal import ACTION_IDS
-from intentframe_action_bundle.terminal._capability_match import (
+from intentframe_native_bundles.actions.terminal import ACTION_IDS
+from intentframe_native_bundles.actions.terminal._capability_match import (
     any_tag_matches,
     matches_any,
 )
-from intentframe_action_bundle.terminal._read_only import is_read_only_fast_path
-from intentframe_action_bundle.terminal.ai_context import (
+from intentframe_native_bundles.actions.terminal._read_only import is_read_only_fast_path
+from intentframe_native_bundles.actions.terminal.ai_context import (
     render_terminal_external_context,
     select_terminal_ae_system_instructions,
 )
-from intentframe_action_bundle.terminal.constraints import TerminalConstraints
-from intentframe_action_bundle.terminal.evidence import (
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
     CommandIntel,
 )
-from intentframe_action_bundle.terminal.pre_pipeline import run_terminal_pre_pipeline
+from intentframe_native_bundles.actions.terminal.pre_pipeline import run_terminal_pre_pipeline
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,

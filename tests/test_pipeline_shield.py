@@ -26,8 +26,8 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
-from intentframe_action_bundle.terminal.evidence import CommandIntel
-from intentframe_action_bundle.terminal.evidence_keys import COMMAND_INTEL_KEY
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_bundles.actions.terminal.evidence_keys import COMMAND_INTEL_KEY
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 from intentframe_server.pipeline import IntentFrameRuntime
 from policy_registry.models import ActionPermission
@@ -493,14 +493,14 @@ class TestCommandIntelPlumbing:
         assert "TERMINAL COMMAND" not in ai_ctx.ae_external_context
 
     def test_command_intel_is_bounded(self):
-        from intentframe_action_bundle.terminal.evidence import CommandIntel
+        from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 
         huge_caps = tuple(f"capability:x{i}:y" for i in range(5000))
         intel = CommandIntel(capabilities=huge_caps)
         assert len(intel.capabilities) <= 64
 
     def test_command_intel_is_frozen(self):
-        from intentframe_action_bundle.terminal.evidence import CommandIntel
+        from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 
         intel = CommandIntel(verdict="SAFE")
         with pytest.raises(Exception):
@@ -656,7 +656,7 @@ class TestDgExceptionFailClosed:
             del args, kwargs
             raise RuntimeError("boom")
 
-        from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
 
         monkeypatch.setattr(TerminalActionBundle, "enforce_constraints", raise_boom)
 

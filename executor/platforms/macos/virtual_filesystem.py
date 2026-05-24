@@ -22,7 +22,7 @@ from executor.services.virtual_filesystem import (
     MountPointResolver,
     VirtualFileSystem,
 )
-from intentframe_action_bundle.executor.floors import check_vfs_write_floor
+from intentframe_native_bundles.executor.floors import check_vfs_write_floor
 
 logger = logging.getLogger(__name__)
 

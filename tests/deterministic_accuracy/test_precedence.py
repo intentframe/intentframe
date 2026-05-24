@@ -19,7 +19,7 @@ from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
-from intentframe_action_bundle.terminal.evidence import CommandIntel
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_core.types import IntentFrame, UserContext
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission

@@ -27,8 +27,8 @@ import pytest
 
 from action_registry.types import ActionType
 from command_shield import inspect_command
-from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
-from intentframe_action_bundle.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
+from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseDecision
 from policy_registry.constraints.terminal import TerminalConstraints

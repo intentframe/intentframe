@@ -7,7 +7,7 @@ and ``DELETE_HOST_FILE``. Host-specific logic lives here:
 - ``deterministic`` — deny-floor BLOCK gates for host mutations
 
 Write-payload tooling (FileIntel pre-pipeline, AE context, prompt bodies)
-is imported from ``intentframe_action_bundle.files`` — that package is the
+is imported from ``intentframe_native_bundles.actions.files`` — that package is the
 canonical owner; this family reuses it rather than duplicating it.
 
 Do not move virtual-path helpers into this package, and do not call

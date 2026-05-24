@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.terminal.evidence import CommandIntel
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,

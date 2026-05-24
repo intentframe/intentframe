@@ -103,7 +103,7 @@ def load_policy_seed(
 def _validate_loaded_policy(policy: UserPolicy) -> None:
     if not policy.domain_constraints:
         return
-    from intentframe_action_bundle import ensure_bundles_registered
+    from intentframe_native_bundles import ensure_bundles_registered
     from intentframe_bundle_sdk.registry import validate_policy_domain_constraints
 
     ensure_bundles_registered()

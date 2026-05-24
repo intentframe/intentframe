@@ -5,8 +5,10 @@ from __future__ import annotations
 import pytest
 
 from action_registry.types import ACTION_DOMAINS, ActionType, DomainType
-from intentframe_action_bundle import ensure_bundles_registered
+from intentframe_native_bundles import ensure_bundles_registered
+from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
 from intentframe_bundle_sdk.registry import (
+    action_bundle_for,
     domain_bundle_for,
     validate_policy_domain_constraints,
 )
@@ -15,6 +17,13 @@ from intentframe_bundle_sdk.registry import (
 @pytest.fixture(autouse=True)
 def _register_bundles() -> None:
     ensure_bundles_registered()
+
+
+def test_pay_invoice_owned_by_api_action_bundle_not_finance_family() -> None:
+    bundle = action_bundle_for(ActionType.PAY_INVOICE.value)
+    assert bundle is not None
+    assert isinstance(bundle, ApiActionBundle)
+    assert bundle.bundle_id == "api"
 
 
 def test_action_domains_cover_finance_and_deletion() -> None:

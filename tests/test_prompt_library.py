@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from intentframe_action_bundle.files.prompts_ae import _CRITICAL_WRITE_FILE
-from intentframe_action_bundle.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
+from intentframe_native_bundles.actions.files.prompts_ae import _CRITICAL_WRITE_FILE
+from intentframe_native_bundles.actions.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_prompt_library.library import (

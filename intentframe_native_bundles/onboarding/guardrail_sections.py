@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from action_registry.types import ActionType
 
-from intentframe_action_bundle.onboarding.action_groups import (
+from intentframe_native_bundles.onboarding.action_groups import (
     HOST_FILE_ACTIONS,
     MUTATING_FILE_ACTIONS,
     OUTBOUND_EMAIL_ACTIONS,

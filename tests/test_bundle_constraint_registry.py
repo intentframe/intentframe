@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 
-from intentframe_action_bundle import ensure_bundles_registered
+from intentframe_native_bundles import ensure_bundles_registered
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.registry import action_bundle_for, all_action_bundles
 from jarvis.policies import builtin_policy_path

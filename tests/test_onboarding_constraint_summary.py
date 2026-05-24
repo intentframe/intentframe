@@ -50,8 +50,8 @@ from __future__ import annotations
 
 import pytest
 
-from intentframe_action_bundle.onboarding import build_onboarding_instructions
-from intentframe_action_bundle import ensure_bundles_registered
+from intentframe_native_bundles.onboarding import build_onboarding_instructions
+from intentframe_native_bundles import ensure_bundles_registered
 from intentframe_components.onboarding.engine import AIOnboardingEngine
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import SemanticIntentLimit

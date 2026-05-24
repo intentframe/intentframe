@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from command_shield import Verdict, inspect_command as shield_inspect
-from intentframe_action_bundle.terminal.evidence import CommandIntel
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_core.types import ExecutionResult, IntentFrame
 
 

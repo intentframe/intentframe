@@ -7,7 +7,7 @@ import fnmatch
 from action_registry.types import DomainType
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.deletion.constraints import DeletionConstraints
+from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
 from intentframe_bundle_sdk.domain import DomainBundle
 from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 

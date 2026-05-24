@@ -7,7 +7,7 @@ import fnmatch
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 
-from intentframe_action_bundle.message.constraints import MessageConstraints
+from intentframe_native_bundles.actions.message.constraints import MessageConstraints
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,

@@ -25,7 +25,7 @@ class DeletionConstraints(DomainConstraints):
     Path-vocabulary warning:
         ``allowed_paths`` uses raw string matching against the action's
         ``target_path`` (see
-        :meth:`intentframe_action_bundle.deletion.bundle.DeletionDomainBundle._path_matches`).
+        :meth:`intentframe_native_bundles.domains.deletion.bundle.DeletionDomainBundle._path_matches`).
         It is **vocabulary-blind** — ``fnmatch`` / ``startswith`` never
         applies ``normalize_virtual_path`` or ``canonicalize_real_path``.
         Because a single :class:`DeletionConstraints` instance is shared

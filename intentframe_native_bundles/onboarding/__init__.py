@@ -1,11 +1,11 @@
 """Bundle-owned onboarding vocabulary and constraint summaries."""
 
-from intentframe_action_bundle.onboarding.deny_capabilities import summarize_deny_capabilities
-from intentframe_action_bundle.onboarding.instructions import (
+from intentframe_native_bundles.onboarding.deny_capabilities import summarize_deny_capabilities
+from intentframe_native_bundles.onboarding.instructions import (
     build_onboarding_instructions,
     root_execution_environment_section,
 )
-from intentframe_action_bundle.onboarding.summarize_constraints import (
+from intentframe_native_bundles.onboarding.summarize_constraints import (
     summarize_constraints_for_onboarding,
 )
 
