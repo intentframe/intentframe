@@ -21,6 +21,7 @@ what to do next — ask the user, retry differently, or skip.
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -156,6 +157,36 @@ class IntentFrameRuntime:
         self.audit_log: list = []
         self._request_counter = 0
         self._lock = asyncio.Lock()
+
+    async def startup(self) -> None:
+        """Warm bundle-owned resources after registration."""
+        from intentframe_bundle_sdk.lifecycle import startup_bundles
+
+        await startup_bundles()
+
+    async def aclose(self) -> None:
+        """Release runtime-owned and bundle-owned resources."""
+        from intentframe_bundle_sdk.lifecycle import shutdown_bundles
+
+        try:
+            await shutdown_bundles()
+        finally:
+            await self._close_executor()
+
+    @staticmethod
+    async def _close_executor_resource(executor: Executor) -> None:
+        """Call ``aclose`` or ``close`` on an executor; await if async."""
+        for name in ("aclose", "close"):
+            method = getattr(executor, name, None)
+            if method is None:
+                continue
+            result = method()
+            if inspect.isawaitable(result):
+                await result
+            return
+
+    async def _close_executor(self) -> None:
+        await self._close_executor_resource(self.executor)
 
     @staticmethod
     def _log_executor_result(intent: IntentFrame, result: ExecutionResult) -> None:

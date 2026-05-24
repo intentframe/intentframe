@@ -53,7 +53,7 @@ Deterministic enforcement is **not one layer**. It is the same conceptual job sp
 |                     → CATASTROPHIC? early return BLOCK           |
 |                     → else CommandIntel + terminal_signals       |
 |        WRITE_FILE / WRITE_HOST_FILE → build_file_intel           |
-|        (all actions) → enrich_email_intent (no-op if not email)  |
+|        (email message actions) → EmailActionBundle.enrich()      |
 |                                                                  |
 |   [DG] DeterministicGuardian.decide (pre-AE)                     |
 |        permission → constraint checker → domain module           |
@@ -170,7 +170,7 @@ These sets live in **components source** — policy cannot express them today:
 | `command_shield_catastrophic` | `intentframe_server/pipeline.py` L501–535 | `RUN_COMMAND` + command present | BLOCK, never reaches DG | **Yes — RUN_COMMAND only** |
 | `command_intel_build` | pipeline L543–563 | same | Evidence for downstream | **Yes — RUN_COMMAND** |
 | `file_intel_build` | pipeline + `file_intel.py` | `WRITE_FILE`, `WRITE_HOST_FILE` + string content | Evidence | **Yes — write family** |
-| `email_enrich` | `enrichers/email.py` | 7 email message actions | Mutates intent target/data | **Yes — email set** |
+| `email_enrich` | `intentframe_native_bundles/actions/email/bundle.py` | 7 email message actions | Mutates intent target/data via bundle `enrich()` | **Yes — email set** |
 | `permission` | `deterministic.py` L197–203 | action not in `allowed_actions` | BLOCK | **Generic** (per-action key) |
 | `constraint` | DG L207–220 | `permission.constraints` type | BLOCK | **Generic dispatch**, family checker |
 | `domain` | DG L222–236 | `ACTION_DOMAINS[intent.action]` | BLOCK | **Per-action map** in action_registry |
@@ -578,7 +578,7 @@ not a gate.
   prompt/strategy.py              |    *    |       ***       |      **
   routing/criticality.py          |    -    |       ***       |      ***
   guardian/checkers/*             |   **    |        *        |       *
-  enrichers/email.py              |    -    |       ***       |      **
+  intentframe_native_bundles/actions/email/bundle.py |    -    |       ***       |      **
   file_intel.py                   |    -    |       **        |       *
   command_shield                  | family  |     RUN_COMMAND |       -
   executor adapters               |  floor  |     per-action  |       -

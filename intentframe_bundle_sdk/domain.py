@@ -41,3 +41,11 @@ class DomainBundle(ABC):
     def describe(self, domain_constraints: dict[str, Any] | None) -> str | None:
         del domain_constraints
         return None
+
+    async def startup(self) -> None:
+        """Optional one-shot init after registration. Must be idempotent."""
+        return None
+
+    async def aclose(self) -> None:
+        """Optional resource release on shutdown. Must be idempotent."""
+        return None

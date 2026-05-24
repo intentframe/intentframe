@@ -86,6 +86,7 @@ def test_registry_rejects_passive_read_not_subset() -> None:
 
 def test_bundle_hooks_never_accept_user_context() -> None:
     hook_names = (
+        "startup",
         "prepare_evidence",
         "enrich",
         "validate_constraints",
@@ -94,6 +95,7 @@ def test_bundle_hooks_never_accept_user_context() -> None:
         "allow_gates",
         "build_ai_context",
         "describe_constraints",
+        "aclose",
     )
     for bundle in all_action_bundles():
         for name in hook_names:
@@ -102,7 +104,7 @@ def test_bundle_hooks_never_accept_user_context() -> None:
                 f"{bundle.bundle_id}.{name} must not accept user_context"
             )
     for domain in all_domain_bundles():
-        for name in ("validate", "enforce", "describe"):
+        for name in ("startup", "validate", "enforce", "describe", "aclose"):
             sig = inspect.signature(getattr(domain, name))
             assert "user_context" not in sig.parameters, (
                 f"{domain.domain_id}.{name} must not accept user_context"

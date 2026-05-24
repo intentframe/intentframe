@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
@@ -20,21 +20,16 @@ EMAIL_MESSAGE_ACTIONS = frozenset({
     ActionType.DOWNLOAD_ATTACHMENT.value,
 })
 
-_email_client: Any | None = None
+
+class EmailLookupClient(Protocol):
+    async def get_email(self, message_id: str, *, headers_only: bool = ...) -> Any: ...
 
 
-async def _get_email_client() -> Any:
-    global _email_client
-    if _email_client is None:
-        from external_data_ingestion.email.client import EmailClient
-
-        _email_client = await EmailClient.create()
-    return _email_client
-
-
-async def _resolve_email_context(message_id: str) -> dict[str, Any]:
+async def _resolve_email_context(
+    client: EmailLookupClient,
+    message_id: str,
+) -> dict[str, Any]:
     try:
-        client = await _get_email_client()
         email = await client.get_email(message_id, headers_only=True)
         if email is None:
             return {}
@@ -81,7 +76,7 @@ def _build_email_target(intent: IntentFrame, meta: dict[str, Any]) -> str:
     return message_id
 
 
-async def enrich_intent(intent: IntentFrame) -> IntentFrame:
+async def enrich_intent(intent: IntentFrame, *, client: EmailLookupClient) -> IntentFrame:
     if intent.action.value not in EMAIL_MESSAGE_ACTIONS:
         return intent
 
@@ -90,7 +85,7 @@ async def enrich_intent(intent: IntentFrame) -> IntentFrame:
     if not message_id:
         return intent
 
-    meta = await _resolve_email_context(message_id)
+    meta = await _resolve_email_context(client, message_id)
 
     for key, value in meta.items():
         if not data.get(key):
@@ -106,10 +101,3 @@ async def enrich_intent(intent: IntentFrame) -> IntentFrame:
         target = _build_email_target(intent, meta)
 
     return intent.model_copy(update={"target": target, "data": data})
-
-
-async def close() -> None:
-    global _email_client
-    if _email_client is not None:
-        await _email_client.close()
-        _email_client = None

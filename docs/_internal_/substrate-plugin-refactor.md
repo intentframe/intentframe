@@ -262,12 +262,14 @@ Questions and concerns raised during the refactor (May 22–24, 2026). Agent tra
 
 ```python
 class ActionBundle:
-    prepare_evidence → enrich → validate_constraints (startup)
+    startup → prepare_evidence → enrich → validate_constraints (startup)
     → enforce_constraints → structural_gates → allow_gates
     → build_ai_context + describe_constraints (UNDECIDED path)
+    → aclose (shutdown)
 
 class DomainBundle:
-    validate (startup) → enforce → describe (UNDECIDED path)
+    startup → validate (startup) → enforce → describe (UNDECIDED path)
+    → aclose (shutdown)
 ```
 
 Gate order is **owned by DeterministicRunner** — authors do not override ordering.
@@ -288,7 +290,7 @@ Boot: `ensure_loaded(["intentframe_native_bundles"])` then `validate_policy_agai
 |------|-------|
 | Orphan copies under `intentframe_native_bundles/{files,terminal,...}/` (top-level, not under `actions/`) | Not imported; safe to delete |
 | `onboarding/engine.py` imports native onboarding | Optional decouple |
-| `intentframe_server/enrichers/email.py` imports native enrich | Optional decouple |
+| ~~`intentframe_server/enrichers/email.py` imports native enrich~~ | Done — bundle owns `EmailClient` lifecycle via `aclose()` |
 | `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Debate: server-only boot vs seed validation |
 | `intentframe_components/TODO/*.md` | References pre-refactor paths (criticality, strategy.py) |
 | Commit `TODO/new_plan.md` | Plan doc still untracked in some snapshots |

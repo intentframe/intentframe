@@ -120,7 +120,7 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | The pipeline runtime — `pipeline.py` (`IntentFrameRuntime`), `server.py` (FastAPI app), `client.py` (HTTP/UDS client used by the Actor SDK and Dashboard), `enrichers/`, `dry_run_executor.py`. File/command intel is built inside bundle `prepare_evidence()` hooks, not in this package. |
+| **What** | The pipeline runtime — `pipeline.py` (`IntentFrameRuntime`), `server.py` (FastAPI app), `client.py` (HTTP/UDS client used by the Actor SDK and Dashboard), `dry_run_executor.py`. File/command intel and email enrichment run inside bundle hooks, not in this package. |
 | **Why** | The pipeline needs a service surface so the Actor SDK can submit intents from a different process. This is that service. |
 | **Where** | `intentframe_server/` |
 | **Process** | `intentframe-core` (uvicorn) on `~/.intentframe/run/intentframe.sock`, started by the supervisor. This is the process that calls OpenAI for AE + Guardian. |

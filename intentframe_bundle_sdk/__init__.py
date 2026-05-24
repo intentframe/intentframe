@@ -12,11 +12,14 @@ Contract summary:
   substrate reads :class:`BundleAIContext` prepared by the runner.
 - Plugin packages register via ``register_bundles(registry)``; use
   :func:`ensure_loaded` as the single boot path.
+- Optional :meth:`ActionBundle.startup` / :meth:`ActionBundle.aclose` hooks
+  release bundle-owned resources; see :mod:`intentframe_bundle_sdk.lifecycle`.
 """
 
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.domain import DomainBundle
 from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
+from intentframe_bundle_sdk.lifecycle import shutdown_bundles, startup_bundles
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     all_action_bundles,
@@ -65,6 +68,8 @@ __all__ = [
     "DeterministicRunner",
     "DomainBundle",
     "ensure_loaded",
+    "shutdown_bundles",
+    "startup_bundles",
     "action_bundle_for",
     "action_permission_from_policy",
     "all_action_bundles",

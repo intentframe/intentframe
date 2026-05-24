@@ -79,9 +79,12 @@ Post-refactor, family-specific deterministic and prompt logic lives on the **Act
   - `allow_gates()` — custom ALLOW fast paths (e.g. terminal read-only)
   - `build_ai_context()` — AE system instructions + external context string
   - `describe_constraints()` — optional; runner fallback is `str(constraints)`
+  - `startup()` / `aclose()` — optional; open and release bundle-owned external resources (IMAP clients, pools, background tasks). Must be idempotent. The runtime calls `startup_bundles()` / `shutdown_bundles()` on boot/shutdown; substrate never imports plugin modules directly.
 - `passive_read_action_ids` on the bundle — SDK-owned passive-read ALLOW (declare subset of `action_ids`)
 - `intentframe_prompt_library/` — substrate default prompt fragments; bundles override via `build_ai_context()`
 - See [\_internal\_/substrate-plugin-refactor.md](../_internal_/substrate-plugin-refactor.md) for gate order vs legacy `66e567c`.
+- Resource audit: `tests/test_native_bundles_resource_audit.py` guards against module-level client singletons. Only `email` owns an external client today; `browser`, `api`, `host_files`, and `terminal` are pure constraint/evidence bundles with default no-op `aclose()`.
+- Future multi-resource bundles: see the ``AsyncExitStack`` note in `intentframe_bundle_sdk/action.py`.
 
 ### 6. Agent + onboarding (LLM-visible surface)
 

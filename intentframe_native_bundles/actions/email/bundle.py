@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import re
+from typing import Any
 
 from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
@@ -42,6 +44,22 @@ class EmailActionBundle(ActionBundle):
     action_ids = _EMAIL_BUNDLE_ACTIONS
     passive_read_action_ids = _EMAIL_READ_ACTIONS
 
+    def __init__(self) -> None:
+        self._client: Any | None = None
+        self._client_lock = asyncio.Lock()
+        self._closed = False
+
+    async def _get_client(self) -> Any:
+        if self._client is None:
+            async with self._client_lock:
+                if self._client is None:
+                    if self._closed:
+                        raise RuntimeError("EmailActionBundle is closed")
+                    from external_data_ingestion.email.client import EmailClient
+
+                    self._client = await EmailClient.create()
+        return self._client
+
     async def enrich(
         self,
         intent: IntentFrame,
@@ -51,8 +69,15 @@ class EmailActionBundle(ActionBundle):
     ) -> BundlePhaseOutcome:
         del verbose
         if intent.action.value in EMAIL_MESSAGE_ACTIONS:
-            ctx.enriched_intent = await enrich_intent(intent)
+            client = await self._get_client()
+            ctx.enriched_intent = await enrich_intent(intent, client=client)
         return BundlePhaseOutcome.continue_(ctx)
+
+    async def aclose(self) -> None:
+        self._closed = True
+        client, self._client = self._client, None
+        if client is not None:
+            await client.close()
 
     def validate_constraints(self, action_permission: ActionPermission) -> None:
         if action_permission.constraints is not None:
