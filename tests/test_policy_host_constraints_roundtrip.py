@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from intentframe_native_bundles import ensure_bundles_registered
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_native_bundles.actions.files.constraints import FileConstraints
 from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
 from intentframe_bundle_sdk.registry import action_bundle_for
@@ -15,7 +15,7 @@ from policy_registry.models import ActionPermission, UserPolicy
 
 @pytest.fixture(autouse=True)
 def _register_bundles() -> None:
-    ensure_bundles_registered()
+    ensure_test_bundles_loaded()
 
 
 class TestOpaqueDictStorage:

@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import pytest
 
-from action_registry.types import ACTION_DOMAINS, ActionType, DomainType
-from intentframe_native_bundles import ensure_bundles_registered
+from action_registry.types import ActionType
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     domain_bundle_for,
+    domains_for_action,
+    registered_domain_ids,
+    routed_domain_ids,
     validate_policy_domain_constraints,
 )
 
 
 @pytest.fixture(autouse=True)
 def _register_bundles() -> None:
-    ensure_bundles_registered()
+    ensure_test_bundles_loaded()
 
 
 def test_pay_invoice_owned_by_api_action_bundle_not_finance_family() -> None:
@@ -26,16 +30,31 @@ def test_pay_invoice_owned_by_api_action_bundle_not_finance_family() -> None:
     assert bundle.bundle_id == "api"
 
 
-def test_action_domains_cover_finance_and_deletion() -> None:
-    assert ACTION_DOMAINS[ActionType.PAY_INVOICE] == DomainType.FINANCE
-    assert ACTION_DOMAINS[ActionType.DELETE_FILE] == DomainType.DELETION
-    assert domain_bundle_for(DomainType.FINANCE) is not None
-    assert domain_bundle_for(DomainType.DELETION) is not None
+def test_sdk_domain_routes_cover_finance_and_deletion() -> None:
+    assert domains_for_action(ActionType.PAY_INVOICE.value) == ("finance",)
+    assert domains_for_action(ActionType.DELETE_FILE.value) == ("deletion",)
+    assert domain_bundle_for("finance") is not None
+    assert domain_bundle_for("deletion") is not None
+    assert registered_domain_ids() >= {"finance", "deletion"}
+    assert routed_domain_ids() >= {"finance", "deletion"}
+    assert "PAY_INVOICE" in DOMAIN_ROUTES["finance"]
+    assert "DELETE_FILE" in DOMAIN_ROUTES["deletion"]
 
 
 def test_validate_policy_domain_constraints_requires_registered_bundle() -> None:
     with pytest.raises(ValueError, match="no registered DomainBundle"):
         validate_policy_domain_constraints({"ghost_domain": {"max_amount": 1.0}})
+
+
+def test_validate_policy_domain_constraints_requires_runtime_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import intentframe_bundle_sdk.registry as bundle_registry
+
+    monkeypatch.setattr(bundle_registry, "_ROUTED_DOMAIN_IDS", frozenset())
+
+    with pytest.raises(ValueError, match="has no domain route"):
+        validate_policy_domain_constraints({"finance": {"max_amount": 1.0}})
 
 
 def test_validate_policy_domain_constraints_accepts_configured_domains() -> None:

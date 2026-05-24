@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from intentframe_native_bundles import ensure_bundles_registered
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.registry import (
     all_passive_read_action_ids,
@@ -14,7 +14,7 @@ from intentframe_bundle_sdk.registry import (
 
 @pytest.fixture(autouse=True)
 def _register_bundles() -> None:
-    ensure_bundles_registered()
+    ensure_test_bundles_loaded()
 
 
 def test_passive_read_action_ids_are_subset_of_action_ids() -> None:

@@ -31,7 +31,7 @@ from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBun
 from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseDecision
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
 _TERMINAL_BUNDLE = TerminalActionBundle()
 

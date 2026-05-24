@@ -21,7 +21,7 @@ from intentframe_components.guardian.deterministic import (
 )
 from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_core.types import IntentFrame, UserContext
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 from ._helpers import build_command_intel, run_dg, run_dg_with_intel

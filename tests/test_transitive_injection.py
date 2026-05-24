@@ -29,7 +29,7 @@ from intentframe_components.analysis.engine import AIAnalysisEngine, AIAnalysisO
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_components.prompt.hardening import PromptHardening
 from policy_registry.models import ActionPermission
-from policy_registry.constraints import ApiConstraints
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
 
 
 # ═══════════════════════════════════════════════════════════════════════

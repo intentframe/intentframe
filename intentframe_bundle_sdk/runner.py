@@ -6,9 +6,7 @@ from copy import deepcopy
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from action_registry.types import ACTION_DOMAINS
-
-from intentframe_bundle_sdk.registry import domain_bundle_for
+from intentframe_bundle_sdk.registry import domain_bundle_for, domains_for_action
 from intentframe_bundle_sdk.types import (
     ActionPermission,
     BundleAIContext,
@@ -73,11 +71,14 @@ class DeterministicRunner:
                 return pol.to_deterministic_result()
             ctx = pol.context
 
-        domain_type = ACTION_DOMAINS.get(intent.action)
-        domain_bundle = domain_bundle_for(domain_type) if domain_type else None
-        if domain_bundle is not None:
+        action_id = intent.action.value
+        domain_ids = domains_for_action(action_id)
+        for domain_id in domain_ids:
+            domain_bundle = domain_bundle_for(domain_id)
+            if domain_bundle is None:
+                continue
             slice_ = deepcopy(
-                (user_context.domain_constraints or {}).get(domain_type.value)
+                (user_context.domain_constraints or {}).get(domain_id)
             )
             dr = domain_bundle.enforce(intent, slice_)
             if dr.terminal:
@@ -100,8 +101,7 @@ class DeterministicRunner:
         constraint_ctx = cls.build_constraint_prompt_context(
             bundle,
             action_permission,
-            domain_bundle,
-            domain_type,
+            domain_ids,
             user_context,
         )
         ai_ctx = bundle.build_ai_context(intent, action_permission, ctx)
@@ -112,8 +112,7 @@ class DeterministicRunner:
     def build_constraint_prompt_context(
         bundle: ActionBundle,
         action_permission: ActionPermission,
-        domain_bundle: DomainBundle | None,
-        domain_type: Any | None,
+        domain_ids: tuple[str, ...],
         user_context: UserContext,
     ) -> ConstraintPromptContext:
         if action_permission.constraints is None:
@@ -128,10 +127,10 @@ class DeterministicRunner:
 
         domain_lines: list[str] = []
         enforced: list[str] = []
-        if domain_type is not None:
-            domain_id = domain_type.value
+        for domain_id in domain_ids:
             enforced.append(domain_id)
             slice_ = (user_context.domain_constraints or {}).get(domain_id)
+            domain_bundle = domain_bundle_for(domain_id)
             if domain_bundle is not None:
                 described = domain_bundle.describe(slice_)
                 domain_lines.append(

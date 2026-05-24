@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry, SYSTEM_TERMINAL_BLOCKED_PATTERNS
 from intentframe_native_bundles.actions.terminal.ae_fast_path import (

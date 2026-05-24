@@ -583,7 +583,7 @@ class TestDeterministicGuardianPipelineFlow:
 
     def test_constraint_block_is_deterministic(self):
         """blocked_patterns BLOCK happens at DG, before AE runs."""
-        from policy_registry.constraints.terminal import TerminalConstraints
+        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         runtime = _make_runtime()
         user = UserContext(
@@ -650,7 +650,7 @@ class TestDgExceptionFailClosed:
     """Bundle/checker crashes must BLOCK fail-closed — no AI degradation."""
 
     def test_dg_exception_blocks_without_ai_and_audits_dg_exception(self, monkeypatch):
-        from policy_registry.constraints.terminal import TerminalConstraints
+        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         def raise_boom(*args, **kwargs):
             del args, kwargs

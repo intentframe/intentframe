@@ -5,6 +5,7 @@ from __future__ import annotations
 from intentframe_bundle_sdk.registry import (
     register_action_bundle,
     register_domain_bundle,
+    register_domain_routes,
 )
 
 _BUNDLES_LOADED = False
@@ -42,6 +43,7 @@ def register_bundles(registry) -> None:
     from intentframe_native_bundles.actions.user_io.bundle import UserIoActionBundle
     from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
     from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+    from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
 
     for bundle in (
         TerminalActionBundle(),
@@ -64,6 +66,7 @@ def register_bundles(registry) -> None:
 
     registry.register_domain_bundle(FinanceDomainBundle())
     registry.register_domain_bundle(DeletionDomainBundle())
+    registry.register_domain_routes(DOMAIN_ROUTES)
 
 
 def _ensure_first_party_bundles_loaded() -> None:
@@ -77,6 +80,7 @@ def _ensure_first_party_bundles_loaded() -> None:
             {
                 "register_action_bundle": staticmethod(register_action_bundle),
                 "register_domain_bundle": staticmethod(register_domain_bundle),
+                "register_domain_routes": staticmethod(register_domain_routes),
             },
         )()
     )

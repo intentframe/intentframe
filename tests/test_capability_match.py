@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from policy_registry.constraints._capability_match import (
+from intentframe_native_bundles.actions.terminal._capability_match import (
     any_tag_matches,
     matches,
     matches_any,

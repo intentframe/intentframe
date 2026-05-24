@@ -8,12 +8,8 @@ used by the FILE category.
 The constraint schema lives in a separate module so:
 
 - the field name ``allowed_host_paths`` stays disjoint from
-  :class:`policy_registry.constraints.file.FileConstraints.allowed_paths`,
-- pydantic's smart-union matcher in
-  :data:`policy_registry.models.ConstraintTypes` can deterministically
-  pick between ``FileConstraints`` and ``HostFileConstraints`` without
-  a ``Discriminator`` or ``Literal`` tag — each payload validates
-  against exactly one type.
+  :class:`intentframe_native_bundles.actions.files.constraints.FileConstraints.allowed_paths`,
+  so virtual and host file policies never share field names.
 """
 
 from __future__ import annotations

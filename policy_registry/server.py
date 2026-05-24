@@ -28,8 +28,7 @@ from pydantic import BaseModel, Field
 
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry
-from policy_registry.constraints.email import EmailConstraints, RecipientSource
-from policy_registry.constraints.message import MessageConstraints, ContactSource
+from policy_registry.source_types import ContactSource, RecipientSource
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +116,7 @@ async def patch_email_recipients(
         updated = _registry.patch_email_recipients(
             user_id, agent_id, action, add=body.add, remove=body.remove
         )
-        return {"status": "ok", "allowed_recipients": updated.allowed_recipients}
+        return {"status": "ok", "allowed_recipients": updated["allowed_recipients"]}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
@@ -134,7 +133,7 @@ async def add_email_source(
         updated = _registry.add_email_source(user_id, agent_id, action, src)
         return {
             "status": "ok",
-            "recipient_sources": [s.model_dump() for s in updated.recipient_sources],
+            "recipient_sources": updated["recipient_sources"],
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -153,7 +152,7 @@ async def delete_email_source(
         )
         return {
             "status": "ok",
-            "recipient_sources": [s.model_dump() for s in updated.recipient_sources],
+            "recipient_sources": updated["recipient_sources"],
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -169,12 +168,13 @@ async def get_resolved_email_recipients(
     try:
         resolved_policy = await _registry.get_user_policy_resolved(user_id, agent_id)
         perm = resolved_policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, EmailConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise HTTPException(status_code=404, detail=f"No EmailConstraints for {action}")
+        recipients = list(perm.constraints.get("allowed_recipients") or [])
         return {
             "action": action,
-            "allowed_recipients": perm.constraints.allowed_recipients,
-            "count": len(perm.constraints.allowed_recipients),
+            "allowed_recipients": recipients,
+            "count": len(recipients),
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -193,7 +193,7 @@ async def patch_message_contacts(
         updated = _registry.patch_message_contacts(
             user_id, agent_id, action, add=body.add, remove=body.remove
         )
-        return {"status": "ok", "allowed_contacts": updated.allowed_contacts}
+        return {"status": "ok", "allowed_contacts": updated["allowed_contacts"]}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
@@ -210,7 +210,7 @@ async def add_message_source(
         updated = _registry.add_message_source(user_id, agent_id, action, src)
         return {
             "status": "ok",
-            "contact_sources": [s.model_dump() for s in updated.contact_sources],
+            "contact_sources": updated["contact_sources"],
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -229,7 +229,7 @@ async def delete_message_source(
         )
         return {
             "status": "ok",
-            "contact_sources": [s.model_dump() for s in updated.contact_sources],
+            "contact_sources": updated["contact_sources"],
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -245,12 +245,13 @@ async def get_resolved_message_contacts(
     try:
         resolved_policy = await _registry.get_user_policy_resolved(user_id, agent_id)
         perm = resolved_policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, MessageConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise HTTPException(status_code=404, detail=f"No MessageConstraints for {action}")
+        contacts = list(perm.constraints.get("allowed_contacts") or [])
         return {
             "action": action,
-            "allowed_contacts": perm.constraints.allowed_contacts,
-            "count": len(perm.constraints.allowed_contacts),
+            "allowed_contacts": contacts,
+            "count": len(contacts),
         }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None

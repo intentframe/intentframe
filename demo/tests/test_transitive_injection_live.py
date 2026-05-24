@@ -49,7 +49,8 @@ from intentframe_components.analysis.engine import AEFieldLimit
 from intentframe_components.guardian import AIGuardian
 from intentframe_components.guardian.engine import AIGuardianOutput
 from policy_registry.models import ActionPermission
-from policy_registry.constraints import ApiConstraints, FileConstraints
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.files.constraints import FileConstraints
 
 
 # ═══════════════════════════════════════════════════════════════════════

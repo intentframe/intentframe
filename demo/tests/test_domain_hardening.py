@@ -33,7 +33,6 @@ from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
 from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 from intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
 from intentframe_bundle_sdk.types import PhaseDecision
-from policy_registry.domains.base import DomainConstraints
 
 passed_count = 0
 failed_count = 0
@@ -53,24 +52,16 @@ def _domain_slice(constraints) -> dict | None:
 
 
 def _check_finance(intent: IntentFrame, constraints) -> tuple[bool, str]:
-    if isinstance(constraints, DomainConstraints) and not isinstance(
-        constraints, FinanceConstraints
-    ):
-        return True, ""
     outcome = _finance_domain.enforce(intent, _domain_slice(constraints))
     if outcome.decision is PhaseDecision.BLOCK:
-        return False, outcome.reason
+        return False, outcome.reason or ""
     return True, ""
 
 
 def _check_deletion(intent: IntentFrame, constraints) -> tuple[bool, str]:
-    if isinstance(constraints, DomainConstraints) and not isinstance(
-        constraints, DeletionConstraints
-    ):
-        return True, ""
     outcome = _deletion_domain.enforce(intent, _domain_slice(constraints))
     if outcome.decision is PhaseDecision.BLOCK:
-        return False, outcome.reason
+        return False, outcome.reason or ""
     return True, ""
 
 
@@ -148,10 +139,9 @@ def test_finance_module():
     ok5, _ = _check_finance(intent5, constraints)
     check("No recipient (optional) → pass", ok5)
 
-    # Base DomainConstraints (not FinanceConstraints) → pass
-    base = DomainConstraints(domain=DomainType.FINANCE)
-    ok6, _ = _check_finance(intent, base)
-    check("Base DomainConstraints → pass (isinstance guard)", ok6)
+    # No domain constraints → pass (nothing to enforce)
+    ok6, _ = _check_finance(intent, None)
+    check("None domain constraints → pass", ok6)
 
 
 def test_deletion_module():
@@ -499,7 +489,8 @@ def test_guardian_pipeline():
     from intentframe_components.analysis import AIAnalysisEngine
     from intentframe_components.guardian import AIGuardian
     from policy_registry.models import ActionPermission
-    from policy_registry.constraints import FileConstraints, ApiConstraints
+    from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+    from intentframe_native_bundles.actions.files.constraints import FileConstraints
 
     analysis_engine = AIAnalysisEngine(model="gpt-4o-mini", verbose=False)
     guardian = AIGuardian(model="gpt-4o-mini", verbose=True)

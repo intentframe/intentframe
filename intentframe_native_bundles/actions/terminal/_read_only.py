@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from policy_registry.constraints._capability_match import any_tag_matches
+from intentframe_native_bundles.actions.terminal._capability_match import any_tag_matches
 
 READ_ONLY_INCOMPATIBLE: frozenset[str] = frozenset({
     "capability:filesystem_write",

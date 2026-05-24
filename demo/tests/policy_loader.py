@@ -13,16 +13,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from policy_registry.constraints import (  # noqa: F401  (re-exported for convenience)
-    ApiConstraints,
-    BrowserConstraints,
-    CalendarConstraints,
-    EmailConstraints,
-    FileConstraints,
-    HostFileConstraints,
-    MessageConstraints,
-    TerminalConstraints,
-)
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.browser.constraints import BrowserConstraints
+from intentframe_native_bundles.actions.calendar.constraints import CalendarConstraints
+from intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_bundles.actions.files.constraints import FileConstraints
+from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_bundles.actions.message.constraints import MessageConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.seeds import load_policy_seed
 

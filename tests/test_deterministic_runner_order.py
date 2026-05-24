@@ -7,8 +7,8 @@ from dataclasses import replace
 
 import pytest
 
-from action_registry.types import ActionType, DomainType
-from intentframe_native_bundles import ensure_bundles_registered
+from action_registry.types import ActionType
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 from intentframe_bundle_sdk.registry import action_bundle_for, domain_bundle_for
@@ -20,14 +20,14 @@ from policy_registry.models import ActionPermission
 
 @pytest.fixture(autouse=True)
 def _register_bundles() -> None:
-    ensure_bundles_registered()
+    ensure_test_bundles_loaded()
 
 
 def test_domain_runs_before_passive_read_allow(monkeypatch: pytest.MonkeyPatch) -> None:
     """Domain BLOCK must fire before SDK passive-read ALLOW short-circuit."""
     order: list[str] = []
     bundle = FilesActionBundle()
-    domain_bundle = domain_bundle_for(DomainType.FINANCE)
+    domain_bundle = domain_bundle_for("finance")
     assert domain_bundle is not None
 
     original_enforce = domain_bundle.enforce
@@ -50,9 +50,13 @@ def test_domain_runs_before_passive_read_allow(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(domain_bundle, "enforce", track_enforce)
     monkeypatch.setattr(FilesActionBundle, "allow_gates", track_allow)
 
-    from action_registry.types import ACTION_DOMAINS
+    import intentframe_bundle_sdk.registry as bundle_registry
 
-    monkeypatch.setitem(ACTION_DOMAINS, ActionType.READ_FILE, DomainType.FINANCE)
+    monkeypatch.setitem(
+        bundle_registry._ACTION_TO_DOMAINS,
+        ActionType.READ_FILE.value,
+        ("finance",),
+    )
 
     intent = IntentFrame(
         action=ActionType.READ_FILE,

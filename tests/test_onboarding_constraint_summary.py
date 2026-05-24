@@ -51,15 +51,15 @@ from __future__ import annotations
 import pytest
 
 from intentframe_native_bundles.onboarding import build_onboarding_instructions
-from intentframe_native_bundles import ensure_bundles_registered
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_components.onboarding.engine import AIOnboardingEngine
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import SemanticIntentLimit
 
 
 @pytest.fixture(autouse=True)
 def _register_bundles() -> None:
-    ensure_bundles_registered()
+    ensure_test_bundles_loaded()
 
 
 PYTHON_SHELL_ONLY_DENY = frozenset({

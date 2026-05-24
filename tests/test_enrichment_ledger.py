@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from action_registry.types import ActionType
-from intentframe_native_bundles import ensure_bundles_registered
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import (
     BundleContext,
@@ -22,7 +22,7 @@ from policy_registry.models import ActionPermission
 
 @pytest.fixture(autouse=True)
 def _bundles() -> None:
-    ensure_bundles_registered()
+    ensure_test_bundles_loaded()
 
 
 def test_enrichment_changed_detects_target_update() -> None:

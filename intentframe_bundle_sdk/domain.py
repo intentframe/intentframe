@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from intentframe_bundle_sdk.types import BundlePhaseOutcome
 
 if TYPE_CHECKING:
-    from action_registry.types import DomainType
     from intentframe_core.types import IntentFrame
 
 
@@ -16,7 +15,7 @@ class DomainBundle(ABC):
     """Deterministic domain enforcement — BLOCK or pass, never ALLOW."""
 
     bundle_id: str
-    domain_type: DomainType
+    domain_id: str
 
     def validate(self, domain_constraints: dict[str, Any] | None) -> None:
         """Startup-only validation of policy YAML shape for this domain."""

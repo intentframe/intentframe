@@ -39,7 +39,7 @@ from intentframe_components.guardian.deterministic import (
 )
 from intentframe_core.types import IntentFrame, UserContext
 from tests.deterministic_accuracy._helpers import decide_dg_sync, run_dg_with_intel
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 
@@ -504,7 +504,7 @@ class TestUndecidedDefault:
     dg = DeterministicGuardian()
 
     def test_send_email_with_constraints_falls_through(self):
-        from policy_registry.constraints.email import EmailConstraints
+        from intentframe_native_bundles.actions.email.constraints import EmailConstraints
         perm = ActionPermission(
             safe=False,
             constraints=EmailConstraints(allowed_recipients=["a@b.com"]).model_dump(
@@ -542,7 +542,7 @@ class TestFailClosedExceptionHandling:
         dg = DeterministicGuardian()
 
         from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-        from policy_registry.constraints.terminal import TerminalConstraints
+        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         def raise_boom(*args, **kwargs):
             del args, kwargs

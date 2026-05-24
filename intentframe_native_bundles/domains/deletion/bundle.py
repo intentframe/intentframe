@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import fnmatch
 
-from action_registry.types import DomainType
 from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
@@ -14,7 +13,7 @@ from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 
 class DeletionDomainBundle(DomainBundle):
     bundle_id = "deletion"
-    domain_type = DomainType.DELETION
+    domain_id = "deletion"
 
     def validate(self, domain_constraints: dict | None) -> None:
         if domain_constraints is not None:

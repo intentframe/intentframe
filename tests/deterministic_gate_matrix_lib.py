@@ -18,7 +18,7 @@ from intentframe_components.guardian.deterministic import (
     DeterministicResult,
 )
 from intentframe_core.types import IntentFrame, UserContext
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 from tests.deterministic_accuracy._helpers import (
     decide_dg_sync,
