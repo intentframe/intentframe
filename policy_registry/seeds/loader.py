@@ -95,7 +95,19 @@ def load_policy_seed(
         merged.update(metadata)
         raw["metadata"] = merged
 
-    return UserPolicy.model_validate(raw)
+    policy = UserPolicy.model_validate(raw)
+    _validate_loaded_policy(policy)
+    return policy
+
+
+def _validate_loaded_policy(policy: UserPolicy) -> None:
+    if not policy.domain_constraints:
+        return
+    from intentframe_action_bundle.bundles.register import ensure_bundles_registered
+    from intentframe_bundle_sdk.registry import validate_policy_domain_constraints
+
+    ensure_bundles_registered()
+    validate_policy_domain_constraints(policy.domain_constraints)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:

@@ -12,7 +12,6 @@ from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
-from intentframe_components.guardian.engine import AIGuardian
 from intentframe_core.enums import Decision, RiskLevel, Reversibility
 from intentframe_core.types import (
     AnalysisReport,
@@ -87,29 +86,6 @@ class TestCheckPolicyMissingChecker:
         assert enrichment_audit_fields(ctx) == {
             "constraint_checker_skipped": "CalendarConstraints",
         }
-
-
-class TestGuardianMissingChecker:
-    def test_check_constraints_records_on_bundle_context(self) -> None:
-        guardian = AIGuardian(verbose=False)
-        ctx = BundleContext(
-            intent=IntentFrame(
-                action=ActionType.CREATE_EVENT,
-                target="work",
-                reason="test",
-                agent_id="a",
-            )
-        )
-        permission = _calendar_permission()
-        passed, reason = guardian._check_constraints(
-            ctx.intent,
-            permission,
-            bundle_context=ctx,
-        )
-
-        assert passed is True
-        assert reason == ""
-        assert ctx.constraint_checker_skipped == "CalendarConstraints"
 
 
 class TestPipelineAuditMissingChecker:

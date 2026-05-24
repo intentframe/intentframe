@@ -18,8 +18,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from action_registry.types import ACTION_DOMAINS
-from intentframe_bundle_sdk.registry import action_bundle_for, domain_bundle_for
+from intentframe_bundle_sdk.registry import (
+    action_bundle_for,
+    domain_bundle_for,
+    domains_for_action,
+)
 from intentframe_bundle_sdk.types import (
     BundleContext,
     BundleDeterministicResult,
@@ -68,7 +71,11 @@ class DeterministicRunner:
             return bundle._phase_to_result(pol)
         ctx = pol.context
 
-        domain_outcome = cls._run_domain(intent, user_context, ctx)
+        domain_outcome = cls._run_domain(
+            intent,
+            user_context.domain_constraints or {},
+            ctx,
+        )
         if domain_outcome is not None:
             return domain_outcome
 
@@ -90,24 +97,28 @@ class DeterministicRunner:
     @staticmethod
     def _run_domain(
         intent: IntentFrame,
-        user_context: UserContext,
+        domain_constraints: dict,
         ctx: BundleContext,
     ) -> BundleDeterministicResult | None:
-        domain_type = ACTION_DOMAINS.get(intent.action)
-        if domain_type is None:
-            return None
-        domain_bundle = domain_bundle_for(domain_type.value)
-        if domain_bundle is None:
-            return None
-        passed, reason = domain_bundle.check(ctx.effective_intent, user_context)
-        if passed:
-            return None
-        return BundleDeterministicResult(
-            decision="BLOCK",
-            context=ctx,
-            reason=f"Domain violation ({domain_type.value}): {reason}",
-            matched_gate="domain",
-        )
+        action_id = intent.action.value
+        for domain_id in domains_for_action(action_id):
+            domain_bundle = domain_bundle_for(domain_id)
+            if domain_bundle is None:
+                continue
+            constraints = domain_constraints.get(domain_id)
+            passed, reason = domain_bundle.check_domain(
+                ctx.effective_intent,
+                constraints,
+                ctx,
+            )
+            if not passed:
+                return BundleDeterministicResult(
+                    decision="BLOCK",
+                    context=ctx,
+                    reason=f"Domain violation ({domain_id}): {reason}",
+                    matched_gate="domain",
+                )
+        return None
 
     @staticmethod
     def resolve_bundle(action_id: str, permission) -> object:

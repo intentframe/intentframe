@@ -7,7 +7,9 @@ from intentframe_action_bundle.bundles.browser import BrowserActionBundle
 from intentframe_action_bundle.bundles.calendar import CalendarActionBundle
 from intentframe_action_bundle.bundles.clipboard import ClipboardActionBundle
 from intentframe_action_bundle.bundles.contacts import ContactsActionBundle
-from intentframe_action_bundle.bundles.domain import DeletionDomainBundle, FinanceDomainBundle
+from intentframe_action_bundle.domain_routes import DOMAIN_ROUTES
+from intentframe_action_bundle.domains.deletion import DeletionDomainBundle
+from intentframe_action_bundle.domains.finance import FinanceDomainBundle
 from intentframe_action_bundle.bundles.email import EmailActionBundle
 from intentframe_action_bundle.bundles.files import FilesActionBundle
 from intentframe_action_bundle.bundles.finance import FinanceActionBundle
@@ -18,7 +20,11 @@ from intentframe_action_bundle.bundles.reminders import RemindersActionBundle
 from intentframe_action_bundle.bundles.spotlight import SpotlightActionBundle
 from intentframe_action_bundle.bundles.system import SystemActionBundle
 from intentframe_action_bundle.bundles.terminal import TerminalActionBundle
-from intentframe_bundle_sdk.registry import register_action_bundle, register_domain_bundle
+from intentframe_bundle_sdk.registry import (
+    register_action_bundle,
+    register_domain_bundle,
+    register_domain_routes,
+)
 
 _BUNDLES_LOADED = False
 
@@ -46,5 +52,6 @@ def ensure_bundles_registered() -> None:
 
     register_domain_bundle(FinanceDomainBundle())
     register_domain_bundle(DeletionDomainBundle())
+    register_domain_routes(DOMAIN_ROUTES)
 
     _BUNDLES_LOADED = True

@@ -18,9 +18,11 @@ next — ask the user, retry differently, or skip.
 
 Validation flow:
     1. PERMISSION CHECK   — is action in allowed_actions? (deny-by-default)
-    2. CONSTRAINT CHECK   — does intent satisfy per-category constraints?
-    3. SAFETY ROUTING     — if permission.safe and no risk flags → fast ALLOW
+    2. SAFETY ROUTING     — if permission.safe and no risk flags → fast ALLOW
                           — otherwise → AI validation
+
+Deterministic constraint and domain enforcement run in DeterministicRunner
+before this component is invoked on the UNDECIDED path.
 """
 
 from typing import Optional
@@ -30,7 +32,6 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, ModelSettings, Runner
 
-from action_registry.types import ACTION_DOMAINS, DomainType
 from intentframe_core.types import (
     AnalysisReport,
     ExecutionContext,
@@ -40,10 +41,8 @@ from intentframe_core.types import (
 )
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_ai_context_or_empty
 from intentframe_bundle_sdk.audit_dump import dump_bundle_ai_context
-from intentframe_action_bundle.evidence import CommandIntel, FileIntel
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
-from intentframe_components.guardian.domains import DOMAIN_MODULES
 from intentframe_components.guardian.checkers import CONSTRAINT_CHECKERS
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
@@ -51,7 +50,6 @@ from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.roles import GUARDIAN_ROLE
 from intentframe_prompt_library.library import DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 from policy_registry.models import ActionPermission
-from policy_registry.domains.base import DomainConstraints
 
 import logging
 
@@ -102,10 +100,9 @@ class AIGuardian(Guardian):
     - BLOCK: Policy violation (unauthorized action, constraint violated,
       phishing, etc.)
 
-    Validation is a 3-step pipeline:
-        1. Permission check (deterministic) → BLOCK if not allowed
-        2. Constraint check (deterministic) → BLOCK if violated
-        3. Safety routing:
+    Validation is a 2-step pipeline on the AI path:
+        1. Permission check (fail-closed defense) → BLOCK if not allowed
+        2. Safety routing:
            - safe=True + no risk flags → fast ALLOW (no AI)
            - otherwise → AI validates with full context
     """
@@ -168,74 +165,6 @@ class AIGuardian(Guardian):
         """Return the default Guardian system-prompt body."""
         return DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 
-    # ── Domain Constraint Lookup ─────────────────────────────────────
-
-    @staticmethod
-    def _get_domain_constraints(
-        user_context: UserContext,
-        domain: DomainType,
-    ) -> DomainConstraints | None:
-        """Look up domain constraints from user context metadata."""
-        dc_map = user_context.domain_constraints
-        return dc_map.get(domain.value)
-
-    # ── Constraint Checking ─────────────────────────────────────────
-
-    @staticmethod
-    def _evidence_command_intel(bundle_context: BundleContext | None) -> CommandIntel | None:
-        if bundle_context is None:
-            return None
-        value = bundle_context.evidence.get("command_intel")
-        return value if isinstance(value, CommandIntel) else None
-
-    @staticmethod
-    def _evidence_file_intel(bundle_context: BundleContext | None) -> FileIntel | None:
-        if bundle_context is None:
-            return None
-        value = bundle_context.evidence.get("file_intel")
-        return value if isinstance(value, FileIntel) else None
-
-    def _check_constraints(
-        self,
-        intent: IntentFrame,
-        permission: ActionPermission,
-        bundle_context: BundleContext | None = None,
-    ) -> tuple[bool, str]:
-        """Evaluate per-category constraints (bundle evidence via CheckContext)."""
-        from intentframe_components.guardian.checkers.base import CheckContext
-
-        constraints = permission.constraints
-        if constraints is None:
-            return True, ""
-        constraint_type = type(constraints)
-        checker = CONSTRAINT_CHECKERS.get(constraint_type)
-        if checker:
-            context = CheckContext(
-                command_intel=self._evidence_command_intel(bundle_context),
-                file_intel=self._evidence_file_intel(bundle_context),
-            )
-            return checker.check(intent, constraints, context)
-        # Same gap as ActionBundle.check_policy: constraint in YAML, no checker wired.
-        # Does not BLOCK — Guardian falls through to semantic validation; LLM may read
-        # raw constraint JSON in the prompt when summarize() is unavailable.
-        if bundle_context is not None:
-            from intentframe_bundle_sdk.constraint_checker_skip import (
-                note_missing_constraint_checker,
-            )
-
-            note_missing_constraint_checker(
-                bundle_context,
-                constraint_type,
-                phase="guardian_check_constraints",
-                verbose=self.verbose,
-            )
-        elif self.verbose:
-            print(
-                f"    │  ⚠ constraint checker skipped: "
-                f"{constraint_type.__name__} (guardian_check_constraints)"
-            )
-        return True, ""
-
     # ── Risk Flag Check ────────────────────────────────────────────
 
     @staticmethod
@@ -266,6 +195,7 @@ class AIGuardian(Guardian):
         bundle_ai_context: BundleAIContext | None = None,
     ) -> ValidationResult:
         """Validate intent against user policies (AI path after DG UNDECIDED)."""
+        del bundle_context
         action = intent.action.value
 
         self.last_prompt_source = None
@@ -287,42 +217,7 @@ class AIGuardian(Guardian):
 
         permission = user_context.allowed_actions[action]
 
-        # ── Step 2: Constraint check (deterministic) ───────────────
-        passed, reason = self._check_constraints(
-            intent, permission, bundle_context=bundle_context
-        )
-        if not passed:
-            if self.verbose:
-                print(f"    │  ✘ BLOCK: {action} — {reason}")
-            return ValidationResult(
-                decision=Decision.BLOCK,
-                intent=intent,
-                analysis=analysis,
-                message=f"Constraint violation: {reason}",
-                decision_path="ai_path",
-            )
-
-        # ── Step 2.5: Domain module enforcement (structural hard gate) ──
-        domain = ACTION_DOMAINS.get(intent.action)
-        if domain and domain in DOMAIN_MODULES:
-            domain_constraints = self._get_domain_constraints(user_context, domain)
-            if domain_constraints is not None:
-                module = DOMAIN_MODULES[domain]
-                passed, reason = module.check(intent, domain_constraints)
-                if not passed:
-                    if self.verbose:
-                        print(f"    │  ✘ BLOCK: {action} — domain:{domain.value} — {reason}")
-                    return ValidationResult(
-                        decision=Decision.BLOCK,
-                        intent=intent,
-                        analysis=analysis,
-                        message=f"Domain violation ({domain.value}): {reason}",
-                        decision_path="ai_path",
-                    )
-                if self.verbose:
-                    print(f"    │  ✓ Domain check passed ({domain.value}) — proceeding to AI")
-
-        # ── Step 3: Safety routing ─────────────────────────────────
+        # ── Step 2: Safety routing ─────────────────────────────────
         if permission.safe and not self._has_risk_flags(analysis):
             if self.verbose:
                 print(f"    │  ⚡ Fast-path ALLOW: {action} (safe + no risk flags)")

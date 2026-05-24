@@ -29,12 +29,27 @@ from intentframe_core.domains import DOMAIN_SCHEMAS
 from policy_registry.models import UserPolicy
 from policy_registry.domains.finance import FinanceConstraints
 from policy_registry.domains.deletion import DeletionConstraints
-from intentframe_components.guardian.domains.finance import FinanceModule
-from intentframe_components.guardian.domains.deletion import DeletionModule
+from intentframe_action_bundle.domain_routes import DOMAIN_ROUTES
+from intentframe_action_bundle.domains.finance import FinanceDomainBundle
+from intentframe_action_bundle.domains.deletion import DeletionDomainBundle
+from intentframe_bundle_sdk.types import BundleContext
 
 
 passed_count = 0
 failed_count = 0
+
+_finance_domain = FinanceDomainBundle()
+_deletion_domain = DeletionDomainBundle()
+
+
+def _check_finance(intent: IntentFrame, constraints) -> tuple[bool, str]:
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    return _finance_domain.check_domain(intent, constraints, ctx)
+
+
+def _check_deletion(intent: IntentFrame, constraints) -> tuple[bool, str]:
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    return _deletion_domain.check_domain(intent, constraints, ctx)
 
 
 def check(label: str, condition: bool, detail: str = ""):
@@ -57,7 +72,7 @@ def test_finance_module():
     print("  1a. Finance Module — structural enforcement")
     print("=" * 60)
 
-    module = FinanceModule()
+    module = _finance_domain
     constraints = FinanceConstraints(
         max_amount=5000.0,
         allowed_currencies=["USD", "EUR"],
@@ -70,7 +85,7 @@ def test_finance_module():
         target="acme_invoice",
         data={"amount": 8000.0, "currency": "USD", "recipient": "ACME Corp"},
     )
-    ok, reason = module.check(intent, constraints)
+    ok, reason = _check_finance(intent, constraints)
     check("Amount $8k > $5k limit → BLOCK", not ok)
     check("  reason mentions limit", "exceeds" in reason.lower())
 
@@ -80,7 +95,7 @@ def test_finance_module():
         target="acme_invoice",
         data={"amount": 3000.0, "currency": "USD", "recipient": "ACME Corp"},
     )
-    ok2, _ = module.check(intent2, constraints)
+    ok2, _ = _check_finance(intent2, constraints)
     check("Amount $3k < $5k limit → pass", ok2)
 
     # Wrong currency → BLOCK
@@ -89,7 +104,7 @@ def test_finance_module():
         target="crypto_vendor",
         data={"amount": 100.0, "currency": "BTC"},
     )
-    ok3, reason3 = module.check(intent3, constraints)
+    ok3, reason3 = _check_finance(intent3, constraints)
     check("Currency BTC not in [USD, EUR] → BLOCK", not ok3)
     check("  reason mentions currency", "currency" in reason3.lower())
 
@@ -99,7 +114,7 @@ def test_finance_module():
         target="shady_vendor",
         data={"amount": 100.0, "currency": "USD", "recipient": "Unknown LLC"},
     )
-    ok4, reason4 = module.check(intent4, constraints)
+    ok4, reason4 = _check_finance(intent4, constraints)
     check("Recipient 'Unknown LLC' not in allowlist → BLOCK", not ok4)
 
     # No recipient specified → pass (optional field)
@@ -108,13 +123,13 @@ def test_finance_module():
         target="vendor",
         data={"amount": 100.0, "currency": "USD"},
     )
-    ok5, _ = module.check(intent5, constraints)
+    ok5, _ = _check_finance(intent5, constraints)
     check("No recipient (optional) → pass", ok5)
 
     # Base DomainConstraints (not FinanceConstraints) → pass
     from policy_registry.domains.base import DomainConstraints
     base = DomainConstraints(domain=DomainType.FINANCE)
-    ok6, _ = module.check(intent, base)
+    ok6, _ = _check_finance(intent, base)
     check("Base DomainConstraints → pass (isinstance guard)", ok6)
 
 
@@ -123,7 +138,7 @@ def test_deletion_module():
     print("  1b. Deletion Module — structural enforcement")
     print("=" * 60)
 
-    module = DeletionModule()
+    module = _deletion_domain
     constraints = DeletionConstraints(
         allowed_paths=["/tmp/*", "/cache/"],
         block_irreversible=True,
@@ -135,7 +150,7 @@ def test_deletion_module():
         target="/important/database.db",
         data={"target_path": "/important/database.db", "irreversible": False},
     )
-    ok, reason = module.check(intent, constraints)
+    ok, reason = _check_deletion(intent, constraints)
     check("Path /important/database.db not in [/tmp/*, /cache/] → BLOCK", not ok)
     check("  reason mentions path", "path" in reason.lower())
 
@@ -145,7 +160,7 @@ def test_deletion_module():
         target="/tmp/scratch.log",
         data={"target_path": "/tmp/scratch.log", "irreversible": True},
     )
-    ok2, reason2 = module.check(intent2, constraints)
+    ok2, reason2 = _check_deletion(intent2, constraints)
     check("Path /tmp/scratch.log matches, but irreversible=True → BLOCK", not ok2)
     check("  reason mentions irreversible", "irreversible" in reason2.lower())
 
@@ -155,7 +170,7 @@ def test_deletion_module():
         target="/tmp/scratch.log",
         data={"target_path": "/tmp/scratch.log", "irreversible": False},
     )
-    ok3, _ = module.check(intent3, constraints)
+    ok3, _ = _check_deletion(intent3, constraints)
     check("Path matches, irreversible=False → pass", ok3)
 
     # Path with prefix match → pass
@@ -164,7 +179,7 @@ def test_deletion_module():
         target="/cache/old_data.bin",
         data={"target_path": "/cache/old_data.bin", "irreversible": False},
     )
-    ok4, _ = module.check(intent4, constraints)
+    ok4, _ = _check_deletion(intent4, constraints)
     check("Path /cache/old_data.bin prefix matches /cache/ → pass", ok4)
 
     # No allowed_paths constraint → only check irreversible
@@ -174,7 +189,7 @@ def test_deletion_module():
         target="/anywhere/file.txt",
         data={"target_path": "/anywhere/file.txt", "irreversible": True},
     )
-    ok5, _ = module.check(intent5, constraints2)
+    ok5, _ = _check_deletion(intent5, constraints2)
     check("No path restriction, block_irreversible=False → pass", ok5)
 
 
@@ -202,7 +217,7 @@ def test_deletion_module_host_file():
     print("  1c. Deletion Module — DELETE_HOST_FILE interactions")
     print("=" * 60)
 
-    module = DeletionModule()
+    module = _deletion_domain
 
     # Recommended config: allowed_paths=None → per-action HostFileConstraints
     # owns the path wall; module only enforces irreversible / confirmation.
@@ -215,7 +230,7 @@ def test_deletion_module_host_file():
         target="~/Documents/notes.md",
         data={"target_path": "~/Documents/notes.md", "irreversible": True},
     )
-    ok, _ = module.check(intent, constraints_none)
+    ok, _ = _check_deletion(intent, constraints_none)
     check(
         "DELETE_HOST_FILE with allowed_paths=None → module passes (defers to per-action)",
         ok,
@@ -227,7 +242,7 @@ def test_deletion_module_host_file():
         allowed_paths=None,
         block_irreversible=True,
     )
-    ok_blocked, reason_blocked = module.check(intent, constraints_block)
+    ok_blocked, reason_blocked = _check_deletion(intent, constraints_block)
     check(
         "DELETE_HOST_FILE with block_irreversible=True → BLOCK",
         not ok_blocked,
@@ -250,7 +265,7 @@ def test_deletion_module_host_file():
         target="~/Documents/notes.md",
         data={"target_path": "~/Documents/notes.md", "irreversible": False},
     )
-    ok_cross, _ = module.check(intent_real, constraints_virtual)
+    ok_cross, _ = _check_deletion(intent_real, constraints_virtual)
     check(
         "Virtual-path allowlist does NOT admit real-path DELETE_HOST_FILE target",
         not ok_cross,
@@ -400,28 +415,28 @@ def test_serialization_roundtrip():
         check("  allowed_paths preserved", dc.allowed_paths == ["/tmp/*"])
 
     # Verify domain modules work with deserialized constraints
-    module = FinanceModule()
+    module = _finance_domain
     intent = IntentFrame(
         action=ActionType.PAY_INVOICE,
         target="test",
         data={"amount": 8000.0, "currency": "USD"},
     )
-    ok, reason = module.check(intent, fc)
+    ok, reason = _check_finance(intent, fc)
     check("Finance module works with deserialized constraints", not ok)
     check("  blocks $8k against $5k limit", "exceeds" in reason.lower())
 
 
 # ═══════════════════════════════════════════════════════════════════
-# 4. Taxonomy — ACTION_DOMAINS and DOMAIN_SCHEMAS consistency
+# 4. Taxonomy — domain routes, ACTION_DOMAINS hints, DOMAIN_SCHEMAS
 # ═══════════════════════════════════════════════════════════════════
 
 def test_taxonomy():
     print("\n" + "=" * 60)
-    print("  4. Taxonomy — ACTION_DOMAINS and DOMAIN_SCHEMAS")
+    print("  4. Taxonomy — domain routes, ACTION_DOMAINS, DOMAIN_SCHEMAS")
     print("=" * 60)
 
-    check("PAY_INVOICE mapped to FINANCE", ACTION_DOMAINS.get(ActionType.PAY_INVOICE) == DomainType.FINANCE)
-    check("DELETE_FILE mapped to DELETION", ACTION_DOMAINS.get(ActionType.DELETE_FILE) == DomainType.DELETION)
+    check("PAY_INVOICE in finance domain routes", "PAY_INVOICE" in DOMAIN_ROUTES["finance"])
+    check("DELETE_FILE in deletion domain routes", "DELETE_FILE" in DOMAIN_ROUTES["deletion"])
     check(
         "DELETE_HOST_FILE mapped to DELETION",
         ACTION_DOMAINS.get(ActionType.DELETE_HOST_FILE) == DomainType.DELETION,

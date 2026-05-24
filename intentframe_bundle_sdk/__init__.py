@@ -8,8 +8,12 @@ from intentframe_bundle_sdk.registry import (
     all_domain_bundles,
     all_passive_read_action_ids,
     domain_bundle_for,
+    domains_for_action,
     register_action_bundle,
     register_domain_bundle,
+    register_domain_routes,
+    routed_domain_ids,
+    validate_policy_domain_constraints,
 )
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.audit_dump import (
@@ -45,6 +49,7 @@ __all__ = [
     "all_passive_read_action_ids",
     "audit_dump",
     "domain_bundle_for",
+    "domains_for_action",
     "dump_bundle_ai_context",
     "dump_bundle_context",
     "bundle_ai_context_or_empty",
@@ -52,4 +57,7 @@ __all__ = [
     "record_enrichment",
     "register_action_bundle",
     "register_domain_bundle",
+    "register_domain_routes",
+    "routed_domain_ids",
+    "validate_policy_domain_constraints",
 ]

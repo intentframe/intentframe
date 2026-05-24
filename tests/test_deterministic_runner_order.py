@@ -30,7 +30,7 @@ def test_domain_runs_before_passive_read_allow(monkeypatch: pytest.MonkeyPatch) 
 
     from intentframe_bundle_sdk import runner as runner_mod
 
-    def fake_domain(intent, user_context, ctx):
+    def fake_domain(intent, domain_constraints, ctx):
         order.append("domain")
         return BundleDeterministicResult(
             decision="BLOCK",
