@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from intentframe_action_bundle.evidence import FileIntel
+from intentframe_action_bundle.files.evidence import FileIntel
 from intentframe_action_bundle.files.prompts_ae import _CRITICAL_WRITE_FILE
 
 

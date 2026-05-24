@@ -1,64 +1,24 @@
-"""Per-constraint-type summaries for onboarding prompts."""
+"""Per-constraint summaries for onboarding prompts."""
 
 from __future__ import annotations
 
-from intentframe_action_bundle.onboarding.action_groups import OUTBOUND_EMAIL_ACTIONS
-from intentframe_action_bundle.onboarding.deny_capabilities import summarize_deny_capabilities
-from policy_registry.constraints.email import EmailConstraints
-from policy_registry.constraints.file import FileConstraints
-from policy_registry.constraints.host_file import HostFileConstraints
-from policy_registry.constraints.message import MessageConstraints
-from policy_registry.constraints.terminal import TerminalConstraints
-from policy_registry.models import ConstraintTypes
+from intentframe_action_bundle import _ensure_first_party_bundles_loaded
+from intentframe_bundle_sdk.registry import action_bundle_for
+from intentframe_bundle_sdk.types import ActionPermission, action_permission_from_policy
+from policy_registry.models import ActionPermission as PolicyActionPermission
 
 
-def summarize_constraints_for_onboarding(action: str, constraints: ConstraintTypes) -> str:
+def summarize_constraints_for_onboarding(
+    action: str,
+    constraints: dict,
+) -> str:
     """Conceptual constraint brief for the onboarding meta-LLM."""
-    if isinstance(constraints, EmailConstraints):
-        if action in OUTBOUND_EMAIL_ACTIONS:
-            return (
-                "outbound email recipients must come from the user's "
-                "contact list or configured recipient allowlist"
-            )
-        return "email recipient constraints are configured"
-
-    if isinstance(constraints, MessageConstraints):
-        return "message recipients must come from the user's contact list"
-
-    if isinstance(constraints, FileConstraints):
-        allowed = ", ".join(repr(path) for path in constraints.allowed_paths)
-        if allowed:
-            return (
-                "file operations must stay within these allowed paths: "
-                f"[{allowed}]"
-            )
-        return "file operations are constrained by configured allowed paths"
-
-    if isinstance(constraints, HostFileConstraints):
-        allowed = ", ".join(repr(path) for path in constraints.allowed_host_paths)
-        if allowed:
-            return (
-                "host file operations must stay within these allowed host "
-                f"paths: [{allowed}]"
-            )
-        return (
-            "host file operations are constrained by configured allowed "
-            "host paths"
-        )
-
-    if isinstance(constraints, TerminalConstraints):
-        blocked = ", ".join(repr(pattern) for pattern in constraints.blocked_patterns)
-        allowed = ", ".join(repr(cmd) for cmd in constraints.allowed_commands)
-        deny_caps = constraints.deny_capabilities or frozenset()
-        parts: list[str] = []
-        if blocked:
-            parts.append(f"blocked patterns: [{blocked}]")
-        if allowed:
-            parts.append(f"allowed commands: [{allowed}]")
-        if deny_caps:
-            parts.append(summarize_deny_capabilities(deny_caps))
-        if parts:
-            return "; ".join(parts)
-        return "terminal command constraints are configured"
-
-    return constraints.model_dump_json()
+    _ensure_first_party_bundles_loaded()
+    bundle = action_bundle_for(action)
+    if bundle is None:
+        return str(constraints)
+    permission = action_permission_from_policy(
+        PolicyActionPermission(safe=True, constraints=constraints)
+    )
+    described = bundle.describe_constraints(permission)
+    return described if described is not None else str(constraints)

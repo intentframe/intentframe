@@ -9,16 +9,17 @@ Run:  .venv/bin/python tests/inspect_hardened_prompts.py
 from __future__ import annotations
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.bundles.files import FilesActionBundle
-from intentframe_action_bundle.bundles.terminal import TerminalActionBundle
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.email.bundle import EmailActionBundle
+from intentframe_action_bundle.files.bundle import FilesActionBundle
+from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_action_bundle.files.evidence_keys import FILE_INTEL_KEY
 from intentframe_action_bundle.files.file_intel import build_file_intel
-from intentframe_action_bundle.terminal.evidence_keys import (
+from intentframe_action_bundle.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
 )
-from intentframe_bundle_sdk.action import NullActionBundle
+from intentframe_bundle_sdk.types import ActionPermission as SdkActionPermission
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_ai_context_or_empty
 from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
 from intentframe_core.enums import RiskLevel, Reversibility
@@ -92,11 +93,11 @@ active_domains = IntentFrameRuntime._extract_active_domains(user_context)
 
 SEPARATOR = "═" * 72
 
+_NO_PERM = SdkActionPermission(safe=True, constraints=None)
+
 ae = AIAnalysisEngine(verbose=False)
 gu = AIGuardian(verbose=False)
-null_bundle = NullActionBundle()
-terminal_bundle = TerminalActionBundle()
-files_bundle = FilesActionBundle()
+email_bundle = EmailActionBundle()
 
 
 def _bundle_ctx(intent: IntentFrame, **evidence) -> BundleContext:
@@ -107,7 +108,7 @@ def _bundle_ctx(intent: IntentFrame, **evidence) -> BundleContext:
 
 def _ai_ctx(intent: IntentFrame, bundle, **evidence) -> BundleAIContext:
     ctx = _bundle_ctx(intent, **evidence)
-    return bundle.build_ai_context(ctx.effective_intent, None, ctx)
+    return bundle.build_ai_context(ctx.effective_intent, _NO_PERM, ctx)
 
 
 def _ae_system_instructions(ai_ctx: BundleAIContext) -> str:
@@ -124,7 +125,7 @@ def section(title: str) -> None:
     print(SEPARATOR)
 
 
-send_email_ai_ctx = _ai_ctx(intent, null_bundle)
+send_email_ai_ctx = _ai_ctx(intent, email_bundle)
 
 section("1. ANALYSIS ENGINE — SYSTEM PROMPT (agent.instructions)")
 print()
@@ -181,6 +182,9 @@ run_cmd_analysis = AnalysisReport(
     confidence=0.95,
     recommendation="Shell execution with outbound network retrieval.",
 )
+terminal_bundle = TerminalActionBundle()
+files_bundle = FilesActionBundle()
+
 run_cmd_ai_ctx = _ai_ctx(
     run_cmd_intent,
     terminal_bundle,
@@ -212,12 +216,19 @@ print(gu._get_agent(_gu_system_instructions(run_cmd_ai_ctx)).instructions)
 
 section("5. GUARDIAN — PER-REQUEST PROMPT (_build_validation_prompt)")
 print()
+from intentframe_bundle_sdk.types import ConstraintPromptContext
+
 gu_prompt = gu._build_validation_prompt(
     intent,
     analysis,
     user_context,
     permission,
     active_domains=active_domains,
+    bundle_ai_context=BundleAIContext(
+        constraint_context=ConstraintPromptContext(
+            action_constraints="No specific constraints",
+        )
+    ),
 )
 print(gu_prompt)
 

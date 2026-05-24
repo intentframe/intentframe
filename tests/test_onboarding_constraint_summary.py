@@ -51,9 +51,15 @@ from __future__ import annotations
 import pytest
 
 from intentframe_action_bundle.onboarding import build_onboarding_instructions
+from intentframe_action_bundle import ensure_bundles_registered
 from intentframe_components.onboarding.engine import AIOnboardingEngine
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import SemanticIntentLimit
+
+
+@pytest.fixture(autouse=True)
+def _register_bundles() -> None:
+    ensure_bundles_registered()
 
 
 PYTHON_SHELL_ONLY_DENY = frozenset({
@@ -190,9 +196,9 @@ class TestSummarizeConstraintsIntegration:
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
         summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "blocked patterns" in summary
+        assert "blocked patterns" in summary.lower()
         assert "node" in summary
         assert "npm" in summary
         assert "compilation" in summary
@@ -205,9 +211,9 @@ class TestSummarizeConstraintsIntegration:
             blocked_patterns=("sudo",),
         )
         summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "blocked patterns" in summary
+        assert "blocked patterns" in summary.lower()
         assert "deny_capabilities" not in summary
         assert "Gate 2" not in summary
         assert "guardian" not in summary.lower()
@@ -217,9 +223,9 @@ class TestSummarizeConstraintsIntegration:
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
         summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "deny_capabilities" in summary
+        assert "deny capabilities" in summary.lower()
         assert "node" in summary
         assert "blocked patterns" not in summary
 
@@ -229,17 +235,17 @@ class TestSummarizeConstraintsIntegration:
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
         summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "allowed commands" in summary
-        assert "deny_capabilities" in summary
+        assert "allowed commands" in summary.lower()
+        assert "deny capabilities" in summary.lower()
 
     def test_empty_terminal_constraints_returns_generic_string(self) -> None:
         constraints = TerminalConstraints()
         summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert summary == "terminal command constraints are configured"
+        assert summary.lower() == "no terminal constraints"
 
 
 # ── meta-prompt contract ─────────────────────────────────────────────

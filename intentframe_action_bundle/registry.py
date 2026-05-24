@@ -1,9 +1,0 @@
-"""Action bundle registry — delegates to Bundle SDK."""
-
-from __future__ import annotations
-
-from intentframe_action_bundle.bundles.register import ensure_bundles_registered
-
-ensure_bundles_registered()
-
-__all__ = ["ensure_bundles_registered"]

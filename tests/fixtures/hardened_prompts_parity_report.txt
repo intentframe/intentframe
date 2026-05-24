@@ -1,6 +1,6 @@
 HARDENED PROMPTS PARITY REPORT
 ========================================================================
-Generated:        2026-05-24 07:18:13 UTC
+Generated:        2026-05-24 08:47:42 UTC
 Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/hardened_prompts_legacy_baseline.txt
 Legacy commit:      ee04d7f
 Inspect script:     tests/inspect_hardened_prompts.py

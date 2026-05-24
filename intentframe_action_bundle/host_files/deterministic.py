@@ -6,7 +6,7 @@ from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 from resource_registry.floor import canonicalize_real_path, match_deny_prefix
 
-from intentframe_action_bundle.types import BundleGateDecision, BundleGateResult
+from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 
 HOST_FILE_ACTIONS = frozenset({
     ActionType.READ_HOST_FILE.value,
@@ -15,15 +15,19 @@ HOST_FILE_ACTIONS = frozenset({
     ActionType.DELETE_HOST_FILE.value,
 })
 
-def decide_host_file_floor(intent: IntentFrame) -> BundleGateResult | None:
+
+def decide_host_file_floor(
+    intent: IntentFrame,
+    ctx: BundleContext,
+) -> BundlePhaseOutcome | None:
     action = intent.action.value
 
     if action == ActionType.WRITE_HOST_FILE.value:
         canonical = canonicalize_real_path(intent.target)
         matched = match_deny_prefix(canonical)
         if matched is not None:
-            return BundleGateResult(
-                decision=BundleGateDecision.BLOCK,
+            return BundlePhaseOutcome.block(
+                ctx,
                 reason=(
                     f"Write to deny-floor host path is not permitted: {matched!r}"
                 ),
@@ -35,8 +39,8 @@ def decide_host_file_floor(intent: IntentFrame) -> BundleGateResult | None:
         canonical = canonicalize_real_path(intent.target)
         matched = match_deny_prefix(canonical)
         if matched is not None:
-            return BundleGateResult(
-                decision=BundleGateDecision.BLOCK,
+            return BundlePhaseOutcome.block(
+                ctx,
                 reason=(
                     f"Delete of deny-floor host path is not permitted: {matched!r}"
                 ),

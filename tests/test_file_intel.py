@@ -35,7 +35,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.evidence import (
+from intentframe_action_bundle.files.evidence import (
     FILE_INTEL_EXTENSION_MAX_LEN,
     FILE_INTEL_PATH_MAX_LEN,
     FileIntel,

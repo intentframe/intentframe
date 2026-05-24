@@ -15,7 +15,7 @@ Both helpers are derived from the same ordered fragment table.
 
 from __future__ import annotations
 
-from intentframe_action_bundle.evidence import FILE_PATH_CATEGORY
+from intentframe_action_bundle.files.evidence import FILE_PATH_CATEGORY
 
 # ────────────────────────────────────────────────────────────────
 # Destination classification

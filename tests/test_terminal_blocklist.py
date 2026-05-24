@@ -6,7 +6,7 @@ Each component independently knows what's dangerous, in its own way:
 0. command_shield at Runtime — pre-pipeline gate (CATASTROPHIC/NEEDS_REVIEW/SAFE)
 1. Policy Registry — system-level floor (user can only append)
 2. Analysis Engine — own catastrophic recognition (deterministic report, no AI)
-3. Guardian — TerminalChecker (deterministic constraint enforcement)
+3. Terminal bundle — ``enforce_constraints`` (deterministic constraint enforcement)
 4. Executor/Adapter — command_shield.quick_check() safety floor (non-negotiable)
 5. command_shield module — standalone deterministic command classification engine
 
@@ -27,10 +27,15 @@ from intentframe_action_bundle.terminal.ae_fast_path import (
     CATASTROPHIC_COMMAND_PATTERNS,
     try_catastrophic_report,
 )
-from intentframe_components.guardian.checkers.base import CheckContext
-from intentframe_components.guardian.checkers.terminal import TerminalChecker
+from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+from intentframe_action_bundle.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
 from intentframe_core.enums import RiskLevel, Reversibility
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk.types import (
+    ActionPermission as SdkActionPermission,
+    BundleContext,
+    PhaseDecision,
+)
 from action_registry.types import ActionType
 from executor.platforms.macos.adapters.terminal import TerminalAdapter
 from command_shield import quick_check
@@ -54,6 +59,54 @@ def _make_intent(command: str) -> MagicMock:
     return intent
 
 
+_TERMINAL_BUNDLE = TerminalActionBundle()
+
+
+def _run_command_intent(command: str) -> IntentFrame:
+    return IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target=command,
+        data={"command": command},
+        reason="test",
+        agent_id="test",
+    )
+
+
+def _enforce_terminal(
+    command: str,
+    constraints: TerminalConstraints,
+    *,
+    command_intel: CommandIntel | None = None,
+) -> tuple[bool, str]:
+    intent = _run_command_intent(command)
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    if command_intel is not None:
+        ctx.evidence[COMMAND_INTEL_KEY] = command_intel
+    outcome = _TERMINAL_BUNDLE.enforce_constraints(
+        intent,
+        SdkActionPermission(
+            safe=False,
+            constraints=constraints.model_dump(mode="python"),
+        ),
+        ctx,
+    )
+    if outcome.decision is PhaseDecision.BLOCK:
+        return False, outcome.reason
+    return True, ""
+
+
+def _describe_terminal(constraints: TerminalConstraints) -> str:
+    return (
+        _TERMINAL_BUNDLE.describe_constraints(
+            SdkActionPermission(
+                safe=False,
+                constraints=constraints.model_dump(mode="python"),
+            )
+        )
+        or ""
+    )
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # LAYER 1: Policy Registry — system-level floor
 # ═════════════════════════════════════════════════════════════════════════
@@ -67,7 +120,7 @@ class TestPolicyRegistryFloor:
             constraints = TerminalConstraints(
                 blocked_patterns=blocked_patterns or [],
                 allowed_commands=allowed_commands or [],
-            )
+            ).model_dump(mode="python")
         return UserPolicy(
             user_id="test",
             agent_id="terminal-test",
@@ -75,6 +128,10 @@ class TestPolicyRegistryFloor:
                 "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
             },
         )
+
+    @staticmethod
+    def _terminal(perm: ActionPermission) -> TerminalConstraints:
+        return TerminalConstraints.model_validate(perm.constraints)
 
     def test_system_patterns_merged_when_user_has_none(self):
         """RUN_COMMAND with no constraints gets system floor."""
@@ -88,9 +145,9 @@ class TestPolicyRegistryFloor:
         resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
         perm = resolved.allowed_actions["RUN_COMMAND"]
-        assert isinstance(perm.constraints, TerminalConstraints)
+        constraints = self._terminal(perm)
         for pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
-            assert pattern in perm.constraints.blocked_patterns
+            assert pattern in constraints.blocked_patterns
 
     def test_system_patterns_merged_with_user_patterns(self):
         """User's custom patterns are preserved alongside system floor."""
@@ -100,7 +157,7 @@ class TestPolicyRegistryFloor:
         ))
         resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
-        patterns = resolved.allowed_actions["RUN_COMMAND"].constraints.blocked_patterns
+        patterns = self._terminal(resolved.allowed_actions["RUN_COMMAND"]).blocked_patterns
         for sys_pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
             assert sys_pattern in patterns
         assert "curl" in patterns
@@ -112,7 +169,7 @@ class TestPolicyRegistryFloor:
         registry.set_user_policy(self._make_policy(blocked_patterns=[]))
         resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
-        patterns = resolved.allowed_actions["RUN_COMMAND"].constraints.blocked_patterns
+        patterns = self._terminal(resolved.allowed_actions["RUN_COMMAND"]).blocked_patterns
         for sys_pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
             assert sys_pattern in patterns
 
@@ -125,7 +182,7 @@ class TestPolicyRegistryFloor:
         ))
         resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
-        constraints = resolved.allowed_actions["RUN_COMMAND"].constraints
+        constraints = self._terminal(resolved.allowed_actions["RUN_COMMAND"])
         assert "ls *" in constraints.allowed_commands
         assert "pwd" in constraints.allowed_commands
 
@@ -137,7 +194,7 @@ class TestPolicyRegistryFloor:
         ))
         resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
 
-        patterns = resolved.allowed_actions["RUN_COMMAND"].constraints.blocked_patterns
+        patterns = self._terminal(resolved.allowed_actions["RUN_COMMAND"]).blocked_patterns
         assert patterns.count("sudo") == 1
 
     def test_system_floor_constant_not_empty(self):
@@ -197,62 +254,58 @@ class TestTerminalCatastrophicPatterns:
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# LAYER 3: Guardian — TerminalChecker + TerminalConstraints
+# LAYER 3: Terminal bundle — enforce_constraints + TerminalConstraints
 # ═════════════════════════════════════════════════════════════════════════
 
-class TestTerminalCheckerBlocklist:
-    """TerminalChecker enforces blocked_patterns from user policy."""
-
-    checker = TerminalChecker()
+class TestTerminalBundleBlocklist:
+    """TerminalActionBundle.enforce_constraints applies blocked_patterns."""
 
     default_constraints = TerminalConstraints(
         blocked_patterns=["sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777"],
     )
 
     def test_blocks_sudo(self):
-        ok, reason = self.checker.check(_make_intent("sudo apt install foo"), self.default_constraints)
+        ok, reason = _enforce_terminal("sudo apt install foo", self.default_constraints)
         assert not ok
         assert "sudo" in reason
 
     def test_blocks_rm_rf_root(self):
-        ok, reason = self.checker.check(_make_intent("rm -rf /"), self.default_constraints)
+        ok, reason = _enforce_terminal("rm -rf /", self.default_constraints)
         assert not ok
         assert "rm -rf /" in reason
 
     def test_blocks_mkfs(self):
-        ok, reason = self.checker.check(_make_intent("mkfs.ext4 /dev/sda1"), self.default_constraints)
+        ok, reason = _enforce_terminal("mkfs.ext4 /dev/sda1", self.default_constraints)
         assert not ok
         assert "mkfs" in reason
 
     def test_blocks_dd(self):
-        ok, reason = self.checker.check(_make_intent("dd if=/dev/zero of=/dev/sda"), self.default_constraints)
+        ok, reason = _enforce_terminal("dd if=/dev/zero of=/dev/sda", self.default_constraints)
         assert not ok
         assert "dd if=" in reason
 
     def test_blocks_dev_write(self):
-        ok, reason = self.checker.check(_make_intent("echo x > /dev/sda"), self.default_constraints)
+        ok, reason = _enforce_terminal("echo x > /dev/sda", self.default_constraints)
         assert not ok
         assert "> /dev/" in reason
 
     def test_blocks_chmod_777(self):
-        ok, reason = self.checker.check(_make_intent("chmod 777 /etc/passwd"), self.default_constraints)
+        ok, reason = _enforce_terminal("chmod 777 /etc/passwd", self.default_constraints)
         assert not ok
         assert "chmod 777" in reason
 
     def test_allows_safe_command(self):
-        ok, _ = self.checker.check(_make_intent("echo hello"), self.default_constraints)
+        ok, _ = _enforce_terminal("echo hello", self.default_constraints)
         assert ok
 
     def test_rm_safe_path_blocked_by_substring(self):
-        """Policy-level substring 'rm -rf /' matches 'rm -rf /tmp/junk' too.
-        This is intentional — broad policy, users can narrow if needed.
-        The adapter's regex layer is more precise."""
-        ok, _ = self.checker.check(_make_intent("rm -rf /tmp/junk"), self.default_constraints)
+        """Policy-level substring 'rm -rf /' matches 'rm -rf /tmp/junk' too."""
+        ok, _ = _enforce_terminal("rm -rf /tmp/junk", self.default_constraints)
         assert not ok
 
     def test_empty_blocklist_allows_all(self):
         constraints = TerminalConstraints(blocked_patterns=[], allowed_commands=[])
-        ok, _ = self.checker.check(_make_intent("anything"), constraints)
+        ok, _ = _enforce_terminal("anything", constraints)
         assert ok
 
     def test_blocklist_priority_over_allowlist(self):
@@ -260,7 +313,7 @@ class TestTerminalCheckerBlocklist:
             blocked_patterns=["sudo"],
             allowed_commands=["*"],
         )
-        ok, reason = self.checker.check(_make_intent("sudo ls"), constraints)
+        ok, reason = _enforce_terminal("sudo ls", constraints)
         assert not ok
         assert "sudo" in reason
 
@@ -269,32 +322,30 @@ class TestTerminalCheckerBlocklist:
             blocked_patterns=[],
             allowed_commands=["ls *", "pwd"],
         )
-        ok, _ = self.checker.check(_make_intent("ls /tmp"), constraints)
+        ok, _ = _enforce_terminal("ls /tmp", constraints)
         assert ok
 
-        ok, reason = self.checker.check(_make_intent("rm foo"), constraints)
+        ok, reason = _enforce_terminal("rm foo", constraints)
         assert not ok
         assert "not in allowed commands" in reason
 
     def test_user_can_add_custom_patterns(self):
         constraints = TerminalConstraints(blocked_patterns=["curl", "wget"])
-        ok, reason = self.checker.check(_make_intent("curl https://evil.com"), constraints)
+        ok, reason = _enforce_terminal("curl https://evil.com", constraints)
         assert not ok
         assert "curl" in reason
 
 
-class TestTerminalCheckerSummarize:
-    checker = TerminalChecker()
-
+class TestTerminalBundleDescribe:
     def test_summarize_both(self):
         c = TerminalConstraints(blocked_patterns=["sudo"], allowed_commands=["ls *"])
-        s = self.checker.summarize(c)
+        s = _describe_terminal(c)
         assert "Blocked" in s
         assert "Allowed" in s
 
     def test_summarize_empty(self):
         c = TerminalConstraints()
-        s = self.checker.summarize(c)
+        s = _describe_terminal(c)
         assert "No terminal constraints" in s
 
     def test_summarize_includes_capabilities(self):
@@ -302,7 +353,7 @@ class TestTerminalCheckerSummarize:
             allow_capabilities=frozenset({"capability:read_only:*"}),
             deny_capabilities=frozenset({"capability:package_install:*"}),
         )
-        s = self.checker.summarize(c)
+        s = _describe_terminal(c)
         assert "Allow capabilities" in s
         assert "Deny capabilities" in s
         assert "capability:read_only:*" in s
@@ -317,26 +368,17 @@ def _intel(*capabilities: str, verdict: str = "NEEDS_REVIEW") -> CommandIntel:
     return CommandIntel(verdict=verdict, capabilities=tuple(capabilities))
 
 
-class TestTerminalCheckerCapabilities:
-    """TerminalChecker consumes CommandIntel capabilities via CheckContext.
-
-    Capabilities are orthogonal to blocked_patterns / allowed_commands.
-    They gate on *what the command can do* (classifier-emitted tags),
-    not on the raw string.  A command that slips past substring matching
-    but classifies into a denied family must still be blocked.
-    """
-
-    checker = TerminalChecker()
+class TestTerminalBundleCapabilities:
+    """TerminalActionBundle reads CommandIntel from bundle context evidence."""
 
     def test_deny_capability_blocks_matching_tag(self):
         constraints = TerminalConstraints(
             deny_capabilities=frozenset({"capability:package_install:*"}),
         )
-        context = CheckContext(
-            command_intel=_intel("capability:package_install:pip")
-        )
-        ok, reason = self.checker.check(
-            _make_intent("pip install requests"), constraints, context
+        ok, reason = _enforce_terminal(
+            "pip install requests",
+            constraints,
+            command_intel=_intel("capability:package_install:pip"),
         )
         assert not ok
         assert "capability:package_install:pip" in reason
@@ -346,37 +388,31 @@ class TestTerminalCheckerCapabilities:
         constraints = TerminalConstraints(
             deny_capabilities=frozenset({"capability:package_install:*"}),
         )
-        context = CheckContext(
-            command_intel=_intel("capability:read_only:file")
-        )
-        ok, _ = self.checker.check(
-            _make_intent("ls -la"), constraints, context
+        ok, _ = _enforce_terminal(
+            "ls -la",
+            constraints,
+            command_intel=_intel("capability:read_only:file"),
         )
         assert ok
 
     def test_deny_capability_without_command_intel_is_no_op(self):
-        """CheckContext(None) keeps legacy (non-RUN_COMMAND) callers working."""
         constraints = TerminalConstraints(
             deny_capabilities=frozenset({"capability:package_install:*"}),
         )
-        ok, _ = self.checker.check(
-            _make_intent("pip install requests"), constraints, None
-        )
-        assert ok  # capability set exists but no intel — cannot deny
+        ok, _ = _enforce_terminal("pip install requests", constraints)
+        assert ok
 
     def test_allow_capability_requires_every_tag_covered(self):
-        """If ANY capability on the command isn't covered, BLOCK."""
         constraints = TerminalConstraints(
             allow_capabilities=frozenset({"capability:read_only:*"}),
         )
-        context = CheckContext(
+        ok, reason = _enforce_terminal(
+            "some-cmd",
+            constraints,
             command_intel=_intel(
                 "capability:read_only:file",
                 "capability:network_bind",
-            )
-        )
-        ok, reason = self.checker.check(
-            _make_intent("some-cmd"), constraints, context
+            ),
         )
         assert not ok
         assert "capability:network_bind" in reason
@@ -388,78 +424,58 @@ class TestTerminalCheckerCapabilities:
                 "capability:package_install:*",
             }),
         )
-        context = CheckContext(
+        ok, _ = _enforce_terminal(
+            "pip install foo",
+            constraints,
             command_intel=_intel(
                 "capability:read_only:file",
                 "capability:package_install:pip",
-            )
-        )
-        ok, _ = self.checker.check(
-            _make_intent("pip install foo"), constraints, context
+            ),
         )
         assert ok
 
     def test_allow_capability_with_no_intel_does_not_block(self):
-        """Empty capabilities (no intel) should not fail allow_capabilities.
-
-        allow_capabilities is meant to narrow admission when the
-        classifier has something to say; when it's silent, we fall
-        back to blocklist / allowlist decisions.
-        """
         constraints = TerminalConstraints(
             allow_capabilities=frozenset({"capability:read_only:*"}),
         )
-        ok, _ = self.checker.check(
-            _make_intent("echo hi"), constraints, None
-        )
+        ok, _ = _enforce_terminal("echo hi", constraints)
         assert ok
 
     def test_blocklist_still_beats_capability_allow(self):
-        """A blocked_pattern hit short-circuits BEFORE capabilities.
-
-        Defense-in-depth: operators shouldn't be able to widen the
-        surface through allow_capabilities if they forgot to remove
-        a stale blocked_pattern.
-        """
         constraints = TerminalConstraints(
             blocked_patterns=["sudo"],
-            allow_capabilities=frozenset({"capability:*"}),  # malformed on purpose
+            allow_capabilities=frozenset({"capability:*"}),
         )
-        context = CheckContext(
-            command_intel=_intel("capability:read_only:file")
-        )
-        ok, reason = self.checker.check(
-            _make_intent("sudo ls"), constraints, context
+        ok, reason = _enforce_terminal(
+            "sudo ls",
+            constraints,
+            command_intel=_intel("capability:read_only:file"),
         )
         assert not ok
         assert "sudo" in reason
 
     def test_deny_capability_beats_allowlist_glob(self):
-        """deny_capabilities is a deny gate — it wins over allowed_commands."""
         constraints = TerminalConstraints(
             allowed_commands=["pip *"],
             deny_capabilities=frozenset({"capability:package_install:*"}),
         )
-        context = CheckContext(
-            command_intel=_intel("capability:package_install:pip")
-        )
-        ok, reason = self.checker.check(
-            _make_intent("pip install requests"), constraints, context
+        ok, reason = _enforce_terminal(
+            "pip install requests",
+            constraints,
+            command_intel=_intel("capability:package_install:pip"),
         )
         assert not ok
         assert "package_install" in reason
 
-    def test_empty_capability_sets_do_not_affect_legacy_behaviour(self):
-        """Commands with intel flow through unchanged when no cap policy set."""
+    def test_empty_capability_sets_do_not_affect_blocklist_behaviour(self):
         constraints = TerminalConstraints(
             blocked_patterns=["sudo"],
             allowed_commands=["ls *"],
         )
-        context = CheckContext(
-            command_intel=_intel("capability:read_only:file")
-        )
-        ok, _ = self.checker.check(
-            _make_intent("ls /tmp"), constraints, context
+        ok, _ = _enforce_terminal(
+            "ls /tmp",
+            constraints,
+            command_intel=_intel("capability:read_only:file"),
         )
         assert ok
 
@@ -543,10 +559,9 @@ class TestComponentIndependence:
         from intentframe_action_bundle.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
         assert "sudo" in CATASTROPHIC_COMMAND_PATTERNS
 
-        # Guardian (via TerminalConstraints with system defaults)
-        checker = TerminalChecker()
+        # Terminal bundle constraint enforcement
         constraints = TerminalConstraints(blocked_patterns=list(SYSTEM_TERMINAL_BLOCKED_PATTERNS))
-        ok, _ = checker.check(_make_intent("sudo ls"), constraints)
+        ok, _ = _enforce_terminal("sudo ls", constraints)
         assert not ok
 
         # Adapter (via command_shield.quick_check)

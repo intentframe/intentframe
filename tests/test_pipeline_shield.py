@@ -26,7 +26,7 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_action_bundle.terminal.evidence_keys import COMMAND_INTEL_KEY
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 from intentframe_server.pipeline import IntentFrameRuntime
@@ -493,14 +493,14 @@ class TestCommandIntelPlumbing:
         assert "TERMINAL COMMAND" not in ai_ctx.ae_external_context
 
     def test_command_intel_is_bounded(self):
-        from intentframe_action_bundle.evidence import CommandIntel
+        from intentframe_action_bundle.terminal.evidence import CommandIntel
 
         huge_caps = tuple(f"capability:x{i}:y" for i in range(5000))
         intel = CommandIntel(capabilities=huge_caps)
         assert len(intel.capabilities) <= 64
 
     def test_command_intel_is_frozen(self):
-        from intentframe_action_bundle.evidence import CommandIntel
+        from intentframe_action_bundle.terminal.evidence import CommandIntel
 
         intel = CommandIntel(verdict="SAFE")
         with pytest.raises(Exception):
@@ -518,7 +518,8 @@ class TestDeterministicGuardianPipelineFlow:
       - DG ALLOW short-circuits AE + AIGuardian but still runs executor.
       - DG BLOCK short-circuits AE + AIGuardian AND executor.
       - DG UNDECIDED produces the full pipeline (AE + AIGuardian + executor).
-      - Audit log uses decision_path="deterministic" for DG decisions.
+      - Audit log uses decision_path from DG (matched_gate passthrough for
+        bundle gates; ``deterministic`` for permission blocks and DG ALLOW).
     """
 
     def test_read_only_command_is_allowed_by_dg(self):
@@ -590,7 +591,9 @@ class TestDeterministicGuardianPipelineFlow:
             allowed_actions={
                 "RUN_COMMAND": ActionPermission(
                     safe=False,
-                    constraints=TerminalConstraints(blocked_patterns=["rm "]),
+                    constraints=TerminalConstraints(
+                        blocked_patterns=["rm "]
+                    ).model_dump(mode="python"),
                 ),
             },
         )
@@ -603,7 +606,7 @@ class TestDeterministicGuardianPipelineFlow:
 
         entry = runtime.audit_log[-1]
         assert entry["decision"] == "BLOCK"
-        assert entry["decision_path"] == "deterministic"
+        assert entry["decision_path"] == "constraint"
         assert entry["matched_gate"] == "constraint"
 
     def test_undecided_command_invokes_ae_and_guardian(self):
@@ -647,22 +650,25 @@ class TestDgExceptionFailClosed:
     """Bundle/checker crashes must BLOCK fail-closed — no AI degradation."""
 
     def test_dg_exception_blocks_without_ai_and_audits_dg_exception(self, monkeypatch):
-        from intentframe_components.guardian import checkers as checkers_mod
         from policy_registry.constraints.terminal import TerminalConstraints
 
         def raise_boom(*args, **kwargs):
+            del args, kwargs
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(
-            checkers_mod,
-            "CONSTRAINT_CHECKERS",
-            {TerminalConstraints: type("Bad", (), {"check": raise_boom})()},
-        )
+        from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+
+        monkeypatch.setattr(TerminalActionBundle, "enforce_constraints", raise_boom)
 
         constraints = TerminalConstraints(blocked_patterns=["sudo"])
         runtime = _make_runtime()
         ctx = _user_context(
-            extra={"RUN_COMMAND": ActionPermission(safe=False, constraints=constraints)},
+            extra={
+                "RUN_COMMAND": ActionPermission(
+                    safe=False,
+                    constraints=constraints.model_dump(mode="python"),
+                )
+            },
         )
         result = _run(runtime.process_intent(_intent("ls"), ctx))
 

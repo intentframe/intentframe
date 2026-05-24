@@ -24,7 +24,7 @@ from intentframe_action_bundle.onboarding import (
     summarize_constraints_for_onboarding,
     summarize_deny_capabilities,
 )
-from policy_registry.models import ConstraintTypes
+from policy_registry.models import ActionPermission
 
 
 # ============================================================
@@ -100,7 +100,7 @@ class AIOnboardingEngine(OnboardingEngine):
         )
 
     @staticmethod
-    def _summarize_constraints(action: str, constraints: ConstraintTypes) -> str:
+    def _summarize_constraints(action: str, constraints: dict) -> str:
         return summarize_constraints_for_onboarding(action, constraints)
 
     async def onboard(

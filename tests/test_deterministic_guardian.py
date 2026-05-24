@@ -29,7 +29,7 @@ from __future__ import annotations
 import pytest
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_action_bundle import passive_read_action_ids
 from intentframe_action_bundle.terminal._read_only import READ_ONLY_INCOMPATIBLE
 from intentframe_components.guardian.deterministic import (
@@ -57,6 +57,11 @@ def _intent(action: ActionType, target: str = "", **data) -> IntentFrame:
 
 def _user(**actions: ActionPermission) -> UserContext:
     return UserContext(user_id="tester", allowed_actions=dict(actions))
+
+def _perm(constraints, *, safe: bool = False) -> ActionPermission:
+    if hasattr(constraints, "model_dump"):
+        constraints = constraints.model_dump(mode="python")
+    return ActionPermission(safe=safe, constraints=constraints)
 
 
 def _intel(
@@ -116,7 +121,7 @@ class TestConstraintGate:
         )
         result = run_dg_with_intel(
             "pip install foo",
-            _user(RUN_COMMAND=ActionPermission(safe=False, constraints=constraints)),
+            _user(RUN_COMMAND=_perm(constraints)),
             _intel("capability:package_install:pip"),
             self.dg,
         )
@@ -128,7 +133,7 @@ class TestConstraintGate:
         constraints = TerminalConstraints(blocked_patterns=["sudo"])
         result = run_dg_with_intel(
             "sudo ls",
-            _user(RUN_COMMAND=ActionPermission(safe=False, constraints=constraints)),
+            _user(RUN_COMMAND=_perm(constraints)),
             _intel(),
             self.dg,
         )
@@ -265,7 +270,7 @@ class TestReadOnlyFastPath:
         constraints = TerminalConstraints(
             deny_capabilities=frozenset({"capability:read_only:*"}),
         )
-        perm = ActionPermission(safe=False, constraints=constraints)
+        perm = _perm(constraints)
         result = run_dg_with_intel(
             "ls",
             _user(RUN_COMMAND=perm),
@@ -502,7 +507,9 @@ class TestUndecidedDefault:
         from policy_registry.constraints.email import EmailConstraints
         perm = ActionPermission(
             safe=False,
-            constraints=EmailConstraints(allowed_recipients=["a@b.com"]),
+            constraints=EmailConstraints(allowed_recipients=["a@b.com"]).model_dump(
+                mode="python"
+            ),
         )
         result = decide_dg_sync(self.dg,
             _intent(ActionType.SEND_EMAIL, target="x", to="a@b.com"),
@@ -534,18 +541,17 @@ class TestFailClosedExceptionHandling:
         """
         dg = DeterministicGuardian()
 
+        from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+        from policy_registry.constraints.terminal import TerminalConstraints
+
         def raise_boom(*args, **kwargs):
+            del args, kwargs
             raise RuntimeError("boom")
 
-        from intentframe_components.guardian import checkers as checkers_mod
-        monkeypatch.setattr(
-            checkers_mod,
-            "CONSTRAINT_CHECKERS",
-            {TerminalConstraints: type("Bad", (), {"check": raise_boom})()},
-        )
+        monkeypatch.setattr(TerminalActionBundle, "enforce_constraints", raise_boom)
 
         constraints = TerminalConstraints(blocked_patterns=["sudo"])
-        perm = ActionPermission(safe=False, constraints=constraints)
+        perm = _perm(constraints)
         result = run_dg_with_intel(
             "ls",
             _user(RUN_COMMAND=perm),

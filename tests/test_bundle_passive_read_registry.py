@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from intentframe_action_bundle.bundles.register import ensure_bundles_registered
+from intentframe_action_bundle import ensure_bundles_registered
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.registry import (
     all_passive_read_action_ids,

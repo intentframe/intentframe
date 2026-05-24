@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
-from policy_registry.models import ActionPermission, DomainConstraintTypes, SemanticIntentLimit
+from policy_registry.models import ActionPermission, SemanticIntentLimit
 
 TERMINAL_COMMAND_SIGNALS_MAX_ITEMS = 32
 TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN = 300
@@ -159,7 +159,7 @@ class UserContext(BaseModel):
     agent_id: str = ""
     allowed_actions: Dict[str, ActionPermission] = Field(default_factory=dict)
     intent_limits: List[SemanticIntentLimit] = Field(default_factory=list)
-    domain_constraints: Dict[str, DomainConstraintTypes] = Field(default_factory=dict)
+    domain_constraints: Dict[str, dict[str, Any]] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 

@@ -1,6 +1,6 @@
 DETERMINISTIC GATE MATRIX PARITY REPORT
 ========================================================================
-Generated:        2026-05-24 07:18:12 UTC
+Generated:        2026-05-24 08:47:41 UTC
 Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/deterministic_gate_matrix_baseline.txt
 Legacy commit:      66e567c
 Verify script:      tests/verify_deterministic_gate_matrix.py
@@ -54,7 +54,7 @@ match:            PASS
 SNAPSHOT HASHES
 ------------------------------------------------------------------------
 baseline sha256: 8a7d74f61ad790603bf32d83c61f6363154b0ecc34106d864de0d82b1ac73f41
-current  sha256: 8a7d74f61ad790603bf32d83c61f6363154b0ecc34106d864de0d82b1ac73f41
+current  sha256: 40c7c915ba2259dac4f5695d6236e08628334b653a69305561152888195098df
 
 All gate rows and runner phase order match the legacy baseline.
 Deterministic gate parity with legacy 66e567c is VERIFIED.

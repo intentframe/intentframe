@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.bundles.register import ensure_bundles_registered
+from intentframe_action_bundle import ensure_bundles_registered
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import (
     BundleContext,
@@ -65,7 +65,7 @@ def test_record_enrichment_populates_ledger() -> None:
 
 def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> None:
     """prepare_evidence runs before enrich; ledger after enrich."""
-    from intentframe_action_bundle.bundles.files import FilesActionBundle
+    from intentframe_action_bundle.files.bundle import FilesActionBundle
 
     bundle = FilesActionBundle()
     order: list[str] = []
@@ -77,11 +77,11 @@ def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> N
         agent_id="a",
     )
 
-    async def track_evidence(self, intent, permission, ctx, *, verbose=False):
+    async def track_evidence(self, intent, ctx, *, verbose=False):
         order.append("evidence")
         return BundlePhaseOutcome.continue_(ctx)
 
-    async def track_enrich(self, intent, permission, ctx, *, verbose=False):
+    async def track_enrich(self, intent, ctx, *, verbose=False):
         order.append("enrich")
         ctx.enriched_intent = intent.model_copy(update={"target": "/tmp/x-enriched"})
         return BundlePhaseOutcome.continue_(ctx)
@@ -105,11 +105,11 @@ def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_enrich_must_not_return_terminal() -> None:
-    from intentframe_action_bundle.bundles.files import FilesActionBundle
+    from intentframe_action_bundle.files.bundle import FilesActionBundle
 
     bundle = FilesActionBundle()
 
-    async def bad_enrich(self, intent, permission, ctx, *, verbose=False):
+    async def bad_enrich(self, intent, ctx, *, verbose=False):
         return BundlePhaseOutcome.block(ctx, reason="nope", matched_gate="bad")
 
     bundle.enrich = bad_enrich.__get__(bundle, FilesActionBundle)

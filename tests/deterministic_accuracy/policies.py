@@ -36,7 +36,10 @@ def _user(constraints: TerminalConstraints) -> UserContext:
         user_id="dg-accuracy",
         agent_id="dg-accuracy-agent",
         allowed_actions={
-            "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
+            "RUN_COMMAND": ActionPermission(
+                safe=False,
+                constraints=constraints.model_dump(mode="python"),
+            ),
         },
     )
 

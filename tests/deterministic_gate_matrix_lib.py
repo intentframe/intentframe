@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from action_registry.types import ActionType
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
@@ -19,7 +19,6 @@ from intentframe_components.guardian.deterministic import (
 )
 from intentframe_core.types import IntentFrame, UserContext
 from policy_registry.constraints.terminal import TerminalConstraints
-from policy_registry.domains.deletion import DeletionConstraints
 from policy_registry.models import ActionPermission
 from tests.deterministic_accuracy._helpers import (
     decide_dg_sync,
@@ -44,9 +43,10 @@ LEGACY_MATCHED_GATES: frozenset[str] = frozenset({
 LEGACY_RUNNER_CALL_PATTERNS: tuple[str, ...] = (
     r"bundle\.prepare_evidence",
     r"bundle\.enrich",
-    r"bundle\.check_policy",
-    r"_run_domain\(",
+    r"bundle\.enforce_constraints",
+    r"domain_bundle\.enforce",
     r"bundle\.structural_gates",
+    r"_try_passive_read_allow",
     r"bundle\.allow_gates",
 )
 
@@ -100,7 +100,12 @@ def gate_cases() -> tuple[GateCase, ...]:
         constraints = TerminalConstraints(blocked_patterns=["sudo"])
         return run_dg_with_intel(
             "sudo ls",
-            _user(RUN_COMMAND=ActionPermission(safe=False, constraints=constraints)),
+            _user(
+                RUN_COMMAND=ActionPermission(
+                    safe=False,
+                    constraints=constraints.model_dump(mode="python"),
+                )
+            ),
             CommandIntel(verdict="SAFE", capabilities=()),
             dg,
         )
@@ -113,7 +118,7 @@ def gate_cases() -> tuple[GateCase, ...]:
                 user_id="gate_matrix",
                 allowed_actions={"DELETE_FILE": perm_unsafe},
                 domain_constraints={
-                    "deletion": DeletionConstraints(block_irreversible=True),
+                    "deletion": {"block_irreversible": True},
                 },
             ),
         )

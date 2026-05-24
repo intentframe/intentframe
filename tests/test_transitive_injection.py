@@ -79,20 +79,27 @@ def _build_guardian_prompt(
         allowed_actions={
             "PAY_INVOICE": ActionPermission(
                 safe=False,
-                constraints=ApiConstraints(max_amount=5000.0),
+                constraints={"max_amount": 5000.0},
             ),
         },
     )
     perm = permission or ActionPermission(
         safe=False,
-        constraints=ApiConstraints(max_amount=5000.0),
+        constraints={"max_amount": 5000.0},
     )
+
+    from intentframe_bundle_sdk.types import BundleAIContext, ConstraintPromptContext
 
     return guardian._build_validation_prompt(
         intent or _make_intent(),
         analysis or _make_poisoned_analysis(),
         uc,
         perm,
+        bundle_ai_context=BundleAIContext(
+            constraint_context=ConstraintPromptContext(
+                action_constraints="Max amount: $5,000.00",
+            )
+        ),
     )
 
 

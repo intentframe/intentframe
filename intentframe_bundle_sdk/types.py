@@ -17,6 +17,34 @@ class PhaseDecision(str, Enum):
     ALLOW = "ALLOW"
 
 
+class BundleGateDecision(str, Enum):
+    """Terminal gate decision used by family structural helpers."""
+
+    BLOCK = "BLOCK"
+    ALLOW = "ALLOW"
+
+
+@dataclass(frozen=True)
+class ActionPermission:
+    """Per-action policy slice passed to bundle hooks (opaque constraints dict)."""
+
+    safe: bool
+    constraints: dict[str, Any] | None = None
+
+    def copy_with_constraints(
+        self, constraints: dict[str, Any] | None
+    ) -> ActionPermission:
+        return ActionPermission(safe=self.safe, constraints=constraints)
+
+
+def action_permission_from_policy(permission: Any) -> ActionPermission:
+    """Convert a policy-registry permission into the SDK shape."""
+    constraints = permission.constraints
+    if constraints is not None and not isinstance(constraints, dict):
+        constraints = constraints.model_dump(mode="python")
+    return ActionPermission(safe=permission.safe, constraints=constraints)
+
+
 @dataclass(frozen=True)
 class EnrichmentRecord:
     """Host-written ledger when a bundle mutates intent via enrichment."""
@@ -35,9 +63,6 @@ class BundleContext:
     evidence: dict[str, Any] = field(default_factory=dict)
     enriched_intent: IntentFrame | None = None
     enrichment: EnrichmentRecord | None = None
-    # Set when permission.constraints is present but CONSTRAINT_CHECKERS has no entry
-    # (e.g. CalendarConstraints). Does not BLOCK — see constraint_checker_skip.py.
-    constraint_checker_skipped: str | None = None
 
     @property
     def intent_submitted(self) -> IntentFrame:
@@ -58,11 +83,14 @@ class BundleContext:
             "target_submitted": self.enrichment.target_submitted,
         }
 
-    def constraint_checker_audit_fields(self) -> dict[str, object]:
-        """Audit when YAML constraints were not checked deterministically."""
-        if not self.constraint_checker_skipped:
-            return {}
-        return {"constraint_checker_skipped": self.constraint_checker_skipped}
+
+@dataclass
+class ConstraintPromptContext:
+    """Runner-built constraint text for the UNDECIDED AI path."""
+
+    action_constraints: str = "No specific constraints"
+    domain_constraints: list[str] = field(default_factory=list)
+    enforced_domains: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -75,6 +103,7 @@ class BundleAIContext:
     guardian_external_context: str = ""
     ae_prompt_label: str | None = None
     guardian_prompt_label: str | None = None
+    constraint_context: ConstraintPromptContext | None = None
     extras: dict[str, Any] = field(default_factory=dict)
 
 
@@ -110,18 +139,15 @@ def record_enrichment(
 
 
 def enrichment_audit_fields(ctx: BundleContext | None) -> dict[str, object]:
-    """Merge enrichment + constraint-checker skip fields into pipeline audit dicts."""
+    """Merge enrichment fields into pipeline audit dicts."""
     if ctx is None:
         return {}
-    return {
-        **ctx.enrichment_audit_fields(),
-        **ctx.constraint_checker_audit_fields(),
-    }
+    return ctx.enrichment_audit_fields()
 
 
 @dataclass(frozen=True)
 class BundlePhaseOutcome:
-    """Result of prepare / check_policy / gates."""
+    """Result of a bundle lifecycle phase."""
 
     decision: PhaseDecision
     context: BundleContext
@@ -154,6 +180,28 @@ class BundlePhaseOutcome:
     def terminal(self) -> bool:
         return self.decision in (PhaseDecision.BLOCK, PhaseDecision.ALLOW)
 
+    def to_deterministic_result(self) -> BundleDeterministicResult:
+        if self.decision is PhaseDecision.BLOCK:
+            decision_path = self.matched_gate if self.matched_gate else "deterministic"
+            return BundleDeterministicResult(
+                decision="BLOCK",
+                context=self.context,
+                reason=self.reason,
+                matched_gate=self.matched_gate,
+                decision_path=decision_path,
+            )
+        if self.decision is PhaseDecision.ALLOW:
+            return BundleDeterministicResult(
+                decision="ALLOW",
+                context=self.context,
+                reason=self.reason,
+                matched_gate=self.matched_gate,
+                decision_path=self.matched_gate if self.matched_gate else "deterministic",
+            )
+        raise ValueError(
+            f"to_deterministic_result() requires BLOCK or ALLOW, got {self.decision!r}"
+        )
+
 
 @dataclass(frozen=True)
 class BundleDeterministicResult:
@@ -164,3 +212,4 @@ class BundleDeterministicResult:
     reason: str = ""
     matched_gate: str = ""
     decision_path: str = "deterministic"
+    bundle_ai_context: BundleAIContext | None = None

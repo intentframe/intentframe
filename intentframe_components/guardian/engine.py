@@ -43,7 +43,6 @@ from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_
 from intentframe_bundle_sdk.audit_dump import dump_bundle_ai_context
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
-from intentframe_components.guardian.checkers import CONSTRAINT_CHECKERS
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
 from intentframe_components.prompt.logging import log_prompt_dump
@@ -236,6 +235,7 @@ class AIGuardian(Guardian):
             intent, analysis, user_context, permission,
             active_domains=active_domains,
             execution_context=execution_context,
+            bundle_ai_context=ai_ctx,
         )
 
         system_instructions = self._resolve_system_instructions(ai_ctx)
@@ -284,6 +284,7 @@ class AIGuardian(Guardian):
         permission: ActionPermission,
         active_domains: set[str] | None = None,
         execution_context: ExecutionContext | None = None,
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> str:
         """Build a hardened prompt for the AI guardian.
 
@@ -303,9 +304,13 @@ class AIGuardian(Guardian):
         if analysis.hidden_behaviors:
             hidden_str = "\n    - ".join([""] + analysis.hidden_behaviors)
 
-        if permission.constraints is not None:
-            checker = CONSTRAINT_CHECKERS.get(type(permission.constraints))
-            constraint_str = checker.summarize(permission.constraints) if checker else str(permission.constraints)
+        ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
+        constraint_ctx = ai_ctx.constraint_context
+        if constraint_ctx is not None:
+            constraint_str = constraint_ctx.action_constraints
+            if constraint_ctx.domain_constraints:
+                domain_bits = "; ".join(constraint_ctx.domain_constraints)
+                constraint_str = f"{constraint_str}; Domain: {domain_bits}"
         else:
             constraint_str = "No specific constraints"
 

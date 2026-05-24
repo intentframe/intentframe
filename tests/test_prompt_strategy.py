@@ -2,22 +2,20 @@
 
 from __future__ import annotations
 
-import pytest
-
 from action_registry.types import ActionType
-from intentframe_action_bundle.bundles.files import FilesActionBundle
-from intentframe_action_bundle.bundles.host_files import HostFilesActionBundle
-from intentframe_action_bundle.bundles.terminal import TerminalActionBundle
-from intentframe_action_bundle.evidence import CommandIntel, FileIntel
+from intentframe_action_bundle.files.bundle import FilesActionBundle
+from intentframe_action_bundle.host_files.bundle import HostFilesActionBundle
+from intentframe_action_bundle.terminal.bundle import TerminalActionBundle
+from intentframe_action_bundle.files.evidence import FileIntel
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_action_bundle.files.evidence_keys import FILE_INTEL_KEY
 from intentframe_action_bundle.files.prompts_ae import _CRITICAL_WRITE_FILE
-from intentframe_action_bundle.terminal.evidence_keys import (
+from intentframe_action_bundle.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
 )
 from intentframe_action_bundle.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
-from intentframe_bundle_sdk.action import NullActionBundle
-from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
+from intentframe_bundle_sdk.types import ActionPermission, BundleAIContext, BundleContext
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_core.types import IntentFrame
@@ -25,6 +23,8 @@ from intentframe_prompt_library.library import (
     DEFAULT_AE_SYSTEM_INSTRUCTIONS,
     DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS,
 )
+
+_NO_CONSTRAINTS = ActionPermission(safe=True, constraints=None)
 
 
 def _intent(action: ActionType, target: str = "/tmp/x") -> IntentFrame:
@@ -78,7 +78,7 @@ class TestTerminalBundleAIContext:
     def test_run_command_returns_specialized_system_prompt(self):
         bundle = TerminalActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.RUN_COMMAND, "ls -la"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert ai_ctx.ae_system_instructions == _CRITICAL_RUN_COMMAND
         assert ai_ctx.ae_prompt_label == "critical_run_command"
 
@@ -95,7 +95,7 @@ class TestTerminalBundleAIContext:
             command_intel=_intel(),
             terminal_command_signals=signals,
         )
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert "TERMINAL COMMAND — STRUCTURAL SIGNALS" in ai_ctx.ae_external_context
         assert ai_ctx.extras.get("terminal_command_signals") == signals
 
@@ -104,7 +104,7 @@ class TestFilesBundleAIContext:
     def test_write_file_returns_specialized_system_prompt(self):
         bundle = FilesActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.WRITE_FILE, "/tmp/x"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert ai_ctx.ae_system_instructions == _CRITICAL_WRITE_FILE
         assert ai_ctx.ae_prompt_label == "critical_write_file"
 
@@ -112,7 +112,7 @@ class TestFilesBundleAIContext:
         bundle = FilesActionBundle()
         fi = _file_intel(language="python", size_bytes=42)
         ctx = _bundle_ctx(_intent(ActionType.WRITE_FILE, "/tmp/x.py"), file_intel=fi)
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert "WRITE_FILE — PAYLOAD SIGNALS" in ai_ctx.ae_external_context
 
 
@@ -120,22 +120,24 @@ class TestHostFilesBundleAIContext:
     def test_write_host_file_returns_specialized_prompt(self):
         bundle = HostFilesActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.WRITE_HOST_FILE, "~/x.md"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert ai_ctx.ae_system_instructions == _CRITICAL_WRITE_FILE
 
     def test_delete_host_file_returns_empty_ai_context(self):
         bundle = HostFilesActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.DELETE_HOST_FILE, "~/x"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert ai_ctx.ae_system_instructions is None
         assert ai_ctx.ae_external_context == ""
 
 
 class TestDefaultBundleAIContext:
-    def test_null_bundle_returns_substrate_defaults(self):
-        bundle = NullActionBundle()
-        ctx = _bundle_ctx(_intent(ActionType.SEND_EMAIL, "bob@example.com"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, None, ctx)
+    def test_spotlight_bundle_returns_substrate_defaults(self):
+        from intentframe_action_bundle.spotlight.bundle import SpotlightActionBundle
+
+        bundle = SpotlightActionBundle()
+        ctx = _bundle_ctx(_intent(ActionType.SEARCH_SPOTLIGHT, "query"))
+        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert ai_ctx.ae_system_instructions is None
         assert ai_ctx.ae_external_context == ""
         assert ai_ctx.guardian_system_instructions is None

@@ -2,35 +2,39 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TYPE_CHECKING, Any
 
+from intentframe_bundle_sdk.types import BundlePhaseOutcome
+
 if TYPE_CHECKING:
+    from action_registry.types import DomainType
     from intentframe_core.types import IntentFrame
-    from intentframe_bundle_sdk.types import BundleContext
 
 
 class DomainBundle(ABC):
-    """Deterministic domain enforcement — BLOCK or pass, never ALLOW.
+    """Deterministic domain enforcement — BLOCK or pass, never ALLOW."""
 
-    Domain bundles own constraint schema and check logic only.
-    Action routing is declared separately via :func:`register_domain_routes`.
-    """
+    bundle_id: str
+    domain_type: DomainType
 
-    domain_id: str
+    def validate(self, domain_constraints: dict[str, Any] | None) -> None:
+        """Startup-only validation of policy YAML shape for this domain."""
+        if domain_constraints is not None:
+            raise NotImplementedError(
+                f"domain bundle {self.bundle_id!r} must override validate"
+            )
 
-    def validate_constraints(self, constraints: dict[str, Any]) -> None:
-        """Optional startup validation of policy YAML shape for this domain."""
-
-    @abstractmethod
-    def check_domain(
+    def enforce(
         self,
         intent: IntentFrame,
-        constraints: Any | None,
-        ctx: BundleContext,
-    ) -> tuple[bool, str]:
-        """Return (True, '') if no violation, else (False, reason)."""
+        domain_constraints: dict[str, Any] | None,
+    ) -> BundlePhaseOutcome:
+        del intent, domain_constraints
+        raise NotImplementedError(
+            f"domain bundle {self.bundle_id!r} must override enforce"
+        )
 
-    def summarize_constraints(self, constraints: Any) -> str:
-        """Human-readable summary for onboarding / AI prompts."""
-        return str(constraints)
+    def describe(self, domain_constraints: dict[str, Any] | None) -> str | None:
+        del domain_constraints
+        return None

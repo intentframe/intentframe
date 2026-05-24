@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_action_bundle.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
 
 

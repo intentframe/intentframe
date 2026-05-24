@@ -1,24 +1,11 @@
-"""Layer 4 — Deterministic Guardian (pre-AE pass).
-
-Substrate permission gate + :class:`DeterministicRunner` (Bundle SDK).
-
-Fixed order (legacy 66e567c, permission-first):
-
-    1. Permission (substrate)
-    2. prepare_evidence → enrich → check_policy → domain → structural → allow
-    3. UNDECIDED → AI path
-
-Bundle/checker exceptions → BLOCK (``matched_gate="exception"``,
-``dg_exception`` on audit). Fail-closed; no AI degradation.
-
-Authors implement bundle hooks only; they do not choose global order.
-"""
+"""Layer 4 — Deterministic Guardian (pre-AE pass)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 
+from intentframe_action_bundle import _ensure_first_party_bundles_loaded
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
@@ -51,9 +38,7 @@ class DeterministicGuardian:
 
     def __init__(self, verbose: bool = False) -> None:
         self.verbose = verbose
-        from intentframe_action_bundle.bundles.register import ensure_bundles_registered
-
-        ensure_bundles_registered()
+        _ensure_first_party_bundles_loaded()
 
     async def decide_async(
         self,
@@ -100,7 +85,13 @@ class DeterministicGuardian:
             )
 
         permission = user_context.allowed_actions[action]
-        bundle = action_bundle_for(action, permission)
+        bundle = action_bundle_for(action)
+        if bundle is None:
+            return DeterministicResult(
+                decision=DeterministicDecision.BLOCK,
+                reason=f"No registered bundle for allowed action '{action}'",
+                matched_gate="no_bundle",
+            )
 
         bundle_result = await DeterministicRunner.run_action_bundle(
             bundle,
@@ -125,16 +116,15 @@ class DeterministicGuardian:
                 decision=DeterministicDecision.ALLOW,
                 reason=bundle_result.reason,
                 matched_gate=bundle_result.matched_gate,
+                decision_path=bundle_result.decision_path,
                 bundle_context=ctx,
             )
-
-        bundle_ai_ctx = bundle.build_ai_context(intent, permission, ctx)
 
         return DeterministicResult(
             decision=DeterministicDecision.UNDECIDED,
             matched_gate="undecided",
             bundle_context=ctx,
-            bundle_ai_context=bundle_ai_ctx,
+            bundle_ai_context=bundle_result.bundle_ai_context,
         )
 
 

@@ -27,13 +27,13 @@ from action_registry.types import DomainType, ACTION_DOMAINS
 from intentframe_core.types import IntentFrame
 from intentframe_core.domains import DOMAIN_SCHEMAS
 from policy_registry.models import UserPolicy
-from policy_registry.domains.finance import FinanceConstraints
-from policy_registry.domains.deletion import DeletionConstraints
+from intentframe_action_bundle.deletion.bundle import DeletionDomainBundle
+from intentframe_action_bundle.deletion.constraints import DeletionConstraints
 from intentframe_action_bundle.domain_routes import DOMAIN_ROUTES
-from intentframe_action_bundle.domains.finance import FinanceDomainBundle
-from intentframe_action_bundle.domains.deletion import DeletionDomainBundle
-from intentframe_bundle_sdk.types import BundleContext
-
+from intentframe_action_bundle.finance.bundle import FinanceDomainBundle
+from intentframe_action_bundle.finance.constraints import FinanceConstraints
+from intentframe_bundle_sdk.types import PhaseDecision
+from policy_registry.domains.base import DomainConstraints
 
 passed_count = 0
 failed_count = 0
@@ -42,14 +42,36 @@ _finance_domain = FinanceDomainBundle()
 _deletion_domain = DeletionDomainBundle()
 
 
+def _domain_slice(constraints) -> dict | None:
+    if constraints is None:
+        return None
+    if isinstance(constraints, dict):
+        return constraints
+    if hasattr(constraints, "model_dump"):
+        return constraints.model_dump(mode="python")
+    return None
+
+
 def _check_finance(intent: IntentFrame, constraints) -> tuple[bool, str]:
-    ctx = BundleContext(intent=intent.model_copy(deep=True))
-    return _finance_domain.check_domain(intent, constraints, ctx)
+    if isinstance(constraints, DomainConstraints) and not isinstance(
+        constraints, FinanceConstraints
+    ):
+        return True, ""
+    outcome = _finance_domain.enforce(intent, _domain_slice(constraints))
+    if outcome.decision is PhaseDecision.BLOCK:
+        return False, outcome.reason
+    return True, ""
 
 
 def _check_deletion(intent: IntentFrame, constraints) -> tuple[bool, str]:
-    ctx = BundleContext(intent=intent.model_copy(deep=True))
-    return _deletion_domain.check_domain(intent, constraints, ctx)
+    if isinstance(constraints, DomainConstraints) and not isinstance(
+        constraints, DeletionConstraints
+    ):
+        return True, ""
+    outcome = _deletion_domain.enforce(intent, _domain_slice(constraints))
+    if outcome.decision is PhaseDecision.BLOCK:
+        return False, outcome.reason
+    return True, ""
 
 
 def check(label: str, condition: bool, detail: str = ""):
@@ -127,7 +149,6 @@ def test_finance_module():
     check("No recipient (optional) → pass", ok5)
 
     # Base DomainConstraints (not FinanceConstraints) → pass
-    from policy_registry.domains.base import DomainConstraints
     base = DomainConstraints(domain=DomainType.FINANCE)
     ok6, _ = _check_finance(intent, base)
     check("Base DomainConstraints → pass (isinstance guard)", ok6)
@@ -377,37 +398,41 @@ def test_serialization_roundtrip():
     print("  3. Serialization Round-Trip — JSON discriminated union")
     print("=" * 60)
 
+    finance_constraints = FinanceConstraints(
+        max_amount=5000.0,
+        allowed_currencies=["USD", "EUR"],
+        allowed_recipients=["ACME Corp"],
+    )
+    deletion_constraints = DeletionConstraints(
+        require_confirmation=True,
+        block_irreversible=True,
+        allowed_paths=["/tmp/*"],
+    )
     policy = UserPolicy(
         user_id="test_user",
         agent_id="domain-hardening-test",
         domain_constraints={
-            "finance": FinanceConstraints(
-                max_amount=5000.0,
-                allowed_currencies=["USD", "EUR"],
-                allowed_recipients=["ACME Corp"],
-            ),
-            "deletion": DeletionConstraints(
-                require_confirmation=True,
-                block_irreversible=True,
-                allowed_paths=["/tmp/*"],
-            ),
+            "finance": finance_constraints.model_dump(mode="python"),
+            "deletion": deletion_constraints.model_dump(mode="python"),
         },
     )
 
     json_str = policy.model_dump_json()
     restored = UserPolicy.model_validate_json(json_str)
 
-    fc = restored.domain_constraints.get("finance")
-    dc = restored.domain_constraints.get("deletion")
+    fc_raw = restored.domain_constraints.get("finance")
+    dc_raw = restored.domain_constraints.get("deletion")
 
-    check("Finance constraints survive round-trip", fc is not None)
+    check("Finance constraints survive round-trip", fc_raw is not None)
+    fc = FinanceConstraints.model_validate(fc_raw) if fc_raw is not None else None
     check("  isinstance FinanceConstraints", isinstance(fc, FinanceConstraints))
     if isinstance(fc, FinanceConstraints):
         check("  max_amount preserved", fc.max_amount == 5000.0)
         check("  allowed_currencies preserved", fc.allowed_currencies == ["USD", "EUR"])
         check("  allowed_recipients preserved", fc.allowed_recipients == ["ACME Corp"])
 
-    check("Deletion constraints survive round-trip", dc is not None)
+    check("Deletion constraints survive round-trip", dc_raw is not None)
+    dc = DeletionConstraints.model_validate(dc_raw) if dc_raw is not None else None
     check("  isinstance DeletionConstraints", isinstance(dc, DeletionConstraints))
     if isinstance(dc, DeletionConstraints):
         check("  require_confirmation preserved", dc.require_confirmation is True)
@@ -421,7 +446,7 @@ def test_serialization_roundtrip():
         target="test",
         data={"amount": 8000.0, "currency": "USD"},
     )
-    ok, reason = _check_finance(intent, fc)
+    ok, reason = _check_finance(intent, fc_raw)
     check("Finance module works with deserialized constraints", not ok)
     check("  blocks $8k against $5k limit", "exceeds" in reason.lower())
 

@@ -19,7 +19,7 @@ from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
-from intentframe_action_bundle.evidence import CommandIntel
+from intentframe_action_bundle.terminal.evidence import CommandIntel
 from intentframe_core.types import IntentFrame, UserContext
 from policy_registry.constraints.terminal import TerminalConstraints
 from policy_registry.models import ActionPermission
@@ -31,7 +31,10 @@ def _ctx(constraints: TerminalConstraints) -> UserContext:
     return UserContext(
         user_id="precedence",
         allowed_actions={
-            "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
+            "RUN_COMMAND": ActionPermission(
+                safe=False,
+                constraints=constraints.model_dump(mode="python"),
+            ),
         },
     )
 
