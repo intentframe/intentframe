@@ -7,7 +7,6 @@ Consumers read from it and apply their own logic.
 
 Usage:
     from policy_registry import PolicyRegistry, UserPolicy, ActionPermission
-    from policy_registry.constraints import FileConstraints
 
     registry = PolicyRegistry()
     registry.set_user_policy(UserPolicy(
@@ -16,7 +15,7 @@ Usage:
         allowed_actions={
             "READ_FILE": ActionPermission(
                 safe=True,
-                constraints=FileConstraints(allowed_paths=["/invoices/"]),
+                constraints={"allowed_paths": ["/invoices/"]},
             ),
         },
     ))

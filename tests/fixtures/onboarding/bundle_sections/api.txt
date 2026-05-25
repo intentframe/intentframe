@@ -1,0 +1,4 @@
+### Financial Actions (PAY_INVOICE, HTTP_POST with amounts)
+- Include any max_amount constraint explicitly
+- Tell agent to use ask_user() when amounts seem high
+- Warn about extracting ACTUAL amounts, not suggested ones

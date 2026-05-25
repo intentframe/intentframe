@@ -9,7 +9,7 @@ It runs ONCE when an agent connects, before any requests are processed.
 
 from abc import ABC, abstractmethod
 
-from intentframe_core.types import AgentCapabilities, ExecutionContext, RuntimeContext, UserContext
+from intentframe_core.types import AgentCapabilities, RuntimeContext, RuntimeContextForLLM, UserContext
 
 
 class OnboardingEngine(ABC):
@@ -44,7 +44,7 @@ class OnboardingEngine(ABC):
         self,
         capabilities: AgentCapabilities,
         user_context: UserContext,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
     ) -> RuntimeContext:
         """
         Perform AI-powered handshake to generate agent context.
@@ -52,9 +52,8 @@ class OnboardingEngine(ABC):
         Input:
         - capabilities: What the agent says it does (type, description, actions)
         - user_context: User's allowed actions with constraints and safe flags
-        - execution_context: Immutable server-side facts about the executor
-          (privilege level, uid/euid).  Allows onboarding to inject
-          appropriate guardrails when the executor runs as root.
+        - runtime_context_for_llm: Pre-rendered server-owned context sections
+          for the onboarding prompt (privilege, deployment, etc.).
 
         AI Processing:
         - Understand agent's purpose from description

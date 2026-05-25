@@ -4,23 +4,24 @@ Inspect hardened prompts — prints the EXACT prompts that AE and Guardian
 would send to the LLM, using real objects (no mocks).
 
 Run:  .venv/bin/python tests/inspect_hardened_prompts.py
-
-What this does:
-  1. Instantiates real AIAnalysisEngine and AIGuardian
-  2. Creates a realistic IntentFrame (SEND_EMAIL with body)
-  3. Creates a realistic AnalysisReport (for Guardian input)
-  4. Calls the actual prompt-building methods
-  5. Prints everything: system prompts + per-request prompts
-
-Nothing is mocked. The only hand-crafted objects are the data inputs
-(IntentFrame, AnalysisReport, UserContext) — the same data that the
-pipeline would construct from a real agent request.
 """
 
 from __future__ import annotations
 
 from action_registry.types import ActionType
-from intentframe_core.types import IntentFrame, AnalysisReport, UserContext, CommandIntel
+from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.actions.files.file_intel import build_file_intel
+from intentframe_native_bundles.actions.terminal.evidence import (
+    COMMAND_INTEL_KEY,
+    TERMINAL_COMMAND_SIGNALS_KEY,
+)
+from intentframe_bundle_sdk.types import ActionPermission as SdkActionPermission
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_ai_context_or_empty
+from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
 from intentframe_core.enums import RiskLevel, Reversibility
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 from command_shield.verdict import Signal
@@ -28,12 +29,7 @@ from command_shield.verdict import Signal
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_server.pipeline import IntentFrameRuntime
-from intentframe_server.file_intel import build_file_intel
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# Test data — realistic scenario
-# ═══════════════════════════════════════════════════════════════════════
 
 intent = IntentFrame(
     action=ActionType.SEND_EMAIL,
@@ -95,16 +91,32 @@ user_context = UserContext(
 permission = ActionPermission(safe=True)
 active_domains = IntentFrameRuntime._extract_active_domains(user_context)
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# Build prompts using real objects
-# ═══════════════════════════════════════════════════════════════════════
-
 SEPARATOR = "═" * 72
-THIN_SEP = "─" * 72
+
+_NO_PERM = SdkActionPermission(safe=True, constraints=None)
 
 ae = AIAnalysisEngine(verbose=False)
 gu = AIGuardian(verbose=False)
+email_bundle = EmailActionBundle()
+
+
+def _bundle_ctx(intent: IntentFrame, **evidence) -> BundleContext:
+    ctx = BundleContext(intent=intent)
+    ctx.evidence.update(evidence)
+    return ctx
+
+
+def _ai_ctx(intent: IntentFrame, bundle, **evidence) -> BundleAIContext:
+    ctx = _bundle_ctx(intent, **evidence)
+    return bundle.build_ai_context(ctx.effective_intent, _NO_PERM, ctx)
+
+
+def _ae_system_instructions(ai_ctx: BundleAIContext) -> str:
+    return ae._resolve_system_instructions(bundle_ai_context_or_empty(ai_ctx))
+
+
+def _gu_system_instructions(ai_ctx: BundleAIContext) -> str:
+    return gu._resolve_system_instructions(bundle_ai_context_or_empty(ai_ctx))
 
 
 def section(title: str) -> None:
@@ -113,20 +125,16 @@ def section(title: str) -> None:
     print(SEPARATOR)
 
 
-# ── 1. Analysis Engine system prompt ──────────────────────────────────
+send_email_ai_ctx = _ai_ctx(intent, email_bundle)
 
 section("1. ANALYSIS ENGINE — SYSTEM PROMPT (agent.instructions)")
 print()
-print(ae._agent.instructions)
-
-# ── 2. Analysis Engine per-request prompt ─────────────────────────────
+print(ae._get_agent(_ae_system_instructions(send_email_ai_ctx)).instructions)
 
 section("2. ANALYSIS ENGINE — PER-REQUEST PROMPT (_build_analysis_prompt)")
 print()
-ae_prompt = ae._build_analysis_prompt(intent, active_domains=active_domains)
+ae_prompt = ae._build_analysis_prompt(intent, send_email_ai_ctx, active_domains=active_domains)
 print(ae_prompt)
-
-# ── 3. Analysis Engine per-request prompt WITH terminal signals ───────
 
 section("3. ANALYSIS ENGINE — WITH TERMINAL COMMAND SIGNALS")
 print()
@@ -174,47 +182,55 @@ run_cmd_analysis = AnalysisReport(
     confidence=0.95,
     recommendation="Shell execution with outbound network retrieval.",
 )
-ae_run_cmd_prompt_id = ae._resolve_prompt_id(run_cmd_intent, run_cmd_intel)
-gu_run_cmd_prompt_id = gu._resolve_prompt_id(run_cmd_intent, run_cmd_analysis, run_cmd_intel)
+terminal_bundle = TerminalActionBundle()
+files_bundle = FilesActionBundle()
+
+run_cmd_ai_ctx = _ai_ctx(
+    run_cmd_intent,
+    terminal_bundle,
+    **{
+        COMMAND_INTEL_KEY: run_cmd_intel,
+        TERMINAL_COMMAND_SIGNALS_KEY: signals,
+    },
+)
+ae_run_cmd_label = run_cmd_ai_ctx.ae_prompt_label or "fallback_default"
+gu_run_cmd_label = gu._resolve_prompt_label(run_cmd_ai_ctx)
 ae_prompt_signals = ae._build_analysis_prompt(
     run_cmd_intent,
-    terminal_command_signals=signals,
+    run_cmd_ai_ctx,
     active_domains=active_domains,
 )
 print(ae_prompt_signals)
 
-# ── 3b. Analysis Engine RUN_COMMAND system prompt ─────────────────────
-
-section(f"3b. ANALYSIS ENGINE — RUN_COMMAND SYSTEM PROMPT ({ae_run_cmd_prompt_id})")
+section(f"3b. ANALYSIS ENGINE — RUN_COMMAND SYSTEM PROMPT ({ae_run_cmd_label})")
 print()
-print(ae._agents[ae_run_cmd_prompt_id].instructions)
-
-# ── 4. Guardian system prompt ─────────────────────────────────────────
+print(ae._get_agent(_ae_system_instructions(run_cmd_ai_ctx)).instructions)
 
 section("4. GUARDIAN — SYSTEM PROMPT (agent.instructions)")
 print()
-print(gu._agent.instructions)
+print(gu._get_agent(_gu_system_instructions(send_email_ai_ctx)).instructions)
 
-# ── 4b. Guardian RUN_COMMAND system prompt ────────────────────────────
-
-section(f"4b. GUARDIAN — RUN_COMMAND SYSTEM PROMPT ({gu_run_cmd_prompt_id})")
+section(f"4b. GUARDIAN — RUN_COMMAND SYSTEM PROMPT ({gu_run_cmd_label})")
 print()
-print(gu._agents[gu_run_cmd_prompt_id].instructions)
-
-# ── 5. Guardian per-request prompt ────────────────────────────────────
+print(gu._get_agent(_gu_system_instructions(run_cmd_ai_ctx)).instructions)
 
 section("5. GUARDIAN — PER-REQUEST PROMPT (_build_validation_prompt)")
 print()
+from intentframe_bundle_sdk.types import ConstraintPromptContext
+
 gu_prompt = gu._build_validation_prompt(
     intent,
     analysis,
     user_context,
     permission,
     active_domains=active_domains,
+    bundle_ai_context=BundleAIContext(
+        constraint_context=ConstraintPromptContext(
+            action_constraints="No specific constraints",
+        )
+    ),
 )
 print(gu_prompt)
-
-# ── 6. Analysis Engine per-request prompt WITH file_intel (WRITE_FILE) ─
 
 section("6. ANALYSIS ENGINE — WRITE_FILE PER-REQUEST PROMPT (with file_intel)")
 print()
@@ -275,26 +291,19 @@ write_file_analysis = AnalysisReport(
         "subprocess invocation once run."
     ),
 )
-ae_write_file_prompt_id = ae._resolve_prompt_id(
-    write_file_intent, None, write_file_intel,
-)
-gu_write_file_prompt_id = gu._resolve_prompt_id(
-    write_file_intent, write_file_analysis, None, write_file_intel,
-)
+write_ai_ctx = _ai_ctx(write_file_intent, files_bundle, **{FILE_INTEL_KEY: write_file_intel})
+ae_write_file_label = write_ai_ctx.ae_prompt_label or "fallback_default"
+gu_write_file_label = gu._resolve_prompt_label(write_ai_ctx)
 ae_prompt_write_file = ae._build_analysis_prompt(
     write_file_intent,
+    write_ai_ctx,
     active_domains=active_domains,
-    file_intel=write_file_intel,
 )
 print(ae_prompt_write_file)
 
-# ── 6b. Analysis Engine WRITE_FILE system prompt ──────────────────────
-
-section(f"6b. ANALYSIS ENGINE — WRITE_FILE SYSTEM PROMPT ({ae_write_file_prompt_id})")
+section(f"6b. ANALYSIS ENGINE — WRITE_FILE SYSTEM PROMPT ({ae_write_file_label})")
 print()
-print(ae._agents[ae_write_file_prompt_id].instructions)
-
-# ── 7. Guardian WRITE_FILE per-request prompt ─────────────────────────
+print(ae._get_agent(_ae_system_instructions(write_ai_ctx)).instructions)
 
 section("7. GUARDIAN — WRITE_FILE PER-REQUEST PROMPT (_build_validation_prompt)")
 print()
@@ -307,29 +316,17 @@ gu_prompt_write_file = gu._build_validation_prompt(
 )
 print(gu_prompt_write_file)
 
-# ── 7b. Guardian WRITE_FILE system prompt ─────────────────────────────
-
-section(f"7b. GUARDIAN — WRITE_FILE SYSTEM PROMPT ({gu_write_file_prompt_id})")
+section(f"7b. GUARDIAN — WRITE_FILE SYSTEM PROMPT ({gu_write_file_label})")
 print()
-print(gu._agents[gu_write_file_prompt_id].instructions)
-
-# ── 8. Summary ────────────────────────────────────────────────────────
+print(gu._get_agent(_gu_system_instructions(write_ai_ctx)).instructions)
 
 section("SUMMARY")
 print()
-print(f"  Analysis Engine system prompt:    {len(ae._agent.instructions):,} chars")
+print(f"  Analysis Engine system prompt:    {len(ae._get_agent(_ae_system_instructions(send_email_ai_ctx)).instructions):,} chars")
 print(f"  Analysis Engine request prompt:   {len(ae_prompt):,} chars")
 print(f"  Analysis Engine w/ signals:       {len(ae_prompt_signals):,} chars")
 print(f"  Analysis Engine w/ file_intel:    {len(ae_prompt_write_file):,} chars")
-print(f"  Guardian system prompt:           {len(gu._agent.instructions):,} chars")
+print(f"  Guardian system prompt:           {len(gu._get_agent(_gu_system_instructions(send_email_ai_ctx)).instructions):,} chars")
 print(f"  Guardian request prompt:          {len(gu_prompt):,} chars")
 print(f"  Guardian WRITE_FILE request:      {len(gu_prompt_write_file):,} chars")
-print()
-print(f"  Hardening techniques applied:")
-print(f"    ✓ Immutable role anchoring      (system prompts start with IMMUTABLE declaration)")
-print(f"    ✓ Boundary protocol             (system prompts explain the boundary markers)")
-print(f"    ✓ XML trusted context tags      (pipeline data in <trusted_context> tags)")
-print(f"    ✓ Random boundary tokens        (untrusted data between per-request hex tokens)")
-print(f"    ✓ Encoding normalization        (zero-width chars, Unicode, base64 flagging)")
-print(f"    ✓ Sandwich reinforcement        (REMINDER after untrusted content)")
 print()

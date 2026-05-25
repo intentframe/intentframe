@@ -1,0 +1,60 @@
+DETERMINISTIC GATE MATRIX PARITY REPORT
+========================================================================
+Generated:        2026-05-25 21:34:12 UTC
+Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/deterministic_gate_matrix_baseline.txt
+Legacy commit:      66e567c
+Verify script:      tests/verify_deterministic_gate_matrix.py
+
+OVERALL:            PASS  (9/9 gate rows match)
+
+GATE ROW DETAILS
+------------------------------------------------------------------------
+[PASS] command_shield
+       baseline: BLOCK|command_shield
+       current:  BLOCK|command_shield
+
+[PASS] constraint
+       baseline: BLOCK|constraint
+       current:  BLOCK|constraint
+
+[PASS] delete_host_file_floor
+       baseline: BLOCK|delete_host_file_floor
+       current:  BLOCK|delete_host_file_floor
+
+[PASS] domain
+       baseline: BLOCK|domain
+       current:  BLOCK|domain
+
+[PASS] passive_read
+       baseline: ALLOW|passive_read
+       current:  ALLOW|passive_read
+
+[PASS] permission
+       baseline: BLOCK|permission
+       current:  BLOCK|permission
+
+[PASS] run_command_read_only
+       baseline: ALLOW|run_command_read_only
+       current:  ALLOW|run_command_read_only
+
+[PASS] write_file_sensitive_path
+       baseline: BLOCK|write_file_sensitive_path
+       current:  BLOCK|write_file_sensitive_path
+
+[PASS] write_host_file_floor
+       baseline: BLOCK|write_host_file_floor
+       current:  BLOCK|write_host_file_floor
+
+RUNNER PHASE ORDER
+------------------------------------------------------------------------
+baseline ordered: yes
+current  ordered: yes
+match:            PASS
+
+SNAPSHOT HASHES
+------------------------------------------------------------------------
+baseline sha256: 8a7d74f61ad790603bf32d83c61f6363154b0ecc34106d864de0d82b1ac73f41
+current  sha256: 40c7c915ba2259dac4f5695d6236e08628334b653a69305561152888195098df
+
+All gate rows and runner phase order match the legacy baseline.
+Deterministic gate parity with legacy 66e567c is VERIFIED.

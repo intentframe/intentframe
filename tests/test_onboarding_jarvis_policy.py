@@ -53,10 +53,10 @@ if str(_REPO_ROOT) not in sys.path:
 
 from intentframe_core.types import (  # noqa: E402
     AgentCapabilities,
-    ExecutionContext,
     RuntimeContext,
     UserContext,
 )
+from intentframe_bundle_sdk.loader import ensure_loaded  # noqa: E402
 from intentframe_components.onboarding.engine import AIOnboardingEngine  # noqa: E402
 from policy_registry.models import UserPolicy  # noqa: E402
 
@@ -140,8 +140,7 @@ _SIMULATED_INTENT_LIMITS: list[dict] = [
     },
 ]
 
-# Disjoint constraint field names drive Pydantic Union dispatch in the
-# registry — keep these as-is.
+# Disjoint constraint field names — validated by the matching action bundle.
 _VFS_CONSTRAINT = {"allowed_paths": ["/home/*"]}
 _HOST_CONSTRAINT = {"allowed_host_paths": ["~/*"]}
 _EMAIL_CONSTRAINT = {
@@ -313,8 +312,6 @@ async def _run(
     user_context: UserContext,
     capabilities: AgentCapabilities,
 ) -> RuntimeContext:
-    execution_context = ExecutionContext()
-
     caps_fs = sorted(set(capabilities.action_types) & FS_FILE_ACTIONS)
     policy_fs = sorted(set(user_context.allowed_actions) & FS_FILE_ACTIONS)
 
@@ -331,11 +328,11 @@ async def _run(
     )
     print(f"constrained       : {constrained}")
 
+    ensure_loaded(["intentframe_native_bundles"])
     engine = AIOnboardingEngine(verbose=True)
     return await engine.onboard(
         capabilities=capabilities,
         user_context=user_context,
-        execution_context=execution_context,
     )
 
 

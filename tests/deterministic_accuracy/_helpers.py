@@ -1,33 +1,26 @@
-"""Helpers for DG accuracy tests.
-
-Core contract: tests here never hand-construct ``CommandIntel``.  Every
-decision is driven by running the real :func:`command_shield.inspect_command`
-on the raw command string and building ``CommandIntel`` the same way
-:mod:`intentframe_server.pipeline` does — so the classifier and DG are
-exercised as a pair.
-
-That way a classifier miss (wrong verdict, missing capability tag,
-missed edge signal) surfaces here as a DG decision drift, not a silent
-pass.
-"""
+"""Helpers for DG accuracy tests — full Bundle SDK lifecycle."""
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from unittest.mock import patch
 
 from action_registry.types import ActionType
 from command_shield import Verdict, inspect_command
+from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_bundle_sdk.types import BundlePhaseOutcome
 from intentframe_components.guardian.deterministic import (
     DeterministicGuardian,
     DeterministicResult,
 )
-from intentframe_core.types import CommandIntel, IntentFrame, UserContext
+from intentframe_core.types import IntentFrame, UserContext
 
 
 @dataclass(frozen=True)
 class ShieldView:
-    """What command_shield saw — kept around so tests can assert on the
-    classifier's own output, not just DG's downstream decision."""
+    """What command_shield saw — kept for test assertions."""
 
     verdict: str
     capabilities: tuple[str, ...]
@@ -37,7 +30,7 @@ class ShieldView:
 
 
 def build_shield_view(command: str) -> ShieldView:
-    """Run the real inspect_command and summarize the way pipeline.py does."""
+    """Run the real inspect_command and summarize."""
     report = inspect_command(command)
 
     code_intel = report.code_intel
@@ -62,13 +55,7 @@ def build_shield_view(command: str) -> ShieldView:
 
 
 def build_command_intel(command: str) -> tuple[CommandIntel | None, ShieldView]:
-    """Build CommandIntel from the real classifier.
-
-    Returns ``(None, view)`` for CATASTROPHIC verdicts — the pipeline
-    would short-circuit at command_shield and DG would never see this
-    command.  Tests that focus on DG should skip those; the full-pipeline
-    catastrophic behavior is covered elsewhere.
-    """
+    """Build CommandIntel from classifier (None when CATASTROPHIC)."""
     view = build_shield_view(command)
     if view.verdict == Verdict.CATASTROPHIC.value:
         return None, view
@@ -83,18 +70,31 @@ def build_command_intel(command: str) -> tuple[CommandIntel | None, ShieldView]:
     return intel, view
 
 
+async def decide_dg(
+    dg: DeterministicGuardian,
+    intent: IntentFrame,
+    user_context: UserContext,
+) -> DeterministicResult:
+    """Await production DG API (tests only)."""
+    return await dg.decide_async(intent, user_context)
+
+
+def decide_dg_sync(
+    dg: DeterministicGuardian,
+    intent: IntentFrame,
+    user_context: UserContext,
+) -> DeterministicResult:
+    """Sync wrapper for pytest without a running loop."""
+    return asyncio.run(decide_dg(dg, intent, user_context))
+
+
 def run_dg(
     command: str,
     user_context: UserContext,
     dg: DeterministicGuardian | None = None,
 ) -> tuple[DeterministicResult, ShieldView]:
-    """Drive DG for a RUN_COMMAND with real classifier output.
-
-    ``dg`` is optional so callers can share a single instance across a
-    parametrized run; a fresh one is created per call by default to
-    keep tests independent.
-    """
-    intel, view = build_command_intel(command)
+    """Drive full DG lifecycle for RUN_COMMAND with real command_shield."""
+    view = build_shield_view(command)
     dg = dg or DeterministicGuardian()
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
@@ -103,5 +103,26 @@ def run_dg(
         reason="accuracy test",
         agent_id="dg_accuracy",
     )
-    result = dg.decide(intent, user_context, command_intel=intel)
+    result = decide_dg_sync(dg, intent, user_context)
     return result, view
+
+
+def run_dg_with_intel(
+    command: str,
+    user_context: UserContext,
+    command_intel: CommandIntel,
+    dg: DeterministicGuardian | None = None,
+) -> DeterministicResult:
+    """Pin checker gates with seeded command_intel (skips real shield)."""
+
+    from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY
+
+    async def seed_prepare(self, intent, ctx, *, verbose=False):
+        del intent, verbose
+        ctx.evidence[COMMAND_INTEL_KEY] = command_intel
+        return BundlePhaseOutcome.continue_(ctx)
+
+    dg = dg or DeterministicGuardian()
+    with patch.object(TerminalActionBundle, "prepare_evidence", seed_prepare):
+        result, _ = run_dg(command, user_context, dg)
+    return result

@@ -17,7 +17,7 @@ benignness under an adversarial agent.
 
 Also covers:
 
-  - Fail-closed exception path (UNDECIDED, never ALLOW)
+  - Fail-closed exception path (BLOCK + matched_gate=exception, never ALLOW/AI)
   - deny_capabilities blocks the read-only fast-path
   - Incompatible capability tags disqualify the read-only fast-path
   - Code-intel findings / edge signals disqualify the fast-path
@@ -29,15 +29,17 @@ from __future__ import annotations
 import pytest
 
 from action_registry.types import ActionType
+from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_bundles import passive_read_action_ids
+from intentframe_native_bundles.actions.terminal._read_only import READ_ONLY_INCOMPATIBLE
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
     DeterministicResult,
-    _PRE_AE_SAFE_READS,
-    _READ_ONLY_INCOMPATIBLE,
 )
-from intentframe_core.types import CommandIntel, IntentFrame, UserContext
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_core.types import IntentFrame, UserContext
+from tests.deterministic_accuracy._helpers import decide_dg_sync, run_dg_with_intel
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 
@@ -55,6 +57,11 @@ def _intent(action: ActionType, target: str = "", **data) -> IntentFrame:
 
 def _user(**actions: ActionPermission) -> UserContext:
     return UserContext(user_id="tester", allowed_actions=dict(actions))
+
+def _perm(constraints, *, safe: bool = False) -> ActionPermission:
+    if hasattr(constraints, "model_dump"):
+        constraints = constraints.model_dump(mode="python")
+    return ActionPermission(safe=safe, constraints=constraints)
 
 
 def _intel(
@@ -80,7 +87,7 @@ class TestPermissionGate:
     dg = DeterministicGuardian()
 
     def test_action_not_in_allowed_actions_blocks(self):
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.READ_FILE, "/tmp/x"),
             _user(),  # nothing allowed
         )
@@ -90,7 +97,7 @@ class TestPermissionGate:
 
     def test_action_in_allowed_actions_passes_gate(self):
         # safe=False so passive-read ALLOW doesn't fire
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.READ_FILE, "/tmp/x"),
             _user(READ_FILE=ActionPermission(safe=False)),
         )
@@ -112,10 +119,11 @@ class TestConstraintGate:
         constraints = TerminalConstraints(
             deny_capabilities=frozenset({"capability:package_install:*"}),
         )
-        result = self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="pip install foo"),
-            _user(RUN_COMMAND=ActionPermission(safe=False, constraints=constraints)),
-            command_intel=_intel("capability:package_install:pip"),
+        result = run_dg_with_intel(
+            "pip install foo",
+            _user(RUN_COMMAND=_perm(constraints)),
+            _intel("capability:package_install:pip"),
+            self.dg,
         )
         assert result.decision is DeterministicDecision.BLOCK
         assert result.matched_gate == "constraint"
@@ -123,20 +131,22 @@ class TestConstraintGate:
 
     def test_blocked_pattern_blocks_before_ae(self):
         constraints = TerminalConstraints(blocked_patterns=["sudo"])
-        result = self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="sudo ls"),
-            _user(RUN_COMMAND=ActionPermission(safe=False, constraints=constraints)),
-            command_intel=_intel(),
+        result = run_dg_with_intel(
+            "sudo ls",
+            _user(RUN_COMMAND=_perm(constraints)),
+            _intel(),
+            self.dg,
         )
         assert result.decision is DeterministicDecision.BLOCK
         assert result.matched_gate == "constraint"
         assert "sudo" in result.reason
 
     def test_no_constraints_passes_gate(self):
-        result = self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="echo hi && echo bye"),
+        result = run_dg_with_intel(
+            "echo hi && echo bye",
             _user(RUN_COMMAND=ActionPermission(safe=False)),
-            command_intel=_intel(verdict="SAFE"),  # no caps → no read-only ALLOW
+            _intel(verdict="SAFE"),
+            self.dg,
         )
         assert result.decision is DeterministicDecision.UNDECIDED
 
@@ -149,7 +159,7 @@ class TestPassiveReadFastPath:
     dg = DeterministicGuardian()
 
     def test_passive_read_safe_allows(self):
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.READ_FILE, "/tmp/x"),
             _user(READ_FILE=ActionPermission(safe=True)),
         )
@@ -159,7 +169,7 @@ class TestPassiveReadFastPath:
     def test_passive_read_unsafe_falls_through(self):
         """safe=False means the user asked for AI review — DG must
         not ALLOW just because the action is conceptually passive."""
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.READ_FILE, "/tmp/x"),
             _user(READ_FILE=ActionPermission(safe=False)),
         )
@@ -168,17 +178,15 @@ class TestPassiveReadFastPath:
     def test_non_passive_safe_action_falls_through(self):
         """SEND_EMAIL marked safe is NOT passive — DG falls through
         so AE can still inspect the prompt content."""
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.SEND_EMAIL, target="x@y.com"),
             _user(SEND_EMAIL=ActionPermission(safe=True)),
         )
         assert result.decision is DeterministicDecision.UNDECIDED
 
-    def test_passive_read_set_matches_ae_passive_set(self):
-        """DG and AE must agree on what counts as a passive read
-        so their fast-path universes stay aligned."""
-        from intentframe_components.analysis.engine import AIAnalysisEngine
-        assert _PRE_AE_SAFE_READS == frozenset(AIAnalysisEngine._PASSIVE_READ_ACTIONS)
+    def test_passive_read_set_is_canonical(self):
+        """Passive read ALLOW is declared per owning bundle and enforced by SDK."""
+        assert ActionType.READ_FILE.value in passive_read_action_ids()
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -191,10 +199,11 @@ class TestReadOnlyFastPath:
     perm = ActionPermission(safe=False)
 
     def _decide(self, command: str, intel: CommandIntel) -> DeterministicResult:
-        return self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target=command),
+        return run_dg_with_intel(
+            command,
             _user(RUN_COMMAND=self.perm),
-            command_intel=intel,
+            intel,
+            self.dg,
         )
 
     def test_read_only_safe_command_allows(self):
@@ -213,7 +222,7 @@ class TestReadOnlyFastPath:
         result = self._decide("echo hi && echo bye", intel)
         assert result.decision is DeterministicDecision.UNDECIDED
 
-    @pytest.mark.parametrize("bad_cap", sorted(_READ_ONLY_INCOMPATIBLE))
+    @pytest.mark.parametrize("bad_cap", sorted(READ_ONLY_INCOMPATIBLE))
     def test_incompatible_capability_blocks_fast_path(self, bad_cap):
         """Each incompatible tag alone disqualifies the fast path —
         defense against classifier co-emitting read_only + dangerous."""
@@ -261,23 +270,23 @@ class TestReadOnlyFastPath:
         constraints = TerminalConstraints(
             deny_capabilities=frozenset({"capability:read_only:*"}),
         )
-        perm = ActionPermission(safe=False, constraints=constraints)
-        result = self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="ls"),
+        perm = _perm(constraints)
+        result = run_dg_with_intel(
+            "ls",
             _user(RUN_COMMAND=perm),
-            command_intel=_intel("capability:read_only:filesystem_list"),
+            _intel("capability:read_only:filesystem_list"),
+            self.dg,
         )
         # TerminalChecker (Step 2) catches this FIRST — so it's a
         # constraint BLOCK, not a fast-path miss.  Either way it's
         # not an ALLOW.
         assert result.decision is DeterministicDecision.BLOCK
 
-    def test_command_intel_none_skips_fast_path(self):
-        """Without CommandIntel, the fast-path cannot fire."""
-        result = self.dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="ls"),
+    def test_empty_command_skips_read_only_allow(self):
+        """Without a command string, shield produces no intel and read-only cannot ALLOW."""
+        result = decide_dg_sync(self.dg,
+            _intent(ActionType.RUN_COMMAND, target=""),
             _user(RUN_COMMAND=self.perm),
-            command_intel=None,
         )
         assert result.decision is DeterministicDecision.UNDECIDED
 
@@ -304,7 +313,7 @@ class TestWriteFileSensitivePathBlock:
     perm_safe = ActionPermission(safe=True)
 
     def _decide(self, target: str, *, safe: bool = True) -> DeterministicResult:
-        return self.dg.decide(
+        return decide_dg_sync(self.dg,
             _intent(ActionType.WRITE_FILE, target),
             _user(WRITE_FILE=self.perm_safe if safe else ActionPermission(safe=False)),
         )
@@ -369,7 +378,7 @@ class TestWriteFileSensitivePathBlock:
     def test_code_payload_with_benign_destination_undecided(self):
         """Only destination drives the DG BLOCK; payload type does not.
         A Python file on a non-sensitive path falls through to AE."""
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.WRITE_FILE, "/home/documents/notes.md"),
             _user(WRITE_FILE=self.perm_safe),
         )
@@ -392,7 +401,7 @@ class TestHostFileFloorBlock:
     dg = DeterministicGuardian()
 
     def _run(self, action: ActionType, target: str):
-        return self.dg.decide(
+        return decide_dg_sync(self.dg,
             _intent(action, target),
             _user(**{action.value: ActionPermission(safe=False)}),
         )
@@ -468,7 +477,7 @@ class TestHostFileFloorBlock:
         # The floor is a *write* floor.  Reads under deny prefixes are
         # an exposure risk but not the same destructive hazard; they
         # fall through to AE/AIGuardian for scope review.
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.READ_HOST_FILE, "/etc/sudoers"),
             _user(READ_HOST_FILE=ActionPermission(safe=False)),
         )
@@ -479,7 +488,7 @@ class TestHostFileFloorBlock:
         just like virtual-path reads — the _PRE_AE_SAFE_READS set
         already includes READ_HOST_FILE / LIST_HOST_DIRECTORY."""
         for action in (ActionType.READ_HOST_FILE, ActionType.LIST_HOST_DIRECTORY):
-            result = self.dg.decide(
+            result = decide_dg_sync(self.dg,
                 _intent(action, "~/Documents/foo.txt"),
                 _user(**{action.value: ActionPermission(safe=True)}),
             )
@@ -495,12 +504,14 @@ class TestUndecidedDefault:
     dg = DeterministicGuardian()
 
     def test_send_email_with_constraints_falls_through(self):
-        from policy_registry.constraints.email import EmailConstraints
+        from intentframe_native_bundles.actions.email.constraints import EmailConstraints
         perm = ActionPermission(
             safe=False,
-            constraints=EmailConstraints(allowed_recipients=["a@b.com"]),
+            constraints=EmailConstraints(allowed_recipients=["a@b.com"]).model_dump(
+                mode="python"
+            ),
         )
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.SEND_EMAIL, target="x", to="a@b.com"),
             _user(SEND_EMAIL=perm),
         )
@@ -510,7 +521,7 @@ class TestUndecidedDefault:
         """ASK_USER/GET_CONFIRMATION/SHOW_MESSAGE must always go
         through AE even when marked safe — their prompt content has
         to be inspected for social-engineering / phishing."""
-        result = self.dg.decide(
+        result = decide_dg_sync(self.dg,
             _intent(ActionType.ASK_USER, target="prompt"),
             _user(ASK_USER=ActionPermission(safe=True)),
         )
@@ -518,37 +529,39 @@ class TestUndecidedDefault:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Fail-closed: exceptions → UNDECIDED (never ALLOW)
+# Fail-closed: exceptions → BLOCK (never ALLOW, never AI degradation)
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestFailClosedExceptionHandling:
 
-    def test_exception_yields_undecided_not_allow(self, monkeypatch):
-        """If a checker raises, DG must fall back to UNDECIDED so the
-        AI path still runs.  It must NOT swallow the error as an
-        implicit ALLOW.
+    def test_exception_yields_block_not_allow_or_undecided(self, monkeypatch):
+        """If a checker raises, DG must BLOCK fail-closed with
+        matched_gate=exception and dg_exception set — not fall through
+        to the AI path.
         """
         dg = DeterministicGuardian()
 
+        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+
         def raise_boom(*args, **kwargs):
+            del args, kwargs
             raise RuntimeError("boom")
 
-        from intentframe_components.guardian import deterministic as dgmod
-        monkeypatch.setattr(
-            dgmod,
-            "CONSTRAINT_CHECKERS",
-            {TerminalConstraints: type("Bad", (), {"check": raise_boom})()},
-        )
+        monkeypatch.setattr(TerminalActionBundle, "enforce_constraints", raise_boom)
 
         constraints = TerminalConstraints(blocked_patterns=["sudo"])
-        perm = ActionPermission(safe=False, constraints=constraints)
-        result = dg.decide(
-            _intent(ActionType.RUN_COMMAND, target="ls"),
+        perm = _perm(constraints)
+        result = run_dg_with_intel(
+            "ls",
             _user(RUN_COMMAND=perm),
-            command_intel=_intel("capability:read_only:filesystem_list"),
+            _intel("capability:read_only:filesystem_list"),
+            dg,
         )
-        assert result.decision is DeterministicDecision.UNDECIDED
+        assert result.decision is DeterministicDecision.BLOCK
         assert result.matched_gate == "exception"
+        assert result.dg_exception == "RuntimeError('boom')"
+        assert result.decision_path == "deterministic"
 
 
 if __name__ == "__main__":

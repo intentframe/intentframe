@@ -23,14 +23,14 @@ and ``agent_id`` explicitly (the gateway derives them from
 populated — either via the YAML or via the keyword overrides — or
 :meth:`UserPolicy.model_validate` raises.
 
-Constraint dispatch
--------------------
-Validation goes through :meth:`UserPolicy.model_validate`, which reuses
-the registry's untagged ``ConstraintTypes`` union (dispatches on the
-disjoint required fields, e.g. ``allowed_paths`` vs
-``allowed_host_paths``).  Both sides set ``extra="forbid"`` — see
-``tests/test_policy_host_constraints_roundtrip.py`` for the regression
-pin.
+Constraint validation
+---------------------
+:meth:`UserPolicy.model_validate` stores ``constraints`` as opaque dicts.
+After load, :func:`intentframe_bundle_sdk.loader.validate_policy_against_registry`
+routes each ``allowed_actions`` entry to its registered action bundle,
+which validates the dict against the family schema (e.g.
+``allowed_paths`` vs ``allowed_host_paths``).  See
+``tests/test_policy_host_constraints_roundtrip.py``.
 """
 
 from __future__ import annotations
@@ -95,7 +95,16 @@ def load_policy_seed(
         merged.update(metadata)
         raw["metadata"] = merged
 
-    return UserPolicy.model_validate(raw)
+    policy = UserPolicy.model_validate(raw)
+    _validate_loaded_policy(policy)
+    return policy
+
+
+def _validate_loaded_policy(policy: UserPolicy) -> None:
+    from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
+
+    ensure_loaded(["intentframe_native_bundles"])
+    validate_policy_against_registry(policy)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -144,9 +153,8 @@ def _normalise_domain_constraints(raw: dict[str, Any]) -> None:
 
     The YAML schema is ``domain_constraints: {<domain>: {<fields>}}``,
     which is friendly to author but does not carry the ``domain`` field
-    that :data:`policy_registry.models.DomainConstraintTypes`'s
-    discriminator dispatches on.  Inject the key into each value (no-op
-    when the field is already present and matches).
+    that domain bundles may read at enforce time.  Inject the key into
+    each value (no-op when the field is already present and matches).
     """
     dc = raw.get("domain_constraints")
     if not isinstance(dc, dict):

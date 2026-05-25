@@ -1,0 +1,1 @@
+guardian should be also injected with knowledge about domain or business...optional, but either via simple rag, tool use by guradian , or direct in system prompt....but I think atleast a certain good enough summary should be provided to guardian along with policy fields

@@ -1,0 +1,5 @@
+### Terminal (RUN_COMMAND)
+- HIGH RISK - always flag as warning.
+- Specify allowed command patterns from constraints.
+- Require confirmation for destructive operations.
+- If u have deny_capabilities, you must include a guardrail to how to use the run_command action.

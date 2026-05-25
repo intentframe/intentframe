@@ -1,5 +1,5 @@
-"""Unit coverage for `AIOnboardingEngine._summarize_constraints`,
-`_summarize_deny_capabilities`, and `_summarize_intent_limits`.
+"""Unit coverage for bundle SDK ``describe_action_constraints``,
+terminal ``summarize_deny_capabilities``, and ``_summarize_intent_limits``.
 
 The summarizer is the seam through which the live `deny_capabilities`
 deny set surfaces to the onboarding LLM.  Before this seam was wired,
@@ -50,9 +50,20 @@ from __future__ import annotations
 
 import pytest
 
+from intentframe_bundle_sdk.constraints import describe_action_constraints
+from intentframe_components.onboarding.instructions import build_onboarding_instructions
+from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_components.onboarding.engine import AIOnboardingEngine
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.deny_capabilities import (
+    summarize_deny_capabilities,
+)
 from policy_registry.models import SemanticIntentLimit
+
+
+@pytest.fixture(autouse=True)
+def _register_bundles() -> None:
+    ensure_test_bundles_loaded()
 
 
 PYTHON_SHELL_ONLY_DENY = frozenset({
@@ -84,9 +95,7 @@ class TestSummarizeDenyCapabilitiesIsLossless:
         drifts from the live deny set as families/tags evolve and drops
         information the meta-LLM needs to judge guardrail shape.
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(
-            PYTHON_SHELL_ONLY_DENY
-        )
+        brief = summarize_deny_capabilities(PYTHON_SHELL_ONLY_DENY)
         for tag in PYTHON_SHELL_ONLY_DENY:
             suffix = tag.split(":", 2)[-1]
             assert suffix in brief, (
@@ -101,9 +110,7 @@ class TestSummarizeDenyCapabilitiesIsLossless:
         cue that lets the meta-LLM recognise the python+shell-only
         clamp shape without us having to call it out in prose.
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(
-            PYTHON_SHELL_ONLY_DENY
-        )
+        brief = summarize_deny_capabilities(PYTHON_SHELL_ONLY_DENY)
         for family in ("script_execution", "stdin_exec", "package_install"):
             assert family in brief, (
                 f"capability family {family!r} should be a labelled bucket "
@@ -115,9 +122,7 @@ class TestSummarizeDenyCapabilitiesIsLossless:
         internal enforcement architecture.  The actual *don't enumerate*
         directive lives in `_build_instructions`.
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(
-            PYTHON_SHELL_ONLY_DENY
-        )
+        brief = summarize_deny_capabilities(PYTHON_SHELL_ONLY_DENY)
         lowered = brief.lower()
         for internal in ("gate 2", "guardian", "deterministic"):
             assert internal not in lowered
@@ -129,7 +134,7 @@ class TestSummarizeDenyCapabilitiesEdgeCases:
         call), but if it does get here the helper must not crash or
         invent policy text.
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(frozenset())
+        brief = summarize_deny_capabilities(frozenset())
         assert "deny_capabilities" not in brief
         assert "0" in brief or "no" in brief.lower()
 
@@ -138,9 +143,7 @@ class TestSummarizeDenyCapabilitiesEdgeCases:
         falls under the `other` bucket.  Lossless: the tag is preserved
         verbatim.
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(
-            frozenset({"capability:compilation"})
-        )
+        brief = summarize_deny_capabilities(frozenset({"capability:compilation"}))
         assert "compilation" in brief
         assert "other" in brief
 
@@ -152,7 +155,7 @@ class TestSummarizeDenyCapabilitiesEdgeCases:
         a new capability family is added; the meta-LLM can reason
         about novel families given the raw tag.
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(
+        brief = summarize_deny_capabilities(
             frozenset({"capability:future_family:special"})
         )
         assert "future_family:special" in brief, (
@@ -167,7 +170,7 @@ class TestSummarizeDenyCapabilitiesEdgeCases:
         co-occurrence as a structural cue (per-interpreter pipe-deny
         AND per-interpreter file-deny → full clamp).
         """
-        brief = AIOnboardingEngine._summarize_deny_capabilities(
+        brief = summarize_deny_capabilities(
             frozenset({
                 "capability:script_execution:node",
                 "capability:stdin_exec:node",
@@ -188,10 +191,10 @@ class TestSummarizeConstraintsIntegration:
             blocked_patterns=("sudo", "rm -rf /"),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+        summary = describe_action_constraints(
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "blocked patterns" in summary
+        assert "blocked patterns" in summary.lower()
         assert "node" in summary
         assert "npm" in summary
         assert "compilation" in summary
@@ -203,10 +206,10 @@ class TestSummarizeConstraintsIntegration:
         constraints = TerminalConstraints(
             blocked_patterns=("sudo",),
         )
-        summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+        summary = describe_action_constraints(
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "blocked patterns" in summary
+        assert "blocked patterns" in summary.lower()
         assert "deny_capabilities" not in summary
         assert "Gate 2" not in summary
         assert "guardian" not in summary.lower()
@@ -215,10 +218,10 @@ class TestSummarizeConstraintsIntegration:
         constraints = TerminalConstraints(
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+        summary = describe_action_constraints(
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "deny_capabilities" in summary
+        assert "deny capabilities" in summary.lower()
         assert "node" in summary
         assert "blocked patterns" not in summary
 
@@ -227,18 +230,18 @@ class TestSummarizeConstraintsIntegration:
             allowed_commands=("git status",),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+        summary = describe_action_constraints(
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert "allowed commands" in summary
-        assert "deny_capabilities" in summary
+        assert "allowed commands" in summary.lower()
+        assert "deny capabilities" in summary.lower()
 
     def test_empty_terminal_constraints_returns_generic_string(self) -> None:
         constraints = TerminalConstraints()
-        summary = AIOnboardingEngine._summarize_constraints(
-            "RUN_COMMAND", constraints
+        summary = describe_action_constraints(
+            "RUN_COMMAND", constraints.model_dump(mode="python")
         )
-        assert summary == "terminal command constraints are configured"
+        assert summary.lower() == "no terminal constraints"
 
 
 # ── meta-prompt contract ─────────────────────────────────────────────
@@ -260,11 +263,8 @@ class TestBuildInstructionsMetaPromptContract:
     """
 
     def _instructions(self) -> str:
-        # Avoid constructing the real OpenAI Agent (needs API key) —
-        # we only care about the static instructions string, which
-        # does not depend on any instance state in ``__init__``.
-        return AIOnboardingEngine._build_instructions(
-            AIOnboardingEngine.__new__(AIOnboardingEngine)
+        return build_onboarding_instructions(
+            frozenset({"RUN_COMMAND", "SEND_EMAIL", "READ_HOST_FILE", "WRITE_HOST_FILE"}),
         )
 
     def test_instructions_forbid_vague_pointer_bullets(self) -> None:
@@ -387,8 +387,8 @@ class TestBuildOnboardingPromptCustomUserRules:
     """
 
     def _instructions(self) -> str:
-        return AIOnboardingEngine._build_instructions(
-            AIOnboardingEngine.__new__(AIOnboardingEngine)
+        return build_onboarding_instructions(
+            frozenset({"RUN_COMMAND", "SEND_EMAIL", "READ_HOST_FILE", "WRITE_HOST_FILE"}),
         )
 
     def test_instructions_contain_custom_user_rules_heading(self) -> None:

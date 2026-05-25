@@ -85,9 +85,7 @@ def policy_host_paths() -> set[str]:
         assert entry is not None, f"seed policy missing {action}"
         constraints = entry.get("constraints") or {}
         # Disjoint-field invariant: the policy key must be ``allowed_host_paths``,
-        # NOT ``allowed_paths`` — otherwise pydantic smart-union dispatches
-        # the payload to ``FileConstraints`` and routes through the
-        # virtual-path ``FileChecker``.  See tests/test_policy_host_constraints_roundtrip.py.
+        # NOT ``allowed_paths``.  See tests/test_policy_host_constraints_roundtrip.py.
         assert "allowed_paths" not in constraints, (
             f"{action} uses the FileConstraints key (allowed_paths); "
             "must use HostFileConstraints.allowed_host_paths instead"

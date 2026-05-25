@@ -25,12 +25,10 @@ import pytest
 
 from intentframe_gateway import bootstrap
 from jarvis.policies import builtin_policy_path
-from policy_registry.constraints import (
-    EmailConstraints,
-    HostFileConstraints,
-    MessageConstraints,
-    TerminalConstraints,
-)
+from intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_bundles.actions.message.constraints import MessageConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import (
     INTENTFRAME_POLICY_SCHEMA_VERSION,
     UserPolicy,
@@ -73,28 +71,25 @@ def test_host_file_actions_dispatch_to_host_file_constraints() -> None:
         "DELETE_HOST_FILE",
     ):
         perm = user.allowed_actions[action]
-        assert isinstance(perm.constraints, HostFileConstraints), (
-            f"{action} constraint dispatched to {type(perm.constraints).__name__}; "
-            "must be HostFileConstraints (allowed_host_paths)."
+        assert isinstance(perm.constraints, dict), (
+            f"{action} constraint must be stored as opaque dict"
         )
-        assert perm.constraints.allowed_host_paths == ["~/*"]
+        assert perm.constraints.get("allowed_host_paths") == ["~/*"]
 
 
 def test_root_variant_broadens_host_paths() -> None:
     root = load_policy_seed(builtin_policy_path("root"), user_id="unit_root")
     perm = root.allowed_actions["READ_HOST_FILE"]
-    assert isinstance(perm.constraints, HostFileConstraints)
-    assert perm.constraints.allowed_host_paths == ["/*"]
+    assert isinstance(perm.constraints, dict)
+    assert perm.constraints.get("allowed_host_paths") == ["/*"]
 
 
 def test_email_and_message_constraints_dispatch_correctly() -> None:
     user = load_policy_seed(builtin_policy_path("user"), user_id="unit_user")
-    assert isinstance(user.allowed_actions["SEND_EMAIL"].constraints, EmailConstraints)
-    assert isinstance(user.allowed_actions["REPLY_EMAIL"].constraints, EmailConstraints)
-    assert isinstance(
-        user.allowed_actions["SEND_MESSAGE"].constraints, MessageConstraints
-    )
-    assert isinstance(user.allowed_actions["RUN_COMMAND"].constraints, TerminalConstraints)
+    assert "allowed_recipients" in (user.allowed_actions["SEND_EMAIL"].constraints or {})
+    assert "allowed_recipients" in (user.allowed_actions["REPLY_EMAIL"].constraints or {})
+    assert "allowed_contacts" in (user.allowed_actions["SEND_MESSAGE"].constraints or {})
+    assert "blocked_patterns" in (user.allowed_actions["RUN_COMMAND"].constraints or {})
 
 
 def test_metadata_overlay_wins() -> None:
