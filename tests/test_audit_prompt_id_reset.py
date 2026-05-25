@@ -88,7 +88,10 @@ class _StubAE:
         self.last_prompt_label = self._prompt_label
         self.last_system_prompt = "ae system prompt"
         self.last_request_prompt = "ae request prompt"
-        return _safe_analysis()
+        report = _safe_analysis()
+        self.last_llm_output = {"stated_intent": "ok"}
+        self.last_converted_output = report.model_dump(mode="json")
+        return report
 
 
 class _StubGuardian:
@@ -106,13 +109,16 @@ class _StubGuardian:
         self.last_prompt_label = self._prompt_label
         self.last_system_prompt = "guardian system prompt"
         self.last_request_prompt = "guardian request prompt"
-        return ValidationResult(
+        validation = ValidationResult(
             decision=Decision.ALLOW,
             intent=intent,
             analysis=analysis,
             message="allowed",
             decision_path="ai_path",
         )
+        self.last_llm_output = {"decision": "ALLOW"}
+        self.last_converted_output = validation.model_dump(mode="json")
+        return validation
 
 
 def _make_runtime(deterministic_decide):
@@ -180,6 +186,10 @@ class TestPromptEvidenceDoesNotLeakAcrossRequests:
         assert ai_entry.get("guardian_prompt_label") == "fallback_default"
         assert ai_entry.get("guardian_system_prompt") == "guardian system prompt"
         assert ai_entry.get("guardian_request_prompt") == "guardian request prompt"
+        assert ai_entry.get("ae_llm_output") == {"stated_intent": "ok"}
+        assert ai_entry.get("guardian_llm_output") == {"decision": "ALLOW"}
+        assert ai_entry.get("ae_converted_output") is not None
+        assert ai_entry.get("guardian_converted_output") is not None
 
         det_entry = runtime.audit_log[1]
         assert det_entry["decision_path"] == "deterministic"
@@ -189,6 +199,8 @@ class TestPromptEvidenceDoesNotLeakAcrossRequests:
         assert "guardian_prompt_label" not in det_entry
         assert "guardian_system_prompt" not in det_entry
         assert "guardian_request_prompt" not in det_entry
+        assert "ae_llm_output" not in det_entry
+        assert "guardian_converted_output" not in det_entry
 
     def test_engines_last_prompt_evidence_cleared_at_request_start(self):
         """Stronger invariant: the reset happens on the engine objects
@@ -220,6 +232,8 @@ class TestPromptEvidenceDoesNotLeakAcrossRequests:
         assert runtime.analysis_engine.last_system_prompt is None
         assert runtime.guardian.last_prompt_label is None
         assert runtime.guardian.last_system_prompt is None
+        assert runtime.analysis_engine.last_llm_output is None
+        assert runtime.guardian.last_converted_output is None
 
     def test_deterministic_block_after_ai_path_has_no_prompt_evidence(self):
         """Deterministic BLOCK emits its own audit entry earlier in the

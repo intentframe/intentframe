@@ -33,7 +33,7 @@ from intentframe_bundle_sdk.audit_dump import dump_bundle_ai_context
 from intentframe_components.analysis.base import AnalysisEngine
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
-from intentframe_components.prompt.logging import log_prompt_dump
+from intentframe_components.prompt.logging import log_output_dump, log_prompt_dump
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
 from intentframe_prompt_library.library import DEFAULT_AE_SYSTEM_INSTRUCTIONS
 import logging
@@ -130,6 +130,8 @@ class AIAnalysisEngine(AnalysisEngine):
         self.last_prompt_label: str | None = None
         self.last_system_prompt: str | None = None
         self.last_request_prompt: str | None = None
+        self.last_llm_output: dict[str, object] | None = None
+        self.last_converted_output: dict[str, object] | None = None
 
     @staticmethod
     def _base_instructions() -> str:
@@ -163,6 +165,8 @@ class AIAnalysisEngine(AnalysisEngine):
         self.last_prompt_label = None
         self.last_system_prompt = None
         self.last_request_prompt = None
+        self.last_llm_output = None
+        self.last_converted_output = None
 
         ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
 
@@ -202,12 +206,23 @@ class AIAnalysisEngine(AnalysisEngine):
         )
         result = await Runner.run(agent, prompt)
 
-        return self._convert_to_report(
+        ai_output = result.final_output
+        self.last_llm_output = ai_output.model_dump(mode="json")
+        report = self._convert_to_report(
             intent,
-            result.final_output,
+            ai_output,
             intent_signals=list(ai_ctx.ae_intent_signals),
             signal_truncated=ai_ctx.ae_signal_truncated,
         )
+        self.last_converted_output = report.model_dump(mode="json")
+        log_output_dump(
+            "analysis",
+            llm_output=self.last_llm_output,
+            converted_output=self.last_converted_output,
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+        )
+        return report
 
     @staticmethod
     def _resolve_system_instructions(bundle_ai_context: BundleAIContext) -> str:

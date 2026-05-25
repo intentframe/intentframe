@@ -45,7 +45,7 @@ from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
-from intentframe_components.prompt.logging import log_prompt_dump
+from intentframe_components.prompt.logging import log_output_dump, log_prompt_dump
 from intentframe_components.prompt.roles import GUARDIAN_ROLE
 from intentframe_prompt_library.library import DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 from policy_registry.models import ActionPermission
@@ -145,6 +145,8 @@ class AIGuardian(Guardian):
         self.last_prompt_label: str | None = None
         self.last_system_prompt: str | None = None
         self.last_request_prompt: str | None = None
+        self.last_llm_output: dict[str, object] | None = None
+        self.last_converted_output: dict[str, object] | None = None
 
     def _get_agent(self, base_instructions: str) -> Agent:
         if base_instructions not in self._agents:
@@ -201,18 +203,22 @@ class AIGuardian(Guardian):
         self.last_prompt_label = None
         self.last_system_prompt = None
         self.last_request_prompt = None
+        self.last_llm_output = None
+        self.last_converted_output = None
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
             if self.verbose:
                 print(f"    │  ✘ BLOCK: {action} not in allowed actions")
-            return ValidationResult(
+            validation = ValidationResult(
                 decision=Decision.BLOCK,
                 intent=intent,
                 analysis=analysis,
                 message=f"Action '{action}' is not permitted by user policy",
                 decision_path="ai_path",
             )
+            self.last_converted_output = validation.model_dump(mode="json")
+            return validation
 
         permission = user_context.allowed_actions[action]
 
@@ -220,13 +226,15 @@ class AIGuardian(Guardian):
         if permission.safe and not self._has_risk_flags(analysis):
             if self.verbose:
                 print(f"    │  ⚡ Fast-path ALLOW: {action} (safe + no risk flags)")
-            return ValidationResult(
+            validation = ValidationResult(
                 decision=Decision.ALLOW,
                 intent=intent,
                 analysis=analysis,
                 message=f"Permitted (fast-path): {action}",
                 decision_path="fast_path",
             )
+            self.last_converted_output = validation.model_dump(mode="json")
+            return validation
 
         # ── AI path: semantic validation ───────────────────────────
         ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
@@ -260,7 +268,18 @@ class AIGuardian(Guardian):
         )
         result = await Runner.run(agent, prompt)
 
-        return self._convert_to_result(intent, analysis, result.final_output)
+        ai_output = result.final_output
+        self.last_llm_output = ai_output.model_dump(mode="json")
+        validation = self._convert_to_result(intent, analysis, ai_output)
+        self.last_converted_output = validation.model_dump(mode="json")
+        log_output_dump(
+            "guardian",
+            llm_output=self.last_llm_output,
+            converted_output=self.last_converted_output,
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+        )
+        return validation
 
     @staticmethod
     def _resolve_system_instructions(bundle_ai_context: BundleAIContext) -> str:

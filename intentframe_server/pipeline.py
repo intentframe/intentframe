@@ -300,6 +300,17 @@ class IntentFrameRuntime:
         audit_entry[f"{prefix}_request_prompt"] = request_prompt
 
     @staticmethod
+    def _add_output_audit_fields(audit_entry: dict, prefix: str, component) -> None:
+        """Attach raw LLM output and converted pipeline artifact when set."""
+        llm_output = getattr(component, "last_llm_output", None)
+        converted_output = getattr(component, "last_converted_output", None)
+
+        if llm_output is not None:
+            audit_entry[f"{prefix}_llm_output"] = llm_output
+        if converted_output is not None:
+            audit_entry[f"{prefix}_converted_output"] = converted_output
+
+    @staticmethod
     def _build_deterministic_report(
         intent: IntentFrame,
         det_result,
@@ -512,6 +523,8 @@ class IntentFrameRuntime:
             component.last_prompt_label = None
             component.last_system_prompt = None
             component.last_request_prompt = None
+            component.last_llm_output = None
+            component.last_converted_output = None
 
         if self.verbose:
             reason = intent.reason or ""
@@ -718,7 +731,9 @@ class IntentFrameRuntime:
         # the exact system and request prompts sent to the model.  Fields
         # are absent when a component did not make an AI call.
         self._add_prompt_audit_fields(audit_entry, "ae", self.analysis_engine)
+        self._add_output_audit_fields(audit_entry, "ae", self.analysis_engine)
         self._add_prompt_audit_fields(audit_entry, "guardian", self.guardian)
+        self._add_output_audit_fields(audit_entry, "guardian", self.guardian)
         
         if validation.decision == Decision.ALLOW:
             # ───────────────────────────────────────────────────────────
