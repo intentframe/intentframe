@@ -22,7 +22,6 @@ with a user-facing API (dashboard, CLI, SDK).
 Usage (demo):
 
     from policy_registry import PolicyRegistry, UserPolicy, ActionPermission
-    from policy_registry.constraints import FileConstraints
 
     registry = PolicyRegistry()
 
@@ -32,7 +31,7 @@ Usage (demo):
         allowed_actions={
             "READ_FILE": ActionPermission(
                 safe=True,
-                constraints=FileConstraints(allowed_paths=["/invoices/"]),
+                constraints={"allowed_paths": ["/invoices/"]},
             ),
             "ASK_USER": ActionPermission(safe=True),
             "PAY_INVOICE": ActionPermission(safe=False),
@@ -49,9 +48,7 @@ from typing import Optional
 
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.contacts_client import PlatformContactsClient
-from policy_registry.constraints.email import EmailConstraints, RecipientSource
-from policy_registry.constraints.message import MessageConstraints, ContactSource
-from policy_registry.constraints.terminal import TerminalConstraints
+from policy_registry.source_types import ContactSource, RecipientSource
 
 logger = logging.getLogger(__name__)
 
@@ -179,16 +176,11 @@ class PolicyRegistry:
         system_patterns = list(SYSTEM_TERMINAL_BLOCKED_PATTERNS)
 
         if perm.constraints is None:
-            merged_constraints = TerminalConstraints(blocked_patterns=system_patterns)
-        elif isinstance(perm.constraints, TerminalConstraints):
-            existing = list(perm.constraints.blocked_patterns)
+            merged_constraints: dict = {"blocked_patterns": system_patterns}
+        elif isinstance(perm.constraints, dict):
+            existing = list(perm.constraints.get("blocked_patterns") or [])
             merged = list(dict.fromkeys(system_patterns + existing))
-            merged_constraints = TerminalConstraints(
-                blocked_patterns=merged,
-                allowed_commands=list(perm.constraints.allowed_commands),
-                allow_capabilities=perm.constraints.allow_capabilities,
-                deny_capabilities=perm.constraints.deny_capabilities,
-            )
+            merged_constraints = {**perm.constraints, "blocked_patterns": merged}
         else:
             return policy
 
@@ -209,28 +201,34 @@ class PolicyRegistry:
                 updated_actions[action] = perm
                 continue
 
-            if isinstance(constraints, EmailConstraints) and constraints.recipient_sources:
+            if isinstance(constraints, dict) and constraints.get("recipient_sources"):
                 resolved = await self._contacts_client.resolve_sources(
-                    constraints.recipient_sources
+                    constraints["recipient_sources"]
                 )
-                merged = list(set(constraints.allowed_recipients) | set(resolved))
-                new_constraints = EmailConstraints(
-                    allowed_recipients=merged,
-                    recipient_sources=[],
+                merged = list(
+                    set(constraints.get("allowed_recipients") or []) | set(resolved)
                 )
+                new_constraints = {
+                    **constraints,
+                    "allowed_recipients": merged,
+                    "recipient_sources": [],
+                }
                 updated_actions[action] = ActionPermission(
                     safe=perm.safe, constraints=new_constraints
                 )
                 changed = True
-            elif isinstance(constraints, MessageConstraints) and constraints.contact_sources:
+            elif isinstance(constraints, dict) and constraints.get("contact_sources"):
                 resolved = await self._contacts_client.resolve_sources(
-                    constraints.contact_sources
+                    constraints["contact_sources"]
                 )
-                merged = list(set(constraints.allowed_contacts) | set(resolved))
-                new_constraints = MessageConstraints(
-                    allowed_contacts=merged,
-                    contact_sources=[],
+                merged = list(
+                    set(constraints.get("allowed_contacts") or []) | set(resolved)
                 )
+                new_constraints = {
+                    **constraints,
+                    "allowed_contacts": merged,
+                    "contact_sources": [],
+                }
                 updated_actions[action] = ActionPermission(
                     safe=perm.safe, constraints=new_constraints
                 )
@@ -302,23 +300,25 @@ class PolicyRegistry:
         action: str,
         add: list[str] | None = None,
         remove: list[str] | None = None,
-    ) -> EmailConstraints:
+    ) -> dict:
         """Add or remove explicit email recipients."""
         policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, EmailConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise KeyError(f"No EmailConstraints found for {action}")
 
-        current = list(perm.constraints.allowed_recipients)
+        constraints = dict(perm.constraints)
+        current = list(constraints.get("allowed_recipients") or [])
         if add:
             current.extend(r for r in add if r not in current)
         if remove:
             current = [r for r in current if r not in remove]
 
-        new_constraints = EmailConstraints(
-            allowed_recipients=current,
-            recipient_sources=list(perm.constraints.recipient_sources),
-        )
+        new_constraints = {
+            **constraints,
+            "allowed_recipients": current,
+            "recipient_sources": list(constraints.get("recipient_sources") or []),
+        }
         self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
@@ -328,18 +328,21 @@ class PolicyRegistry:
         agent_id: str,
         action: str,
         source: RecipientSource,
-    ) -> EmailConstraints:
+    ) -> dict:
         """Add a recipient source rule to email constraints."""
         policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, EmailConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise KeyError(f"No EmailConstraints found for {action}")
 
-        sources = list(perm.constraints.recipient_sources) + [source]
-        new_constraints = EmailConstraints(
-            allowed_recipients=list(perm.constraints.allowed_recipients),
-            recipient_sources=sources,
-        )
+        constraints = dict(perm.constraints)
+        sources = list(constraints.get("recipient_sources") or [])
+        sources.append(source.model_dump(mode="python"))
+        new_constraints = {
+            **constraints,
+            "allowed_recipients": list(constraints.get("allowed_recipients") or []),
+            "recipient_sources": sources,
+        }
         self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
@@ -350,21 +353,24 @@ class PolicyRegistry:
         action: str,
         source_type: str,
         source_filter: str = "",
-    ) -> EmailConstraints:
+    ) -> dict:
         """Remove a recipient source by type and filter."""
         policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, EmailConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise KeyError(f"No EmailConstraints found for {action}")
 
+        constraints = dict(perm.constraints)
         sources = [
-            s for s in perm.constraints.recipient_sources
-            if not (s.source == source_type and s.filter == source_filter)
+            s
+            for s in (constraints.get("recipient_sources") or [])
+            if not (s.get("source") == source_type and s.get("filter") == source_filter)
         ]
-        new_constraints = EmailConstraints(
-            allowed_recipients=list(perm.constraints.allowed_recipients),
-            recipient_sources=sources,
-        )
+        new_constraints = {
+            **constraints,
+            "allowed_recipients": list(constraints.get("allowed_recipients") or []),
+            "recipient_sources": sources,
+        }
         self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
@@ -375,23 +381,25 @@ class PolicyRegistry:
         action: str,
         add: list[str] | None = None,
         remove: list[str] | None = None,
-    ) -> MessageConstraints:
+    ) -> dict:
         """Add or remove explicit message contacts."""
         policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, MessageConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise KeyError(f"No MessageConstraints found for {action}")
 
-        current = list(perm.constraints.allowed_contacts)
+        constraints = dict(perm.constraints)
+        current = list(constraints.get("allowed_contacts") or [])
         if add:
             current.extend(c for c in add if c not in current)
         if remove:
             current = [c for c in current if c not in remove]
 
-        new_constraints = MessageConstraints(
-            allowed_contacts=current,
-            contact_sources=list(perm.constraints.contact_sources),
-        )
+        new_constraints = {
+            **constraints,
+            "allowed_contacts": current,
+            "contact_sources": list(constraints.get("contact_sources") or []),
+        }
         self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
@@ -401,18 +409,21 @@ class PolicyRegistry:
         agent_id: str,
         action: str,
         source: ContactSource,
-    ) -> MessageConstraints:
+    ) -> dict:
         """Add a contact source rule to message constraints."""
         policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, MessageConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise KeyError(f"No MessageConstraints found for {action}")
 
-        sources = list(perm.constraints.contact_sources) + [source]
-        new_constraints = MessageConstraints(
-            allowed_contacts=list(perm.constraints.allowed_contacts),
-            contact_sources=sources,
-        )
+        constraints = dict(perm.constraints)
+        sources = list(constraints.get("contact_sources") or [])
+        sources.append(source.model_dump(mode="python"))
+        new_constraints = {
+            **constraints,
+            "allowed_contacts": list(constraints.get("allowed_contacts") or []),
+            "contact_sources": sources,
+        }
         self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints
 
@@ -423,20 +434,23 @@ class PolicyRegistry:
         action: str,
         source_type: str,
         source_filter: str = "",
-    ) -> MessageConstraints:
+    ) -> dict:
         """Remove a contact source by type and filter."""
         policy = self.get_user_policy(user_id, agent_id)
         perm = policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, MessageConstraints):
+        if perm is None or not isinstance(perm.constraints, dict):
             raise KeyError(f"No MessageConstraints found for {action}")
 
+        constraints = dict(perm.constraints)
         sources = [
-            s for s in perm.constraints.contact_sources
-            if not (s.source == source_type and s.filter == source_filter)
+            s
+            for s in (constraints.get("contact_sources") or [])
+            if not (s.get("source") == source_type and s.get("filter") == source_filter)
         ]
-        new_constraints = MessageConstraints(
-            allowed_contacts=list(perm.constraints.allowed_contacts),
-            contact_sources=sources,
-        )
+        new_constraints = {
+            **constraints,
+            "allowed_contacts": list(constraints.get("allowed_contacts") or []),
+            "contact_sources": sources,
+        }
         self._update_action_constraints(user_id, agent_id, action, new_constraints)
         return new_constraints

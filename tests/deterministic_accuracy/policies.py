@@ -21,7 +21,7 @@ from intentframe_gateway.bootstrap import (
     DEFAULT_TERMINAL_DENY_CAPABILITIES,
     PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
 )
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 
@@ -36,7 +36,10 @@ def _user(constraints: TerminalConstraints) -> UserContext:
         user_id="dg-accuracy",
         agent_id="dg-accuracy-agent",
         allowed_actions={
-            "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
+            "RUN_COMMAND": ActionPermission(
+                safe=False,
+                constraints=constraints.model_dump(mode="python"),
+            ),
         },
     )
 

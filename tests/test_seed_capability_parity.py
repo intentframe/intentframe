@@ -47,7 +47,7 @@ def test_yaml_deny_capabilities_equal_constants(variant: str) -> None:
     policy = load_policy_seed(builtin_policy_path(variant), user_id="parity")  # type: ignore[arg-type]
     perm = policy.allowed_actions["RUN_COMMAND"]
     assert perm.constraints is not None, "RUN_COMMAND must carry TerminalConstraints"
-    yaml_caps = set(perm.constraints.deny_capabilities)
+    yaml_caps = set(perm.constraints.get("deny_capabilities") or [])
     expected = set(DEFAULT_TERMINAL_DENY_CAPABILITIES)
     assert yaml_caps == expected, (
         f"{variant} variant's RUN_COMMAND.deny_capabilities drifted from "
@@ -66,7 +66,7 @@ def test_user_and_root_variants_share_deny_set() -> None:
         "RUN_COMMAND"
     ].constraints
     assert user is not None and root is not None
-    assert set(user.deny_capabilities) == set(root.deny_capabilities), (
+    assert set(user.get("deny_capabilities") or []) == set(root.get("deny_capabilities") or []), (
         "user and root Jarvis variant RUN_COMMAND deny_capabilities drifted apart; "
         "the language- and sensitive-surface clamps are variant-independent."
     )

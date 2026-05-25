@@ -13,16 +13,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from policy_registry.constraints import (  # noqa: F401  (re-exported for convenience)
-    ApiConstraints,
-    BrowserConstraints,
-    CalendarConstraints,
-    EmailConstraints,
-    FileConstraints,
-    HostFileConstraints,
-    MessageConstraints,
-    TerminalConstraints,
-)
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.browser.constraints import BrowserConstraints
+from intentframe_native_bundles.actions.calendar.constraints import CalendarConstraints
+from intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_bundles.actions.files.constraints import FileConstraints
+from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_bundles.actions.message.constraints import MessageConstraints
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.seeds import load_policy_seed
 
@@ -69,14 +67,12 @@ def load_test_policy(
 
 
 def _parse_constraints(raw: dict[str, Any] | None) -> Any:
-    """Resolve a raw constraints dict to its concrete constraint type.
+    """Return raw constraints unchanged (opaque dict storage).
 
-    Kept as a back-compat helper for ``tests/test_policy_host_constraints_roundtrip.py``
-    which pins this function as the per-payload dispatch surface.  Now
-    delegates to :class:`ActionPermission`'s untagged-union dispatch
-    (``ConstraintTypes``) instead of the legacy field-set introspection
-    loop, so the disjoint-field regression pin in that test is what
-    actually drives the result.
+    Kept as a back-compat helper for callers that previously resolved
+    a concrete Pydantic constraint type.  Policy registry now stores
+    opaque dicts; family bundles validate shape via
+    ``validate_policy_against_registry``.
     """
     if raw is None:
         return None

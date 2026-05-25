@@ -18,9 +18,11 @@ next — ask the user, retry differently, or skip.
 
 Validation flow:
     1. PERMISSION CHECK   — is action in allowed_actions? (deny-by-default)
-    2. CONSTRAINT CHECK   — does intent satisfy per-category constraints?
-    3. SAFETY ROUTING     — if permission.safe and no risk flags → fast ALLOW
+    2. SAFETY ROUTING     — if permission.safe and no risk flags → fast ALLOW
                           — otherwise → AI validation
+
+Deterministic constraint and domain enforcement run in DeterministicRunner
+before this component is invoked on the UNDECIDED path.
 """
 
 from typing import Optional
@@ -30,34 +32,24 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, ModelSettings, Runner
 
-from action_registry.types import ACTION_DOMAINS, DomainType
 from intentframe_core.types import (
     AnalysisReport,
-    CommandIntel,
-    ExecutionContext,
-    FileIntel,
     IntentFrame,
+    RuntimeContextForLLM,
     UserContext,
     ValidationResult,
 )
+from intentframe_bundle_sdk.types import BundleAIContext, BundleContext, bundle_ai_context_or_empty
+from intentframe_bundle_sdk.audit_dump import dump_bundle_ai_context
 from intentframe_core.enums import Decision, RiskLevel
 from intentframe_components.guardian.base import Guardian
-from intentframe_components.guardian.domains import DOMAIN_MODULES
-from intentframe_components.guardian.checkers import CONSTRAINT_CHECKERS
 from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
-from intentframe_components.prompt.library import (
-    GUARDIAN_PROMPT_IDS,
-    GUARDIAN_PROMPTS,
-)
-from intentframe_components.prompt.logging import log_prompt_dump
+from intentframe_components.prompt.logging import log_output_dump, log_prompt_dump
 from intentframe_components.prompt.roles import GUARDIAN_ROLE
-from intentframe_components.prompt.strategy import (
-    DefaultPromptStrategy,
-    PromptStrategy,
-)
+from intentframe_components.prompt.runtime_context import merge_runtime_context_sections
+from intentframe_prompt_library.library import DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 from policy_registry.models import ActionPermission
-from policy_registry.domains.base import DomainConstraints
 
 import logging
 
@@ -108,10 +100,9 @@ class AIGuardian(Guardian):
     - BLOCK: Policy violation (unauthorized action, constraint violated,
       phishing, etc.)
 
-    Validation is a 3-step pipeline:
-        1. Permission check (deterministic) → BLOCK if not allowed
-        2. Constraint check (deterministic) → BLOCK if violated
-        3. Safety routing:
+    Validation is a 2-step pipeline on the AI path:
+        1. Permission check (fail-closed defense) → BLOCK if not allowed
+        2. Safety routing:
            - safe=True + no risk flags → fast ALLOW (no AI)
            - otherwise → AI validates with full context
     """
@@ -146,95 +137,35 @@ class AIGuardian(Guardian):
         self,
         model: str = "gpt-5-mini-2025-08-07",
         verbose: bool = True,
-        prompt_strategy: PromptStrategy | None = None,
     ):
         self.model = model
         self.verbose = verbose
-        self._prompt_strategy: PromptStrategy = prompt_strategy or DefaultPromptStrategy()
+        self._agents: dict[str, Agent] = {}
+        self._agent = self._get_agent(DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS)
+        self.last_prompt_source: str | None = None
+        self.last_prompt_label: str | None = None
+        self.last_system_prompt: str | None = None
+        self.last_request_prompt: str | None = None
+        self.last_llm_output: dict[str, object] | None = None
+        self.last_converted_output: dict[str, object] | None = None
 
-        # Build one Agent per prompt id.  Guardian has coarser
-        # specialisation than AE (two ids: standard / critical).  The
-        # role preamble and hardening wrapper are identical across
-        # ids; only the base_instructions body differs.
-        self._agents: dict[str, Agent] = {
-            pid: Agent(
-                name=f"Policy Guardian ({pid})",
+    def _get_agent(self, base_instructions: str) -> Agent:
+        if base_instructions not in self._agents:
+            self._agents[base_instructions] = Agent(
+                name="Policy Guardian",
                 instructions=self._hardener.harden_system_prompt(
-                    base_instructions=body,
+                    base_instructions=base_instructions,
                     role_preamble=GUARDIAN_ROLE,
                 ),
                 model=self.model,
                 output_type=AIGuardianOutput,
-                # model_settings=ModelSettings(
-                #     reasoning=Reasoning(effort="high"),
-                # ),
             )
-            for pid, body in GUARDIAN_PROMPTS.items()
-        }
-        # Back-compat: tests and callers that reach for `self._agent`
-        # get the standard lane.
-        self._agent = self._agents["standard"]
-
-        # Last-used prompt id, populated by validate().  The pipeline
-        # reads this for audit only; concurrent writes are bounded by
-        # the runtime's per-request asyncio.Lock.
-        self.last_prompt_id: str | None = None
+        return self._agents[base_instructions]
 
     @staticmethod
     def _base_instructions() -> str:
-        """Return the standard-lane Guardian system-prompt body.
-
-        Thin facade over :data:`GUARDIAN_PROMPTS` so existing tests and
-        external callers that reach for this static method keep working
-        unchanged.  The full set of lane bodies lives in
-        :mod:`intentframe_components.prompt.library.guardian`.
-        """
-        return GUARDIAN_PROMPTS["standard"]
-
-    # ── Domain Constraint Lookup ─────────────────────────────────────
-
-    @staticmethod
-    def _get_domain_constraints(
-        user_context: UserContext,
-        domain: DomainType,
-    ) -> DomainConstraints | None:
-        """Look up domain constraints from user context metadata."""
-        dc_map = user_context.domain_constraints
-        return dc_map.get(domain.value)
-
-    # ── Constraint Checking ─────────────────────────────────────────
-
-    def _check_constraints(
-        self,
-        intent: IntentFrame,
-        permission: ActionPermission,
-        command_intel: CommandIntel | None = None,
-        file_intel: FileIntel | None = None,
-    ) -> tuple[bool, str]:
-        """Evaluate per-category constraints against the intent.
-
-        Dispatches to the registered ConstraintChecker for the constraint type.
-        Returns (passed, reason).
-
-        ``command_intel`` and ``file_intel`` are forwarded as
-        ``CheckContext`` fields to checkers that can consume them
-        (TerminalChecker uses ``command_intel``; a future payload-aware
-        FileChecker would use ``file_intel``).  Checkers that don't
-        care simply ignore the context.
-        """
-        from intentframe_components.guardian.checkers.base import CheckContext
-
-        constraints = permission.constraints
-        if constraints is None:
-            return True, ""
-        checker = CONSTRAINT_CHECKERS.get(type(constraints))
-        if checker:
-            context = CheckContext(
-                command_intel=command_intel,
-                file_intel=file_intel,
-            )
-            return checker.check(intent, constraints, context)
-        return True, ""
+        """Return the default Guardian system-prompt body."""
+        return DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 
     # ── Risk Flag Check ────────────────────────────────────────────
 
@@ -259,142 +190,111 @@ class AIGuardian(Guardian):
         intent: IntentFrame,
         analysis: AnalysisReport,
         user_context: UserContext,
+        *,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
-        command_intel: CommandIntel | None = None,
-        file_intel: FileIntel | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
+        bundle_context: BundleContext | None = None,
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> ValidationResult:
-        """
-        Validate intent against user policies.
-
-        Three-step pipeline:
-        1. Permission check  → BLOCK if action not in allowed_actions
-        2. Constraint check  → BLOCK if per-category constraints violated
-        3. Safety routing    → fast ALLOW or AI validation
-
-        ``command_intel`` carries deterministic command_shield facts
-        (verdict, capability tags).  It is consumed by per-category
-        checkers (see TerminalChecker) and otherwise ignored here.
-        """
+        """Validate intent against user policies (AI path after DG UNDECIDED)."""
+        del bundle_context
         action = intent.action.value
 
-        # Reset before any early return so stale prompt ids from a
-        # previous request never leak into audit on deterministic
-        # BLOCK or fast-path ALLOW cases.
-        self.last_prompt_id = None
+        self.last_prompt_source = None
+        self.last_prompt_label = None
+        self.last_system_prompt = None
+        self.last_request_prompt = None
+        self.last_llm_output = None
+        self.last_converted_output = None
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
             if self.verbose:
                 print(f"    │  ✘ BLOCK: {action} not in allowed actions")
-            return ValidationResult(
+            validation = ValidationResult(
                 decision=Decision.BLOCK,
                 intent=intent,
                 analysis=analysis,
                 message=f"Action '{action}' is not permitted by user policy",
                 decision_path="ai_path",
             )
+            self.last_converted_output = validation.model_dump(mode="json")
+            return validation
 
         permission = user_context.allowed_actions[action]
 
-        # ── Step 2: Constraint check (deterministic) ───────────────
-        passed, reason = self._check_constraints(
-            intent, permission,
-            command_intel=command_intel,
-            file_intel=file_intel,
-        )
-        if not passed:
-            if self.verbose:
-                print(f"    │  ✘ BLOCK: {action} — {reason}")
-            return ValidationResult(
-                decision=Decision.BLOCK,
-                intent=intent,
-                analysis=analysis,
-                message=f"Constraint violation: {reason}",
-                decision_path="ai_path",
-            )
-
-        # ── Step 2.5: Domain module enforcement (structural hard gate) ──
-        domain = ACTION_DOMAINS.get(intent.action)
-        if domain and domain in DOMAIN_MODULES:
-            domain_constraints = self._get_domain_constraints(user_context, domain)
-            if domain_constraints is not None:
-                module = DOMAIN_MODULES[domain]
-                passed, reason = module.check(intent, domain_constraints)
-                if not passed:
-                    if self.verbose:
-                        print(f"    │  ✘ BLOCK: {action} — domain:{domain.value} — {reason}")
-                    return ValidationResult(
-                        decision=Decision.BLOCK,
-                        intent=intent,
-                        analysis=analysis,
-                        message=f"Domain violation ({domain.value}): {reason}",
-                        decision_path="ai_path",
-                    )
-                if self.verbose:
-                    print(f"    │  ✓ Domain check passed ({domain.value}) — proceeding to AI")
-
-        # ── Step 3: Safety routing ─────────────────────────────────
+        # ── Step 2: Safety routing ─────────────────────────────────
         if permission.safe and not self._has_risk_flags(analysis):
             if self.verbose:
                 print(f"    │  ⚡ Fast-path ALLOW: {action} (safe + no risk flags)")
-            return ValidationResult(
+            validation = ValidationResult(
                 decision=Decision.ALLOW,
                 intent=intent,
                 analysis=analysis,
                 message=f"Permitted (fast-path): {action}",
                 decision_path="fast_path",
             )
+            self.last_converted_output = validation.model_dump(mode="json")
+            return validation
 
         # ── AI path: semantic validation ───────────────────────────
+        ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
+
         prompt = self._build_validation_prompt(
             intent, analysis, user_context, permission,
             active_domains=active_domains,
-            execution_context=execution_context,
+            runtime_context_for_llm=runtime_context_for_llm,
+            bundle_ai_context=ai_ctx,
         )
 
-        prompt_id = self._resolve_prompt_id(
-            intent, analysis, command_intel, file_intel,
-        )
-        self.last_prompt_id = prompt_id
-        agent = self._agents[prompt_id]
+        system_instructions = self._resolve_system_instructions(ai_ctx)
+        prompt_source = self._resolve_prompt_source(ai_ctx)
+        prompt_label = self._resolve_prompt_label(ai_ctx)
+        self.last_prompt_source = prompt_source
+        self.last_prompt_label = prompt_label
+        self.last_request_prompt = prompt
+        agent = self._get_agent(system_instructions)
+        self.last_system_prompt = agent.instructions
 
         if self.verbose:
-            print(f"    │  AI judging: {action} (prompt={prompt_id})...")
+            print(f"    │  AI judging: {action} (prompt={prompt_source}:{prompt_label})...")
 
-        log_prompt_dump("guardian", prompt, prompt_id=prompt_id)
+        log_prompt_dump(
+            "guardian",
+            prompt,
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+            system_prompt=agent.instructions,
+            bundle_ai_context=dump_bundle_ai_context(ai_ctx),
+        )
         result = await Runner.run(agent, prompt)
 
-        return self._convert_to_result(intent, analysis, result.final_output)
+        ai_output = result.final_output
+        self.last_llm_output = ai_output.model_dump(mode="json")
+        validation = self._convert_to_result(intent, analysis, ai_output)
+        self.last_converted_output = validation.model_dump(mode="json")
+        log_output_dump(
+            "guardian",
+            llm_output=self.last_llm_output,
+            converted_output=self.last_converted_output,
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+        )
+        return validation
 
-    def _resolve_prompt_id(
-        self,
-        intent: IntentFrame,
-        analysis: AnalysisReport,
-        command_intel: CommandIntel | None,
-        file_intel: FileIntel | None = None,
-    ) -> str:
-        """Ask the strategy for a Guardian prompt id, fail-closed.
+    @staticmethod
+    def _resolve_system_instructions(bundle_ai_context: BundleAIContext) -> str:
+        if bundle_ai_context.guardian_system_instructions:
+            return bundle_ai_context.guardian_system_instructions
+        return DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 
-        Unknown / erroring ids are downgraded to ``standard`` with a
-        warning.  Raising inside a Guardian AI call would turn a
-        config bug into a policy outage, so we explicitly avoid it.
-        """
-        try:
-            pid = self._prompt_strategy.select_guardian_prompt_id(
-                intent, analysis, command_intel, file_intel,
-            )
-        except Exception:
-            logger.exception("Guardian prompt strategy raised; falling back to 'standard'")
-            return "standard"
+    @staticmethod
+    def _resolve_prompt_source(bundle_ai_context: BundleAIContext) -> str:
+        return "bundle" if bundle_ai_context.guardian_system_instructions else "fallback_default"
 
-        if pid not in GUARDIAN_PROMPT_IDS:
-            logger.warning(
-                "Guardian prompt strategy returned unknown id %r; falling back to 'standard'",
-                pid,
-            )
-            return "standard"
-        return pid
+    @staticmethod
+    def _resolve_prompt_label(bundle_ai_context: BundleAIContext) -> str:
+        return bundle_ai_context.guardian_prompt_label or "fallback_default"
 
     def _build_validation_prompt(
         self,
@@ -403,7 +303,8 @@ class AIGuardian(Guardian):
         user_context: UserContext,
         permission: ActionPermission,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
+        bundle_ai_context: BundleAIContext | None = None,
     ) -> str:
         """Build a hardened prompt for the AI guardian.
 
@@ -423,9 +324,13 @@ class AIGuardian(Guardian):
         if analysis.hidden_behaviors:
             hidden_str = "\n    - ".join([""] + analysis.hidden_behaviors)
 
-        if permission.constraints is not None:
-            checker = CONSTRAINT_CHECKERS.get(type(permission.constraints))
-            constraint_str = checker.summarize(permission.constraints) if checker else str(permission.constraints)
+        ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
+        constraint_ctx = ai_ctx.constraint_context
+        if constraint_ctx is not None:
+            constraint_str = constraint_ctx.action_constraints
+            if constraint_ctx.domain_constraints:
+                domain_bits = "; ".join(constraint_ctx.domain_constraints)
+                constraint_str = f"{constraint_str}; Domain: {domain_bits}"
         else:
             constraint_str = "No specific constraints"
 
@@ -492,14 +397,7 @@ class AIGuardian(Guardian):
         ]
         trusted_sections["Policy Context"] = "\n".join(policy_lines)
 
-        if execution_context and execution_context.executor_running_as_root:
-            trusted_sections["Execution Privilege"] = (
-                "The executor is running as root (uid=0). All commands execute "
-                "with full root privileges. Apply heightened scrutiny — filesystem "
-                "modifications affect the entire system, not just the user's home "
-                "directory. The agent should never need sudo; its presence in a "
-                "command is itself a red flag."
-            )
+        merge_runtime_context_sections(trusted_sections, runtime_context_for_llm)
 
         if user_context.intent_limits:
             limit_lines: list[str] = []

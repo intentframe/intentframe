@@ -172,7 +172,7 @@ def canonicalize_real_path(raw: str) -> str:
 
     - :class:`intentframe_components.guardian.deterministic.DeterministicGuardian`
       (host-file floor gates)
-    - :class:`intentframe_components.guardian.checkers.host_file.HostFileChecker`
+    - :class:`intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`
       (per-action allowlist match)
     - :class:`executor.platforms.macos.adapters.host_files.HostFilesAdapter`
       (pre-I/O enforcement)

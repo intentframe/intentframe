@@ -1,3 +1,5 @@
+> **Note:** This document surveys **industry patterns for future partner extension** (MCP, WASM, Cedar, sidecars, etc.). For the **completed substrate plugin refactor** (May 2026 — bundle SDK, native bundles, gate parity with `66e567c`), see [substrate-plugin-refactor.md](substrate-plugin-refactor.md).
+
 This is the classic "extensible runtime" problem. Every database, web framework, IDE, service mesh, CDN, and policy engine has solved a version of it. Here's the honest survey of what industry actually does, with concrete real-world examples, and how each applies to IntentFrame.
 
 ## The seven patterns that exist

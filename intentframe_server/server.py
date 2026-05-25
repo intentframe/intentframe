@@ -37,6 +37,7 @@ from intentframe_core.types import (
     UserContext,
 )
 from intentframe_components.guardian import AIGuardian
+from intentframe_components.guardian.deterministic import DeterministicGuardian
 from intentframe_components.onboarding import AIOnboardingEngine
 from intentframe_server.pipeline import IntentFrameRuntime
 
@@ -111,6 +112,10 @@ def _create_runtime() -> IntentFrameRuntime:
         executor=executor,
         execution_context=execution_context,
         onboarding_engine=onboarding,
+        deterministic_guardian=DeterministicGuardian(
+            packages=["intentframe_native_bundles"],
+            verbose=verbose,
+        ),
         verbose=verbose,
     )
 
@@ -119,11 +124,15 @@ def _create_runtime() -> IntentFrameRuntime:
 async def lifespan(app: FastAPI):
     global _runtime
     _runtime = _create_runtime()
+    await _runtime.startup()
     logger.info("IntentFrame Core runtime ready")
-    yield
-    from intentframe_server.enrichers.email import close as close_email_enricher
-    await close_email_enricher()
-    logger.info("IntentFrame Core runtime shut down")
+    try:
+        yield
+    finally:
+        try:
+            await _runtime.aclose()
+        finally:
+            logger.info("IntentFrame Core runtime shut down")
 
 
 app = FastAPI(

@@ -55,7 +55,10 @@ Issues = "https://github.com/intentframe/intentframe/issues"
 [tool.setuptools.packages.find]
 include = [
     "action_registry*",
+    "intentframe_native_bundles*",
+    "intentframe_bundle_sdk*",
     "intentframe_core*",
+    "intentframe_prompt_library*",
     "intentframe_components*",
     "intentframe_server*",
     "intentframe_actor*",

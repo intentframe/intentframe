@@ -20,7 +20,8 @@ from intentframe_core import IntentFrame, UserContext
 from intentframe_components.analysis import AIAnalysisEngine
 from intentframe_components.guardian import AIGuardian
 from policy_registry.models import ActionPermission
-from policy_registry.constraints import FileConstraints, ApiConstraints
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.files.constraints import FileConstraints
 
 
 async def _run_test():

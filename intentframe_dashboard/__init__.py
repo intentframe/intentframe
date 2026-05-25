@@ -34,7 +34,6 @@ from typing import Any, Dict, List
 
 from policy_registry.client import PolicyRegistryClient
 from policy_registry.models import ActionPermission, SemanticIntentLimit, UserPolicy
-from policy_registry.domains.base import DomainConstraints
 from resource_registry.client import ResourceRegistryClient
 from resource_registry.models import ResourceMount
 
@@ -48,8 +47,6 @@ from intentframe_dashboard.config import (
     DashboardConfig,
     load_config,
 )
-from policy_registry.domains import DOMAIN_CONSTRAINT_TYPES
-
 INTENTFRAME_SOCKET = "~/.intentframe/run/intentframe.sock"
 
 
@@ -104,7 +101,7 @@ class IntentFrameDashboard:
         agent_id: str,
         allowed_actions: Dict[str, ActionPermission],
         intent_limits: List[SemanticIntentLimit] | None = None,
-        domain_constraints: Dict[str, DomainConstraints] | None = None,
+        domain_constraints: Dict[str, dict] | None = None,
         metadata: Dict[str, Any] | None = None,
     ) -> UserPolicy:
         """Register a (user, agent) policy with the registry.
@@ -291,17 +288,9 @@ def run_config(
                 for lc in user_cfg.intent_limits
             ]
 
-            domain_constraints: Dict[str, DomainConstraints] = {}
+            domain_constraints: Dict[str, dict] = {}
             for domain_name, dc_cfg in user_cfg.domain_constraints.items():
-                constraint_cls = DOMAIN_CONSTRAINT_TYPES.get(domain_name)
-                if constraint_cls is not None:
-                    valid_fields = constraint_cls.model_fields.keys()
-                    dc_dict = {
-                        k: v
-                        for k, v in dc_cfg.model_dump(exclude_none=True).items()
-                        if k in valid_fields
-                    }
-                    domain_constraints[domain_name] = constraint_cls(**dc_dict)
+                domain_constraints[domain_name] = dc_cfg.model_dump(exclude_none=True)
 
             agent_ids = agents_per_user.get(user_id) or {user_id}
             for agent_id in sorted(agent_ids):

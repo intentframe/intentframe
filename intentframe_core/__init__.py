@@ -13,7 +13,9 @@ from intentframe_core.types import (
     ExecutionContext,
     ExecutionResult,
     IntentFrame,
+    LLMContextSection,
     RuntimeContext,
+    RuntimeContextForLLM,
     UserContext,
     ValidationResult,
 )

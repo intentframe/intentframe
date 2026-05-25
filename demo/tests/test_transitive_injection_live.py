@@ -49,7 +49,8 @@ from intentframe_components.analysis.engine import AEFieldLimit
 from intentframe_components.guardian import AIGuardian
 from intentframe_components.guardian.engine import AIGuardianOutput
 from policy_registry.models import ActionPermission
-from policy_registry.constraints import ApiConstraints, FileConstraints
+from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.files.constraints import FileConstraints
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -139,8 +140,8 @@ def _print_analysis(analysis: AnalysisReport, label: str = "AnalysisReport"):
 
     if analysis.semantic_domains:
         print(f"    domains:            {analysis.semantic_domains}")
-    if analysis.terminal_command_signals:
-        print(f"    cmd_signals:        {analysis.terminal_command_signals}")
+    if analysis.intent_signals:
+        print(f"    cmd_signals:        {analysis.intent_signals}")
 
     print(f"    recommendation:     {_DIM}{analysis.recommendation}{_RESET}")
 

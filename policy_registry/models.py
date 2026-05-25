@@ -11,32 +11,19 @@ Design:
     - Present in allowed_actions → ALLOWED (with optional constraints).
     - Absent from allowed_actions → BLOCKED (deny-by-default).
     - No "decision" field. The data structure IS the permission.
-    - Constraints are per-category (FileConstraints, EmailConstraints, etc.)
+    - Constraints are opaque dicts per action or category; registered bundles
+      validate shape at startup via the Bundle SDK.
     - The ``safe`` flag lets the user declare trust level for fast validation.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated, Any, Optional, Union
+from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, StringConstraints, Tag
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1)]
-
-from policy_registry.constraints import (
-    ApiConstraints,
-    BrowserConstraints,
-    CalendarConstraints,
-    EmailConstraints,
-    FileConstraints,
-    HostFileConstraints,
-    MessageConstraints,
-    TerminalConstraints,
-)
-from policy_registry.domains.base import DomainConstraints
-from policy_registry.domains.finance import FinanceConstraints
-from policy_registry.domains.deletion import DeletionConstraints
 
 # Schema version for IntentFrame policy YAMLs.  Bump when the YAML
 # shape changes in a backwards-incompatible way (renamed/removed
@@ -44,33 +31,6 @@ from policy_registry.domains.deletion import DeletionConstraints
 # fails on mismatch with a friendly error so users with stale YAMLs
 # get a clear migration signal instead of a Pydantic stacktrace.
 INTENTFRAME_POLICY_SCHEMA_VERSION: int = 1
-
-# Per-action constraint Union.  Undiscriminated: pydantic picks the
-# concrete type by field-set match.  ``FileConstraints`` and
-# ``HostFileConstraints`` deliberately carry disjoint required fields
-# (``allowed_paths`` vs ``allowed_host_paths``) and both set
-# ``extra="forbid"`` so the match is always unambiguous.  See
-# ``tests/test_policy_host_constraints_roundtrip.py`` for the
-# regression pin.
-ConstraintTypes = Union[
-    FileConstraints,
-    HostFileConstraints,
-    TerminalConstraints,
-    EmailConstraints,
-    CalendarConstraints,
-    MessageConstraints,
-    BrowserConstraints,
-    ApiConstraints,
-]
-
-DomainConstraintTypes = Annotated[
-    Union[
-        Annotated[FinanceConstraints, Tag("finance")],
-        Annotated[DeletionConstraints, Tag("deletion")],
-    ],
-    Discriminator(lambda v: v.get("domain", v) if isinstance(v, dict) else v.domain),
-]
-
 
 class SemanticIntentLimit(BaseModel):
     """A human-level restriction the AI Guardian evaluates against.
@@ -106,7 +66,7 @@ class ActionPermission(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     safe: bool = False
-    constraints: Optional[ConstraintTypes] = Field(default=None, discriminator=None)
+    constraints: dict[str, Any] | None = None
 
 
 class UserPolicy(BaseModel):
@@ -149,7 +109,7 @@ class UserPolicy(BaseModel):
     intentframe_schema_version: int = INTENTFRAME_POLICY_SCHEMA_VERSION
     allowed_actions: dict[str, ActionPermission] = Field(default_factory=dict)
     intent_limits: list[SemanticIntentLimit] = Field(default_factory=list)
-    domain_constraints: dict[str, DomainConstraintTypes] = Field(default_factory=dict)
+    domain_constraints: dict[str, dict[str, Any]] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),

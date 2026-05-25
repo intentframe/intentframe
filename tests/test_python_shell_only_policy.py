@@ -5,8 +5,8 @@ policy that allows python and shell commands but blocks every other
 language, compiler, and non-pip/non-shell package install — without
 any LLM cost.
 
-This module wires the full classifier → TerminalChecker pipeline
-together (no mocks, no stubs) so we know the deny list actually fires
+This module wires the full classifier → TerminalActionBundle.enforce_constraints
+path together (no mocks, no stubs) so we know the deny list actually fires
 on the same `capabilities` tuple that production code sees.
 
 Two failure modes are guarded against:
@@ -23,16 +23,17 @@ Two failure modes are guarded against:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from action_registry.types import ActionType
 from command_shield import inspect_command
-from intentframe_components.guardian.checkers.base import CheckContext
-from intentframe_components.guardian.checkers.terminal import TerminalChecker
-from intentframe_core.types import CommandIntel
-from policy_registry.constraints.terminal import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
+from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseDecision
+from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+
+_TERMINAL_BUNDLE = TerminalActionBundle()
 
 
 # Frozen policy snapshot — the actual deny set the python+shell-only
@@ -82,33 +83,36 @@ PYTHON_SHELL_ONLY_DENY: frozenset[str] = frozenset({
 })
 
 
-def _make_intent(command: str) -> MagicMock:
-    intent = MagicMock()
-    intent.target = ""
-    intent.data = {"command": command}
-    intent.action = ActionType.RUN_COMMAND
-    intent.agent_id = "test"
-    intent.agent_type = "test"
-    intent.task_description = "test"
-    intent.reason = "test"
-    return intent
-
-
 def _check(command: str) -> tuple[bool, str]:
-    """Run command_shield → TerminalChecker exactly as production does."""
+    """Run command_shield → bundle enforce_constraints as production does."""
     report = inspect_command(command)
     intel = CommandIntel(
         verdict=report.verdict.name,
         capabilities=report.capabilities,
     )
+    intent = IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target=command,
+        data={"command": command},
+        reason="test",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    ctx.evidence[COMMAND_INTEL_KEY] = intel
     constraints = TerminalConstraints(
         deny_capabilities=PYTHON_SHELL_ONLY_DENY,
     )
-    return TerminalChecker().check(
-        _make_intent(command),
-        constraints,
-        CheckContext(command_intel=intel),
+    outcome = _TERMINAL_BUNDLE.enforce_constraints(
+        intent,
+        ActionPermission(
+            safe=False,
+            constraints=constraints.model_dump(mode="python"),
+        ),
+        ctx,
     )
+    if outcome.decision is PhaseDecision.BLOCK:
+        return False, outcome.reason
+    return True, ""
 
 
 # ── Allowed (python + shell) ────────────────────────────────────────
