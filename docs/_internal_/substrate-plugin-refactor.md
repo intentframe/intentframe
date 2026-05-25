@@ -265,6 +265,7 @@ class ActionBundle:
     startup → prepare_evidence → enrich → validate_constraints (startup)
     → enforce_constraints → structural_gates → allow_gates
     → build_ai_context + describe_constraints (UNDECIDED path)
+    → onboarding_guardrails() (onboarding handshake only — not in hot path)
     → aclose (shutdown)
 
 class DomainBundle:
@@ -289,7 +290,7 @@ Boot: `ensure_loaded(["intentframe_native_bundles"])` then `validate_policy_agai
 | Item | Notes |
 |------|-------|
 | Orphan copies under `intentframe_native_bundles/{files,terminal,...}/` (top-level, not under `actions/`) | Not imported; safe to delete |
-| `onboarding/engine.py` imports native onboarding | Optional decouple |
+| `onboarding/engine.py` imports native onboarding | ~~Optional decouple~~ — Done: `engine.py` now imports `build_onboarding_instructions` from `intentframe_components.onboarding.instructions`. Bundle SDK owns the middle section via `render_onboarding_bundle_context`; each bundle contributes via `onboarding_guardrails()`; cross-bundle copy lives in `intentframe_native_bundles/onboarding/manifest.py`. |
 | ~~`intentframe_server/enrichers/email.py` imports native enrich~~ | Done — bundle owns `EmailClient` lifecycle via `aclose()` |
 | `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Debate: server-only boot vs seed validation |
 | `intentframe_components/TODO/*.md` | References pre-refactor paths (criticality, strategy.py) |
@@ -329,4 +330,4 @@ If a change alters deterministic outcomes, update baselines **deliberately** wit
 
 ---
 
-*Last updated: 2026-05-24 — reflects pass 15 (`fee09a6`) and design discussions through Wave D.*
+*Last updated: 2026-05-26 — onboarding decoupled from native bundles (refactor-substrate branch); `engine.py` cleanup item resolved.*

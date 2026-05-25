@@ -38,14 +38,16 @@ Do not collapse these:
 
 ```
 intentframe_bundle_sdk/
-  action.py       ActionBundle base class
-  domain.py       DomainBundle base class
-  types.py        ActionPermission, BundleContext, BundlePhaseOutcome, …
-  registry.py     register_* / lookup helpers
-  loader.py       ensure_loaded, validate_policy_against_registry
-  runner.py       DeterministicRunner — fixed gate order
-  lifecycle.py    startup_bundles, shutdown_bundles
-  audit_dump.py   JSON-safe context serialization for audit logs
+  action.py              ActionBundle base class (includes onboarding_guardrails hook)
+  domain.py              DomainBundle base class
+  types.py               ActionPermission, BundleContext, BundlePhaseOutcome, …
+  registry.py            register_* / lookup helpers (incl. register_onboarding_manifest)
+  loader.py              ensure_loaded, validate_policy_against_registry
+  runner.py              DeterministicRunner — fixed gate order
+  lifecycle.py           startup_bundles, shutdown_bundles
+  audit_dump.py          JSON-safe context serialization for audit logs
+  onboarding.py          render_onboarding_bundle_context — middle-section assembly
+  onboarding_manifest.py OnboardingManifest — cross-bundle onboarding sections
 ```
 
 Public API is re-exported from `intentframe_bundle_sdk/__init__.py` (`__all__`).
@@ -123,6 +125,7 @@ Subclass `ActionBundle` and set:
 | `allow_gates()` | sync | Custom ALLOW fast paths |
 | `build_ai_context()` | sync | AE/Guardian prompt material (UNDECIDED path) |
 | `describe_constraints()` | sync | Optional human-readable constraint text for prompts |
+| `onboarding_guardrails()` | sync | Paste-ready markdown for the onboarding system-prompt middle section (default: `""`) |
 | `aclose()` | async | Optional; release bundle-owned resources (must be idempotent) |
 
 ### Rules for action bundle authors
@@ -186,6 +189,32 @@ registry.register_domain_routes({
 
 ---
 
+## Onboarding
+
+`onboarding_guardrails()` on each `ActionBundle` returns a paste-ready markdown string that the onboarding engine inserts into its meta-LLM system prompt. Bundles that have no onboarding copy return `""` (the default).
+
+Cross-bundle sections (rules that apply regardless of which bundles are active) are registered via `OnboardingManifest`:
+
+```python
+from intentframe_bundle_sdk import OnboardingManifest, register_onboarding_manifest
+
+manifest = OnboardingManifest(
+    sections=(
+        "### My Cross-Cutting Rule\n- ...",
+    ),
+)
+registry.register_onboarding_manifest(manifest)
+```
+
+`render_onboarding_bundle_context(allowed_action_ids)` assembles the middle section:
+
+1. Iterates registered action bundles; includes `onboarding_guardrails()` for bundles whose `action_ids` intersect `allowed_action_ids`.
+2. Appends all `OnboardingManifest.sections` unconditionally.
+
+The top and bottom of the system prompt are owned by `intentframe_components/onboarding/instructions.py`; the SDK only provides the middle.
+
+---
+
 ## Plugin package entry point
 
 Each plugin package exposes exactly one registration function:
@@ -195,6 +224,7 @@ def register_bundles(registry) -> None:
     registry.register_action_bundle(MyActionBundle())
     registry.register_domain_bundle(MyDomainBundle())
     registry.register_domain_routes(DOMAIN_ROUTES)
+    registry.register_onboarding_manifest(MY_ONBOARDING_MANIFEST)  # optional
 ```
 
 See `intentframe_native_bundles/__init__.py` for the first-party pattern.
@@ -266,6 +296,8 @@ not dispatch into per-family checkers or re-read constraint schemas.
 | `tests/test_boundary_imports.py` | Substrate must not import plugin modules |
 | `tests/native_bundles/test_email_bundle_lifecycle.py` | Instance-owned client + `aclose` |
 | `tests/test_runtime_email_lifecycle_integration.py` | Full registry shutdown path |
+| `tests/test_onboarding_sdk.py` | `render_onboarding_bundle_context`, manifest sections |
+| `tests/test_onboarding_constraint_summary.py` | Meta-prompt contract, `_summarize_intent_limits` |
 
 Run SDK-focused tests:
 

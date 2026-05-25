@@ -93,7 +93,10 @@ Post-refactor, family-specific deterministic and prompt logic lives on the **Act
   cross-referencing sibling file families unless you are intentionally
   building a comparison/test profile.
 - `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` — add the new action types so they appear in `AgentCapabilities` at handshake.
-- `intentframe_components/onboarding/engine.py` — if the family needs its own guardrail block in the prompt, add a section here.
+- `intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` — implement the `onboarding_guardrails()` function and wire it in the bundle's `onboarding_guardrails()` override. Return a paste-ready markdown block (e.g. `### Email Actions (...)`) that the onboarding meta-LLM will see in the system-prompt middle section. Return `""` if the family has no onboarding copy of its own.
+- `intentframe_native_bundles/onboarding/manifest.py` — if the family participates in a **cross-bundle rule** (e.g. a guardrail that only makes sense when two families are both active), add a verbatim string to `ONBOARDING_MANIFEST.sections`. This is appended unconditionally to the middle section for all policies.
+- `tests/test_onboarding_sdk.py` — add a test asserting the bundle section appears in `render_onboarding_bundle_context` when its actions are granted, and is absent when they are not.
+- `tests/fixtures/onboarding/bundle_sections/<bundle_id>.txt` — run `python tests/inspect_onboarding_prompts.py --write-baseline` to regenerate golden fixtures after intentional content changes.
 
 ### 7. Policy seed (the runtime truth)
 
@@ -185,7 +188,7 @@ When you see one of these, jump straight to the file named.
 | Symptom | Likely cause | File to inspect |
 |---|---|---|
 | Handshake action count is lower than you expected | `bootstrap.py` missing new actions | `intentframe_gateway/bootstrap.py` |
-| Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale | `jarvis_pa/jarvis/agent.py` |
+| Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale, or `onboarding_guardrails()` not implemented | `jarvis_pa/jarvis/agent.py`, `intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` |
 | Agent tool call returns "action not allowed by policy" | Policy seeded without that action | `intentframe_gateway/bootstrap.py::_build_default_policy` |
 | Guardian approves but executor refuses | Policy allowlist wider than executor ceiling | `executor.yaml` vs policy constraint |
 | Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `intentframe_native_bundles/actions/*/constraints.py` |
@@ -203,7 +206,7 @@ When you see one of these, jump straight to the file named.
 
 Two disjoint sets. Keep them mentally separate when debugging.
 
-- **LLM sees:** tool docstrings in `jarvis_pa/jarvis/tools.py`, the onboarding guardrails rendered from `intentframe_components/onboarding/engine.py` using `AgentCapabilities.action_types`, the system prompt, per-intent user messages, and whatever the `reason` field last said.
+- **LLM sees:** tool docstrings in `jarvis_pa/jarvis/tools.py`, the onboarding guardrails assembled by `render_onboarding_bundle_context` (bundle `onboarding_guardrails()` + manifest sections) via `intentframe_components/onboarding/instructions.py`, the system prompt, per-intent user messages, and whatever the `reason` field last said.
 - **Runtime enforces:** `ActionType` enum membership, policy allowed actions (`bootstrap.py`), constraint checkers, deterministic gates, `DENY_WRITE_PREFIXES`, executor adapter floor, sandbox write scope.
 
 Drift between these two produces the most confusing bugs because code looks right but behaviour doesn't match. When something surprises you, ask: "is this a declaration problem (LLM visibility) or an enforcement problem (runtime gate)?" and walk the appropriate column above.

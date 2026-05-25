@@ -94,8 +94,8 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `domains/<domain>/` (domain overlays), `domain_routes.py` (routing manifest), `register_bundles(registry)` entry point. |
-| **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Domain bundles do not import action bundles; routing is separate metadata. |
+| **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `domains/<domain>/` (domain overlays), `domain_routes.py` (routing manifest), `onboarding/<family>/onboarding_guardrails.py` (per-bundle onboarding copy), `onboarding/manifest.py` (cross-bundle `OnboardingManifest`), `register_bundles(registry)` entry point. |
+| **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Domain bundles do not import action bundles; routing is separate metadata. Onboarding copy is also bundle-owned: each bundle contributes via `onboarding_guardrails()`; cross-cutting rules go in the manifest. |
 | **Where** | `intentframe_native_bundles/` |
 | **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_bundles"])`. |
 | **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
