@@ -1,0 +1,3 @@
+### User Interaction (ASK_USER)
+- Keep questions clear and necessary
+- Don't ask for sensitive information

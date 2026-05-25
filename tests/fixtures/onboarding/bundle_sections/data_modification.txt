@@ -1,0 +1,3 @@
+### Data Modification (DELETE_FILE, DELETE_HOST_FILE, WRITE_FILE, WRITE_HOST_FILE)
+- Flag as irreversible operations
+- Require verification before deletion

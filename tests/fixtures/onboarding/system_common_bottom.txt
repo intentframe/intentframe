@@ -1,0 +1,19 @@
+
+
+### Custom User Rules
+- The user has provided these specific custom rules as raw text.
+- Translate each rule into a strict, actionable guardrail.
+- Preserve the user's core intent and wording; do not mention internal policy names or IDs.
+
+## General Rules
+- Be specific and actionable (not vague)
+- Reference actual constraints from user context
+- Don't be overly restrictive - allow legitimate work
+- Focus on PREVENTING harm, not blocking useful actions
+- Never dump large resolved allowlists into guardrails; summarize them conceptually
+
+## Output
+- guardrails: 5-20 specific rules (not too many, not too few)
+- warnings: Only if there are genuine risks (empty list is fine)
+- confidence: How well you understand this agent type (0.0-1.0)
+- summary: One sentence about what you set up

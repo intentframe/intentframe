@@ -1,0 +1,32 @@
+ONBOARDING PROMPTS PARITY REPORT
+========================================================================
+Generated:     2026-05-25 19:26:23 UTC
+Fixtures dir:  tests/fixtures/onboarding
+
+Strategy:
+  - system: common top + bundle section substrings + common bottom
+  - user:   full byte compare
+  - bundle section order is NOT compared
+
+OVERALL:       PASS  (9/9 checks passed)
+
+CHECK DETAILS
+------------------------------------------------------------------------
+[PASS] system common top
+
+[PASS] bundle section: api
+
+[PASS] bundle section: data_modification
+
+[PASS] bundle section: email
+
+[PASS] bundle section: file_access
+
+[PASS] bundle section: terminal
+
+[PASS] bundle section: user_io
+
+[PASS] system common bottom
+
+[PASS] user prompt (full)
+

@@ -8,7 +8,7 @@ Run:
 
     .venv/bin/python tests/inspect_onboarding_prompts.py
 
-Write a frozen baseline for future parity checks:
+Write split parity fixtures for future golden checks:
 
     .venv/bin/python tests/inspect_onboarding_prompts.py --write-baseline
 """
@@ -36,10 +36,14 @@ from intentframe_server.runtime_context_for_llms import (  # noqa: E402
 )
 from policy_registry.seeds.loader import load_policy_seed  # noqa: E402
 from tests._bundle_loader import ensure_test_bundles_loaded  # noqa: E402
+from tests.onboarding_prompt_parity import (  # noqa: E402
+    FIXTURES_DIR,
+    split_system_prompt,
+    write_parity_fixtures,
+)
 
 SEPARATOR = "═" * 72
 JARVIS_POLICY_YAML = REPO_ROOT / "jarvis_pa" / "jarvis" / "policies" / "jarvis.yaml"
-BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "onboarding_prompts_baseline.txt"
 
 # Mirrors ``jarvis_pa/jarvis/agent.py`` — kept here so inspect stays
 # self-contained and does not import jarvis_pa.
@@ -188,17 +192,28 @@ def render_inspection(
     capabilities: AgentCapabilities,
     executor_running_as_root: bool = False,
 ) -> str:
-    """Full inspect output (system + user prompts + summary)."""
+    """Full inspect output (split system parts + user prompt)."""
     system_prompt, user_prompt = build_onboarding_prompts(
         user_context=user_context,
         capabilities=capabilities,
         executor_running_as_root=executor_running_as_root,
     )
+    common_top, middle, common_bottom = split_system_prompt(system_prompt)
     buf = StringIO()
 
-    section("1. ONBOARDING — SYSTEM PROMPT (agent.instructions)", buf)
+    section("1a. ONBOARDING — SYSTEM COMMON TOP", buf)
     buf.write("\n")
-    buf.write(system_prompt)
+    buf.write(common_top)
+    buf.write("\n")
+
+    section("1b. ONBOARDING — SYSTEM BUNDLE SECTIONS (middle)", buf)
+    buf.write("\n")
+    buf.write(middle)
+    buf.write("\n")
+
+    section("1c. ONBOARDING — SYSTEM COMMON BOTTOM", buf)
+    buf.write("\n")
+    buf.write(common_bottom)
     buf.write("\n")
 
     section("2. ONBOARDING — USER PROMPT (_build_onboarding_prompt)", buf)
@@ -209,7 +224,7 @@ def render_inspection(
     constrained = sum(
         1 for perm in user_context.allowed_actions.values() if perm.constraints is not None
     )
-    section("SUMMARY", buf)
+    section("INFO (not parity-gated)", buf)
     buf.write("\n")
     buf.write(f"  policy source          : {JARVIS_POLICY_YAML.relative_to(REPO_ROOT)}\n")
     buf.write(f"  user_id                : {user_context.user_id}\n")
@@ -235,7 +250,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--write-baseline",
         action="store_true",
-        help=f"Write inspect output to {BASELINE_PATH.relative_to(REPO_ROOT)}",
+        help=f"Write split parity fixtures under {FIXTURES_DIR.relative_to(REPO_ROOT)}/",
     )
     parser.add_argument(
         "--root",
@@ -261,9 +276,13 @@ def main() -> int:
     )
 
     if args.write_baseline:
-        BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        BASELINE_PATH.write_text(output, encoding="utf-8")
-        print(f"Wrote baseline ({len(output):,} chars) → {BASELINE_PATH}")
+        system_prompt, user_prompt = build_onboarding_prompts(
+            user_context=user_context,
+            capabilities=capabilities,
+            executor_running_as_root=args.root,
+        )
+        write_parity_fixtures(system_prompt=system_prompt, user_prompt=user_prompt)
+        print(f"Wrote parity fixtures → {FIXTURES_DIR.relative_to(REPO_ROOT)}/")
         return 0
 
     print(output, end="")
