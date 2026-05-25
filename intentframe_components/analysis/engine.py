@@ -42,6 +42,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# ============================================================
+# AE Output Field Limits
+# ============================================================
+# OpenAI structured output enforces these via JSON Schema maxLength /
+# maxItems.  The model writes complete text within the budget — no
+# post-hoc truncation needed.  These limits are generous: legitimate
+# AE output rarely exceeds half the cap.  They exist to structurally
+# bound the surface available for a transitive injection payload.
+
 class AEFieldLimit(IntEnum):
     STATED_INTENT = 400
     ACTUAL_BEHAVIOR = 600
@@ -53,6 +62,10 @@ class AEFieldLimit(IntEnum):
     SEMANTIC_DOMAIN_ITEM = 80
     SEMANTIC_DOMAINS_MAX_ITEMS = 15
 
+
+# ============================================================
+# Structured Output for AI Analysis
+# ============================================================
 
 _BoundedBehavior = Annotated[str, StringConstraints(max_length=AEFieldLimit.HIDDEN_BEHAVIOR_ITEM)]
 _BoundedDomain = Annotated[str, StringConstraints(max_length=AEFieldLimit.SEMANTIC_DOMAIN_ITEM)]
@@ -113,10 +126,49 @@ class AIAnalysisOutput(BaseModel):
     )
 
 
+# ============================================================
+# AI Analysis Engine
+# ============================================================
+
 class AIAnalysisEngine(AnalysisEngine):
-    """AI-powered Analysis Engine using OpenAI Agents."""
+    """
+    AI-powered Analysis Engine using OpenAI Agents.
+
+    Provides deep semantic understanding of:
+    - What actions will ACTUALLY do
+    - Hidden or non-obvious behaviors
+    - Risk factors
+    - Reversibility
+
+    Does NOT make allow/block decisions - that's Guardian's job.
+
+    Deterministic fast-paths (safe passive reads, catastrophic commands)
+    run upstream in the Bundle SDK before this engine is invoked.  This
+    class only performs full AI analysis on UNDECIDED intents.
+
+    User-facing IO (ASK_USER, SHOW_MESSAGE, GET_CONFIRMATION) always
+    goes through full AI analysis so that prompt content is inspected
+    for phishing / social engineering.  Guardian depends on this.
+    """
 
     _hardener = PromptHardening()
+
+    # ── Model settings note ──────────────────────────────────────
+    # The Agents SDK passes ModelSettings fields to the OpenAI Responses
+    # API via a _non_null_or_omit() pattern: any field left as None is
+    # omitted from the request entirely, falling back to the API's own
+    # default (temperature=1.0, top_p=1.0, etc.).
+    #
+    # For standard completion models (gpt-4o-mini, gpt-4.1, etc.)
+    # temperature=0 gives greedy decoding — always picks the highest-
+    # probability token.  This is the single biggest lever for
+    # reproducibility (~95%+ identical outputs on identical inputs).
+    # OpenAI recommends not setting both temperature and top_p, and
+    # with temperature=0 top_p is irrelevant, so we leave it as None.
+    #
+    # GPT-5 family models are reasoning models and do NOT accept
+    # temperature — use ModelSettings(reasoning=Reasoning(effort=...))
+    # instead.  See the Guardian engine for that pattern.
 
     def __init__(
         self,
@@ -303,6 +355,13 @@ class AIAnalysisEngine(AnalysisEngine):
         intent_signals: list[IntentSignal] | None = None,
         signal_truncated: bool = False,
     ) -> AnalysisReport:
+        """Convert AI output to AnalysisReport format.
+
+        Includes a deterministic backstop: if any field exceeds the
+        schema-defined bound (which should never happen when OpenAI
+        structured output is enforcing maxLength), the report is flagged
+        with ae_output_anomaly so Guardian treats it as elevated risk.
+        """
         anomaly = self._detect_overflow(ai_output)
 
         risk_level_map = {
@@ -352,6 +411,7 @@ class AIAnalysisEngine(AnalysisEngine):
         )
 
     def _detect_overflow(self, ai_output: AIAnalysisOutput) -> bool:
+        """Return True if any AI output field exceeds its schema bound."""
         for field_name, limit in self._FIELD_BOUNDS.items():
             if len(getattr(ai_output, field_name, "")) > limit:
                 return True
