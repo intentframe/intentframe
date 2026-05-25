@@ -22,7 +22,6 @@ from intentframe_components.prompt.runtime_context import append_runtime_context
 from intentframe_native_bundles.onboarding import (
     build_onboarding_instructions,
     summarize_constraints_for_onboarding,
-    summarize_deny_capabilities,
 )
 from policy_registry.models import ActionPermission
 
@@ -85,10 +84,6 @@ class AIOnboardingEngine(OnboardingEngine):
     @staticmethod
     def _build_instructions() -> str:
         return build_onboarding_instructions()
-
-    @staticmethod
-    def _summarize_deny_capabilities(deny_caps: frozenset[str]) -> str:
-        return summarize_deny_capabilities(deny_caps)
 
     @staticmethod
     def _summarize_intent_limits(intent_limits) -> str:

@@ -1,4 +1,4 @@
-"""Terminal deny_capabilities brief for onboarding (lossless, family-grouped)."""
+"""Terminal ``deny_capabilities`` brief for constraint / prompt rendering."""
 
 
 def summarize_deny_capabilities(deny_caps: frozenset[str]) -> str:
