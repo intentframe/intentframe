@@ -47,8 +47,8 @@ def data_modification_section() -> str:
 def email_section() -> str:
     actions = _join_actions(OUTBOUND_EMAIL_ACTIONS)
     return f"""### Email Actions ({actions})
-- Tell the agent that outbound email is limited to recipients from the user's contact list or configured recipient allowlist
-- Do NOT list concrete email addresses in guardrails
+- For outbound email constraints, tell the agent to only send, reply, or forward emails to recipients from the user's contact list or configured allowlist
+- Do not list concrete email addresses from resolved policies in the guardrails
 - Phrase email rules conceptually (for example: "only send/reply/forward emails to the user's contacts")"""
 
 

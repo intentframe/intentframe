@@ -1,0 +1,26 @@
+ONBOARDING PROMPTS PARITY REPORT
+========================================================================
+Generated:        2026-05-25 18:05:45 UTC
+Baseline:           /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/onboarding_prompts_baseline.txt
+Inspect script:     tests/inspect_onboarding_prompts.py
+
+OVERALL:            PASS  (3/3 sections match)
+
+SECTION DETAILS
+------------------------------------------------------------------------
+[PASS] 1. ONBOARDING — SYSTEM PROMPT (agent.instructions)
+       baseline sha256: 9f31c8cbba50e7a8d491965f23bdcf260c9f965d2ed4d529ebaf725317b1dff6
+       current  sha256: 9f31c8cbba50e7a8d491965f23bdcf260c9f965d2ed4d529ebaf725317b1dff6
+       chars: baseline=3,069  current=3,069
+
+[PASS] 2. ONBOARDING — USER PROMPT (_build_onboarding_prompt)
+       baseline sha256: 8a5cae926b3fc05cd7d5da0034cddb59114adb901486d275fd1cfbb2e5e630ba
+       current  sha256: 8a5cae926b3fc05cd7d5da0034cddb59114adb901486d275fd1cfbb2e5e630ba
+       chars: baseline=6,173  current=6,173
+
+[PASS] SUMMARY
+       baseline sha256: 7b732e0df11316d7876909c37d6eb3a92b498dfcb053959e9bd185759b90eebb
+       current  sha256: 7b732e0df11316d7876909c37d6eb3a92b498dfcb053959e9bd185759b90eebb
+       chars: baseline=323  current=323
+
+All sections match. Onboarding prompt parity is VERIFIED.

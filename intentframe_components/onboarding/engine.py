@@ -188,9 +188,7 @@ Custom User Rules:
         prompt += """
 
 Generate appropriate guardrails for this agent based on its capabilities and the user's policies.
-Be specific - reference actual constraints and allowed actions.
-For outbound email constraints, tell the agent to only send, reply, or forward emails to recipients from the user's contact list or configured allowlist.
-Do not list concrete email addresses from resolved policies in the guardrails."""
+Be specific - reference actual constraints and allowed actions."""
 
         return prompt
 
