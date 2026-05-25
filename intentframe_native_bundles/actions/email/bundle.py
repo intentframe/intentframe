@@ -12,6 +12,9 @@ from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.actions.email.constraints import EmailConstraints
 from intentframe_native_bundles.actions.email.enrich import EMAIL_MESSAGE_ACTIONS, enrich_intent
+from intentframe_native_bundles.actions.email.onboarding_guardrails import (
+    email_onboarding_guardrails,
+)
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,
@@ -112,6 +115,9 @@ class EmailActionBundle(ActionBundle):
         if len(recipients) <= 10:
             return f"Allowed recipients: {', '.join(recipients)}"
         return f"Allowed recipients: {len(recipients)} addresses configured"
+
+    def onboarding_guardrails(self) -> str:
+        return email_onboarding_guardrails()
 
     @staticmethod
     def _extract_emails(value: str) -> list[str]:

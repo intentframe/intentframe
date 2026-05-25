@@ -28,6 +28,7 @@ def register_bundles(registry) -> None:
     from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
     from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
     from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
+    from intentframe_native_bundles.onboarding.manifest import ONBOARDING_MANIFEST
 
     for bundle in (
         TerminalActionBundle(),
@@ -51,6 +52,7 @@ def register_bundles(registry) -> None:
     registry.register_domain_bundle(FinanceDomainBundle())
     registry.register_domain_bundle(DeletionDomainBundle())
     registry.register_domain_routes(DOMAIN_ROUTES)
+    registry.register_onboarding_manifest(ONBOARDING_MANIFEST)
 
 
 def passive_read_action_ids() -> frozenset[str]:

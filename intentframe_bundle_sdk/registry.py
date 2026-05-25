@@ -11,12 +11,14 @@ from typing import Any
 
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.domain import DomainBundle
+from intentframe_bundle_sdk.onboarding_manifest import OnboardingManifest
 
 _ACTION_BY_ID: dict[str, ActionBundle] = {}
 _ACTION_INSTANCES: list[ActionBundle] = []
 _DOMAIN_BY_ID: dict[str, DomainBundle] = {}
 _ACTION_TO_DOMAINS: dict[str, tuple[str, ...]] = {}
 _ROUTED_DOMAIN_IDS: frozenset[str] = frozenset()
+_ONBOARDING_MANIFEST: OnboardingManifest = OnboardingManifest()
 
 
 def register_action_bundle(bundle: ActionBundle) -> ActionBundle:
@@ -146,3 +148,14 @@ def all_passive_read_action_ids() -> frozenset[str]:
     for bundle in _ACTION_INSTANCES:
         result.update(bundle.passive_read_action_ids)
     return frozenset(result)
+
+
+def register_onboarding_manifest(manifest: OnboardingManifest) -> OnboardingManifest:
+    """Register plugin-authored cross-bundle onboarding facts."""
+    global _ONBOARDING_MANIFEST
+    _ONBOARDING_MANIFEST = manifest
+    return manifest
+
+
+def onboarding_manifest() -> OnboardingManifest:
+    return _ONBOARDING_MANIFEST

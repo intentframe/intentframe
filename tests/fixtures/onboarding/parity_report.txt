@@ -1,6 +1,6 @@
 ONBOARDING PROMPTS PARITY REPORT
 ========================================================================
-Generated:     2026-05-25 20:23:55 UTC
+Generated:     2026-05-25 21:29:58 UTC
 Fixtures dir:  tests/fixtures/onboarding
 
 Strategy:

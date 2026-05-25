@@ -111,6 +111,10 @@ class ActionBundle(ABC):
         del action_permission
         return None
 
+    def onboarding_guardrails(self) -> str:
+        """Paste-ready markdown for the onboarding system-prompt middle section."""
+        return ""
+
     async def startup(self) -> None:
         """Optional one-shot init after registration. Must be idempotent."""
         return None

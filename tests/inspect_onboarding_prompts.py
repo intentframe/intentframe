@@ -171,7 +171,8 @@ def build_onboarding_prompts(
     runtime_context = onboarding_runtime_context_for_llm(
         (SubstrateContext(execution=execution),),
     )
-    system_prompt = AIOnboardingEngine._build_instructions()
+    allowed_action_ids = frozenset(user_context.allowed_actions.keys())
+    system_prompt = AIOnboardingEngine._build_instructions(allowed_action_ids)
     user_prompt = engine._build_onboarding_prompt(
         capabilities,
         user_context,
@@ -198,7 +199,8 @@ def render_inspection(
         capabilities=capabilities,
         executor_running_as_root=executor_running_as_root,
     )
-    common_top, middle, common_bottom = split_system_prompt(system_prompt)
+    allowed_action_ids = frozenset(user_context.allowed_actions.keys())
+    common_top, middle, common_bottom = split_system_prompt(system_prompt, allowed_action_ids)
     buf = StringIO()
 
     section("1a. ONBOARDING — SYSTEM COMMON TOP", buf)
@@ -281,7 +283,11 @@ def main() -> int:
             capabilities=capabilities,
             executor_running_as_root=args.root,
         )
-        write_parity_fixtures(system_prompt=system_prompt, user_prompt=user_prompt)
+        write_parity_fixtures(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            allowed_action_ids=frozenset(user_context.allowed_actions.keys()),
+        )
         print(f"Wrote parity fixtures → {FIXTURES_DIR.relative_to(REPO_ROOT)}/")
         return 0
 

@@ -20,6 +20,7 @@ from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.domain import DomainBundle
 from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
 from intentframe_bundle_sdk.lifecycle import shutdown_bundles, startup_bundles
+from intentframe_bundle_sdk.onboarding_manifest import OnboardingManifest
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     all_action_bundles,
@@ -31,9 +32,11 @@ from intentframe_bundle_sdk.registry import (
     register_action_bundle,
     register_domain_bundle,
     register_domain_routes,
+    register_onboarding_manifest,
     routed_domain_ids,
     validate_policy_domain_constraints,
 )
+from intentframe_bundle_sdk.onboarding import render_onboarding_bundle_context
 from intentframe_bundle_sdk.constraints import (
     describe_action_constraints,
     describe_action_constraints_from_policy,
@@ -72,6 +75,7 @@ __all__ = [
     "BundlePhaseOutcome",
     "ConstraintPromptContext",
     "EnrichmentRecord",
+    "OnboardingManifest",
     "describe_action_constraints",
     "describe_action_constraints_from_policy",
     "describe_permission_constraints",
@@ -97,6 +101,8 @@ __all__ = [
     "register_action_bundle",
     "register_domain_bundle",
     "register_domain_routes",
+    "register_onboarding_manifest",
+    "render_onboarding_bundle_context",
     "routed_domain_ids",
     "validate_policy_domain_constraints",
     "validate_policy_against_registry",

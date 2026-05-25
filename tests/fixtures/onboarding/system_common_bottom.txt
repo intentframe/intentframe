@@ -1,5 +1,4 @@
 
-
 ### Custom User Rules
 - The user has provided these specific custom rules as raw text.
 - Translate each rule into a strict, actionable guardrail.
@@ -11,6 +10,7 @@
 - Don't be overly restrictive - allow legitimate work
 - Focus on PREVENTING harm, not blocking useful actions
 - Never dump large resolved allowlists into guardrails; summarize them conceptually
+- Emit one guardrail per granted action family; do not merge families into a single bullet
 
 ## Output
 - guardrails: 5-20 specific rules (not too many, not too few)

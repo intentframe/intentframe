@@ -16,6 +16,9 @@ from intentframe_native_bundles.actions.files.constraints import FileConstraints
 from intentframe_native_bundles.actions.files.deterministic import decide_write_file_sensitive_path
 from intentframe_native_bundles.actions.files.evidence import FileIntel
 from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.actions.files.onboarding_guardrails import (
+    files_onboarding_guardrails,
+)
 from intentframe_native_bundles.actions.files.pre_pipeline import run_files_pre_pipeline
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
@@ -79,6 +82,9 @@ class FilesActionBundle(ActionBundle):
             return None
         constraints = FileConstraints.model_validate(action_permission.constraints)
         return f"Allowed paths: {', '.join(constraints.allowed_paths)}"
+
+    def onboarding_guardrails(self) -> str:
+        return files_onboarding_guardrails()
 
     def structural_gates(
         self,

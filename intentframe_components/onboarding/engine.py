@@ -20,7 +20,7 @@ from intentframe_components.onboarding.base import OnboardingEngine
 from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.runtime_context import append_runtime_context_sections
 from intentframe_bundle_sdk.constraints import describe_action_constraints_from_policy
-from intentframe_native_bundles.onboarding import build_onboarding_instructions
+from intentframe_components.onboarding.instructions import build_onboarding_instructions
 
 
 # ============================================================
@@ -71,16 +71,9 @@ class AIOnboardingEngine(OnboardingEngine):
         self.model = model
         self.verbose = verbose
 
-        self._agent = Agent(
-            name="Onboarding Engine",
-            instructions=self._build_instructions(),
-            model=self.model,
-            output_type=AIOnboardingOutput,
-        )
-
     @staticmethod
-    def _build_instructions() -> str:
-        return build_onboarding_instructions()
+    def _build_instructions(allowed_action_ids: frozenset[str]) -> str:
+        return build_onboarding_instructions(allowed_action_ids)
 
     @staticmethod
     def _summarize_intent_limits(intent_limits) -> str:
@@ -104,11 +97,20 @@ class AIOnboardingEngine(OnboardingEngine):
             runtime_context_for_llm=runtime_context_for_llm,
         )
 
+        allowed_action_ids = frozenset(user_context.allowed_actions.keys())
+        system_instructions = self._build_instructions(allowed_action_ids)
+
         if self.verbose:
             print(f"\n    [ONBOARDING] AI analyzing agent '{capabilities.agent_type}'...")
 
-        log_prompt_dump("onboarding", prompt)
-        result = await Runner.run(self._agent, prompt)
+        log_prompt_dump("onboarding", prompt, system_prompt=system_instructions)
+        agent = Agent(
+            name="Onboarding Engine",
+            instructions=system_instructions,
+            model=self.model,
+            output_type=AIOnboardingOutput,
+        )
+        result = await Runner.run(agent, prompt)
         ai_output: AIOnboardingOutput = result.final_output
 
         if self.verbose:

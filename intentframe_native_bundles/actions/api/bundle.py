@@ -8,6 +8,7 @@ from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_bundles.actions.api.onboarding_guardrails import api_onboarding_guardrails
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,
@@ -84,3 +85,6 @@ class ApiActionBundle(ActionBundle):
         if constraints.allowed_endpoints is not None:
             parts.append(f"Allowed endpoints: {', '.join(constraints.allowed_endpoints)}")
         return "; ".join(parts) if parts else "No specific constraints"
+
+    def onboarding_guardrails(self) -> str:
+        return api_onboarding_guardrails()

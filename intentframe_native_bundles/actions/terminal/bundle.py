@@ -23,6 +23,9 @@ from intentframe_native_bundles.actions.terminal.evidence import (
     TERMINAL_COMMAND_SIGNALS_KEY,
     CommandIntel,
 )
+from intentframe_native_bundles.actions.terminal.onboarding_guardrails import (
+    terminal_onboarding_guardrails,
+)
 from intentframe_native_bundles.actions.terminal.pre_pipeline import run_terminal_pre_pipeline
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
@@ -110,6 +113,9 @@ class TerminalActionBundle(ActionBundle):
                 f"Allow capabilities: {', '.join(sorted(constraints.allow_capabilities))}"
             )
         return "; ".join(parts) if parts else "No terminal constraints"
+
+    def onboarding_guardrails(self) -> str:
+        return terminal_onboarding_guardrails()
 
     def allow_gates(
         self,

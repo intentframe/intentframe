@@ -20,6 +20,9 @@ from intentframe_native_bundles.actions.host_files.deterministic import (
     HOST_FILE_ACTIONS,
     decide_host_file_floor,
 )
+from intentframe_native_bundles.actions.host_files.onboarding_guardrails import (
+    host_files_onboarding_guardrails,
+)
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,
@@ -80,6 +83,9 @@ class HostFilesActionBundle(ActionBundle):
             return None
         constraints = HostFileConstraints.model_validate(action_permission.constraints)
         return f"Allowed host paths: {', '.join(constraints.allowed_host_paths)}"
+
+    def onboarding_guardrails(self) -> str:
+        return host_files_onboarding_guardrails()
 
     def structural_gates(
         self,

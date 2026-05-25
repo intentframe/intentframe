@@ -51,7 +51,7 @@ from __future__ import annotations
 import pytest
 
 from intentframe_bundle_sdk.constraints import describe_action_constraints
-from intentframe_native_bundles.onboarding import build_onboarding_instructions
+from intentframe_components.onboarding.instructions import build_onboarding_instructions
 from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_components.onboarding.engine import AIOnboardingEngine
 from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
@@ -263,7 +263,9 @@ class TestBuildInstructionsMetaPromptContract:
     """
 
     def _instructions(self) -> str:
-        return build_onboarding_instructions()
+        return build_onboarding_instructions(
+            frozenset({"RUN_COMMAND", "SEND_EMAIL", "READ_HOST_FILE", "WRITE_HOST_FILE"}),
+        )
 
     def test_instructions_forbid_vague_pointer_bullets(self) -> None:
         """'avoid denied capabilities' / 'avoid script execution from
@@ -385,7 +387,9 @@ class TestBuildOnboardingPromptCustomUserRules:
     """
 
     def _instructions(self) -> str:
-        return build_onboarding_instructions()
+        return build_onboarding_instructions(
+            frozenset({"RUN_COMMAND", "SEND_EMAIL", "READ_HOST_FILE", "WRITE_HOST_FILE"}),
+        )
 
     def test_instructions_contain_custom_user_rules_heading(self) -> None:
         assert "Custom User Rules" in self._instructions()
