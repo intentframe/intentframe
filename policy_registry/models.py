@@ -11,7 +11,8 @@ Design:
     - Present in allowed_actions → ALLOWED (with optional constraints).
     - Absent from allowed_actions → BLOCKED (deny-by-default).
     - No "decision" field. The data structure IS the permission.
-    - Constraints are per-category (FileConstraints, EmailConstraints, etc.)
+    - Constraints are opaque dicts per action or category; registered bundles
+      validate shape at startup via the Bundle SDK.
     - The ``safe`` flag lets the user declare trust level for fast validation.
 """
 

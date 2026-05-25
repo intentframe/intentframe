@@ -23,7 +23,7 @@ Before touching anything file-path-related, be explicit about which world you ar
 | Virtual filesystem | `/home/foo.txt` | `normalize_virtual_path` | `FileChecker` | `FileConstraints.allowed_paths` |
 | Host filesystem | `~/Documents/foo.txt` | `canonicalize_real_path` | `HostFileChecker` | `HostFileConstraints.allowed_host_paths` |
 
-The two must **never** share a constraint field name. The disjoint field names (`allowed_paths` vs `allowed_host_paths`) are what drive Pydantic's smart-union dispatch to the correct constraint type. Renaming or unifying them silently reroutes everything through the wrong checker.
+The two must **never** share a constraint field name. The disjoint field names (`allowed_paths` vs `allowed_host_paths`) must not be renamed or unified.
 
 Trailing-slash shorthand for host paths (`~/Documents/`) is rejected at config load time. Use `dir/*` for subtree scope, exact paths otherwise.
 

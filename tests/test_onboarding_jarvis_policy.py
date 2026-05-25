@@ -139,8 +139,7 @@ _SIMULATED_INTENT_LIMITS: list[dict] = [
     },
 ]
 
-# Disjoint constraint field names drive Pydantic Union dispatch in the
-# registry — keep these as-is.
+# Disjoint constraint field names — validated by the matching action bundle.
 _VFS_CONSTRAINT = {"allowed_paths": ["/home/*"]}
 _HOST_CONSTRAINT = {"allowed_host_paths": ["~/*"]}
 _EMAIL_CONSTRAINT = {

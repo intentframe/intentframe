@@ -1,4 +1,4 @@
-"""Regression pin for opaque dict constraint storage in UserPolicy."""
+"""Regression pin for opaque dict constraint storage and bundle validation."""
 
 from __future__ import annotations
 

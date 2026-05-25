@@ -14,12 +14,10 @@ class FileConstraints(BaseModel):
             and glob patterns (fnmatch).
 
     Note:
-        ``extra="forbid"`` is required for defense-in-depth against
-        the policy-schema disambiguation invariant (see
-        ``HostFileConstraints``).  Payloads that accidentally mix
-        ``allowed_paths`` and ``allowed_host_paths`` must fail loudly
-        instead of silently selecting whichever Union member happens
-        to match first.
+        ``extra="forbid"`` rejects unknown fields (see
+        ``HostFileConstraints``).  At startup, the files bundle's
+        ``validate_constraints`` parses policy dicts with this schema;
+        mixed ``allowed_paths`` and ``allowed_host_paths`` fail loudly.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

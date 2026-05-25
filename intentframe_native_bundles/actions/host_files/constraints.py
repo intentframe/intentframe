@@ -9,7 +9,9 @@ The constraint schema lives in a separate module so:
 
 - the field name ``allowed_host_paths`` stays disjoint from
   :class:`intentframe_native_bundles.actions.files.constraints.FileConstraints.allowed_paths`,
-  so virtual and host file policies never share field names.
+  so virtual and host file policies never share field names;
+- each family bundle validates its slice at startup via
+  :func:`intentframe_bundle_sdk.loader.validate_policy_against_registry`.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ class HostFileConstraints(BaseModel):
     are matched against canonicalized real filesystem paths (after
     ``~`` expansion and symlink resolution via
     :func:`resource_registry.floor.canonicalize_real_path`).  The
-    matching checker does **not** apply ``normalize_virtual_path``.
+    host-files bundle does **not** apply ``normalize_virtual_path``.
 
     Attributes:
         allowed_host_paths: Real host path patterns the user permits.
@@ -35,7 +37,7 @@ class HostFileConstraints(BaseModel):
               - **subtree glob**: ``~/Documents/*`` — matches children
                 under the directory via :mod:`fnmatch`.
 
-            Patterns may start with ``~`` — the checker canonicalizes
+            Patterns may start with ``~`` — enforcement canonicalizes
             them before matching.  Trailing-slash directory shorthand
             (``~/Documents/``) is **rejected at load time**: real-path
             canonicalization (``pathlib.Path.resolve``) strips trailing
@@ -48,14 +50,13 @@ class HostFileConstraints(BaseModel):
 
     Note:
         Field name is deliberately disjoint from
-        ``FileConstraints.allowed_paths`` so pydantic's smart-union in
-        :attr:`policy_registry.models.ActionPermission.constraints`
-        can deterministically pick the right concrete type.  Combined
-        with ``model_config(extra="forbid")`` on both constraint
-        models, the per-action constraint Union has no ambiguity: a
-        payload with ``allowed_paths`` validates uniquely against
-        :class:`FileConstraints`, and a payload with
-        ``allowed_host_paths`` validates uniquely against this class.
+        ``FileConstraints.allowed_paths`` so virtual and host file
+        policies never share YAML field names.  Startup validation
+        routes each ``allowed_actions`` entry by action id to its
+        bundle, which parses constraints with
+        :class:`FileConstraints` or this class respectively.
+        ``model_config(extra="forbid")`` on both models rejects mixed
+        or wrong-key payloads loudly.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
