@@ -51,20 +51,9 @@ class LoggingAnalysisEngine:
     async def analyze(
         self,
         intent: IntentFrame,
-        *,
-        safe_actions: set[str],
-        terminal_command_signals: tuple = (),
         **kwargs: Any,
     ) -> AnalysisReport:
         _dump("STAGE 4: Analysis Engine received intent", intent)
-        _dump(
-            "STAGE 4B: Analysis Engine inputs",
-            {
-                "safe_actions": sorted(safe_actions),
-                "terminal_command_signals": list(terminal_command_signals),
-                "command_intel": kwargs.get("command_intel"),
-            },
-        )
         return AnalysisReport(
             stated_intent="reply to the selected email",
             risk_factors={"overall": RiskLevel.LOW},

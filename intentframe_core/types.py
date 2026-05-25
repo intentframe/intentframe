@@ -13,8 +13,23 @@ from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 
-TERMINAL_COMMAND_SIGNALS_MAX_ITEMS = 32
-TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN = 300
+INTENT_SIGNALS_MAX_ITEMS = 32
+INTENT_SIGNAL_VALUE_MAX_LEN = 300
+
+
+class IntentSignal(BaseModel):
+    """A single deterministic finding attached to an AnalysisReport.
+
+    Produced by bundles (not the AE LLM) from substrate evidence such as
+    command_shield signals.  All fields are bounded so the report cannot
+    carry an oversized payload regardless of upstream source.
+    """
+
+    source: str = Field(default="", max_length=80)
+    check: str = Field(default="", max_length=80)
+    signal_id: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=INTENT_SIGNAL_VALUE_MAX_LEN)
+    evidence: str = Field(default="", max_length=INTENT_SIGNAL_VALUE_MAX_LEN)
 
 
 class IntentFrame(BaseModel):
@@ -67,42 +82,11 @@ class AnalysisReport(BaseModel):
     confidence: float = 0.0
     recommendation: str = ""
 
-    terminal_command_signals: List[Dict[str, str]] = Field(default_factory=list)
+    intent_signals: List[IntentSignal] = Field(default_factory=list)
 
     ae_output_anomaly: bool = False
 
-    @staticmethod
-    def clip_terminal_command_signals(
-        signals: List[Dict[str, str]],
-    ) -> tuple[List[Dict[str, str]], bool]:
-        """Enforce the shield-side input bound on serialized signals.
-
-        Returns the clipped list plus an ``overflow`` flag.  The flag
-        is lifted into :pyattr:`ae_output_anomaly` by the caller when
-        truncation occurred, so Guardian treats the report with
-        elevated suspicion.  No caller should ever produce an
-        overflowing list today — this is defense-in-depth against a
-        future shield change or a malformed round-trip.
-        """
-        if not signals:
-            return [], False
-        overflow = False
-        if len(signals) > TERMINAL_COMMAND_SIGNALS_MAX_ITEMS:
-            signals = signals[:TERMINAL_COMMAND_SIGNALS_MAX_ITEMS]
-            overflow = True
-        clipped: List[Dict[str, str]] = []
-        for item in signals:
-            if not isinstance(item, dict):
-                continue
-            capped: Dict[str, str] = {}
-            for k, v in item.items():
-                sv = str(v) if v is not None else ""
-                if len(sv) > TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN:
-                    sv = sv[:TERMINAL_COMMAND_SIGNAL_VALUE_MAX_LEN]
-                    overflow = True
-                capped[str(k)] = sv
-            clipped.append(capped)
-        return clipped, overflow
+    report_integrity_flags: List[str] = Field(default_factory=list)
 
 
 class ValidationResult(BaseModel):

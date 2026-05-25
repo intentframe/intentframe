@@ -54,10 +54,12 @@ from intentframe_bundle_sdk.types import (
     enrichment_audit_fields,
     record_enrichment,
 )
+from intentframe_core.types import IntentSignal
 
 __all__ = [
     "ActionBundle",
     "ActionPermission",
+    "IntentSignal",
     "BundleAIContext",
     "BundleContext",
     "BundleDeterministicResult",

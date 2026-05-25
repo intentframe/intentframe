@@ -97,7 +97,9 @@ class TestTerminalBundleAIContext:
         )
         ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
         assert "TERMINAL COMMAND — STRUCTURAL SIGNALS" in ai_ctx.ae_external_context
-        assert ai_ctx.extras.get("terminal_command_signals") == signals
+        assert len(ai_ctx.ae_intent_signals) == 1
+        assert ai_ctx.ae_intent_signals[0].check == "edge"
+        assert ai_ctx.ae_intent_signals[0].signal_id == "edge:curl_pipe"
 
 
 class TestFilesBundleAIContext:

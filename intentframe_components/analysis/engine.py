@@ -19,6 +19,7 @@ from agents import Agent, ModelSettings, Runner
 
 from intentframe_core.types import (
     AnalysisReport,
+    IntentSignal,
     ExecutionContext,
     IntentFrame,
 )
@@ -164,15 +165,10 @@ class AIAnalysisEngine(AnalysisEngine):
         self.last_request_prompt = None
 
         ai_ctx = bundle_ai_context_or_empty(bundle_ai_context)
-        terminal_command_signals = ai_ctx.extras.get("terminal_command_signals", ())
-        if not isinstance(terminal_command_signals, tuple):
-            terminal_command_signals = ()
 
-        if terminal_command_signals and self.verbose:
-            print(
-                f"    │  Terminal command signals ({len(terminal_command_signals)}) "
-                f"— enriching AI prompt"
-            )
+        if self.verbose:
+            for hint in ai_ctx.ae_log_hints:
+                print(f"    │  {hint}")
 
         prompt = self._build_analysis_prompt(
             intent,
@@ -209,7 +205,8 @@ class AIAnalysisEngine(AnalysisEngine):
         return self._convert_to_report(
             intent,
             result.final_output,
-            terminal_command_signals=terminal_command_signals,
+            intent_signals=list(ai_ctx.ae_intent_signals),
+            signal_truncated=ai_ctx.ae_signal_truncated,
         )
 
     @staticmethod
@@ -293,7 +290,9 @@ class AIAnalysisEngine(AnalysisEngine):
         self,
         intent: IntentFrame,
         ai_output: AIAnalysisOutput,
-        terminal_command_signals: tuple = (),
+        *,
+        intent_signals: list[IntentSignal] | None = None,
+        signal_truncated: bool = False,
     ) -> AnalysisReport:
         anomaly = self._detect_overflow(ai_output)
 
@@ -317,19 +316,6 @@ class AIAnalysisEngine(AnalysisEngine):
             Reversibility.UNKNOWN,
         )
 
-        serialized_signals = [
-            {
-                "check": s.check,
-                "signal_id": s.signal_id,
-                "description": s.description,
-                "evidence": s.evidence,
-            }
-            for s in terminal_command_signals
-        ]
-        clipped_signals, signals_overflow = AnalysisReport.clip_terminal_command_signals(
-            serialized_signals
-        )
-
         return AnalysisReport(
             stated_intent=ai_output.stated_intent,
             actual_behaviors=[{
@@ -349,8 +335,11 @@ class AIAnalysisEngine(AnalysisEngine):
             semantic_domains=ai_output.semantic_domains,
             confidence=ai_output.confidence,
             recommendation=ai_output.recommendation,
-            terminal_command_signals=clipped_signals,
-            ae_output_anomaly=anomaly or signals_overflow,
+            intent_signals=intent_signals or [],
+            ae_output_anomaly=anomaly,
+            report_integrity_flags=(
+                ["intent_signals_truncated"] if signal_truncated else []
+            ),
         )
 
     def _detect_overflow(self, ai_output: AIAnalysisOutput) -> bool:

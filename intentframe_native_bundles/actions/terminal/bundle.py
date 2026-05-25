@@ -13,6 +13,7 @@ from intentframe_native_bundles.actions.terminal._capability_match import (
 )
 from intentframe_native_bundles.actions.terminal._read_only import is_read_only_fast_path
 from intentframe_native_bundles.actions.terminal.ai_context import (
+    build_terminal_intent_signals,
     render_terminal_external_context,
     select_terminal_ae_system_instructions,
 )
@@ -145,11 +146,16 @@ class TerminalActionBundle(ActionBundle):
         if not isinstance(signals, tuple):
             signals = ()
         system, label = select_terminal_ae_system_instructions(command_intel)
+        intent_signals, truncated = build_terminal_intent_signals(signals)
         return BundleAIContext(
             ae_system_instructions=system,
             ae_external_context=render_terminal_external_context(signals),
             ae_prompt_label=label,
-            extras={"terminal_command_signals": signals},
+            ae_log_hints=(
+                f"Terminal command signals ({len(signals)}) — enriching AI prompt",
+            ) if signals else (),
+            ae_intent_signals=tuple(intent_signals),
+            ae_signal_truncated=truncated,
         )
 
     @staticmethod

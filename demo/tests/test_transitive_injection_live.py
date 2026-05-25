@@ -140,8 +140,8 @@ def _print_analysis(analysis: AnalysisReport, label: str = "AnalysisReport"):
 
     if analysis.semantic_domains:
         print(f"    domains:            {analysis.semantic_domains}")
-    if analysis.terminal_command_signals:
-        print(f"    cmd_signals:        {analysis.terminal_command_signals}")
+    if analysis.intent_signals:
+        print(f"    cmd_signals:        {analysis.intent_signals}")
 
     print(f"    recommendation:     {_DIM}{analysis.recommendation}{_RESET}")
 

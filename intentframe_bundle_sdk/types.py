@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from intentframe_core.types import IntentFrame
+from intentframe_core.types import IntentSignal, IntentFrame
 
 
 class PhaseDecision(str, Enum):
@@ -104,7 +104,9 @@ class BundleAIContext:
     ae_prompt_label: str | None = None
     guardian_prompt_label: str | None = None
     constraint_context: ConstraintPromptContext | None = None
-    extras: dict[str, Any] = field(default_factory=dict)
+    ae_log_hints: tuple[str, ...] = field(default_factory=tuple)
+    ae_intent_signals: tuple[IntentSignal, ...] = field(default_factory=tuple)
+    ae_signal_truncated: bool = False
 
 
 def bundle_ai_context_or_empty(

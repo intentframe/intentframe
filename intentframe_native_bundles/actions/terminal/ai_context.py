@@ -2,8 +2,46 @@
 
 from __future__ import annotations
 
+from intentframe_core.types import IntentSignal, INTENT_SIGNALS_MAX_ITEMS, INTENT_SIGNAL_VALUE_MAX_LEN
 from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_native_bundles.actions.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
+
+
+def build_terminal_intent_signals(
+    signals: tuple,
+) -> tuple[list[IntentSignal], bool]:
+    """Convert raw command_shield Signal objects into bounded IntentSignal list.
+
+    Returns (clipped_list, truncated).  ``truncated`` is True if any signal was
+    dropped (count overflow) or any field value had to be capped (length overflow).
+    This is the only place in the codebase that knows about the command_shield
+    Signal shape; all other layers work with the generic IntentSignal type.
+    """
+    if not signals:
+        return [], False
+    truncated = False
+    raw = signals
+    if len(raw) > INTENT_SIGNALS_MAX_ITEMS:
+        raw = raw[:INTENT_SIGNALS_MAX_ITEMS]
+        truncated = True
+    result: list[IntentSignal] = []
+    for s in raw:
+        evidence = s.evidence or ""
+        if len(evidence) > INTENT_SIGNAL_VALUE_MAX_LEN:
+            evidence = evidence[:INTENT_SIGNAL_VALUE_MAX_LEN]
+            truncated = True
+        description = s.description or ""
+        if len(description) > INTENT_SIGNAL_VALUE_MAX_LEN:
+            description = description[:INTENT_SIGNAL_VALUE_MAX_LEN]
+            truncated = True
+        result.append(IntentSignal(
+            source="terminal.command_shield",
+            check=s.check or "",
+            signal_id=s.signal_id or "",
+            description=description,
+            evidence=evidence,
+        ))
+    return result, truncated
 
 
 def render_terminal_external_context(terminal_command_signals: tuple) -> str:

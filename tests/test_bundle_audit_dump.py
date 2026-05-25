@@ -86,13 +86,13 @@ class TestAuditDump:
             ae_system_instructions="CUSTOM AE",
             ae_external_context="\nTERMINAL COMMAND — STRUCTURAL SIGNALS:\n  - x",
             ae_prompt_label="critical_run_command",
-            extras={"terminal_command_signals": ()},
         )
         dumped = dump_bundle_ai_context(ai_ctx)
         assert dumped is not None
         assert dumped["ae_system_instructions"] == "CUSTOM AE"
         assert dumped["ae_prompt_label"] == "critical_run_command"
-        assert dumped["extras"]["terminal_command_signals"] == []
+        assert dumped["ae_intent_signals"] == []
+        assert dumped["ae_signal_truncated"] is False
         json.dumps(dumped)
 
     def test_none_contexts_return_none(self):

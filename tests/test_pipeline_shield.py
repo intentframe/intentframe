@@ -20,6 +20,7 @@ from command_shield.verdict import Signal
 from intentframe_core.enums import Decision, RiskLevel, Reversibility
 from intentframe_core.types import (
     AnalysisReport,
+    IntentSignal,
     ExecutionContext,
     ExecutionResult,
     IntentFrame,
@@ -269,7 +270,7 @@ class TestNeedsReviewFlow:
         call_kwargs = runtime.analysis_engine.analyze.call_args
         ai_ctx = call_kwargs.kwargs.get("bundle_ai_context")
         assert ai_ctx is not None
-        signals = ai_ctx.extras.get("terminal_command_signals", ())
+        signals = ai_ctx.ae_intent_signals
         assert len(signals) > 0
 
     def test_needs_review_still_reaches_guardian(self):
@@ -292,9 +293,9 @@ class TestNeedsReviewFlow:
         call_kwargs = runtime.analysis_engine.analyze.call_args
         ai_ctx = call_kwargs.kwargs.get("bundle_ai_context")
         assert ai_ctx is not None
-        signals = ai_ctx.extras.get("terminal_command_signals", ())
+        signals = ai_ctx.ae_intent_signals
         for sig in signals:
-            assert isinstance(sig, Signal)
+            assert isinstance(sig, IntentSignal)
             assert sig.check
             assert sig.signal_id
 
