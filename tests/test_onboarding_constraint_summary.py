@@ -1,5 +1,5 @@
-"""Unit coverage for `AIOnboardingEngine._summarize_constraints`,
-terminal `summarize_deny_capabilities`, and `_summarize_intent_limits`.
+"""Unit coverage for bundle SDK ``describe_action_constraints``,
+terminal ``summarize_deny_capabilities``, and ``_summarize_intent_limits``.
 
 The summarizer is the seam through which the live `deny_capabilities`
 deny set surfaces to the onboarding LLM.  Before this seam was wired,
@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import pytest
 
+from intentframe_bundle_sdk.constraints import describe_action_constraints
 from intentframe_native_bundles.onboarding import build_onboarding_instructions
 from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_components.onboarding.engine import AIOnboardingEngine
@@ -190,7 +191,7 @@ class TestSummarizeConstraintsIntegration:
             blocked_patterns=("sudo", "rm -rf /"),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = AIOnboardingEngine._summarize_constraints(
+        summary = describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
         )
         assert "blocked patterns" in summary.lower()
@@ -205,7 +206,7 @@ class TestSummarizeConstraintsIntegration:
         constraints = TerminalConstraints(
             blocked_patterns=("sudo",),
         )
-        summary = AIOnboardingEngine._summarize_constraints(
+        summary = describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
         )
         assert "blocked patterns" in summary.lower()
@@ -217,7 +218,7 @@ class TestSummarizeConstraintsIntegration:
         constraints = TerminalConstraints(
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = AIOnboardingEngine._summarize_constraints(
+        summary = describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
         )
         assert "deny capabilities" in summary.lower()
@@ -229,7 +230,7 @@ class TestSummarizeConstraintsIntegration:
             allowed_commands=("git status",),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = AIOnboardingEngine._summarize_constraints(
+        summary = describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
         )
         assert "allowed commands" in summary.lower()
@@ -237,7 +238,7 @@ class TestSummarizeConstraintsIntegration:
 
     def test_empty_terminal_constraints_returns_generic_string(self) -> None:
         constraints = TerminalConstraints()
-        summary = AIOnboardingEngine._summarize_constraints(
+        summary = describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
         )
         assert summary.lower() == "no terminal constraints"

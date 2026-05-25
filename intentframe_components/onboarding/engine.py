@@ -3,8 +3,8 @@ AI-Powered Onboarding Engine
 
 Uses OpenAI Agents to dynamically generate context for any agent type.
 
-Substrate orchestration only — action-family vocabulary and constraint
-summaries live in ``intentframe_native_bundles.onboarding``.
+Substrate orchestration only — action-family onboarding copy lives in
+native bundles; constraint summaries use the bundle SDK.
 """
 
 from datetime import datetime, timezone
@@ -19,11 +19,8 @@ from intentframe_core.types import AgentCapabilities, RuntimeContext, RuntimeCon
 from intentframe_components.onboarding.base import OnboardingEngine
 from intentframe_components.prompt.logging import log_prompt_dump
 from intentframe_components.prompt.runtime_context import append_runtime_context_sections
-from intentframe_native_bundles.onboarding import (
-    build_onboarding_instructions,
-    summarize_constraints_for_onboarding,
-)
-from policy_registry.models import ActionPermission
+from intentframe_bundle_sdk.constraints import describe_action_constraints_from_policy
+from intentframe_native_bundles.onboarding import build_onboarding_instructions
 
 
 # ============================================================
@@ -94,10 +91,6 @@ class AIOnboardingEngine(OnboardingEngine):
             for limit in intent_limits
         )
 
-    @staticmethod
-    def _summarize_constraints(action: str, constraints: dict) -> str:
-        return summarize_constraints_for_onboarding(action, constraints)
-
     async def onboard(
         self,
         capabilities: AgentCapabilities,
@@ -141,7 +134,7 @@ class AIOnboardingEngine(OnboardingEngine):
         for action, perm in user_context.allowed_actions.items():
             if perm.constraints is not None:
                 constraint_summary_lines.append(
-                    f"  {action}: {self._summarize_constraints(action, perm.constraints)}"
+                    f"  {action}: {describe_action_constraints_from_policy(action, perm)}"
                 )
 
         constraint_str = "\n".join(constraint_summary_lines) if constraint_summary_lines else "  None"

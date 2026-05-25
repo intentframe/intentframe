@@ -11,6 +11,7 @@ from copy import deepcopy
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from intentframe_bundle_sdk.constraints import describe_permission_constraints
 from intentframe_bundle_sdk.registry import domain_bundle_for, domains_for_action
 from intentframe_bundle_sdk.types import (
     ActionPermission,
@@ -120,15 +121,7 @@ class DeterministicRunner:
         domain_ids: tuple[str, ...],
         user_context: UserContext,
     ) -> ConstraintPromptContext:
-        if action_permission.constraints is None:
-            action_constraints = "No specific constraints"
-        else:
-            described = bundle.describe_constraints(action_permission)
-            action_constraints = (
-                described
-                if described is not None
-                else str(action_permission.constraints)
-            )
+        action_constraints = describe_permission_constraints(bundle, action_permission)
 
         domain_lines: list[str] = []
         enforced: list[str] = []

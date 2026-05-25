@@ -56,6 +56,7 @@ from intentframe_core.types import (  # noqa: E402
     RuntimeContext,
     UserContext,
 )
+from intentframe_bundle_sdk.loader import ensure_loaded  # noqa: E402
 from intentframe_components.onboarding.engine import AIOnboardingEngine  # noqa: E402
 from policy_registry.models import UserPolicy  # noqa: E402
 
@@ -327,6 +328,7 @@ async def _run(
     )
     print(f"constrained       : {constrained}")
 
+    ensure_loaded(["intentframe_native_bundles"])
     engine = AIOnboardingEngine(verbose=True)
     return await engine.onboard(
         capabilities=capabilities,

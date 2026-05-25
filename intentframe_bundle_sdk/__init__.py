@@ -34,6 +34,11 @@ from intentframe_bundle_sdk.registry import (
     routed_domain_ids,
     validate_policy_domain_constraints,
 )
+from intentframe_bundle_sdk.constraints import (
+    describe_action_constraints,
+    describe_action_constraints_from_policy,
+    describe_permission_constraints,
+)
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.audit_dump import (
     audit_dump,
@@ -67,6 +72,9 @@ __all__ = [
     "BundlePhaseOutcome",
     "ConstraintPromptContext",
     "EnrichmentRecord",
+    "describe_action_constraints",
+    "describe_action_constraints_from_policy",
+    "describe_permission_constraints",
     "DeterministicRunner",
     "DomainBundle",
     "ensure_loaded",
