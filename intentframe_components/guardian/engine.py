@@ -34,8 +34,8 @@ from agents import Agent, ModelSettings, Runner
 
 from intentframe_core.types import (
     AnalysisReport,
-    ExecutionContext,
     IntentFrame,
+    RuntimeContextForLLM,
     UserContext,
     ValidationResult,
 )
@@ -47,6 +47,7 @@ from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
 from intentframe_components.prompt.logging import log_output_dump, log_prompt_dump
 from intentframe_components.prompt.roles import GUARDIAN_ROLE
+from intentframe_components.prompt.runtime_context import merge_runtime_context_sections
 from intentframe_prompt_library.library import DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS
 from policy_registry.models import ActionPermission
 
@@ -191,7 +192,7 @@ class AIGuardian(Guardian):
         user_context: UserContext,
         *,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
         bundle_context: BundleContext | None = None,
         bundle_ai_context: BundleAIContext | None = None,
     ) -> ValidationResult:
@@ -242,7 +243,7 @@ class AIGuardian(Guardian):
         prompt = self._build_validation_prompt(
             intent, analysis, user_context, permission,
             active_domains=active_domains,
-            execution_context=execution_context,
+            runtime_context_for_llm=runtime_context_for_llm,
             bundle_ai_context=ai_ctx,
         )
 
@@ -302,7 +303,7 @@ class AIGuardian(Guardian):
         user_context: UserContext,
         permission: ActionPermission,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
         bundle_ai_context: BundleAIContext | None = None,
     ) -> str:
         """Build a hardened prompt for the AI guardian.
@@ -396,14 +397,7 @@ class AIGuardian(Guardian):
         ]
         trusted_sections["Policy Context"] = "\n".join(policy_lines)
 
-        if execution_context and execution_context.executor_running_as_root:
-            trusted_sections["Execution Privilege"] = (
-                "The executor is running as root (uid=0). All commands execute "
-                "with full root privileges. Apply heightened scrutiny — filesystem "
-                "modifications affect the entire system, not just the user's home "
-                "directory. The agent should never need sudo; its presence in a "
-                "command is itself a red flag."
-            )
+        merge_runtime_context_sections(trusted_sections, runtime_context_for_llm)
 
         if user_context.intent_limits:
             limit_lines: list[str] = []

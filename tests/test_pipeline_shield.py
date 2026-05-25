@@ -341,8 +341,8 @@ class TestPipelineEdgeCases:
 # ExecutionContext plumbing
 # ═══════════════════════════════════════════════════════════════════════
 
-class TestExecutionContextPlumbing:
-    """ExecutionContext is threaded through to analyze and validate."""
+class TestRuntimeContextPlumbing:
+    """Rendered runtime context sections are passed to analyze and validate."""
 
     def _make_root_runtime(self) -> IntentFrameRuntime:
         root_ctx = ExecutionContext(
@@ -374,34 +374,33 @@ class TestExecutionContextPlumbing:
 
         return runtime
 
-    def test_analyze_receives_execution_context(self):
+    def test_analyze_receives_runtime_context_for_llm(self):
         runtime = self._make_root_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        ctx = call_kwargs.kwargs.get("execution_context")
-        assert ctx is not None
-        assert ctx.executor_running_as_root is True
-        assert ctx.executor_euid == 0
+        sections = call_kwargs.kwargs.get("runtime_context_for_llm")
+        assert sections
+        assert sections[0].label == "Execution Privilege"
+        assert "running as root" in sections[0].content
 
-    def test_validate_receives_execution_context(self):
+    def test_validate_receives_runtime_context_for_llm(self):
         runtime = self._make_root_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.guardian.validate.call_args
-        ctx = call_kwargs.kwargs.get("execution_context")
-        assert ctx is not None
-        assert ctx.executor_running_as_root is True
+        sections = call_kwargs.kwargs.get("runtime_context_for_llm")
+        assert sections
+        assert sections[0].label == "Execution Privilege"
+        assert "running as root" in sections[0].content
 
-    def test_default_execution_context_is_non_root(self):
+    def test_default_runtime_context_for_llm_is_empty(self):
         runtime = _make_runtime()
         _run(runtime.process_intent(_intent(CMD_UNDECIDED), _user_context()))
 
         call_kwargs = runtime.analysis_engine.analyze.call_args
-        ctx = call_kwargs.kwargs.get("execution_context")
-        assert ctx is not None
-        assert ctx.executor_running_as_root is False
-        assert ctx.executor_euid == -1
+        sections = call_kwargs.kwargs.get("runtime_context_for_llm")
+        assert sections == ()
 
     def test_execution_context_is_frozen(self):
         ctx = ExecutionContext(executor_running_as_root=True, executor_uid=0, executor_euid=0)

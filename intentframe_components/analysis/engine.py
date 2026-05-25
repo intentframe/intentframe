@@ -20,8 +20,8 @@ from agents import Agent, ModelSettings, Runner
 from intentframe_core.types import (
     AnalysisReport,
     IntentSignal,
-    ExecutionContext,
     IntentFrame,
+    RuntimeContextForLLM,
 )
 from intentframe_core.enums import Reversibility, RiskLevel
 from intentframe_bundle_sdk.types import (
@@ -35,6 +35,7 @@ from intentframe_components.prompt import format_intent_data
 from intentframe_components.prompt.hardening import PromptHardening
 from intentframe_components.prompt.logging import log_output_dump, log_prompt_dump
 from intentframe_components.prompt.roles import ANALYSIS_ENGINE_ROLE
+from intentframe_components.prompt.runtime_context import merge_runtime_context_sections
 from intentframe_prompt_library.library import DEFAULT_AE_SYSTEM_INSTRUCTIONS
 import logging
 
@@ -156,7 +157,7 @@ class AIAnalysisEngine(AnalysisEngine):
         intent: IntentFrame,
         *,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
         bundle_context: BundleContext | None = None,
         bundle_ai_context: BundleAIContext | None = None,
     ) -> AnalysisReport:
@@ -178,7 +179,7 @@ class AIAnalysisEngine(AnalysisEngine):
             intent,
             ai_ctx,
             active_domains=active_domains,
-            execution_context=execution_context,
+            runtime_context_for_llm=runtime_context_for_llm,
         )
 
         system_instructions = self._resolve_system_instructions(ai_ctx)
@@ -244,7 +245,7 @@ class AIAnalysisEngine(AnalysisEngine):
         bundle_ai_context: BundleAIContext,
         *,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
     ) -> str:
         """Build hardened per-request prompt; bundle supplies external Context text."""
         context_lines = [
@@ -269,14 +270,7 @@ class AIAnalysisEngine(AnalysisEngine):
                 "domains you observe."
             )
 
-        if execution_context and execution_context.executor_running_as_root:
-            trusted_sections["Execution Privilege"] = (
-                "The executor is running as root (uid=0). All commands execute "
-                "with full root privileges. Assess blast radius accordingly — "
-                "even benign-looking commands can cause system-wide damage when "
-                "run as root. The agent should never use sudo; if sudo appears "
-                "in the command, flag it as a hidden behavior."
-            )
+        merge_runtime_context_sections(trusted_sections, runtime_context_for_llm)
 
         untrusted = {"Target": intent.target, "Reason": intent.reason}
         data_section = format_intent_data(intent.data)

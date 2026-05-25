@@ -15,12 +15,12 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, ModelSettings, Runner
 
-from intentframe_core.types import AgentCapabilities, ExecutionContext, RuntimeContext, UserContext
+from intentframe_core.types import AgentCapabilities, RuntimeContext, RuntimeContextForLLM, UserContext
 from intentframe_components.onboarding.base import OnboardingEngine
 from intentframe_components.prompt.logging import log_prompt_dump
+from intentframe_components.prompt.runtime_context import append_runtime_context_sections
 from intentframe_native_bundles.onboarding import (
     build_onboarding_instructions,
-    root_execution_environment_section,
     summarize_constraints_for_onboarding,
     summarize_deny_capabilities,
 )
@@ -107,12 +107,13 @@ class AIOnboardingEngine(OnboardingEngine):
         self,
         capabilities: AgentCapabilities,
         user_context: UserContext,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
     ) -> RuntimeContext:
         """Perform AI-powered handshake to generate agent context."""
         prompt = self._build_onboarding_prompt(
-            capabilities, user_context,
-            execution_context=execution_context,
+            capabilities,
+            user_context,
+            runtime_context_for_llm=runtime_context_for_llm,
         )
 
         if self.verbose:
@@ -134,7 +135,7 @@ class AIOnboardingEngine(OnboardingEngine):
         self,
         capabilities: AgentCapabilities,
         user_context: UserContext,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
     ) -> str:
         """Build the prompt for the AI agent."""
 
@@ -182,8 +183,7 @@ Custom User Rules:
             for key, value in user_context.metadata.items():
                 prompt += f"  - {key}: {value}\n"
 
-        if execution_context and execution_context.executor_running_as_root:
-            prompt += root_execution_environment_section()
+        prompt = append_runtime_context_sections(prompt, runtime_context_for_llm)
 
         prompt += """
 

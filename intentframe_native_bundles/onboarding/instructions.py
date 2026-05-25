@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from action_registry.types import ActionType
-
 from intentframe_native_bundles.onboarding.guardrail_sections import (
     guardrail_generation_sections,
 )
@@ -11,7 +9,6 @@ from intentframe_native_bundles.onboarding.guardrail_sections import (
 
 def build_onboarding_instructions() -> str:
     """System instructions for the onboarding meta-LLM."""
-    run_command = ActionType.RUN_COMMAND.value
     sections = guardrail_generation_sections()
     return f"""You are the Onboarding Engine in IntentFrame. Your job is to generate appropriate context and guardrails for AI agents before they start working.
 
@@ -47,19 +44,3 @@ For each action type the agent can use, generate appropriate guardrails:
 - warnings: Only if there are genuine risks (empty list is fine)
 - confidence: How well you understand this agent type (0.0-1.0)
 - summary: One sentence about what you set up"""
-
-
-def root_execution_environment_section() -> str:
-    """Prompt fragment when the executor runs as root."""
-    run_command = ActionType.RUN_COMMAND.value
-    return f"""
-## EXECUTION ENVIRONMENT
-
-The executor is running as root (uid=0).
-All commands this agent issues via {run_command} will execute with full root privileges.
-The agent must NOT use sudo — commands already run as root.
-Generate guardrails that reflect this elevated privilege level:
-- Explicitly tell the agent its commands run with root privileges.
-- Explicitly tell the agent to never use sudo.
-- Warn that filesystem operations affect the entire system.
-"""

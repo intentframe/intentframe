@@ -53,7 +53,6 @@ if str(_REPO_ROOT) not in sys.path:
 
 from intentframe_core.types import (  # noqa: E402
     AgentCapabilities,
-    ExecutionContext,
     RuntimeContext,
     UserContext,
 )
@@ -313,8 +312,6 @@ async def _run(
     user_context: UserContext,
     capabilities: AgentCapabilities,
 ) -> RuntimeContext:
-    execution_context = ExecutionContext()
-
     caps_fs = sorted(set(capabilities.action_types) & FS_FILE_ACTIONS)
     policy_fs = sorted(set(user_context.allowed_actions) & FS_FILE_ACTIONS)
 
@@ -335,7 +332,6 @@ async def _run(
     return await engine.onboard(
         capabilities=capabilities,
         user_context=user_context,
-        execution_context=execution_context,
     )
 
 

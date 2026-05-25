@@ -5,6 +5,7 @@ All models used to pass information between layers.
 Pydantic BaseModel for automatic JSON serialization over HTTP.
 """
 
+from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -145,6 +146,17 @@ class UserContext(BaseModel):
     intent_limits: List[SemanticIntentLimit] = Field(default_factory=list)
     domain_constraints: Dict[str, dict[str, Any]] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class LLMContextSection:
+    """One trusted prompt section; label maps to <trusted_context source=\"...\">."""
+
+    label: str
+    content: str
+
+
+RuntimeContextForLLM = tuple[LLMContextSection, ...]
 
 
 class ExecutionContext(BaseModel):

@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 
 from intentframe_core.types import (
     AnalysisReport,
-    ExecutionContext,
     IntentFrame,
+    RuntimeContextForLLM,
     UserContext,
     ValidationResult,
 )
@@ -27,7 +27,7 @@ class Guardian(ABC):
         user_context: UserContext,
         *,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
         bundle_context: BundleContext | None = None,
         bundle_ai_context: BundleAIContext | None = None,
     ) -> ValidationResult:

@@ -48,6 +48,12 @@ from intentframe_components.guardian import (
 )
 from intentframe_components.executor import Executor
 from intentframe_components.onboarding import OnboardingEngine
+from intentframe_server.runtime_context_for_llms import (
+    SubstrateContext,
+    analysis_runtime_context_for_llm,
+    guardian_runtime_context_for_llm,
+    onboarding_runtime_context_for_llm,
+)
 from policy_registry.client import PolicyRegistryClient
 from resource_registry.client import ResourceRegistryClient
 
@@ -147,6 +153,9 @@ class IntentFrameRuntime:
         self.guardian = guardian
         self.executor = executor
         self._execution_context = execution_context or ExecutionContext()
+        self._substrate_contexts = (
+            SubstrateContext(execution=self._execution_context),
+        )
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
         self._resource_client = resource_client or ResourceRegistryClient()
@@ -437,8 +446,11 @@ class IntentFrameRuntime:
                 print(f"    ╚══════════════════════════════════════════════════════════╝")
             
             context = await self.onboarding_engine.onboard(
-                capabilities, user_context,
-                execution_context=self._execution_context,
+                capabilities,
+                user_context,
+                runtime_context_for_llm=onboarding_runtime_context_for_llm(
+                    self._substrate_contexts
+                ),
             )
             context.virtual_paths = virtual_paths
             context.path_permissions = path_permissions
@@ -654,7 +666,9 @@ class IntentFrameRuntime:
             analysis = await self.analysis_engine.analyze(
                 intent,
                 active_domains=active_domains,
-                execution_context=self._execution_context,
+                runtime_context_for_llm=analysis_runtime_context_for_llm(
+                    self._substrate_contexts
+                ),
                 bundle_context=det_result.bundle_context,
                 bundle_ai_context=bundle_ai_context,
             )
@@ -689,7 +703,9 @@ class IntentFrameRuntime:
                 analysis,
                 user_context,
                 active_domains=active_domains,
-                execution_context=self._execution_context,
+                runtime_context_for_llm=guardian_runtime_context_for_llm(
+                    self._substrate_contexts
+                ),
                 bundle_context=det_result.bundle_context,
                 bundle_ai_context=bundle_ai_context,
             )

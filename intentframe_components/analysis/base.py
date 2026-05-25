@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 
 from intentframe_core.types import (
     AnalysisReport,
-    ExecutionContext,
     IntentFrame,
+    RuntimeContextForLLM,
 )
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 
@@ -28,7 +28,7 @@ class AnalysisEngine(ABC):
         intent: IntentFrame,
         *,
         active_domains: set[str] | None = None,
-        execution_context: ExecutionContext | None = None,
+        runtime_context_for_llm: RuntimeContextForLLM = (),
         bundle_context: BundleContext | None = None,
         bundle_ai_context: BundleAIContext | None = None,
     ) -> AnalysisReport:
