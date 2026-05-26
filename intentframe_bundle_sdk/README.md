@@ -346,6 +346,8 @@ When bundle-runtime becomes a separate UDS process (see
 `policy_registry/TODO/bundle_validator.md`), this log moves with that process;
 `BundleDeterministicResult` stays unchanged.
 
+Full querying guide: [docs/tracing_guide.md](docs/tracing_guide.md).
+
 ---
 
 ## Testing
@@ -375,6 +377,7 @@ uv run pytest tests/test_bundle_sdk_invariants.py tests/test_bundle_loader.py \
 
 ## Related documentation
 
+- [docs/tracing_guide.md](docs/tracing_guide.md) — read and query `bundle-sdk.log` (pretty JSON, per-intent traces, test runs)
 - [docs/dev/action-family-wiring.md](../docs/dev/action-family-wiring.md) — checklist for adding action families
 - [docs/_internal_/substrate-plugin-refactor.md](../docs/_internal_/substrate-plugin-refactor.md) — refactor narrative and outcomes
 - [docs/modules.md](../docs/modules.md) — workspace module map
