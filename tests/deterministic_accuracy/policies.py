@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Callable
 
 from intentframe_core.types import UserContext
-from intentframe_gateway.bootstrap import (
+from intentframe_native_bundles.actions.terminal.capabilities import (
     DEFAULT_TERMINAL_DENY_CAPABILITIES,
     PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
 )
@@ -111,7 +111,7 @@ def python_shell_only() -> UserContext:
     """Python/shell command profile plus the sensitive-surface clamp.
 
     Pulls the canonical deny set from
-    :data:`intentframe_gateway.bootstrap.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+    :data:`intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
     (union of :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` and
     :data:`SENSITIVE_SURFACE_DENY_CAPABILITIES`) so the accuracy corpus
     automatically tracks future changes to the default deny set.

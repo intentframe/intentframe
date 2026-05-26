@@ -236,7 +236,7 @@ RUN_COMMAND:
 `blocked_patterns` are direct string-level hard blocks.
 
 `deny_capabilities` are command-shield capability tags. The default list is
-mirrored from `policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+mirrored from `intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
 and pinned by tests. If you change the default deny surface in the codebase,
 update the capability constant first and keep the YAML parity test passing.
 

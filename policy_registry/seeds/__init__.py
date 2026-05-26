@@ -26,18 +26,10 @@ Public API
 * :func:`resolve_seed_path` — first-existing of override path → caller-supplied builtin.
 * :func:`override_path` — absolute path to ``~/.intentframe/policies/<agent_id>.yaml``.
 * :class:`PolicySchemaVersionError` — raised on missing/stale schema version.
-
-Capability constants live in :mod:`policy_registry.seeds.capabilities`
-and are re-exported here for convenience.
 """
 
 from __future__ import annotations
 
-from policy_registry.seeds.capabilities import (
-    DEFAULT_TERMINAL_DENY_CAPABILITIES,
-    PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
-    SENSITIVE_SURFACE_DENY_CAPABILITIES,
-)
 from policy_registry.seeds.loader import (
     PolicySchemaVersionError,
     load_policy_seed,
@@ -51,11 +43,8 @@ from policy_registry.seeds.resolver import (
 )
 
 __all__ = [
-    "DEFAULT_TERMINAL_DENY_CAPABILITIES",
     "OVERRIDE_DIR",
-    "PYTHON_SHELL_ONLY_DENY_CAPABILITIES",
     "PolicySchemaVersionError",
-    "SENSITIVE_SURFACE_DENY_CAPABILITIES",
     "load_policy_seed",
     "override_path",
     "resolve_agent_id",
