@@ -8,9 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class RecipientSource(BaseModel):
     """A dynamic source of allowed recipients.
 
-    Sources are resolved by the Policy Registry at serve time into
-    concrete email addresses, then merged with allowed_recipients.
-    Guardian only ever sees the resolved flat list.
+    Stored opaquely in the policy registry; resolved at runtime by
+    ``EmailActionBundle.enforce_constraints`` into concrete email
+    addresses, then merged with ``allowed_recipients``.
 
     Attributes:
         source: Source type — "contacts_all", "contacts_group".
@@ -32,7 +32,7 @@ class EmailConstraints(BaseModel):
         allowed_recipients: Email address patterns for outbound emails.
             e.g. ["*@mycompany.com", "bob@partner.org"]
             Only relevant for SEND_EMAIL. Read/search are unconstrained.
-        recipient_sources: Dynamic sources resolved at policy-serve time.
+        recipient_sources: Dynamic sources resolved at runtime by the email bundle.
     """
 
     model_config = ConfigDict(frozen=True)

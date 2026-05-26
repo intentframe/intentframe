@@ -45,6 +45,7 @@ intentframe_bundle_sdk/
   loader.py              ensure_loaded, validate_policy_against_registry
   runner.py              DeterministicRunner — fixed gate order
   lifecycle.py           startup_bundles, shutdown_bundles
+  trace.py               Internal lifecycle audit log (bundle-sdk.log)
   audit_dump.py          JSON-safe context serialization for audit logs
   onboarding.py          render_onboarding_bundle_context — middle-section assembly
   onboarding_manifest.py OnboardingManifest — cross-bundle onboarding sections
@@ -71,7 +72,9 @@ validate_policy_against_registry(user_policy)
 - Requires `register_bundles(registry)` — importing a plugin package must **not** register bundles as a side effect.
 
 `validate_policy_against_registry()` fails closed when policy references actions or
-domains that cannot be enforced at runtime.
+domains that cannot be enforced at runtime. Each `validate_constraints` and
+`DomainBundle.validate` call is recorded in the internal trace log (see
+[Lifecycle trace](#lifecycle-trace-internal-audit)).
 
 Runtime shutdown (typically from `IntentFrameRuntime.aclose()`):
 
@@ -285,6 +288,68 @@ not dispatch into per-family checkers or re-read constraint schemas.
 
 ---
 
+## Lifecycle trace (internal audit)
+
+The SDK maintains its **own** forensic log, separate from substrate audit entries
+and from `BundleDeterministicResult`. Callers of the runner never receive trace
+data on the wire; an auditor reads the bundle-runtime process log directly.
+
+**Log file:** `~/.intentframe/logs/bundle-sdk.log` (or `$INTENTFRAME_LOG_DIR` /
+`configure_trace_logging(log_dir)` when redirected, e.g. in tests).
+
+Each hook invocation (or deliberate skip) emits one minified JSON line via the
+`bundle_sdk.trace` logger. Records capture the **full function frame** — every
+positional and keyword argument bound by name through `inspect.signature`, plus
+the audit-dumped return value. No curated field lists; new hook parameters show
+up automatically.
+
+Example record:
+
+```json
+{"ts": "2026-05-26T08:30:00Z", "lane": "runtime", "trace_id": "jarvis:abc123:7:email",
+ "phase": "enrich", "skipped": false, "skipped_reason": null, "elapsed_ms": 1.234,
+ "inputs": {"intent": {...}, "action_permission": {...}, "ctx": {...}, "verbose": false},
+ "output": {"decision": "CONTINUE", "context": {...}, ...}, "raised": null, "terminal": false}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `lane` | Which lifecycle lane (see below) |
+| `trace_id` | Correlates related records (per-intent, per-boot action, per-bundle lifecycle, …) |
+| `phase` | Hook name or synthetic phase (e.g. `domain_enforce:finance`, `domain_describe:finance`) |
+| `skipped` | `true` when the runner chose not to call the hook |
+| `inputs` / `output` | Full audit-dumped args and return value |
+| `raised` | `repr(exc)` when the hook raised |
+| `terminal` | `true` when the hook produced the final BLOCK/ALLOW that stopped the runner |
+
+### Lanes
+
+| Lane | When | Hooks traced |
+|------|------|--------------|
+| `boot` | Policy seed load | `ActionBundle.validate_constraints`, `DomainBundle.validate` |
+| `lifecycle` | Server start / shutdown | `startup`, `aclose` on every registered bundle |
+| `handshake` | Onboarding prompt assembly | `onboarding_guardrails` |
+| `runtime` | Per intent in `DeterministicRunner` | All runner hooks below, plus skips for omitted phases |
+
+Runtime lane covers: `prepare_evidence`, `enrich`, `enforce_constraints` (or skip
+when no constraints), `domain_enforce:{id}`, `structural_gates`,
+`_try_passive_read_allow`, `allow_gates`, `describe_constraints`,
+`domain_describe:{id}`, `build_ai_context`.
+
+Implementation lives in `trace.py` (`traced_call`, `traced_acall`, `emit_skip`).
+Only SDK-internal modules call these helpers. The public surface for integrators
+is `configure_trace_logging()` — re-exported from `intentframe_bundle_sdk` to
+point the log at a custom directory. Trace helpers are not part of the stable
+plugin author API.
+
+When bundle-runtime becomes a separate UDS process (see
+`policy_registry/TODO/bundle_validator.md`), this log moves with that process;
+`BundleDeterministicResult` stays unchanged.
+
+Full querying guide: [docs/tracing_guide.md](docs/tracing_guide.md).
+
+---
+
 ## Testing
 
 | Test file | What it guards |
@@ -296,6 +361,7 @@ not dispatch into per-family checkers or re-read constraint schemas.
 | `tests/test_boundary_imports.py` | Substrate must not import plugin modules |
 | `tests/native_bundles/test_email_bundle_lifecycle.py` | Instance-owned client + `aclose` |
 | `tests/test_runtime_email_lifecycle_integration.py` | Full registry shutdown path |
+| `tests/test_bundle_sdk_trace.py` | Trace log format, terminal markers, boot/runtime hook coverage |
 | `tests/test_onboarding_sdk.py` | `render_onboarding_bundle_context`, manifest sections |
 | `tests/test_onboarding_constraint_summary.py` | Meta-prompt contract, `_summarize_intent_limits` |
 
@@ -303,13 +369,15 @@ Run SDK-focused tests:
 
 ```bash
 uv run pytest tests/test_bundle_sdk_invariants.py tests/test_bundle_loader.py \
-              tests/test_bundle_lifecycle.py tests/test_deterministic_gate_matrix.py -v
+              tests/test_bundle_lifecycle.py tests/test_bundle_sdk_trace.py \
+              tests/test_deterministic_gate_matrix.py -v
 ```
 
 ---
 
 ## Related documentation
 
+- [docs/tracing_guide.md](docs/tracing_guide.md) — read and query `bundle-sdk.log` (pretty JSON, per-intent traces, test runs)
 - [docs/dev/action-family-wiring.md](../docs/dev/action-family-wiring.md) — checklist for adding action families
 - [docs/_internal_/substrate-plugin-refactor.md](../docs/_internal_/substrate-plugin-refactor.md) — refactor narrative and outcomes
 - [docs/modules.md](../docs/modules.md) — workspace module map

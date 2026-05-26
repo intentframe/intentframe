@@ -14,6 +14,7 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
 import re
 from unittest.mock import patch
 
@@ -375,8 +376,10 @@ class TestAnalysisEnginePrompt:
         bundle_ctx = BundleContext(intent=intent)
         if signals:
             bundle_ctx.evidence[TERMINAL_COMMAND_SIGNALS_KEY] = tuple(signals)
-        ai_ctx = TerminalActionBundle().build_ai_context(
-            intent, SdkActionPermission(safe=True), bundle_ctx
+        ai_ctx = asyncio.run(
+            TerminalActionBundle().build_ai_context(
+                intent, SdkActionPermission(safe=True), bundle_ctx
+            )
         )
         engine = AIAnalysisEngine.__new__(AIAnalysisEngine)
         engine._hardener = PromptHardening()

@@ -9,9 +9,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from action_registry.types import ActionType
-from intentframe_bundle_sdk.types import BundleContext
+from intentframe_bundle_sdk.types import ActionPermission, BundleContext
 from intentframe_core.types import IntentFrame
 from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+
+_NO_PERM = ActionPermission(safe=True)
 
 
 def _reply_intent(message_id: str = "<test@example.com>") -> IntentFrame:
@@ -42,7 +44,7 @@ async def test_aclose_closes_client_after_enrich() -> None:
     ):
         bundle = EmailActionBundle()
         ctx = BundleContext(intent=_reply_intent())
-        await bundle.enrich(_reply_intent(), ctx)
+        await bundle.enrich(_reply_intent(), _NO_PERM, ctx)
         await bundle.aclose()
 
     mock_client.close.assert_awaited_once()
@@ -60,7 +62,7 @@ async def test_aclose_is_idempotent() -> None:
     ):
         bundle = EmailActionBundle()
         ctx = BundleContext(intent=_reply_intent())
-        await bundle.enrich(_reply_intent(), ctx)
+        await bundle.enrich(_reply_intent(), _NO_PERM, ctx)
         await bundle.aclose()
         await bundle.aclose()
 
@@ -87,6 +89,7 @@ async def test_concurrent_enrich_shares_one_client() -> None:
             *(
                 bundle.enrich(
                     intent,
+                    _NO_PERM,
                     BundleContext(intent=intent),
                 )
                 for intent in intents
@@ -109,8 +112,8 @@ async def test_enrich_after_aclose_raises() -> None:
         bundle = EmailActionBundle()
         intent = _reply_intent()
         ctx = BundleContext(intent=intent)
-        await bundle.enrich(intent, ctx)
+        await bundle.enrich(intent, _NO_PERM, ctx)
         await bundle.aclose()
 
         with pytest.raises(RuntimeError, match="closed"):
-            await bundle.enrich(intent, ctx)
+            await bundle.enrich(intent, _NO_PERM, ctx)

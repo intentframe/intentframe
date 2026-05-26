@@ -101,7 +101,7 @@ def verify_user_prompt(user_prompt: str, expected: str) -> CheckResult:
     )
 
 
-def run_checks() -> list[CheckResult]:
+async def run_checks() -> list[CheckResult]:
     if not SYSTEM_COMMON_TOP_PATH.is_file():
         raise FileNotFoundError(
             f"missing {SYSTEM_COMMON_TOP_PATH.relative_to(REPO_ROOT)} — "
@@ -110,7 +110,7 @@ def run_checks() -> list[CheckResult]:
 
     user_context = build_jarvis_user_context()
     capabilities = build_jarvis_capabilities()
-    system_prompt, user_prompt = build_onboarding_prompts(
+    system_prompt, user_prompt = await build_onboarding_prompts(
         user_context=user_context,
         capabilities=capabilities,
     )
@@ -167,9 +167,9 @@ def write_report(results: list[CheckResult]) -> None:
     REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> int:
+async def main() -> int:
     try:
-        results = run_checks()
+        results = await run_checks()
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -191,4 +191,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import asyncio as _asyncio
+    raise SystemExit(_asyncio.run(main()))

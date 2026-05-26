@@ -4,6 +4,18 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Non-negotiable system-level floor.  These patterns are always checked
+# regardless of what the user's policy specifies.  Users may add their own
+# blocked_patterns but cannot remove these.
+SYSTEM_TERMINAL_BLOCKED_PATTERNS: tuple[str, ...] = (
+    "sudo",
+    "rm -rf /",
+    "mkfs",
+    "dd if=",
+    "> /dev/",
+    "chmod 777",
+)
+
 
 class TerminalConstraints(BaseModel):
     """Command-pattern constraints for terminal/shell actions.

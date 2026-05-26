@@ -341,7 +341,7 @@ immediately.
   exhaustive set. A novel command that tricks the classifier into
   emitting `read_only:*` would not be caught unless we add it here.
 - **Policy merging.** Profiles embed a small static floor. The merge
-  with `SYSTEM_TERMINAL_BLOCKED_PATTERNS` from the registry is covered
+  with `SYSTEM_TERMINAL_BLOCKED_PATTERNS` from the terminal bundle is covered
   in `tests/test_terminal_blocklist.py`.
 
 ---
@@ -398,7 +398,7 @@ Two-stage algorithmic failure:
    structural signals include `command-substitution`. Correct behavior —
    the classifier can't know what `$(echo pip)` evaluates to.
 2. DG's gates skip on empty caps: in
-   [`checkers/terminal.py:56`](../../intentframe_components/guardian/checkers/terminal.py#L56),
+   [`intentframe_native_bundles/actions/terminal/bundle.py`](../../intentframe_native_bundles/actions/terminal/bundle.py),
    the guard `if constraints.deny_capabilities and capabilities:` makes
    the deny check a no-op when `capabilities` is an empty tuple. Same
    for `allow_capabilities`.

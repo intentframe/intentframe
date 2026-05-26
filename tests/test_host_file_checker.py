@@ -14,6 +14,7 @@ per-action allowlist.  Floor interactions are covered in
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -47,14 +48,14 @@ def _enforce(
 ) -> tuple[bool, str]:
     intent = _intent(target, action=action)
     ctx = BundleContext(intent=intent.model_copy(deep=True))
-    outcome = _BUNDLE.enforce_constraints(
+    outcome = asyncio.run(_BUNDLE.enforce_constraints(
         intent,
         ActionPermission(
             safe=False,
             constraints=constraints.model_dump(mode="python"),
         ),
         ctx,
-    )
+    ))
     if outcome.decision is PhaseDecision.BLOCK:
         return False, outcome.reason
     return True, ""
@@ -123,12 +124,12 @@ class TestDenyMatching:
 class TestDescribe:
     def test_describe_returns_human_readable(self):
         c = HostFileConstraints(allowed_host_paths=["~/Documents/*", "~/Downloads/*"])
-        summary = _BUNDLE.describe_constraints(
+        summary = asyncio.run(_BUNDLE.describe_constraints(
             ActionPermission(
                 safe=False,
                 constraints=c.model_dump(mode="python"),
             )
-        )
+        ))
         assert summary is not None
         assert "~/Documents/*" in summary
         assert "~/Downloads/*" in summary

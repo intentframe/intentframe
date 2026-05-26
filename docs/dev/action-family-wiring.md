@@ -145,7 +145,7 @@ These are the files that **must** stay in sync but have no compiler-enforced rel
 |---|---|---|
 | `jarvis_pa/jarvis/policies/jarvis.yaml::allowed_actions` ↔ `ActionType` enum | YAML missing new actions | Handshake total count is lower than enum size; agent sees tool, policy denies at runtime |
 | `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` ↔ `tools.py::ALL_TOOLS` | Agent advertises fewer actions than it can call | Onboarding prompt has no guardrails for the missing actions; agent still calls them, no policy-side guidance |
-| `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
+| `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
 | `executor.yaml::host_files.allowed_write_paths` ↔ `jarvis.yaml::READ_HOST_FILE.constraints.allowed_host_paths` | Adapter ceiling and policy allowlist disagree | "Guardian approved, executor refused" inconsistency, and vice versa |
 | `passive_read_action_ids` on bundle ↔ policy `safe: true` | Passive-read list out of sync with policy | Read action pays full AE when it should ALLOW deterministically, or vice versa |
 | `DENY_WRITE_PREFIXES` ↔ canonicalizer used by that family | Deny list stores canonical form, checker compares raw form (or vice versa) | `/etc/sudoers` blocked but `/private/etc/sudoers` allowed, or similar macOS-only asymmetries |

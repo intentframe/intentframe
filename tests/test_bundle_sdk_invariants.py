@@ -199,7 +199,7 @@ def test_mutation_safety_constraints_not_shared_with_host(
     )
     original_snapshot = dict(host_constraints)
 
-    def _mutating_enforce(self, intent, action_permission, ctx, *, verbose=False):
+    async def _mutating_enforce(self, intent, action_permission, ctx, *, verbose=False):
         if action_permission.constraints is not None:
             action_permission.constraints["allowed_paths"] = ["/mutated"]
         return BundlePhaseOutcome.continue_(ctx)
@@ -223,9 +223,9 @@ def test_undecided_populates_constraint_context_and_calls_describe_once(
     bundle = FilesActionBundle()
     original = bundle.describe_constraints
 
-    def counting_describe(action_permission):
+    async def counting_describe(action_permission):
         calls["count"] += 1
-        return original(action_permission)
+        return await original(action_permission)
 
     monkeypatch.setattr(bundle, "describe_constraints", counting_describe)
 
@@ -340,7 +340,10 @@ def test_missing_describe_falls_back_to_str_constraints(
 ) -> None:
     bundle = FilesActionBundle()
     constraints = {"allowed_paths": ["/tmp/*"]}
-    monkeypatch.setattr(bundle, "describe_constraints", lambda _perm: None)
+    async def _null_describe(_perm):
+        return None
+
+    monkeypatch.setattr(bundle, "describe_constraints", _null_describe)
 
     intent = IntentFrame(
         action=ActionType.WRITE_FILE,
@@ -421,11 +424,11 @@ def test_structural_gates_before_passive_read_before_allow_gates(
     order: list[str] = []
     bundle = FilesActionBundle()
 
-    def track_structural(self, intent, ctx):
+    async def track_structural(self, intent, ctx, **_kw):
         order.append("structural")
         return BundlePhaseOutcome.continue_(ctx)
 
-    def track_allow(self, intent, action_permission, ctx):
+    async def track_allow(self, intent, action_permission, ctx, **_kw):
         order.append("allow")
         return BundlePhaseOutcome.continue_(ctx)
 

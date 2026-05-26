@@ -20,7 +20,7 @@ The important pieces are:
 
 - `jarvis_pa/jarvis/policies/jarvis.yaml`: packaged user-mode Jarvis policy.
 - `jarvis_pa/jarvis/policies/jarvis_root.yaml`: packaged root-demo Jarvis policy.
-- `policy_registry/seeds/loader.py`: YAML to validated `UserPolicy`.
+- `policy_registry/seeds/loader.py`: YAML → `UserPolicy` (opaque constraint dicts; bundle shape validation via `validate_policy_against_registry`).
 - `policy_registry/seeds/resolver.py`: resolves user override files under
   `~/.intentframe/policies/`.
 - `intentframe_gateway/bootstrap.py`: seeds Jarvis policy and workspace on
@@ -122,7 +122,7 @@ For Jarvis, `intentframe_gateway/bootstrap.py` resolves:
 2. User id: gateway identity config, with environment fallback.
 3. Agent id: `jarvis` for user mode or `jarvis_root` for root mode.
 4. YAML path: user override first, packaged policy second.
-5. Validated policy: `policy_registry.seeds.load_policy_seed(...)`.
+5. Validated policy: `policy_registry.seeds.load_policy_seed(...)` (registry fields + bundle constraint schemas).
 
 The bootstrapper then posts the policy into the policy registry.
 
@@ -236,7 +236,7 @@ RUN_COMMAND:
 `blocked_patterns` are direct string-level hard blocks.
 
 `deny_capabilities` are command-shield capability tags. The default list is
-mirrored from `policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+mirrored from `intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
 and pinned by tests. If you change the default deny surface in the codebase,
 update the capability constant first and keep the YAML parity test passing.
 
@@ -278,6 +278,11 @@ SEND_MESSAGE:
 To allow everyone in Contacts, enable the `contacts_all` source. To keep the
 policy narrow, leave contact sources disabled and list explicit recipients or
 contacts.
+
+`recipient_sources` and `contact_sources` are stored opaquely in the policy
+registry and resolved at runtime by the email and message bundles during
+`enforce_constraints` (via `intentframe_native_bundles/platform/contacts_client.py`).
+The registry does not expand contact lists at write time.
 
 ## Intent Limits
 

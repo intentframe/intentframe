@@ -32,7 +32,7 @@ class ApiActionBundle(ActionBundle):
         if action_permission.constraints is not None:
             ApiConstraints.model_validate(action_permission.constraints)
 
-    def enforce_constraints(
+    async def enforce_constraints(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -75,7 +75,7 @@ class ApiActionBundle(ActionBundle):
             )
         return BundlePhaseOutcome.continue_(ctx)
 
-    def describe_constraints(self, action_permission: ActionPermission) -> str | None:
+    async def describe_constraints(self, action_permission: ActionPermission) -> str | None:
         if action_permission.constraints is None:
             return None
         constraints = ApiConstraints.model_validate(action_permission.constraints)

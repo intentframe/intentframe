@@ -116,6 +116,7 @@ class DeterministicGuardian:
                 matched_gate=bundle_result.matched_gate,
                 decision_path=bundle_result.decision_path,
                 bundle_context=ctx,
+                dg_exception=bundle_result.dg_exception,
             )
         if bundle_result.decision == "ALLOW":
             return DeterministicResult(

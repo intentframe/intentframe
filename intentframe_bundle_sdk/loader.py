@@ -21,6 +21,7 @@ from intentframe_bundle_sdk.registry import (
     all_action_bundles,
     validate_policy_domain_constraints,
 )
+from intentframe_bundle_sdk.trace import traced_call
 from intentframe_bundle_sdk.types import action_permission_from_policy
 
 if TYPE_CHECKING:
@@ -88,7 +89,12 @@ def validate_policy_against_registry(policy: UserPolicy) -> None:
             continue
         bundle = action_bundle_for(action_id)
         assert bundle is not None
-        bundle.validate_constraints(action_permission_from_policy(perm))
+        traced_call(
+            bundle.validate_constraints, action_permission_from_policy(perm),
+            lane="boot",
+            trace_id=f"boot:{bundle.bundle_id}:{action_id}",
+            phase="validate_constraints",
+        )
 
     if policy.domain_constraints:
         validate_policy_domain_constraints(policy.domain_constraints)

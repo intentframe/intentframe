@@ -198,7 +198,12 @@ accuracy matrix reflects the real production profile.
 
 ### 8.3 Guardian wiring
 
-`TerminalChecker` already consumed `deny_capabilities` from
+> **Note (2026-05):** `TerminalChecker` (`guardian/checkers/terminal.py`) was
+> superseded by `TerminalActionBundle.enforce_constraints` in
+> `intentframe_native_bundles/actions/terminal/bundle.py`. The behavior
+> described below is unchanged; only the enforcement site moved.
+
+`TerminalActionBundle.enforce_constraints` already consumed `deny_capabilities` from
 `TerminalConstraints`; no code change there.  `DeterministicGuardian._is_read_only_fast_path`
 picked up belt-and-braces `startswith` checks for the two new families so even
 if the classifier regressed and a `read_only:*` tag slipped through alongside
@@ -209,7 +214,7 @@ route to the AE.
 
 For each of the nine failing intents we now observe, in offline end-to-end
 checks driven by the production classifier + production deny-set + production
-`TerminalChecker`:
+terminal bundle constraint enforcement:
 
 | # | Command | Capability tag | Guardian reason |
 | --- | --- | --- | --- |
@@ -239,7 +244,7 @@ These shapes are covered end-to-end by the DG accuracy matrix under neutral
 
 A classifier regression (wrong tag, or a sensitive surface silently regaining
 `read_only:*`) surfaces in `test_classifier_contract.py` first; a gate
-regression (wrong `TerminalChecker` decision for a correctly-tagged command)
+regression (wrong terminal bundle constraint decision for a correctly-tagged command)
 surfaces in `test_profile_matrix.py`.  Both narrow blame without chasing
 through the rest of the pipeline.
 

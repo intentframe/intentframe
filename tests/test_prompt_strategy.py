@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from action_registry.types import ActionType
 from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
@@ -78,7 +80,7 @@ class TestTerminalBundleAIContext:
     def test_run_command_returns_specialized_system_prompt(self):
         bundle = TerminalActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.RUN_COMMAND, "ls -la"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert ai_ctx.ae_system_instructions == _CRITICAL_RUN_COMMAND
         assert ai_ctx.ae_prompt_label == "critical_run_command"
 
@@ -95,7 +97,7 @@ class TestTerminalBundleAIContext:
             command_intel=_intel(),
             terminal_command_signals=signals,
         )
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert "TERMINAL COMMAND — STRUCTURAL SIGNALS" in ai_ctx.ae_external_context
         assert len(ai_ctx.ae_intent_signals) == 1
         assert ai_ctx.ae_intent_signals[0].check == "edge"
@@ -106,7 +108,7 @@ class TestFilesBundleAIContext:
     def test_write_file_returns_specialized_system_prompt(self):
         bundle = FilesActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.WRITE_FILE, "/tmp/x"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert ai_ctx.ae_system_instructions == _CRITICAL_WRITE_FILE
         assert ai_ctx.ae_prompt_label == "critical_write_file"
 
@@ -114,7 +116,7 @@ class TestFilesBundleAIContext:
         bundle = FilesActionBundle()
         fi = _file_intel(language="python", size_bytes=42)
         ctx = _bundle_ctx(_intent(ActionType.WRITE_FILE, "/tmp/x.py"), file_intel=fi)
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert "WRITE_FILE — PAYLOAD SIGNALS" in ai_ctx.ae_external_context
 
 
@@ -122,13 +124,13 @@ class TestHostFilesBundleAIContext:
     def test_write_host_file_returns_specialized_prompt(self):
         bundle = HostFilesActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.WRITE_HOST_FILE, "~/x.md"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert ai_ctx.ae_system_instructions == _CRITICAL_WRITE_FILE
 
     def test_delete_host_file_returns_empty_ai_context(self):
         bundle = HostFilesActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.DELETE_HOST_FILE, "~/x"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert ai_ctx.ae_system_instructions is None
         assert ai_ctx.ae_external_context == ""
 
@@ -139,7 +141,7 @@ class TestDefaultBundleAIContext:
 
         bundle = SpotlightActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.SEARCH_SPOTLIGHT, "query"))
-        ai_ctx = bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx)
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert ai_ctx.ae_system_instructions is None
         assert ai_ctx.ae_external_context == ""
         assert ai_ctx.guardian_system_instructions is None

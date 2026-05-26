@@ -36,7 +36,7 @@
 #   `tests/test_jarvis_host_scope_mirror.py`.
 #
 # * `RUN_COMMAND.constraints.deny_capabilities` MUST equal
-#   `sorted(policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES)`.
+#   `sorted(intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES)`.
 #   Pinned by `tests/test_seed_capability_parity.py`.  Edit the constant
 #   set in code, not the list here, when adding/removing surfaces.
 #

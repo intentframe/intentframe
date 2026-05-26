@@ -57,7 +57,7 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | The user's rules: which actions are allowed, with what constraints, with what intent limits. Plus a system-level blocked-pattern floor. |
+| **What** | The user's rules: which actions are allowed, with opaque constraint dicts and intent limits. Stores policy only — constraint shape validation, system safety floors, and dynamic contact resolution happen in action bundles at enforcement time. |
 | **Why** | Separates configuration from decision-making. The Guardian reads policies; it doesn't store them. This is also what closes the "compromised agent talks the Guardian into a policy exception" attack — there is no negotiation surface. |
 | **Where** | `policy_registry/` |
 | **Process** | `policy-registry` (uvicorn) on `~/.intentframe/run/policy-registry.sock`, started by the supervisor. |
@@ -94,7 +94,7 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `domains/<domain>/` (domain overlays), `domain_routes.py` (routing manifest), `onboarding/<family>/onboarding_guardrails.py` (per-bundle onboarding copy), `onboarding/manifest.py` (cross-bundle `OnboardingManifest`), `register_bundles(registry)` entry point. |
+| **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `domains/<domain>/` (domain overlays), `platform/contacts_client.py` (contact-based recipient resolution at enforce time), `domain_routes.py` (routing manifest), `onboarding/<family>/onboarding_guardrails.py` (per-bundle onboarding copy), `onboarding/manifest.py` (cross-bundle `OnboardingManifest`), `register_bundles(registry)` entry point. |
 | **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Domain bundles do not import action bundles; routing is separate metadata. Onboarding copy is also bundle-owned: each bundle contributes via `onboarding_guardrails()`; cross-cutting rules go in the manifest. |
 | **Where** | `intentframe_native_bundles/` |
 | **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_bundles"])`. |

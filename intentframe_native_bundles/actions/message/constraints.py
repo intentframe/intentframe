@@ -8,9 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class ContactSource(BaseModel):
     """A dynamic source of allowed contacts.
 
-    Sources are resolved by the Policy Registry at serve time into
-    concrete contact identifiers, then merged with allowed_contacts.
-    Guardian only ever sees the resolved flat list.
+    Stored opaquely in the policy registry; resolved at runtime by
+    ``MessageActionBundle.enforce_constraints`` into concrete contact
+    identifiers, then merged with ``allowed_contacts``.
 
     Attributes:
         source: Source type — "contacts_all", "contacts_group".
@@ -30,7 +30,7 @@ class MessageConstraints(BaseModel):
 
     Attributes:
         allowed_contacts: Contact identifiers (phone, email, name patterns).
-        contact_sources: Dynamic sources resolved at policy-serve time.
+        contact_sources: Dynamic sources resolved at runtime by the message bundle.
     """
 
     model_config = ConfigDict(frozen=True)

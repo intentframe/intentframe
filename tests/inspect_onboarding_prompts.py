@@ -159,7 +159,7 @@ def build_jarvis_capabilities() -> AgentCapabilities:
     )
 
 
-def build_onboarding_prompts(
+async def build_onboarding_prompts(
     *,
     user_context: UserContext,
     capabilities: AgentCapabilities,
@@ -173,7 +173,7 @@ def build_onboarding_prompts(
     )
     allowed_action_ids = frozenset(user_context.allowed_actions.keys())
     system_prompt = AIOnboardingEngine._build_instructions(allowed_action_ids)
-    user_prompt = engine._build_onboarding_prompt(
+    user_prompt = await engine._build_onboarding_prompt(
         capabilities,
         user_context,
         runtime_context_for_llm=runtime_context,
@@ -187,14 +187,14 @@ def section(title: str, out: StringIO) -> None:
     out.write(f"{SEPARATOR}\n")
 
 
-def render_inspection(
+async def render_inspection(
     *,
     user_context: UserContext,
     capabilities: AgentCapabilities,
     executor_running_as_root: bool = False,
 ) -> str:
     """Full inspect output (split system parts + user prompt)."""
-    system_prompt, user_prompt = build_onboarding_prompts(
+    system_prompt, user_prompt = await build_onboarding_prompts(
         user_context=user_context,
         capabilities=capabilities,
         executor_running_as_root=executor_running_as_root,
@@ -267,18 +267,18 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
+async def main() -> int:
     args = _parse_args()
     user_context = build_jarvis_user_context(user_id=args.user_id)
     capabilities = build_jarvis_capabilities()
-    output = render_inspection(
+    output = await render_inspection(
         user_context=user_context,
         capabilities=capabilities,
         executor_running_as_root=args.root,
     )
 
     if args.write_baseline:
-        system_prompt, user_prompt = build_onboarding_prompts(
+        system_prompt, user_prompt = await build_onboarding_prompts(
             user_context=user_context,
             capabilities=capabilities,
             executor_running_as_root=args.root,
@@ -296,4 +296,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import asyncio as _asyncio
+    raise SystemExit(_asyncio.run(main()))

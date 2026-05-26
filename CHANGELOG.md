@@ -6,6 +6,14 @@ This project follows semantic versioning where practical. While IntentFrame is i
 
 ## [Unreleased]
 
+### Changed
+
+- Policy registry decoupling: constraint schemas, system terminal floors, and
+  contact-based recipient resolution moved from `policy_registry/` into action
+  bundles (`intentframe_native_bundles/actions/*/constraints.py`) and
+  `intentframe_native_bundles/platform/contacts_client.py`. The registry stores
+  opaque constraint dicts only; bundles enforce shape and runtime resolution.
+
 ### Added
 
 - Public-release README updates: logo, demo CTA, TL;DR, quickstart, audience routing, support, and commercial contact paths.

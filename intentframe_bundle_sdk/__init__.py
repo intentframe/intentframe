@@ -2,18 +2,22 @@
 
 Contract summary:
 
-- Async hooks (``prepare_evidence``, ``enrich``) are for I/O; sync hooks are
-  for pure compute.
+- All policy-aware hooks are async (``enrich``, ``enforce_constraints``,
+  ``structural_gates``, ``allow_gates``, ``build_ai_context``,
+  ``describe_constraints``).  Only ``validate_constraints`` and
+  ``onboarding_guardrails`` are sync.
 - Bundles receive a per-action :class:`ActionPermission` only — never
   ``UserContext`` or ``UserPolicy``.
 - Constraint dicts are parsed fresh on each hook call; do not cache parsed
   models on bundle classes.
 - :class:`DeterministicRunner` is the sole runtime caller of bundle hooks;
-  substrate reads :class:`BundleAIContext` prepared by the runner.
+  it enforces per-hook deadlines and converts timeout/crash to structured
+  BLOCK outcomes.
 - Plugin packages register via ``register_bundles(registry)``; use
   :func:`ensure_loaded` as the single boot path.
 - Optional :meth:`ActionBundle.startup` / :meth:`ActionBundle.aclose` hooks
   release bundle-owned resources; see :mod:`intentframe_bundle_sdk.lifecycle`.
+- See :data:`BUNDLE_SDK_VERSION` for the current contract version.
 """
 
 from intentframe_bundle_sdk.action import ActionBundle
@@ -43,17 +47,24 @@ from intentframe_bundle_sdk.constraints import (
     describe_permission_constraints,
 )
 from intentframe_bundle_sdk.runner import DeterministicRunner
+from intentframe_bundle_sdk.trace import configure_trace_logging
 from intentframe_bundle_sdk.audit_dump import (
     audit_dump,
     dump_bundle_ai_context,
     dump_bundle_context,
 )
+from intentframe_bundle_sdk.runner import HookTimeouts
 from intentframe_bundle_sdk.types import (
+    BUNDLE_SDK_VERSION,
     ActionPermission,
     BundleAIContext,
+    BundleConfigError,
     BundleContext,
     BundleDeterministicResult,
+    BundleError,
     BundleGateDecision,
+    BundleHookCrashed,
+    BundleHookTimeout,
     BundlePhaseOutcome,
     ConstraintPromptContext,
     EnrichmentRecord,
@@ -67,6 +78,12 @@ from intentframe_core.types import IntentSignal
 __all__ = [
     "ActionBundle",
     "ActionPermission",
+    "BUNDLE_SDK_VERSION",
+    "BundleConfigError",
+    "BundleError",
+    "BundleHookCrashed",
+    "BundleHookTimeout",
+    "HookTimeouts",
     "IntentSignal",
     "BundleAIContext",
     "BundleContext",
@@ -80,6 +97,7 @@ __all__ = [
     "describe_action_constraints_from_policy",
     "describe_permission_constraints",
     "DeterministicRunner",
+    "configure_trace_logging",
     "DomainBundle",
     "ensure_loaded",
     "shutdown_bundles",

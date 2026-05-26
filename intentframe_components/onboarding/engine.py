@@ -91,7 +91,7 @@ class AIOnboardingEngine(OnboardingEngine):
         runtime_context_for_llm: RuntimeContextForLLM = (),
     ) -> RuntimeContext:
         """Perform AI-powered handshake to generate agent context."""
-        prompt = self._build_onboarding_prompt(
+        prompt = await self._build_onboarding_prompt(
             capabilities,
             user_context,
             runtime_context_for_llm=runtime_context_for_llm,
@@ -121,7 +121,7 @@ class AIOnboardingEngine(OnboardingEngine):
 
         return self._build_runtime_context(capabilities, user_context, ai_output)
 
-    def _build_onboarding_prompt(
+    async def _build_onboarding_prompt(
         self,
         capabilities: AgentCapabilities,
         user_context: UserContext,
@@ -136,7 +136,7 @@ class AIOnboardingEngine(OnboardingEngine):
         for action, perm in user_context.allowed_actions.items():
             if perm.constraints is not None:
                 constraint_summary_lines.append(
-                    f"  {action}: {describe_action_constraints_from_policy(action, perm)}"
+                    f"  {action}: {await describe_action_constraints_from_policy(action, perm)}"
                 )
 
         constraint_str = "\n".join(constraint_summary_lines) if constraint_summary_lines else "  None"

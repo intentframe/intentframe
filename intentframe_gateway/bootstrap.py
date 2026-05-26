@@ -43,9 +43,6 @@ by the runtime.
 
 Public surface (used elsewhere in the codebase / docs)
 ------------------------------------------------------
-* :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES`,
-  :data:`SENSITIVE_SURFACE_DENY_CAPABILITIES`,
-  :data:`DEFAULT_TERMINAL_DENY_CAPABILITIES`
 * :data:`SAFE_ACTIONS`, :data:`UNSAFE_ACTIONS`, :data:`INTENT_LIMITS`
 * :func:`_build_default_policy`, :func:`_build_jarvis_policy`
 * :func:`current_jarvis_identity` — returns ``(user_id, agent_id)``
@@ -68,24 +65,15 @@ from jarvis.policies import (
 
 from intentframe_gateway.config import GatewayConfig
 from intentframe_gateway.proxy import UDSProxy
-from policy_registry.seeds import (
-    DEFAULT_TERMINAL_DENY_CAPABILITIES,
-    PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
-    SENSITIVE_SURFACE_DENY_CAPABILITIES,
-    load_policy_seed,
-    resolve_seed_path,
-)
+from policy_registry.seeds import load_policy_seed, resolve_seed_path
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "Bootstrapper",
-    "DEFAULT_TERMINAL_DENY_CAPABILITIES",
     "INTENT_LIMITS",
-    "PYTHON_SHELL_ONLY_DENY_CAPABILITIES",
     "ROOT_WORKSPACE_MOUNTS",
     "SAFE_ACTIONS",
-    "SENSITIVE_SURFACE_DENY_CAPABILITIES",
     "UNSAFE_ACTIONS",
     "WORKSPACE_MOUNTS",
     "current_jarvis_identity",

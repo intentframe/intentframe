@@ -18,7 +18,7 @@ The current path:
 Key references:
 - `command_shield/pipeline.py`
 - `intentframe_gateway/bootstrap.py`
-- `intentframe_components/guardian/checkers/terminal.py`
+- `intentframe_native_bundles/actions/terminal/bundle.py`
 - `intentframe_components/guardian/deterministic.py`
 
 ## What Actually Affects Jarvis Today

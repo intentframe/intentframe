@@ -48,6 +48,8 @@ and documented in the engine module docstring.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from intentframe_bundle_sdk.constraints import describe_action_constraints
@@ -191,9 +193,9 @@ class TestSummarizeConstraintsIntegration:
             blocked_patterns=("sudo", "rm -rf /"),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = describe_action_constraints(
+        summary = asyncio.run(describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
-        )
+        ))
         assert "blocked patterns" in summary.lower()
         assert "node" in summary
         assert "npm" in summary
@@ -206,9 +208,9 @@ class TestSummarizeConstraintsIntegration:
         constraints = TerminalConstraints(
             blocked_patterns=("sudo",),
         )
-        summary = describe_action_constraints(
+        summary = asyncio.run(describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
-        )
+        ))
         assert "blocked patterns" in summary.lower()
         assert "deny_capabilities" not in summary
         assert "Gate 2" not in summary
@@ -218,9 +220,9 @@ class TestSummarizeConstraintsIntegration:
         constraints = TerminalConstraints(
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = describe_action_constraints(
+        summary = asyncio.run(describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
-        )
+        ))
         assert "deny capabilities" in summary.lower()
         assert "node" in summary
         assert "blocked patterns" not in summary
@@ -230,17 +232,17 @@ class TestSummarizeConstraintsIntegration:
             allowed_commands=("git status",),
             deny_capabilities=PYTHON_SHELL_ONLY_DENY,
         )
-        summary = describe_action_constraints(
+        summary = asyncio.run(describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
-        )
+        ))
         assert "allowed commands" in summary.lower()
         assert "deny capabilities" in summary.lower()
 
     def test_empty_terminal_constraints_returns_generic_string(self) -> None:
         constraints = TerminalConstraints()
-        summary = describe_action_constraints(
+        summary = asyncio.run(describe_action_constraints(
             "RUN_COMMAND", constraints.model_dump(mode="python")
-        )
+        ))
         assert summary.lower() == "no terminal constraints"
 
 

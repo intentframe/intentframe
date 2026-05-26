@@ -354,6 +354,11 @@ SEND_EMAIL:
 
 To disable a source without deleting it, set `enabled: false`.
 
+Contact list resolution (`recipient_sources`, `contact_sources`) happens at
+runtime when the email or message bundle enforces constraints — not when the
+policy registry stores the policy. See
+`intentframe_native_bundles/platform/contacts_client.py`.
+
 ### Message contacts
 
 Use with: `SEND_MESSAGE`

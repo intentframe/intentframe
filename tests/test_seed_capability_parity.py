@@ -4,7 +4,7 @@ The packaged Jarvis YAMLs under :mod:`jarvis.policies` carry the
 ``RUN_COMMAND.constraints.deny_capabilities`` list literally — they
 are the source of truth for the gateway's runtime seed.  The same
 set is exposed as a Python ``frozenset`` constant
-(:data:`policy_registry.seeds.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`)
+(:data:`intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`)
 for the deterministic-accuracy and classifier-contract tests that
 compare against named values rather than parsing YAML.
 
@@ -18,23 +18,19 @@ What the tests check
   that equals ``sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES)``.
 * The two variants deny the same capability set (the language /
   sensitive surface clamp is variant-independent on purpose).
-* ``intentframe_gateway.bootstrap`` re-exports the seeds-module
-  constants by identity (back-compat, used by
-  ``tests/deterministic_accuracy/policies.py``).
 """
 
 from __future__ import annotations
 
 import pytest
 
-from intentframe_gateway import bootstrap
-from jarvis.policies import builtin_policy_path
-from policy_registry.seeds import (
+from intentframe_native_bundles.actions.terminal.capabilities import (
     DEFAULT_TERMINAL_DENY_CAPABILITIES,
     PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
     SENSITIVE_SURFACE_DENY_CAPABILITIES,
-    load_policy_seed,
 )
+from jarvis.policies import builtin_policy_path
+from policy_registry.seeds import load_policy_seed
 
 
 @pytest.mark.parametrize("variant", ["user", "root"])
@@ -77,10 +73,3 @@ def test_constant_is_union_of_two_clamps() -> None:
     assert DEFAULT_TERMINAL_DENY_CAPABILITIES == (
         PYTHON_SHELL_ONLY_DENY_CAPABILITIES | SENSITIVE_SURFACE_DENY_CAPABILITIES
     )
-
-
-def test_bootstrap_reexport_identity() -> None:
-    """The legacy ``intentframe_gateway.bootstrap`` import path still works."""
-    assert bootstrap.DEFAULT_TERMINAL_DENY_CAPABILITIES is DEFAULT_TERMINAL_DENY_CAPABILITIES
-    assert bootstrap.PYTHON_SHELL_ONLY_DENY_CAPABILITIES is PYTHON_SHELL_ONLY_DENY_CAPABILITIES
-    assert bootstrap.SENSITIVE_SURFACE_DENY_CAPABILITIES is SENSITIVE_SURFACE_DENY_CAPABILITIES

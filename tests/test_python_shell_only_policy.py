@@ -23,6 +23,8 @@ Two failure modes are guarded against:
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from action_registry.types import ActionType
@@ -83,7 +85,7 @@ PYTHON_SHELL_ONLY_DENY: frozenset[str] = frozenset({
 })
 
 
-def _check(command: str) -> tuple[bool, str]:
+async def _check_async(command: str) -> tuple[bool, str]:
     """Run command_shield → bundle enforce_constraints as production does."""
     report = inspect_command(command)
     intel = CommandIntel(
@@ -102,7 +104,7 @@ def _check(command: str) -> tuple[bool, str]:
     constraints = TerminalConstraints(
         deny_capabilities=PYTHON_SHELL_ONLY_DENY,
     )
-    outcome = _TERMINAL_BUNDLE.enforce_constraints(
+    outcome = await _TERMINAL_BUNDLE.enforce_constraints(
         intent,
         ActionPermission(
             safe=False,
@@ -113,6 +115,10 @@ def _check(command: str) -> tuple[bool, str]:
     if outcome.decision is PhaseDecision.BLOCK:
         return False, outcome.reason
     return True, ""
+
+
+def _check(command: str) -> tuple[bool, str]:
+    return asyncio.run(_check_async(command))
 
 
 # ── Allowed (python + shell) ────────────────────────────────────────

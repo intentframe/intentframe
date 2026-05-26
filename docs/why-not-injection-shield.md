@@ -81,8 +81,8 @@ The system has one **structural** invariant (No-Self-IO — agents cannot execut
 | # | Layer | What it does | Can be prompt-injected? |
 |---|---|---|---|
 | 1 | `command_shield` | Terminal command patterns, normalization, AST decomposition | No — pure regex/AST |
-| 2 | `DeterministicGuardian` | Permission check → constraint check → domain modules → `TerminalChecker` blocklist/allowlist | No — deterministic code (fnmatch + set intersection) |
-| 3 | Policy Registry floor | System blocked patterns always merged | No — code, not AI |
+| 2 | `DeterministicGuardian` | Permission check → `DeterministicRunner` + action bundles (constraint enforcement, domain gates, terminal blocklist/allowlist) | No — deterministic code (fnmatch + set intersection) |
+| 3 | Terminal bundle system floor | `SYSTEM_TERMINAL_BLOCKED_PATTERNS` merged at enforce time — users can append, never remove | No — code, not AI |
 | 4 | AE catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
 | 5 | Adapter `quick_check()` | Last-resort pattern match at execution boundary | No — pure regex |
 

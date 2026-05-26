@@ -4,9 +4,57 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from intentframe_core.types import IntentSignal, IntentFrame
+
+# Bump this whenever the hook contract changes in a backwards-incompatible way
+# (new required args, removed hooks, semantic shifts).  Bundles that declare
+# ``min_sdk_version`` will fail at load time when this is below their minimum.
+BUNDLE_SDK_VERSION: int = 2
+
+
+# ---------------------------------------------------------------------------
+# Error hierarchy
+# ---------------------------------------------------------------------------
+
+class BundleError(Exception):
+    """Base class for all structured bundle errors."""
+
+
+class BundleConfigError(BundleError):
+    """Raised during startup / validate_constraints for configuration problems.
+    Maps to a BLOCK at boot; the bundle is not registered.
+    """
+
+
+class BundleHookTimeout(BundleError):
+    """Raised by the runner when a hook exceeds its deadline.
+    Maps to a fail-closed BLOCK with matched_gate='hook_timeout'.
+    """
+
+    def __init__(self, bundle_id: str, hook: str, timeout_s: float) -> None:
+        super().__init__(
+            f"bundle {bundle_id!r} hook {hook!r} timed out after {timeout_s:.1f}s"
+        )
+        self.bundle_id = bundle_id
+        self.hook = hook
+        self.timeout_s = timeout_s
+
+
+class BundleHookCrashed(BundleError):
+    """Raised by the runner when a hook raises an unexpected exception.
+    Wraps the original; maps to a fail-closed BLOCK with matched_gate='hook_crash'.
+    """
+
+    def __init__(self, bundle_id: str, hook: str, cause: BaseException) -> None:
+        super().__init__(
+            f"bundle {bundle_id!r} hook {hook!r} crashed: {cause!r}"
+        )
+        self.bundle_id = bundle_id
+        self.hook = hook
+        self.cause = cause
+        self.__cause__ = cause
 
 
 class PhaseDecision(str, Enum):
@@ -215,3 +263,4 @@ class BundleDeterministicResult:
     matched_gate: str = ""
     decision_path: str = "deterministic"
     bundle_ai_context: BundleAIContext | None = None
+    dg_exception: str = ""

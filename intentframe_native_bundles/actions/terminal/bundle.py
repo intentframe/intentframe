@@ -17,7 +17,10 @@ from intentframe_native_bundles.actions.terminal.ai_context import (
     render_terminal_external_context,
     select_terminal_ae_system_instructions,
 )
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import (
+    SYSTEM_TERMINAL_BLOCKED_PATTERNS,
+    TerminalConstraints,
+)
 from intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
@@ -74,7 +77,7 @@ class TerminalActionBundle(ActionBundle):
         if action_permission.constraints is not None:
             TerminalConstraints.model_validate(action_permission.constraints)
 
-    def enforce_constraints(
+    async def enforce_constraints(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -95,7 +98,7 @@ class TerminalActionBundle(ActionBundle):
             )
         return BundlePhaseOutcome.continue_(ctx)
 
-    def describe_constraints(self, action_permission: ActionPermission) -> str | None:
+    async def describe_constraints(self, action_permission: ActionPermission) -> str | None:
         if action_permission.constraints is None:
             return None
         constraints = TerminalConstraints.model_validate(action_permission.constraints)
@@ -117,7 +120,7 @@ class TerminalActionBundle(ActionBundle):
     def onboarding_guardrails(self) -> str:
         return terminal_onboarding_guardrails()
 
-    def allow_gates(
+    async def allow_gates(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -138,7 +141,7 @@ class TerminalActionBundle(ActionBundle):
             )
         return BundlePhaseOutcome.continue_(ctx)
 
-    def build_ai_context(
+    async def build_ai_context(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -179,7 +182,11 @@ class TerminalActionBundle(ActionBundle):
     ) -> tuple[bool, str]:
         command = intent.target or (intent.data or {}).get("command", "")
 
-        for pattern in constraints.blocked_patterns:
+        # System floor is always enforced, independent of user policy.
+        effective_blocked = list(
+            dict.fromkeys(list(SYSTEM_TERMINAL_BLOCKED_PATTERNS) + constraints.blocked_patterns)
+        )
+        for pattern in effective_blocked:
             if pattern in command:
                 return False, f"Command blocked — matched pattern: {pattern}"
 

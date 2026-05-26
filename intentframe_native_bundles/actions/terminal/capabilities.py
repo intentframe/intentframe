@@ -10,7 +10,7 @@ constants — not pulled from the YAML — so that:
 * The classifier-vs-policy contract test
   (``tests/test_python_shell_only_policy.py``) can compare strings.
 
-The packaged ``profiles/user.yaml`` and ``profiles/root.yaml`` MUST list
+The packaged ``jarvis.yaml`` and ``jarvis_root.yaml`` MUST list
 ``RUN_COMMAND.constraints.deny_capabilities`` equal to
 ``sorted(DEFAULT_TERMINAL_DENY_CAPABILITIES)`` — this drift is pinned by
 ``tests/test_seed_capability_parity.py``.

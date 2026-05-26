@@ -1,6 +1,6 @@
 # Substrate Plugin Refactor — Goals, Decisions, and Outcome
 
-**Status:** Complete on branch `refactor-substrate` (pass 15 / `fee09a6`, May 2026)  
+**Status:** Complete on branch `refactor-substrate` (merged PR #33, `d191b6e`). Post-merge follow-up (`88d61f6`–`8600ec8`, May 2026) decoupled remaining policy-registry business logic (terminal system floor, contact resolution, constraint schemas) into native bundles.  
 **Legacy baseline:** `66e567c` (pre-refactor tag)  
 **Canonical implementation plan:** `TODO/new_plan.md`  
 **Developer runbook:** [dev/action-family-wiring.md](../dev/action-family-wiring.md)
@@ -71,7 +71,7 @@ DeterministicRunner (SDK) — fixed gate order:
 | Substrate | UserPolicy resolution, pipeline, AE/Guardian assembly, audit | Read constraint field names; call checkers; import plugin schemas |
 | Bundle SDK | Hook contract, runner order, registry, loader, `BundleAIContext` | Import first-party evidence types or substrate checkers |
 | Plugins | Action/domain logic, constraints, enforcement, AI context | See `UserPolicy` or other actions' permissions |
-| Policy registry | Storage + merge of opaque dicts | Typed Pydantic constraint unions for dispatch |
+| Policy registry | Storage of opaque dicts only | Typed Pydantic constraint unions; system-floor merge; contact-source resolution; constraint shape validation |
 
 ### Package layout
 
@@ -79,6 +79,7 @@ DeterministicRunner (SDK) — fixed gate order:
 intentframe_native_bundles/
   actions/<family>/     # ActionBundle implementations
   domains/<domain>/     # DomainBundle implementations (finance, deletion)
+  platform/             # Shared runtime helpers (e.g. contacts_client for policy sources)
   domain_routes.py      # domain_id → action ids (routing manifest)
   onboarding/           # first-party onboarding copy
   __init__.py           # register_bundles(registry) only
@@ -115,12 +116,16 @@ Implementation followed nine phases in `TODO/new_plan.md`, grouped into four **w
 | `e3855aa` | Fix actions/ vs domains/ split |
 | `aeb3130` | Restore pass-12 SDK routing; delete policy_registry constraint copies |
 | `fee09a6` | Loader + invariant tests (pass 15) |
+| `88d61f6` | Decouple email/message contact resolution + terminal capabilities from policy registry |
+| `0c27a38` | Policy registry cleanup — opaque CRUD only |
+| `8600ec8` | Document future bundle-runtime validation contract (`policy_registry/TODO/bundle_validator.md`) |
 
 ### Deleted (legacy scaffolding)
 
 - `intentframe_components/guardian/checkers/`
 - `intentframe_action_bundle/` (entire package — replaced by native bundles + SDK)
-- `policy_registry/constraints/`, `policy_registry/domains/`
+- `policy_registry/constraints/`, `policy_registry/domains/`, `policy_registry/source_types.py`, `policy_registry/contacts_client.py`
+- Terminal system-floor merge and `DEFAULT_TERMINAL_DENY_CAPABILITIES` ownership moved to `intentframe_native_bundles/actions/terminal/`
 - Manifest, policy_bridge, NullActionBundle, checker shims
 
 ---
@@ -292,7 +297,7 @@ Boot: `ensure_loaded(["intentframe_native_bundles"])` then `validate_policy_agai
 | Orphan copies under `intentframe_native_bundles/{files,terminal,...}/` (top-level, not under `actions/`) | Not imported; safe to delete |
 | `onboarding/engine.py` imports native onboarding | ~~Optional decouple~~ — Done: `engine.py` now imports `build_onboarding_instructions` from `intentframe_components.onboarding.instructions`. Bundle SDK owns the middle section via `render_onboarding_bundle_context`; each bundle contributes via `onboarding_guardrails()`; cross-bundle copy lives in `intentframe_native_bundles/onboarding/manifest.py`. |
 | ~~`intentframe_server/enrichers/email.py` imports native enrich~~ | Done — bundle owns `EmailClient` lifecycle via `aclose()` |
-| `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Debate: server-only boot vs seed validation |
+| `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Resolved: loader validates constraint shapes via `validate_policy_against_registry` after opaque `UserPolicy` construction. Registry HTTP writes remain unvalidated until bundle-runtime service lands (see `policy_registry/TODO/bundle_validator.md`). |
 | `intentframe_components/TODO/*.md` | References pre-refactor paths (criticality, strategy.py) |
 | Commit `TODO/new_plan.md` | Plan doc still untracked in some snapshots |
 
