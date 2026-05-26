@@ -102,7 +102,9 @@ class FilesActionBundle(ActionBundle):
         action_permission: ActionPermission,
         ctx: BundleContext,
     ) -> BundleAIContext:
-        del intent, action_permission
+        del action_permission
+        if intent.action != ActionType.WRITE_FILE:
+            return BundleAIContext()
         file_intel = ctx.evidence.get(FILE_INTEL_KEY)
         if file_intel is not None and not isinstance(file_intel, FileIntel):
             file_intel = None

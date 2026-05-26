@@ -119,6 +119,19 @@ class TestFilesBundleAIContext:
         ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert "WRITE_FILE — PAYLOAD SIGNALS" in ai_ctx.ae_external_context
 
+    def test_append_row_uses_substrate_default_prompt(self):
+        bundle = FilesActionBundle()
+        ctx = _bundle_ctx(_intent(ActionType.APPEND_ROW, "/expense_tracker.md"))
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
+        assert ai_ctx.ae_system_instructions is None
+        assert ai_ctx.ae_prompt_label is None
+
+    def test_delete_file_uses_substrate_default_prompt(self):
+        bundle = FilesActionBundle()
+        ctx = _bundle_ctx(_intent(ActionType.DELETE_FILE, "/tmp/x"))
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
+        assert ai_ctx.ae_system_instructions is None
+
 
 class TestHostFilesBundleAIContext:
     def test_write_host_file_returns_specialized_prompt(self):
