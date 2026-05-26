@@ -100,6 +100,7 @@ async def _call_hook(
             trace_id=trace_id,
             phase=hook,
             timeout_s=timeout_s,
+            terminal_from=lambda r: getattr(r, "terminal", False),
             **kwargs,
         )
     except asyncio.TimeoutError as exc:
@@ -220,6 +221,7 @@ class DeterministicRunner:
                 lane="runtime",
                 trace_id=trace_id,
                 phase=f"domain_enforce:{domain_id}",
+                terminal_from=lambda r: r.terminal,
             )
             if dr.terminal:
                 merged = replace(dr, context=ctx)
@@ -246,6 +248,7 @@ class DeterministicRunner:
             lane="runtime",
             trace_id=trace_id,
             phase="_try_passive_read_allow",
+            terminal_from=lambda r: r is not None,
         )
         if passive is not None:
             return passive.to_deterministic_result()
@@ -314,7 +317,12 @@ class DeterministicRunner:
             slice_ = (user_context.domain_constraints or {}).get(domain_id)
             domain_bundle = domain_bundle_for(domain_id)
             if domain_bundle is not None:
-                described = domain_bundle.describe(slice_)
+                described = traced_call(
+                    domain_bundle.describe, slice_,
+                    lane="runtime",
+                    trace_id=trace_id,
+                    phase=f"domain_describe:{domain_id}",
+                )
                 domain_lines.append(
                     described if described is not None else f"{domain_id}: {slice_}"
                 )

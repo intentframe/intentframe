@@ -12,6 +12,7 @@ from typing import Any
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.domain import DomainBundle
 from intentframe_bundle_sdk.onboarding_manifest import OnboardingManifest
+from intentframe_bundle_sdk.trace import traced_call
 
 _ACTION_BY_ID: dict[str, ActionBundle] = {}
 _ACTION_INSTANCES: list[ActionBundle] = []
@@ -111,7 +112,12 @@ def validate_policy_domain_constraints(
                 if isinstance(constraints, dict)
                 else constraints.model_dump(mode="python")
             )
-            bundle.validate(raw)
+            traced_call(
+                bundle.validate, raw,
+                lane="boot",
+                trace_id=f"boot:{bundle.bundle_id}:{domain_id}",
+                phase="validate",
+            )
 
 
 def action_bundle_for(action_id: str) -> ActionBundle | None:

@@ -30,7 +30,10 @@ Each record is one minified JSON line::
     {"ts": "...", "lane": "runtime", "trace_id": "...", "phase": "enrich",
      "skipped": false, "elapsed_ms": 1.2,
      "inputs": {"intent": {...}, "permission": {...}, ...},
-     "output": {...}, "raised": null}
+     "output": {...}, "raised": null, "terminal": false}
+
+Terminal hook records carry ``"terminal": true`` when the caller supplied
+``terminal_from`` and it returned true for the hook result.
 
 Usage
 -----
@@ -49,6 +52,7 @@ import logging.handlers
 import os
 import time
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from intentframe_bundle_sdk.audit_dump import audit_dump
@@ -144,6 +148,7 @@ def _emit(
     elapsed_ms: float | None = None,
     skipped: bool = False,
     skipped_reason: str | None = None,
+    terminal: bool = False,
 ) -> None:
     if not _handler_installed:
         configure_trace_logging()
@@ -158,8 +163,16 @@ def _emit(
         "inputs": inputs,
         "output": output,
         "raised": raised,
+        "terminal": terminal,
     }
     _trace_logger.debug(json.dumps(payload, default=str))
+
+
+def reset_trace_logging() -> None:
+    """Clear handlers and allow re-configuration — for tests only."""
+    global _handler_installed
+    _trace_logger.handlers.clear()
+    _handler_installed = False
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +204,7 @@ def traced_call(
     lane: str,
     trace_id: str,
     phase: str,
+    terminal_from: Callable[[Any], bool] | None = None,
     **kwargs: Any,
 ) -> Any:
     """Call a synchronous hook, emit a full trace record, and return the result.
@@ -214,6 +228,11 @@ def traced_call(
         raise
     finally:
         elapsed = (time.perf_counter() - t0) * 1000
+        terminal = (
+            terminal_from(result) is True
+            if terminal_from is not None and raised_repr is None
+            else False
+        )
         _emit(
             lane=lane,
             trace_id=trace_id,
@@ -222,6 +241,7 @@ def traced_call(
             output=audit_dump(result) if raised_repr is None else None,
             raised=raised_repr,
             elapsed_ms=elapsed,
+            terminal=terminal,
         )
 
 
@@ -233,6 +253,7 @@ async def traced_acall(
     trace_id: str,
     phase: str,
     timeout_s: float | None = None,
+    terminal_from: Callable[[Any], bool] | None = None,
     **kwargs: Any,
 ) -> Any:
     """Await an asynchronous hook, emit a full trace record, and return the result.
@@ -261,6 +282,11 @@ async def traced_acall(
         raise
     finally:
         elapsed = (time.perf_counter() - t0) * 1000
+        terminal = (
+            terminal_from(result) is True
+            if terminal_from is not None and raised_repr is None
+            else False
+        )
         _emit(
             lane=lane,
             trace_id=trace_id,
@@ -269,6 +295,7 @@ async def traced_acall(
             output=audit_dump(result) if raised_repr is None else None,
             raised=raised_repr,
             elapsed_ms=elapsed,
+            terminal=terminal,
         )
 
 
