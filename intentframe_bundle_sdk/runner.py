@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any
 
 from intentframe_bundle_sdk.constraints import describe_permission_constraints
 from intentframe_bundle_sdk.registry import domain_bundle_for, domains_for_action
+from intentframe_bundle_sdk.trace import emit_skip, make_trace_id, traced_acall, traced_call
 from intentframe_bundle_sdk.types import (
     ActionPermission,
     BundleAIContext,
@@ -71,15 +72,36 @@ _DEFAULT_TIMEOUTS = HookTimeouts()
 
 
 async def _call_hook(
-    coro: Any,
-    *,
+    hook_fn: Any,
+    /,
+    *args: Any,
     bundle_id: str,
     hook: str,
     timeout_s: float,
+    trace_id: str = "",
+    **kwargs: Any,
 ) -> Any:
-    """Await ``coro`` with a deadline; convert timeout/crash to structured errors."""
+    """Await ``hook_fn(*args, **kwargs)`` with a deadline; emit a trace record.
+
+    Converts ``asyncio.TimeoutError`` → :class:`BundleHookTimeout` and any
+    other exception → :class:`BundleHookCrashed`.  ``NotImplementedError`` is
+    re-raised as-is so callers can handle the "not implemented" contract.
+
+    The full input dump (all named args) and the return value are written to
+    ``bundle-sdk.log`` via :mod:`intentframe_bundle_sdk.trace` before any
+    exception conversion, so every hook invocation leaves a forensic record
+    regardless of outcome.
+    """
     try:
-        return await asyncio.wait_for(coro, timeout=timeout_s)
+        return await traced_acall(
+            hook_fn,
+            *args,
+            lane="runtime",
+            trace_id=trace_id,
+            phase=hook,
+            timeout_s=timeout_s,
+            **kwargs,
+        )
     except asyncio.TimeoutError as exc:
         raise BundleHookTimeout(bundle_id, hook, timeout_s) from exc
     except (BundleHookTimeout, BundleHookCrashed):
@@ -106,14 +128,17 @@ class DeterministicRunner:
     ) -> BundleDeterministicResult:
         action_permission = action_permission_from_policy(permission)
         ctx = BundleContext(intent=intent.model_copy(deep=True))
+        trace_id = make_trace_id(intent, bundle.bundle_id)
 
         # ── prepare_evidence ───────────────────────────────────────────
         try:
             prep = await _call_hook(
-                bundle.prepare_evidence(intent, ctx, verbose=verbose),
+                bundle.prepare_evidence, intent, ctx,
                 bundle_id=bundle.bundle_id,
                 hook="prepare_evidence",
                 timeout_s=timeouts.prepare_evidence,
+                trace_id=trace_id,
+                verbose=verbose,
             )
         except (BundleHookTimeout, BundleHookCrashed) as exc:
             return cls._block_from_hook_error(ctx, exc)
@@ -124,10 +149,12 @@ class DeterministicRunner:
         # ── enrich ─────────────────────────────────────────────────────
         try:
             enriched = await _call_hook(
-                bundle.enrich(intent, action_permission, ctx, verbose=verbose),
+                bundle.enrich, intent, action_permission, ctx,
                 bundle_id=bundle.bundle_id,
                 hook="enrich",
                 timeout_s=timeouts.enrich,
+                trace_id=trace_id,
+                verbose=verbose,
             )
         except (BundleHookTimeout, BundleHookCrashed) as exc:
             return cls._block_from_hook_error(ctx, exc)
@@ -146,10 +173,12 @@ class DeterministicRunner:
             )
             try:
                 pol = await _call_hook(
-                    bundle.enforce_constraints(intent, frozen, ctx, verbose=verbose),
+                    bundle.enforce_constraints, intent, frozen, ctx,
                     bundle_id=bundle.bundle_id,
                     hook="enforce_constraints",
                     timeout_s=timeouts.enforce_constraints,
+                    trace_id=trace_id,
+                    verbose=verbose,
                 )
             except NotImplementedError:
                 return cls._block(
@@ -162,6 +191,13 @@ class DeterministicRunner:
             if pol.terminal:
                 return pol.to_deterministic_result()
             ctx = pol.context
+        else:
+            emit_skip(
+                lane="runtime",
+                trace_id=trace_id,
+                phase="enforce_constraints",
+                reason="action_permission.constraints is None",
+            )
 
         # ── domain enforce ─────────────────────────────────────────────
         action_id = intent.action.value
@@ -169,11 +205,22 @@ class DeterministicRunner:
         for domain_id in domain_ids:
             domain_bundle = domain_bundle_for(domain_id)
             if domain_bundle is None:
+                emit_skip(
+                    lane="runtime",
+                    trace_id=trace_id,
+                    phase=f"domain_enforce:{domain_id}",
+                    reason="no domain bundle registered",
+                )
                 continue
             slice_ = deepcopy(
                 (user_context.domain_constraints or {}).get(domain_id)
             )
-            dr = domain_bundle.enforce(intent, slice_)
+            dr = traced_call(
+                domain_bundle.enforce, intent, slice_,
+                lane="runtime",
+                trace_id=trace_id,
+                phase=f"domain_enforce:{domain_id}",
+            )
             if dr.terminal:
                 merged = replace(dr, context=ctx)
                 return merged.to_deterministic_result()
@@ -181,10 +228,11 @@ class DeterministicRunner:
         # ── structural_gates ───────────────────────────────────────────
         try:
             struct = await _call_hook(
-                bundle.structural_gates(intent, ctx),
+                bundle.structural_gates, intent, ctx,
                 bundle_id=bundle.bundle_id,
                 hook="structural_gates",
                 timeout_s=timeouts.structural_gates,
+                trace_id=trace_id,
             )
         except (BundleHookTimeout, BundleHookCrashed) as exc:
             return cls._block_from_hook_error(ctx, exc)
@@ -193,17 +241,23 @@ class DeterministicRunner:
         ctx = struct.context
 
         # ── passive_read ALLOW ─────────────────────────────────────────
-        passive = cls._try_passive_read_allow(bundle, intent, action_permission, ctx)
+        passive = traced_call(
+            cls._try_passive_read_allow, bundle, intent, action_permission, ctx,
+            lane="runtime",
+            trace_id=trace_id,
+            phase="_try_passive_read_allow",
+        )
         if passive is not None:
             return passive.to_deterministic_result()
 
         # ── allow_gates ────────────────────────────────────────────────
         try:
             allow = await _call_hook(
-                bundle.allow_gates(intent, action_permission, ctx),
+                bundle.allow_gates, intent, action_permission, ctx,
                 bundle_id=bundle.bundle_id,
                 hook="allow_gates",
                 timeout_s=timeouts.allow_gates,
+                trace_id=trace_id,
             )
         except (BundleHookTimeout, BundleHookCrashed) as exc:
             return cls._block_from_hook_error(ctx, exc)
@@ -217,13 +271,15 @@ class DeterministicRunner:
             domain_ids,
             user_context,
             timeout_s=timeouts.describe_constraints,
+            trace_id=trace_id,
         )
         try:
             ai_ctx = await _call_hook(
-                bundle.build_ai_context(intent, action_permission, ctx),
+                bundle.build_ai_context, intent, action_permission, ctx,
                 bundle_id=bundle.bundle_id,
                 hook="build_ai_context",
                 timeout_s=timeouts.build_ai_context,
+                trace_id=trace_id,
             )
         except (BundleHookTimeout, BundleHookCrashed):
             ai_ctx = BundleAIContext()
@@ -238,13 +294,15 @@ class DeterministicRunner:
         user_context: UserContext,
         *,
         timeout_s: float = _DEFAULT_TIMEOUTS.describe_constraints,
+        trace_id: str = "",
     ) -> ConstraintPromptContext:
         try:
             action_constraints = await _call_hook(
-                describe_permission_constraints(bundle, action_permission),
+                describe_permission_constraints, bundle, action_permission,
                 bundle_id=bundle.bundle_id,
                 hook="describe_constraints",
                 timeout_s=timeout_s,
+                trace_id=trace_id,
             )
         except (BundleHookTimeout, BundleHookCrashed):
             action_constraints = str(action_permission.constraints or "No specific constraints")

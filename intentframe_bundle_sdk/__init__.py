@@ -47,6 +47,7 @@ from intentframe_bundle_sdk.constraints import (
     describe_permission_constraints,
 )
 from intentframe_bundle_sdk.runner import DeterministicRunner
+from intentframe_bundle_sdk.trace import configure_trace_logging
 from intentframe_bundle_sdk.audit_dump import (
     audit_dump,
     dump_bundle_ai_context,
@@ -96,6 +97,7 @@ __all__ = [
     "describe_action_constraints_from_policy",
     "describe_permission_constraints",
     "DeterministicRunner",
+    "configure_trace_logging",
     "DomainBundle",
     "ensure_loaded",
     "shutdown_bundles",

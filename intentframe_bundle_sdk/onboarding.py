@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from intentframe_bundle_sdk.registry import all_action_bundles, onboarding_manifest
+from intentframe_bundle_sdk.trace import traced_call
 
 
 def render_onboarding_bundle_context(allowed_action_ids: frozenset[str]) -> str:
@@ -17,7 +18,12 @@ def render_onboarding_bundle_context(allowed_action_ids: frozenset[str]) -> str:
     for bundle in all_action_bundles():
         if not (bundle.action_ids & allowed_action_ids):
             continue
-        text = bundle.onboarding_guardrails().strip()
+        text = traced_call(
+            bundle.onboarding_guardrails,
+            lane="handshake",
+            trace_id=f"handshake:{bundle.bundle_id}",
+            phase="onboarding_guardrails",
+        ).strip()
         if text:
             blocks.append(text)
 
