@@ -1,9 +1,10 @@
 """
 Client for resolving contact-based recipient sources via the platform server.
 
-The Policy Registry calls this at serve time to resolve RecipientSource /
-ContactSource rules into flat email/contact lists. Results are cached
-with a short TTL to avoid hammering the Contacts.framework on every request.
+Action bundles (EmailActionBundle, MessageActionBundle) use this during
+``enforce_constraints`` to resolve RecipientSource / ContactSource rules into
+flat email/contact lists.  Results are cached with a short TTL to avoid
+hammering Contacts.framework on every request.
 """
 
 from __future__ import annotations
@@ -132,19 +133,25 @@ class PlatformContactsClient:
             logger.exception("Failed to resolve group contacts")
             return []
 
-    async def resolve_sources(
-        self,
-        sources: list,
-    ) -> list[str]:
-        """Resolve a list of RecipientSource or ContactSource into email/contact strings."""
+    async def resolve_sources(self, sources: list) -> list[str]:
+        """Resolve a list of source dicts or source models into email/contact strings."""
         resolved: list[str] = []
         for src in sources:
-            if not src.enabled:
-                continue
-            if src.source == "contacts_all":
-                resolved.extend(await self.fetch_all_emails())
-            elif src.source == "contacts_group":
-                resolved.extend(await self.fetch_group_emails(src.filter))
+            if isinstance(src, dict):
+                if not src.get("enabled", True):
+                    continue
+                source_type = src.get("source", "")
+                filter_val = src.get("filter", "")
             else:
-                logger.warning("Unknown source type: %s", src.source)
+                if not src.enabled:
+                    continue
+                source_type = src.source
+                filter_val = src.filter
+
+            if source_type == "contacts_all":
+                resolved.extend(await self.fetch_all_emails())
+            elif source_type == "contacts_group":
+                resolved.extend(await self.fetch_group_emails(filter_val))
+            else:
+                logger.warning("Unknown source type: %s", source_type)
         return resolved

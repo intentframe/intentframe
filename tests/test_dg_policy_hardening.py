@@ -46,9 +46,10 @@ class TestExceptionFailClosedPolicy:
         )
 
         assert result.decision is DeterministicDecision.BLOCK
-        assert result.matched_gate == "exception"
+        assert result.matched_gate == "hook_crash"
+        assert "shield blew up" in result.reason
+        assert result.decision_path == "hook_crash"
         assert result.dg_exception == "ValueError('shield blew up')"
-        assert result.decision_path == "deterministic"
 
     def test_permission_block_has_no_dg_exception(self) -> None:
         dg = DeterministicGuardian()

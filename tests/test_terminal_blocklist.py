@@ -20,9 +20,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_bundles.actions.terminal.constraints import (
+    SYSTEM_TERMINAL_BLOCKED_PATTERNS,
+    TerminalConstraints,
+)
 from policy_registry.models import ActionPermission, UserPolicy
-from policy_registry.registry import PolicyRegistry, SYSTEM_TERMINAL_BLOCKED_PATTERNS
+from policy_registry.registry import PolicyRegistry
 from intentframe_native_bundles.actions.terminal.ae_fast_path import (
     CATASTROPHIC_COMMAND_PATTERNS,
     try_catastrophic_report,
@@ -72,7 +75,7 @@ def _run_command_intent(command: str) -> IntentFrame:
     )
 
 
-def _enforce_terminal(
+async def _enforce_terminal_async(
     command: str,
     constraints: TerminalConstraints,
     *,
@@ -82,7 +85,7 @@ def _enforce_terminal(
     ctx = BundleContext(intent=intent.model_copy(deep=True))
     if command_intel is not None:
         ctx.evidence[COMMAND_INTEL_KEY] = command_intel
-    outcome = _TERMINAL_BUNDLE.enforce_constraints(
+    outcome = await _TERMINAL_BUNDLE.enforce_constraints(
         intent,
         SdkActionPermission(
             safe=False,
@@ -95,107 +98,89 @@ def _enforce_terminal(
     return True, ""
 
 
+def _enforce_terminal(
+    command: str,
+    constraints: TerminalConstraints,
+    *,
+    command_intel: CommandIntel | None = None,
+) -> tuple[bool, str]:
+    return _run(_enforce_terminal_async(command, constraints, command_intel=command_intel))
+
+
 def _describe_terminal(constraints: TerminalConstraints) -> str:
-    return (
+    return _run(
         _TERMINAL_BUNDLE.describe_constraints(
             SdkActionPermission(
                 safe=False,
                 constraints=constraints.model_dump(mode="python"),
             )
         )
-        or ""
-    )
+    ) or ""
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# LAYER 1: Policy Registry — system-level floor
+# LAYER 1: Terminal bundle system-level floor
+# (previously enforced by the policy registry; now enforced by the bundle)
 # ═════════════════════════════════════════════════════════════════════════
 
-class TestPolicyRegistryFloor:
-    """System defaults are merged on read. Users can append, not remove."""
+class TestTerminalBundleSystemFloor:
+    """System floor is enforced by TerminalActionBundle.enforce_constraints.
 
-    def _make_policy(self, blocked_patterns=None, allowed_commands=None):
-        constraints = None
-        if blocked_patterns is not None or allowed_commands is not None:
-            constraints = TerminalConstraints(
-                blocked_patterns=blocked_patterns or [],
-                allowed_commands=allowed_commands or [],
-            ).model_dump(mode="python")
-        return UserPolicy(
-            user_id="test",
-            agent_id="terminal-test",
-            allowed_actions={
-                "RUN_COMMAND": ActionPermission(safe=False, constraints=constraints),
-            },
-        )
+    The floor is defined in SYSTEM_TERMINAL_BLOCKED_PATTERNS and applied on
+    every enforce_constraints call, regardless of what the user's policy
+    specifies.  Users cannot remove these patterns; they can only add more.
+    """
 
-    @staticmethod
-    def _terminal(perm: ActionPermission) -> TerminalConstraints:
-        return TerminalConstraints.model_validate(perm.constraints)
-
-    def test_system_patterns_merged_when_user_has_none(self):
-        """RUN_COMMAND with no constraints gets system floor."""
-        registry = PolicyRegistry()
-        policy = UserPolicy(
-            user_id="test",
-            agent_id="terminal-test",
-            allowed_actions={"RUN_COMMAND": ActionPermission(safe=False)},
-        )
-        registry.set_user_policy(policy)
-        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
-
-        perm = resolved.allowed_actions["RUN_COMMAND"]
-        constraints = self._terminal(perm)
+    def test_system_patterns_block_even_with_empty_user_constraints(self):
+        """Bundle blocks floor patterns even when user policy has none."""
         for pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
-            assert pattern in constraints.blocked_patterns
+            ok, _ = _enforce_terminal(
+                f"something {pattern} rest",
+                TerminalConstraints(blocked_patterns=[]),
+            )
+            assert not ok, f"Expected floor pattern {pattern!r} to block"
 
-    def test_system_patterns_merged_with_user_patterns(self):
-        """User's custom patterns are preserved alongside system floor."""
-        registry = PolicyRegistry()
-        registry.set_user_policy(self._make_policy(
-            blocked_patterns=["curl", "wget"],
-        ))
-        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
+    def test_system_patterns_block_with_user_custom_patterns(self):
+        """Floor patterns block alongside user-specified patterns."""
+        constraints = TerminalConstraints(blocked_patterns=["curl", "wget"])
+        for pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
+            ok, _ = _enforce_terminal(f"something {pattern} rest", constraints)
+            assert not ok, f"Floor pattern {pattern!r} should still block"
+        ok, _ = _enforce_terminal("curl http://example.com", constraints)
+        assert not ok
 
-        patterns = self._terminal(resolved.allowed_actions["RUN_COMMAND"]).blocked_patterns
-        for sys_pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
-            assert sys_pattern in patterns
-        assert "curl" in patterns
-        assert "wget" in patterns
+    def test_user_blocked_patterns_respected(self):
+        """User's custom patterns are enforced alongside the floor."""
+        constraints = TerminalConstraints(blocked_patterns=["custom_dangerous"])
+        ok, _ = _enforce_terminal("run custom_dangerous now", constraints)
+        assert not ok
 
-    def test_user_cannot_remove_system_patterns(self):
-        """Even if user sets empty blocked_patterns, system floor is merged back."""
-        registry = PolicyRegistry()
-        registry.set_user_policy(self._make_policy(blocked_patterns=[]))
-        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
-
-        patterns = self._terminal(resolved.allowed_actions["RUN_COMMAND"]).blocked_patterns
-        for sys_pattern in SYSTEM_TERMINAL_BLOCKED_PATTERNS:
-            assert sys_pattern in patterns
-
-    def test_allowed_commands_preserved(self):
-        """System floor merge doesn't clobber user's allowed_commands."""
-        registry = PolicyRegistry()
-        registry.set_user_policy(self._make_policy(
+    def test_allowed_commands_preserved_alongside_floor(self):
+        """System floor enforcement does not clobber allowed_commands check."""
+        constraints = TerminalConstraints(
             blocked_patterns=[],
             allowed_commands=["ls *", "pwd"],
-        ))
-        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
+        )
+        ok, _ = _enforce_terminal("ls /tmp", constraints)
+        assert ok
+        ok, _ = _enforce_terminal("cat /etc/passwd", constraints)
+        assert not ok
 
-        constraints = self._terminal(resolved.allowed_actions["RUN_COMMAND"])
-        assert "ls *" in constraints.allowed_commands
-        assert "pwd" in constraints.allowed_commands
+    def test_floor_pattern_beats_allowed_commands(self):
+        """A floor pattern blocks even if the command matches allowed_commands."""
+        constraints = TerminalConstraints(
+            blocked_patterns=[],
+            allowed_commands=["sudo *"],
+        )
+        ok, _ = _enforce_terminal("sudo ls", constraints)
+        assert not ok, "Floor (sudo) must beat allowed_commands allowlist"
 
-    def test_no_duplicates_when_user_includes_system_pattern(self):
-        """If user already has a system pattern, it's not duplicated."""
-        registry = PolicyRegistry()
-        registry.set_user_policy(self._make_policy(
-            blocked_patterns=["sudo", "custom_pattern"],
-        ))
-        resolved = _run(registry.get_user_policy_resolved("test", "terminal-test"))
-
-        patterns = self._terminal(resolved.allowed_actions["RUN_COMMAND"]).blocked_patterns
-        assert patterns.count("sudo") == 1
+    def test_no_duplicate_blocking_when_user_includes_system_pattern(self):
+        """Bundle still blocks; dedup is an implementation detail not a contract."""
+        constraints = TerminalConstraints(blocked_patterns=["sudo", "custom_pattern"])
+        ok, reason = _enforce_terminal("sudo ls", constraints)
+        assert not ok
+        assert "sudo" in reason
 
     def test_system_floor_constant_not_empty(self):
         assert len(SYSTEM_TERMINAL_BLOCKED_PATTERNS) >= 6

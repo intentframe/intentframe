@@ -28,7 +28,7 @@ class BrowserActionBundle(ActionBundle):
         if action_permission.constraints is not None:
             BrowserConstraints.model_validate(action_permission.constraints)
 
-    def enforce_constraints(
+    async def enforce_constraints(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -50,7 +50,7 @@ class BrowserActionBundle(ActionBundle):
             matched_gate="constraint",
         )
 
-    def describe_constraints(self, action_permission: ActionPermission) -> str | None:
+    async def describe_constraints(self, action_permission: ActionPermission) -> str | None:
         if action_permission.constraints is None:
             return None
         constraints = BrowserConstraints.model_validate(action_permission.constraints)

@@ -13,7 +13,7 @@ This doc covers all three registries together because they share the same shape 
 | Registry | Source | What it stores | Who writes it | Who reads it |
 |---|---|---|---|---|
 | **Action registry** | `action_registry/` | The universal *taxonomy* — every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category, its metadata | IntentFrame developers (it's a static catalog) | Policy registry (to validate user policies); pipeline (to dispatch to adapters) |
-| **Policy registry** | `policy_registry/` | The user's *rules* — which actions are allowed, what constraints apply, what intent limits, plus a system-level blocked-pattern floor | The user (via dashboard / CLI / SDK at registration time) | Guardian (every validation), Analysis Engine (to adjust depth) |
+| **Policy registry** | `policy_registry/` | The user's *rules* — which actions are allowed, opaque constraint dicts, intent limits | The user (via dashboard / CLI / SDK at registration time) | Guardian (every validation), Analysis Engine (to adjust depth) |
 | **Resource registry** | `resource_registry/` | The user's *workspaces* and resource mounts — virtual paths, real paths, writability, file filters, plus the registered adapter inventory | The user (when defining workspaces) and platform (when adapters register) | Agent client (sees `ClientView` — virtual paths only); executor (sees `ExecutorView` — full mount table with real paths) |
 
 Capability-tagging (the tag taxonomy used inside `TerminalConstraints`) is owned by `command_shield`, not by a registry of its own.
@@ -30,9 +30,9 @@ Capability-tagging (the tag taxonomy used inside `TerminalConstraints`) is owned
 │ ACTION REGISTRY  │   │  POLICY REGISTRY   │   │ RESOURCE REGISTRY  │
 │                  │   │                    │   │                    │
 │ Static taxonomy  │   │ User policies +    │   │ Workspaces + VFS   │
-│ of every action  │   │ intent limits +    │   │ mounts + adapter   │
-│ that CAN exist   │   │ system floor       │   │ inventory          │
-│                  │   │                    │   │                    │
+│ of every action  │   │ intent limits      │   │ mounts + adapter   │
+│ that CAN exist   │   │ (opaque constraint │   │ inventory          │
+│                  │   │  dicts per action) │   │                    │
 │ "READ_FILE,      │   │ "READ_FILE only    │   │ "/invoices/ →      │
 │  RUN_COMMAND,    │   │  in /invoices/,    │   │  /Users/me/inbox/  │
 │  PAY_INVOICE,    │   │  PAY_INVOICE max   │   │  (read-only)"      │
@@ -84,8 +84,8 @@ ActionCatalog ──── lookup: ActionType → ActionMeta
 Each `ActionType` belongs to exactly one `ActionCategory`. Categories determine which constraint schema applies when a user writes a policy. For example:
 
 - `READ_FILE`, `WRITE_FILE`, `LIST_DIRECTORY` → `ActionCategory.FILE` → `FileConstraints` (allowed paths, file filters)
-- `SEND_EMAIL`, `READ_EMAIL` → `ActionCategory.EMAIL` → `EmailConstraints` (recipient sources)
-- `RUN_COMMAND` → `ActionCategory.TERMINAL` → `TerminalConstraints` (allow/deny capability tags)
+- `SEND_EMAIL`, `READ_EMAIL` → `ActionCategory.EMAIL` → `EmailConstraints` (in `intentframe_native_bundles/actions/email/constraints.py`)
+- `RUN_COMMAND` → `ActionCategory.TERMINAL` → `TerminalConstraints` (in `intentframe_native_bundles/actions/terminal/constraints.py`)
 - `PAY_INVOICE` → `ActionCategory.API` + `DomainType.FINANCE` → finance hard gate
 
 ### Why it's a separate module
@@ -115,7 +115,7 @@ UserPolicy
 ├── allowed_actions: dict[ActionType → ActionPermission]
 │        ActionPermission:
 │          • safe: bool                ← critical for fast-path routing
-│          • constraints: typed schema  ← FileConstraints / EmailConstraints / …
+│          • constraints: dict | None  ← opaque JSON; schema owned by action bundles
 │          • description
 │
 ├── intent_limits: list[SemanticIntentLimit]
@@ -123,11 +123,9 @@ UserPolicy
 │          • limit_id, domain, raw text, optional threshold
 │
 └── (per-policy metadata)
-
-SYSTEM_TERMINAL_BLOCKED_PATTERNS  ← system-level safety floor
-                                     merged into every user's TerminalConstraints
-                                     on read; users can append, cannot remove
 ```
+
+The registry stores constraint dicts **opaquely**. It does not validate shapes, resolve dynamic sources (e.g. `contacts_all` → email addresses), or merge system safety floors. Those responsibilities live in the **action bundles** that own each constraint schema (see `intentframe_native_bundles/actions/*/constraints.py` and `intentframe_bundle_sdk/runner.py`).
 
 ### Two important properties
 
@@ -141,17 +139,19 @@ SYSTEM_TERMINAL_BLOCKED_PATTERNS  ← system-level safety floor
 
 ### System floor
 
-The registry merges `SYSTEM_TERMINAL_BLOCKED_PATTERNS` (a tuple of regex patterns for known-catastrophic shell command shapes) into every user's `TerminalConstraints` on read. A user can *add* deny patterns; they cannot remove the system floor. This guarantees a baseline even if the user's terminal policy is empty.
+Terminal command safety floors are **not** applied by the policy registry. `TerminalActionBundle.enforce_constraints` merges `SYSTEM_TERMINAL_BLOCKED_PATTERNS` (defined in `intentframe_native_bundles/actions/terminal/constraints.py`) with the user's `blocked_patterns` at runtime. A user can *add* deny patterns; they cannot remove the system floor. This guarantees a baseline even if the user's terminal policy is empty.
+
+Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jarvis YAML) are also resolved at runtime by the email and message bundles during `enforce_constraints`, via `intentframe_native_bundles/platform/contacts_client.py`.
 
 ### Where to look
 
 - `policy_registry/__init__.py` — public API
-- `policy_registry/registry.py` — `PolicyRegistry` class, system floor merging
+- `policy_registry/registry.py` — `PolicyRegistry` class (opaque CRUD + query)
 - `policy_registry/models.py` — `UserPolicy`, `ActionPermission`, `SemanticIntentLimit`
-- `policy_registry/constraints/` — typed constraint schemas (`file.py`, `email.py`, `message.py`, `terminal.py`)
 - `policy_registry/server.py` — FastAPI service
 - `policy_registry/client.py` — async client for callers
-- `policy_registry/contacts_client.py` — bridges contact-based recipient policies to the macOS Contacts framework
+- `intentframe_native_bundles/actions/*/constraints.py` — typed constraint schemas per action family
+- `intentframe_native_bundles/platform/contacts_client.py` — resolves contact-based policy sources at bundle enforcement time
 
 ---
 
@@ -216,16 +216,16 @@ When an `IntentFrame` arrives at the pipeline:
    → finds the ActionCategory and dispatching adapter
    → "READ_FILE belongs to FILE category, served by FilesAdapter"
 
-2. Pipeline calls policy_registry.get_user_policy(user_id)
+2. Pipeline calls policy_registry.get_user_policy(user_id, agent_id)
    → returns UserPolicy with allowed_actions and intent_limits
-   → "user has READ_FILE allowed with FileConstraints(allowed_paths=['/invoices/'])"
+   → "user has READ_FILE allowed with constraints={'allowed_paths': ['/invoices/']}"
 
-3. DeterministicGuardian checks:
-   - is the action in allowed_actions?     (permission check)
-   - does target satisfy constraints?       (constraint check)
-   - any deny capability tags hit?          (capability check)
-   - any domain hard gate fire?             (domain module check)
-   - any fast-path ALLOW?                   (passive-read or run-command read-only)
+3. DeterministicRunner + action bundles check:
+   - is the action in allowed_actions?              (permission check)
+   - does target satisfy bundle constraints?         (enforce_constraints hook)
+   - any deny capability tags hit?                   (terminal bundle + command_shield)
+   - any domain hard gate fire?                      (domain bundle check)
+   - any fast-path ALLOW?                            (passive-read or allow_gates)
 
 4. If executor reached:
    executor calls resource_registry.executor_view(workspace_id)
@@ -272,5 +272,5 @@ The capability tags that `TerminalConstraints` uses (`capability:read_only:*`, `
 - [processes.md](processes.md) — Where the policy and resource registries sit in the process tree
 - [executor.md](executor.md) — How the executor uses the resource registry's `ExecutorView`
 - [vfs-vs-host-tools.md](vfs-vs-host-tools.md) — Virtual filesystem vs host filesystem tools, both backed by resource_registry
-- [executor/security-model.md](executor/security-model.md) — How `TerminalConstraints` (in policy registry) interact with `command_shield` capability tags
+- [executor/security-model.md](executor/security-model.md) — How `TerminalConstraints` and the terminal bundle system floor interact with `command_shield` capability tags
 - [`../command_shield/README.md`](../command_shield/README.md) — Capability tag taxonomy

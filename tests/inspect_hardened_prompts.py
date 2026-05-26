@@ -8,6 +8,8 @@ Run:  .venv/bin/python tests/inspect_hardened_prompts.py
 
 from __future__ import annotations
 
+import asyncio
+
 from action_registry.types import ActionType
 from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
 from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
@@ -108,7 +110,7 @@ def _bundle_ctx(intent: IntentFrame, **evidence) -> BundleContext:
 
 def _ai_ctx(intent: IntentFrame, bundle, **evidence) -> BundleAIContext:
     ctx = _bundle_ctx(intent, **evidence)
-    return bundle.build_ai_context(ctx.effective_intent, _NO_PERM, ctx)
+    return asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_PERM, ctx))
 
 
 def _ae_system_instructions(ai_ctx: BundleAIContext) -> str:

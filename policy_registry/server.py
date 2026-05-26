@@ -8,11 +8,10 @@ Routes are keyed on the ``(user_id, agent_id)`` pair:
 
     GET    /policies                                  → list all (user, agent) keys
     POST   /policies                                  → upsert (body has both ids)
-    GET    /policies/{user_id}/{agent_id}             → resolved policy
-    GET    /policies/{user_id}/{agent_id}/raw         → raw policy
+    GET    /policies/{user_id}/{agent_id}             → policy (opaque constraints)
     GET    /policies/{user_id}/{agent_id}/permission  → single ActionPermission
     DELETE /policies/{user_id}/{agent_id}             → drop policy
-    PATCH/POST/DELETE /policies/{user_id}/{agent_id}/constraints/...
+    PATCH  /policies/{user_id}/{agent_id}/constraints → update one action's constraints
 
 Startup:
     uvicorn policy_registry.server:app --uds ~/.intentframe/run/policy-registry.sock
@@ -21,18 +20,17 @@ Startup:
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry
-from policy_registry.source_types import ContactSource, RecipientSource
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="IntentFrame Policy Registry", version="0.3.0")
+app = FastAPI(title="IntentFrame Policy Registry", version="0.4.0")
 _registry = PolicyRegistry()
 
 
@@ -54,16 +52,7 @@ async def list_users() -> list[tuple[str, str]]:
 
 @app.get("/policies/{user_id}/{agent_id}", response_model=UserPolicy)
 async def get_user_policy(user_id: str, agent_id: str) -> UserPolicy:
-    """Return policy with all dynamic sources resolved into flat lists."""
-    try:
-        return await _registry.get_user_policy_resolved(user_id, agent_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.get("/policies/{user_id}/{agent_id}/raw", response_model=UserPolicy)
-async def get_user_policy_raw(user_id: str, agent_id: str) -> UserPolicy:
-    """Return policy without source resolution (for management UIs)."""
+    """Return the stored policy (opaque constraint dicts, no resolution)."""
     try:
         return _registry.get_user_policy(user_id, agent_id)
     except KeyError as exc:
@@ -85,174 +74,24 @@ async def delete_user_policy(user_id: str, agent_id: str) -> None:
     _registry.delete_user_policy(user_id, agent_id)
 
 
-# ── Request bodies for management endpoints ─────────────────────────
-
-class PatchRecipientsRequest(BaseModel):
-    add: list[str] = Field(default_factory=list)
-    remove: list[str] = Field(default_factory=list)
+class UpdateConstraintsRequest(BaseModel):
+    """Generic constraint update — callers own the shape."""
+    constraints: dict[str, Any] | None = None
 
 
-class AddSourceRequest(BaseModel):
-    source: str
-    filter: str = ""
-    enabled: bool = True
-
-
-class RemoveSourceRequest(BaseModel):
-    source: str
-    filter: str = ""
-
-
-# ── Email constraint management ─────────────────────────────────────
-
-@app.patch("/policies/{user_id}/{agent_id}/constraints/email")
-async def patch_email_recipients(
+@app.patch("/policies/{user_id}/{agent_id}/constraints")
+async def update_action_constraints(
     user_id: str,
     agent_id: str,
-    body: PatchRecipientsRequest,
-    action: str = "SEND_EMAIL",
-) -> dict:
+    action: str,
+    body: UpdateConstraintsRequest,
+) -> dict[str, str]:
+    """Replace the constraints dict for a single action (opaque)."""
     try:
-        updated = _registry.patch_email_recipients(
-            user_id, agent_id, action, add=body.add, remove=body.remove
+        _registry.update_action_constraints(
+            user_id, agent_id, action, body.constraints
         )
-        return {"status": "ok", "allowed_recipients": updated["allowed_recipients"]}
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.post("/policies/{user_id}/{agent_id}/constraints/email/sources", status_code=201)
-async def add_email_source(
-    user_id: str,
-    agent_id: str,
-    body: AddSourceRequest,
-    action: str = "SEND_EMAIL",
-) -> dict:
-    try:
-        src = RecipientSource(source=body.source, filter=body.filter, enabled=body.enabled)
-        updated = _registry.add_email_source(user_id, agent_id, action, src)
-        return {
-            "status": "ok",
-            "recipient_sources": updated["recipient_sources"],
-        }
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.delete("/policies/{user_id}/{agent_id}/constraints/email/sources")
-async def delete_email_source(
-    user_id: str,
-    agent_id: str,
-    body: RemoveSourceRequest,
-    action: str = "SEND_EMAIL",
-) -> dict:
-    try:
-        updated = _registry.remove_email_source(
-            user_id, agent_id, action, body.source, body.filter
-        )
-        return {
-            "status": "ok",
-            "recipient_sources": updated["recipient_sources"],
-        }
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.get("/policies/{user_id}/{agent_id}/constraints/email/resolved")
-async def get_resolved_email_recipients(
-    user_id: str,
-    agent_id: str,
-    action: str = "SEND_EMAIL",
-) -> dict:
-    """Preview the fully resolved recipient list (explicit + sources)."""
-    try:
-        resolved_policy = await _registry.get_user_policy_resolved(user_id, agent_id)
-        perm = resolved_policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, dict):
-            raise HTTPException(status_code=404, detail=f"No EmailConstraints for {action}")
-        recipients = list(perm.constraints.get("allowed_recipients") or [])
-        return {
-            "action": action,
-            "allowed_recipients": recipients,
-            "count": len(recipients),
-        }
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-# ── Message constraint management ───────────────────────────────────
-
-@app.patch("/policies/{user_id}/{agent_id}/constraints/message")
-async def patch_message_contacts(
-    user_id: str,
-    agent_id: str,
-    body: PatchRecipientsRequest,
-    action: str = "SEND_MESSAGE",
-) -> dict:
-    try:
-        updated = _registry.patch_message_contacts(
-            user_id, agent_id, action, add=body.add, remove=body.remove
-        )
-        return {"status": "ok", "allowed_contacts": updated["allowed_contacts"]}
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.post("/policies/{user_id}/{agent_id}/constraints/message/sources", status_code=201)
-async def add_message_source(
-    user_id: str,
-    agent_id: str,
-    body: AddSourceRequest,
-    action: str = "SEND_MESSAGE",
-) -> dict:
-    try:
-        src = ContactSource(source=body.source, filter=body.filter, enabled=body.enabled)
-        updated = _registry.add_message_source(user_id, agent_id, action, src)
-        return {
-            "status": "ok",
-            "contact_sources": updated["contact_sources"],
-        }
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.delete("/policies/{user_id}/{agent_id}/constraints/message/sources")
-async def delete_message_source(
-    user_id: str,
-    agent_id: str,
-    body: RemoveSourceRequest,
-    action: str = "SEND_MESSAGE",
-) -> dict:
-    try:
-        updated = _registry.remove_message_source(
-            user_id, agent_id, action, body.source, body.filter
-        )
-        return {
-            "status": "ok",
-            "contact_sources": updated["contact_sources"],
-        }
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from None
-
-
-@app.get("/policies/{user_id}/{agent_id}/constraints/message/resolved")
-async def get_resolved_message_contacts(
-    user_id: str,
-    agent_id: str,
-    action: str = "SEND_MESSAGE",
-) -> dict:
-    """Preview the fully resolved contact list (explicit + sources)."""
-    try:
-        resolved_policy = await _registry.get_user_policy_resolved(user_id, agent_id)
-        perm = resolved_policy.allowed_actions.get(action)
-        if perm is None or not isinstance(perm.constraints, dict):
-            raise HTTPException(status_code=404, detail=f"No MessageConstraints for {action}")
-        contacts = list(perm.constraints.get("allowed_contacts") or [])
-        return {
-            "action": action,
-            "allowed_contacts": contacts,
-            "count": len(contacts),
-        }
+        return {"status": "ok"}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
 

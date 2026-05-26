@@ -81,7 +81,7 @@ def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> N
         order.append("evidence")
         return BundlePhaseOutcome.continue_(ctx)
 
-    async def track_enrich(self, intent, ctx, *, verbose=False):
+    async def track_enrich(self, intent, action_permission, ctx, *, verbose=False):
         order.append("enrich")
         ctx.enriched_intent = intent.model_copy(update={"target": "/tmp/x-enriched"})
         return BundlePhaseOutcome.continue_(ctx)
@@ -109,7 +109,7 @@ def test_enrich_must_not_return_terminal() -> None:
 
     bundle = FilesActionBundle()
 
-    async def bad_enrich(self, intent, ctx, *, verbose=False):
+    async def bad_enrich(self, intent, action_permission, ctx, *, verbose=False):
         return BundlePhaseOutcome.block(ctx, reason="nope", matched_gate="bad")
 
     bundle.enrich = bad_enrich.__get__(bundle, FilesActionBundle)

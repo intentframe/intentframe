@@ -57,7 +57,7 @@ class FilesActionBundle(ActionBundle):
         if action_permission.constraints is not None:
             FileConstraints.model_validate(action_permission.constraints)
 
-    def enforce_constraints(
+    async def enforce_constraints(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -77,7 +77,7 @@ class FilesActionBundle(ActionBundle):
             )
         return BundlePhaseOutcome.continue_(ctx)
 
-    def describe_constraints(self, action_permission: ActionPermission) -> str | None:
+    async def describe_constraints(self, action_permission: ActionPermission) -> str | None:
         if action_permission.constraints is None:
             return None
         constraints = FileConstraints.model_validate(action_permission.constraints)
@@ -86,7 +86,7 @@ class FilesActionBundle(ActionBundle):
     def onboarding_guardrails(self) -> str:
         return files_onboarding_guardrails()
 
-    def structural_gates(
+    async def structural_gates(
         self,
         intent: IntentFrame,
         ctx: BundleContext,
@@ -96,7 +96,7 @@ class FilesActionBundle(ActionBundle):
             return BundlePhaseOutcome.continue_(ctx)
         return outcome
 
-    def build_ai_context(
+    async def build_ai_context(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,

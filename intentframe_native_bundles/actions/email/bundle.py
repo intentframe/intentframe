@@ -15,9 +15,11 @@ from intentframe_native_bundles.actions.email.enrich import EMAIL_MESSAGE_ACTION
 from intentframe_native_bundles.actions.email.onboarding_guardrails import (
     email_onboarding_guardrails,
 )
+from intentframe_native_bundles.platform.contacts_client import PlatformContactsClient
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,
+    BundleAIContext,
     BundleContext,
     BundlePhaseOutcome,
 )
@@ -41,6 +43,12 @@ _EMAIL_BUNDLE_ACTIONS: frozenset[str] = frozenset({
     ActionType.DELETE_EMAIL.value,
 }) | _EMAIL_READ_ACTIONS
 
+_SEND_LIKE_ACTIONS = frozenset({
+    ActionType.SEND_EMAIL.value,
+    ActionType.REPLY_EMAIL.value,
+    ActionType.FORWARD_EMAIL.value,
+})
+
 
 class EmailActionBundle(ActionBundle):
     bundle_id = "email"
@@ -51,6 +59,7 @@ class EmailActionBundle(ActionBundle):
         self._client: Any | None = None
         self._client_lock = asyncio.Lock()
         self._closed = False
+        self._contacts = PlatformContactsClient()
 
     async def _get_client(self) -> Any:
         if self._client is None:
@@ -66,11 +75,12 @@ class EmailActionBundle(ActionBundle):
     async def enrich(
         self,
         intent: IntentFrame,
+        action_permission: ActionPermission,
         ctx: BundleContext,
         *,
         verbose: bool = False,
     ) -> BundlePhaseOutcome:
-        del verbose
+        del action_permission, verbose
         if intent.action.value in EMAIL_MESSAGE_ACTIONS:
             client = await self._get_client()
             ctx.enriched_intent = await enrich_intent(intent, client=client)
@@ -81,12 +91,13 @@ class EmailActionBundle(ActionBundle):
         client, self._client = self._client, None
         if client is not None:
             await client.close()
+        self._contacts.invalidate()
 
     def validate_constraints(self, action_permission: ActionPermission) -> None:
         if action_permission.constraints is not None:
             EmailConstraints.model_validate(action_permission.constraints)
 
-    def enforce_constraints(
+    async def enforce_constraints(
         self,
         intent: IntentFrame,
         action_permission: ActionPermission,
@@ -98,7 +109,15 @@ class EmailActionBundle(ActionBundle):
         if action_permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
         constraints = EmailConstraints.model_validate(action_permission.constraints)
-        passed, reason = self._check(intent, constraints)
+
+        # Resolve dynamic recipient sources here — the natural place since
+        # "is this recipient allowed?" is a constraint check, not enrichment.
+        allowed = list(constraints.allowed_recipients)
+        if intent.action.value in _SEND_LIKE_ACTIONS and constraints.recipient_sources:
+            resolved = await self._contacts.resolve_sources(constraints.recipient_sources)
+            allowed = list(set(allowed) | set(resolved))
+
+        passed, reason = self._check(intent, allowed_recipients=allowed)
         if not passed:
             return BundlePhaseOutcome.block(
                 ctx,
@@ -107,7 +126,7 @@ class EmailActionBundle(ActionBundle):
             )
         return BundlePhaseOutcome.continue_(ctx)
 
-    def describe_constraints(self, action_permission: ActionPermission) -> str | None:
+    async def describe_constraints(self, action_permission: ActionPermission) -> str | None:
         if action_permission.constraints is None:
             return None
         constraints = EmailConstraints.model_validate(action_permission.constraints)
@@ -126,7 +145,8 @@ class EmailActionBundle(ActionBundle):
     def _check(
         self,
         intent: IntentFrame,
-        constraints: EmailConstraints,
+        *,
+        allowed_recipients: list[str],
     ) -> tuple[bool, str]:
         data = intent.data or {}
         action = intent.action.value
@@ -140,6 +160,6 @@ class EmailActionBundle(ActionBundle):
                 )
             return False, "No recipient email address specified"
         for addr in recipients:
-            if not any(fnmatch.fnmatch(addr, pat) for pat in constraints.allowed_recipients):
+            if not any(fnmatch.fnmatch(addr, pat) for pat in allowed_recipients):
                 return False, f"Recipient '{addr}' not in allowed recipients"
         return True, ""

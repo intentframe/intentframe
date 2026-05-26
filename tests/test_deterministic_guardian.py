@@ -17,7 +17,7 @@ benignness under an adversarial agent.
 
 Also covers:
 
-  - Fail-closed exception path (BLOCK + matched_gate=exception, never ALLOW/AI)
+  - Fail-closed exception path (BLOCK + matched_gate=hook_crash, never ALLOW/AI)
   - deny_capabilities blocks the read-only fast-path
   - Incompatible capability tags disqualify the read-only fast-path
   - Code-intel findings / edge signals disqualify the fast-path
@@ -536,7 +536,7 @@ class TestFailClosedExceptionHandling:
 
     def test_exception_yields_block_not_allow_or_undecided(self, monkeypatch):
         """If a checker raises, DG must BLOCK fail-closed with
-        matched_gate=exception and dg_exception set — not fall through
+        matched_gate=hook_crash and dg_exception set — not fall through
         to the AI path.
         """
         dg = DeterministicGuardian()
@@ -544,8 +544,8 @@ class TestFailClosedExceptionHandling:
         from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
         from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
-        def raise_boom(*args, **kwargs):
-            del args, kwargs
+        async def raise_boom(self, intent, action_permission, ctx, *, verbose=False):
+            del self, intent, action_permission, ctx, verbose
             raise RuntimeError("boom")
 
         monkeypatch.setattr(TerminalActionBundle, "enforce_constraints", raise_boom)
@@ -559,9 +559,9 @@ class TestFailClosedExceptionHandling:
             dg,
         )
         assert result.decision is DeterministicDecision.BLOCK
-        assert result.matched_gate == "exception"
+        assert result.matched_gate == "hook_crash"
         assert result.dg_exception == "RuntimeError('boom')"
-        assert result.decision_path == "deterministic"
+        assert result.decision_path == "hook_crash"
 
 
 if __name__ == "__main__":

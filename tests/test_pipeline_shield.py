@@ -652,8 +652,8 @@ class TestDgExceptionFailClosed:
     def test_dg_exception_blocks_without_ai_and_audits_dg_exception(self, monkeypatch):
         from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
-        def raise_boom(*args, **kwargs):
-            del args, kwargs
+        async def raise_boom(self, intent, action_permission, ctx, *, verbose=False):
+            del self, intent, action_permission, ctx, verbose
             raise RuntimeError("boom")
 
         from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
@@ -673,7 +673,7 @@ class TestDgExceptionFailClosed:
         result = _run(runtime.process_intent(_intent("ls"), ctx))
 
         assert not result.success
-        assert result.data["matched_gate"] == "exception"
+        assert result.data["matched_gate"] == "hook_crash"
         assert result.data["decision"] == "BLOCK"
         runtime.analysis_engine.analyze.assert_not_called()
         runtime.guardian.validate.assert_not_called()
@@ -681,9 +681,9 @@ class TestDgExceptionFailClosed:
 
         entry = runtime.audit_log[-1]
         assert entry["decision"] == "BLOCK"
-        assert entry["matched_gate"] == "exception"
+        assert entry["matched_gate"] == "hook_crash"
         assert entry["dg_exception"] == "RuntimeError('boom')"
-        assert entry["decision_path"] == "deterministic"
+        assert entry["decision_path"] == "hook_crash"
 
 
 class TestBundleSdkAuditFields:

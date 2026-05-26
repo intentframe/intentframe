@@ -57,10 +57,11 @@ def test_candidate_bundles_have_bundle_module(bundle_id: str) -> None:
     assert bundle_path.is_file(), f"missing bundle module for {bundle_id!r}"
 
 
-def test_only_email_bundle_declares_aclose() -> None:
+def test_only_contacts_bundles_declare_aclose() -> None:
+    """Bundles that hold a PlatformContactsClient must implement aclose."""
     pattern = re.compile(r"async def aclose\(")
     bundles_with_aclose: list[str] = []
     for path in sorted(ACTIONS_ROOT.glob("*/bundle.py")):
         if pattern.search(path.read_text(encoding="utf-8")):
             bundles_with_aclose.append(path.parent.name)
-    assert bundles_with_aclose == ["email"]
+    assert bundles_with_aclose == ["email", "message"]
