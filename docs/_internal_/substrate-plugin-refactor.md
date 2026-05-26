@@ -77,13 +77,19 @@ DeterministicRunner (SDK) — fixed gate order:
 
 ```
 intentframe_native_bundles/
-  actions/<family>/     # ActionBundle implementations
+  actions/<family>/     # ActionBundle implementations (bundle-local constraints, gates)
+  shared/<topic>/       # Cross-family libraries (not bundles; e.g. shared/files/ write-payload tooling)
   domains/<domain>/     # DomainBundle implementations (finance, deletion)
   platform/             # Shared runtime helpers (e.g. contacts_client for policy sources)
   domain_routes.py      # domain_id → action ids (routing manifest)
   onboarding/           # first-party onboarding copy
   __init__.py           # register_bundles(registry) only
 ```
+
+Import layering (CI-enforced in `tests/test_boundary_imports.py`):
+
+- `actions/<A>/` may import `shared/*` and `intentframe_bundle_sdk`; must not import `actions/<B>/` when A ≠ B.
+- `shared/<topic>/` may import SDK and third-party libs; must not import any `actions/<bundle>/` module.
 
 Three concepts stay **separate** (do not collapse):
 
@@ -227,7 +233,7 @@ Plugins own Pydantic validation via `validate_constraints` at startup and `enfor
 
 ### Heuristics package
 
-Legacy `intentframe_components/heuristics/` (`is_sensitive_write_path`, `classify_path_category`) moved to `actions/files/path_heuristics.py`. Still used for **BLOCK-only** deterministic gates and file_intel context — not for payload ALLOW shortcuts (removed before `66e567c`).
+Legacy `intentframe_components/heuristics/` (`is_sensitive_write_path`, `classify_path_category`) moved to `shared/files/path_heuristics.py`. `files` and `host_files` bundles import from `shared/files/` for write-payload tooling (`FileIntel`, `pre_pipeline`, `ai_context`, etc.); virtual vs real path enforcement stays in each bundle's own `constraints.py` and `deterministic.py`. Heuristics are used for **BLOCK-only** deterministic gates and file_intel context — not for payload ALLOW shortcuts (removed before `66e567c`).
 
 ---
 
