@@ -8,10 +8,10 @@ from action_registry.types import ActionType
 from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
 from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.files.evidence import FileIntel
+from intentframe_native_bundles.shared.files.evidence import FileIntel
 from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
-from intentframe_native_bundles.actions.files.prompts_ae import _CRITICAL_WRITE_FILE
+from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.shared.files.prompts_ae import _CRITICAL_WRITE_FILE
 from intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
@@ -118,6 +118,19 @@ class TestFilesBundleAIContext:
         ctx = _bundle_ctx(_intent(ActionType.WRITE_FILE, "/tmp/x.py"), file_intel=fi)
         ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
         assert "WRITE_FILE — PAYLOAD SIGNALS" in ai_ctx.ae_external_context
+
+    def test_append_row_uses_substrate_default_prompt(self):
+        bundle = FilesActionBundle()
+        ctx = _bundle_ctx(_intent(ActionType.APPEND_ROW, "/expense_tracker.md"))
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
+        assert ai_ctx.ae_system_instructions is None
+        assert ai_ctx.ae_prompt_label is None
+
+    def test_delete_file_uses_substrate_default_prompt(self):
+        bundle = FilesActionBundle()
+        ctx = _bundle_ctx(_intent(ActionType.DELETE_FILE, "/tmp/x"))
+        ai_ctx = asyncio.run(bundle.build_ai_context(ctx.effective_intent, _NO_CONSTRAINTS, ctx))
+        assert ai_ctx.ae_system_instructions is None
 
 
 class TestHostFilesBundleAIContext:

@@ -6,9 +6,9 @@ import json
 
 from action_registry.types import ActionType
 from command_shield.verdict import Signal
-from intentframe_native_bundles.actions.files.evidence import FileIntel
+from intentframe_native_bundles.shared.files.evidence import FileIntel
 from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
 from intentframe_native_bundles.actions.terminal.evidence_keys import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,

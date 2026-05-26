@@ -1,0 +1,284 @@
+PROMPT ROUTING PARITY REPORT
+========================================================================
+Generated:        2026-05-26 18:20:28 UTC
+Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/prompt_routing_legacy_baseline.txt
+Legacy commit:      66e567c
+Inspect script:     tests/inspect_prompt_routing.py
+
+OVERALL:            PASS  (rows 65/65, blocks 2/2)
+
+ROUTING ROW DETAILS
+------------------------------------------------------------------------
+[PASS] ADD_CONTACT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] APPEND_ROW
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] ASK_USER
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] COMPLETE_REMINDER
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] CREATE_EVENT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] CREATE_NOTE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] CREATE_REMINDER
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_CONTACT
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_EMAIL
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_EVENT
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_FILE
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_HOST_FILE
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_NOTE
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DELETE_REMINDER
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] DOWNLOAD_ATTACHMENT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] FORWARD_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_BRIGHTNESS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_CLIPBOARD
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_CONFIRMATION
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_CONTACT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_DARK_MODE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_MUTE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_PAGE_CONTENT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_SYSTEM_INFO
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] GET_VOLUME
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] HTTP_GET
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] HTTP_POST
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_CALENDARS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_DIRECTORY
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_EVENTS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_HOST_DIRECTORY
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_NOTES
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_REMINDERS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] LIST_REMINDER_LISTS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] MARK_READ_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] MOVE_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] OPEN_URL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] PAY_INVOICE
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] READ_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] READ_FILE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] READ_HOST_FILE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] READ_MESSAGES
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] READ_NOTE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] REPLY_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] RUN_COMMAND
+       baseline: critical_run_command|critical|2dbdce4a6ff7a2f43e7c40111424b0cffdcd8ebcdee68ae017f839213f5d97cb|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_run_command|critical|2dbdce4a6ff7a2f43e7c40111424b0cffdcd8ebcdee68ae017f839213f5d97cb|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEARCH_CONTACTS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEARCH_EMAIL
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEARCH_EVENTS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEARCH_SPOTLIGHT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEARCH_WEB
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEND_EMAIL
+       baseline: critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_generic|critical|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SEND_MESSAGE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SET_BRIGHTNESS
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SET_CLIPBOARD
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SET_VOLUME
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SHOW_MESSAGE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] SHOW_NOTIFICATION
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] TOGGLE_DARK_MODE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] TOGGLE_MUTE
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] UPDATE_CONTACT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] UPDATE_EVENT
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] UPDATE_REMINDER
+       baseline: standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  standard|standard|a5030beaed9729a41e06181e7394ebecaadc4676e6b289772aa63691cc61437a|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] WRITE_FILE
+       baseline: critical_write_file|standard|9a71cfd654c6a9964921fdeef9cc6de278853b5f03d02ac129a8552a52ebe778|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_write_file|standard|9a71cfd654c6a9964921fdeef9cc6de278853b5f03d02ac129a8552a52ebe778|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+[PASS] WRITE_HOST_FILE
+       baseline: critical_write_file|standard|9a71cfd654c6a9964921fdeef9cc6de278853b5f03d02ac129a8552a52ebe778|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+       current:  critical_write_file|standard|9a71cfd654c6a9964921fdeef9cc6de278853b5f03d02ac129a8552a52ebe778|849f58bfbe77b1d97f1d5f0d961fec1408589d7925a0636abfd0b013087e2d4f
+
+PROMPT BODY BLOCKS
+------------------------------------------------------------------------
+[PASS] AE SYSTEM PROMPT BODIES
+       baseline sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+       current  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+       chars: baseline=0  current=0
+
+[PASS] GUARDIAN SYSTEM PROMPT BODIES
+       baseline sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+       current  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+       chars: baseline=0  current=0
+
+All routing rows and prompt bodies match legacy 66e567c.

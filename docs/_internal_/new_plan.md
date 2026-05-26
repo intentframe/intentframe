@@ -242,7 +242,9 @@ Constraint prompt context fallbacks (all inside the SDK runner, never in Guardia
 
 ```
 intentframe_native_bundles/
-  __init__.py                # register_bundles(registry) + temporary _ensure_first_party_bundles_loaded() shim
+  __init__.py                # register_bundles(registry) only (shim removed in Phase 7)
+  shared/
+    files/                   # FileIntel, pre_pipeline, path_heuristics, AE write prompts (files + host_files)
   actions/
     api/                     PAY_INVOICE, HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE (+ ApiConstraints)
     terminal/                RUN_COMMAND
@@ -272,7 +274,7 @@ Per family:
 - `actions.py` owns its action-id sets.
 - `constraints.py` owns plugin-local Pydantic constraint parsing (only if the family has constraints).
 - `bundle.py` owns action ids, passive-read ids, `validate_constraints`, `enforce_constraints`, `describe_constraints`, `structural_gates`, `allow_gates`, `build_ai_context`.
-- `evidence.py` exists only where the family has typed evidence (`terminal` → `CommandIntel`, `files`/`host_files` → `FileIntel`).
+- `evidence.py` exists only where the family has bundle-local typed evidence (`terminal` → `CommandIntel` in `actions/terminal/evidence.py`). Write-family `FileIntel` lives in `shared/files/evidence.py` and is consumed by both `files` and `host_files` bundles.
 
 Per-family passive-read ids (locked):
 
@@ -402,8 +404,8 @@ Exit: ✅ Registry round-trips opaque dicts; dashboard renders policies; substra
 Scope (one family at a time under `actions/`, in this order to minimize churn):
 
 1. `actions/terminal/`: fold legacy bundle; move constraints to `actions/terminal/constraints.py`; `_capability_match.py`; evidence in `actions/terminal/evidence.py`.
-2. `actions/files/`: fold + move `FileConstraints` and `FileIntel`.
-3. `actions/host_files/`: fold + move `HostFileConstraints` (`FileIntel` shared from `actions/files/evidence.py`).
+2. `actions/files/`: fold + move `FileConstraints`; write-payload modules in `shared/files/` (see post-Phase-3 layout above).
+3. `actions/host_files/`: fold + move `HostFileConstraints`; import write-payload from `shared/files/` (not from `actions/files/`).
 4. `actions/email/`: fold + move `EmailConstraints`.
 5. `actions/api/`: first-class `ApiActionBundle` including `PAY_INVOICE`; move `ApiConstraints`.
 6. `domains/finance/`: `FinanceDomainBundle` + plugin-local `FinanceConstraints` (no finance action family).
