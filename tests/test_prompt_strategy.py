@@ -8,10 +8,10 @@ from action_registry.types import ActionType
 from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
 from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.files.evidence import FileIntel
+from intentframe_native_bundles.shared.files.evidence import FileIntel
 from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
-from intentframe_native_bundles.actions.files.prompts_ae import _CRITICAL_WRITE_FILE
+from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.shared.files.prompts_ae import _CRITICAL_WRITE_FILE
 from intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,

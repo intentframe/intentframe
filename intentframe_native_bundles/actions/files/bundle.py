@@ -8,18 +8,18 @@ from action_registry.types import ActionType
 from intentframe_core.paths import normalize_virtual_path
 from intentframe_core.types import IntentFrame
 
-from intentframe_native_bundles.actions.files.ai_context import (
+from intentframe_native_bundles.shared.files.ai_context import (
     render_file_external_context,
     select_write_file_ae_system_instructions,
 )
 from intentframe_native_bundles.actions.files.constraints import FileConstraints
 from intentframe_native_bundles.actions.files.deterministic import decide_write_file_sensitive_path
-from intentframe_native_bundles.actions.files.evidence import FileIntel
-from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.shared.files.evidence import FileIntel
+from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
 from intentframe_native_bundles.actions.files.onboarding_guardrails import (
     files_onboarding_guardrails,
 )
-from intentframe_native_bundles.actions.files.pre_pipeline import run_files_pre_pipeline
+from intentframe_native_bundles.shared.files.pre_pipeline import run_files_pre_pipeline
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.types import (
     ActionPermission,

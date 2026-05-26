@@ -8,13 +8,13 @@ from action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
 from resource_registry.floor import canonicalize_real_path
 
-from intentframe_native_bundles.actions.files.ai_context import (
+from intentframe_native_bundles.shared.files.ai_context import (
     render_file_external_context,
     select_write_file_ae_system_instructions,
 )
-from intentframe_native_bundles.actions.files.evidence import FileIntel
-from intentframe_native_bundles.actions.files.evidence_keys import FILE_INTEL_KEY
-from intentframe_native_bundles.actions.files.pre_pipeline import run_files_pre_pipeline
+from intentframe_native_bundles.shared.files.evidence import FileIntel
+from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_bundles.shared.files.pre_pipeline import run_files_pre_pipeline
 from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
 from intentframe_native_bundles.actions.host_files.deterministic import (
     HOST_FILE_ACTIONS,

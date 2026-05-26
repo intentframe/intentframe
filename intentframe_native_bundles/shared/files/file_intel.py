@@ -9,8 +9,8 @@ from pathlib import Path
 
 from action_registry.types import ActionType
 from command_shield import inspect_code as shield_inspect_code
-from intentframe_native_bundles.actions.files.path_heuristics import classify_path_category
-from intentframe_native_bundles.actions.files.evidence import (
+from intentframe_native_bundles.shared.files.path_heuristics import classify_path_category
+from intentframe_native_bundles.shared.files.evidence import (
     FILE_DESTINATION_KIND,
     FILE_PARENT_KIND,
     FileIntel,
@@ -26,7 +26,7 @@ __all__ = [
     "WRITE_FILE_ACTIONS",
 ]
 
-from intentframe_native_bundles.actions.files.actions import WRITE_FILE_ACTIONS
+from intentframe_native_bundles.shared.files.actions import WRITE_FILE_ACTIONS
 
 _HOST_PATH_ACTIONS: frozenset[str] = frozenset({
     ActionType.WRITE_HOST_FILE.value,
