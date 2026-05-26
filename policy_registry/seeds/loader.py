@@ -83,7 +83,6 @@ def load_policy_seed(
     path = Path(yaml_path)
     raw = _read_yaml(path)
     _validate_schema_version(raw, source=path)
-    _normalise_domain_constraints(raw)
 
     if user_id is not None:
         raw["user_id"] = user_id
@@ -146,30 +145,6 @@ def _validate_schema_version(raw: dict[str, Any], *, source: Path) -> None:
             f"but this build of IntentFrame supports schema version {expected}. "
             f"Either update the YAML to the new schema or pin to a matching IntentFrame release."
         )
-
-
-def _normalise_domain_constraints(raw: dict[str, Any]) -> None:
-    """Inject the dict key into each ``domain_constraints`` value as ``domain``.
-
-    The YAML schema is ``domain_constraints: {<domain>: {<fields>}}``,
-    which is friendly to author but does not carry the ``domain`` field
-    that domain bundles may read at enforce time.  Inject the key into
-    each value (no-op when the field is already present and matches).
-    """
-    dc = raw.get("domain_constraints")
-    if not isinstance(dc, dict):
-        return
-    for domain_name, value in dc.items():
-        if not isinstance(value, dict):
-            continue
-        existing = value.get("domain")
-        if existing is None:
-            value["domain"] = domain_name
-        elif existing != domain_name:
-            raise ValueError(
-                f"domain_constraints[{domain_name!r}] has conflicting "
-                f"`domain: {existing!r}` field; remove it or align with the key."
-            )
 
 
 __all__ = [

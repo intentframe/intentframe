@@ -22,6 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from intentframe_gateway import bootstrap
 from jarvis.policies import builtin_policy_path
@@ -113,6 +114,44 @@ def test_explicit_user_id_and_agent_id_win() -> None:
     )
     assert policy.user_id == "explicit-user"
     assert policy.agent_id == "explicit-agent"
+
+
+def test_demo_test_policy_domain_constraints_validate_at_load() -> None:
+    """Attack/red-team YAML carries domain_constraints; loader must not inject legacy ``domain`` keys."""
+    yaml_path = Path(__file__).resolve().parents[1] / "demo" / "config" / "test_policy.yaml"
+    policy = load_policy_seed(
+        yaml_path,
+        user_id="attack_tester",
+        agent_id="stub_pipeline_agent",
+    )
+    finance = policy.domain_constraints["finance"]
+    deletion = policy.domain_constraints["deletion"]
+    assert finance["max_amount"] == 5000.0
+    assert finance["allowed_currencies"] == ["USD"]
+    assert deletion["require_confirmation"] is True
+    assert deletion["block_irreversible"] is True
+    assert "domain" not in finance
+    assert "domain" not in deletion
+
+
+def test_domain_constraints_reject_legacy_domain_field(tmp_path: Path) -> None:
+    """domain_constraints values must not carry a legacy ``domain`` discriminator."""
+    yaml_path = _write_yaml(
+        tmp_path / "legacy_domain_field.yaml",
+        "intentframe_schema_version: 1\n"
+        "agent_id: stub_pipeline_agent\n"
+        "allowed_actions:\n"
+        "  PAY_INVOICE:\n"
+        "    safe: false\n"
+        "    constraints:\n"
+        "      max_amount: 5000.0\n"
+        "domain_constraints:\n"
+        "  finance:\n"
+        "    domain: finance\n"
+        "    max_amount: 5000.0\n",
+    )
+    with pytest.raises(ValidationError, match="domain"):
+        load_policy_seed(yaml_path, user_id="u", agent_id="stub_pipeline_agent")
 
 
 # ── Schema version validation ────────────────────────────────────────────────
