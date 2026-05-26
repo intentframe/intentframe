@@ -418,7 +418,7 @@ For every bundle: implement `validate_constraints` (Pydantic `model_validate(...
 
 Replace per-family `passive_read_action_ids` to match the locked list in Section 8.
 
-Exit: ✅ Each family folder under `actions/` is the source of truth. Domain overlays live under `domains/` only. **Remaining:** delete duplicate top-level family folders and stale `policy_registry/constraints/` + `policy_registry/domains/` copies (Phase 6).
+Exit: ✅ Each family folder under `actions/` is the source of truth. Domain overlays live under `domains/` only. Legacy `policy_registry/constraints/` + `policy_registry/domains/` copies deleted in Phase 6.
 
 ### Phase 4 — Runner wiring (passive-read gate + constraint prompt context + domain routing) ✅
 
@@ -454,7 +454,7 @@ Scope:
 - `intentframe_components/onboarding/engine.py`: switch manifest-driven listings to `all_action_bundles()`.
 - `intentframe_native_bundles/onboarding/summarize_constraints.py`: delegate to `bundle.describe_constraints(action_permission)` with dict-dump fallback.
 
-Exit: ✅ Guardian renders prompts from `BundleAIContext` data only. **Remaining:** delete dead `guardian/checkers/` package (Phase 6).
+Exit: ✅ Guardian renders prompts from `BundleAIContext` data only. Dead `guardian/checkers/` package deleted in Phase 6.
 
 ### Phase 6 — Atomic legacy scaffolding deletion ✅
 
@@ -462,7 +462,12 @@ Delete everything remaining in Section 9 ("Still to delete"). Do it in one wave 
 
 Sub-steps:
 - Migrate the 12+ test imports of `ensure_bundles_registered` / `_ensure_first_party_bundles_loaded` to a shared helper `tests/_bundle_loader.py` that calls `_ensure_first_party_bundles_loaded()` (in this phase) and `ensure_loaded(["intentframe_native_bundles"])` (in Phase 7).
-- Delete `guardian/checkers/`, duplicate top-level family folders, `policy_registry/constraints/`, `policy_registry/domains/`.
+### Phase 6 — Legacy scaffolding deletion ✅
+
+Deleted:
+
+- `guardian/checkers/`, duplicate top-level family folders, `policy_registry/constraints/`, `policy_registry/domains/`.
+- Policy-registry coupling to bundle business logic (terminal system floor, contact resolution, constraint schemas) moved into `intentframe_native_bundles/` in follow-on commits (`88d61f6`, `0c27a38`).
 
 Exit: ✅ workspace builds with no dead imports; tests pass via `tests/_bundle_loader.py`.
 

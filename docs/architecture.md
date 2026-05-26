@@ -141,15 +141,15 @@ This is the L0–L4 numbering used by the code (`intentframe_components/guardian
 | # | Code label | What it is | Lives inside (View A) |
 |---|---|---|---|
 | L0 | `command_shield` | Terminal command AST + capability tagging | L3 stage's pre-AE deterministic floor |
-| L1 | `policy_registry` floor | System blocked patterns merged into user policy | Loaded into L4 Guardian context |
+| L1 | Terminal bundle system floor | `SYSTEM_TERMINAL_BLOCKED_PATTERNS` merged at `TerminalActionBundle.enforce_constraints` | L4 Guardian (via `DeterministicRunner`) |
 | L2 | `analysis_engine` catastrophic path | Hardcoded substring catastrophic recognition inside the AE | L3 Analysis Engine |
-| L3a | `DeterministicGuardian` (pre-AE pass) | Permission, constraint, domain-module checks; passive-read and read-only RUN_COMMAND fast-path; `TerminalChecker` | L4 Guardian |
+| L3a | `DeterministicGuardian` (pre-AE pass) | Permission check; `DeterministicRunner` + action bundles (`enforce_constraints`, domain gates, structural/allow gates); passive-read and read-only RUN_COMMAND fast-path | L4 Guardian |
 | L3b | `AIGuardian` | The semantic AI judgement | L4 Guardian |
 | L4 | `executor/adapter` | `quick_check()` regex floor at the execution boundary | L5 Executor |
 
 ### The "five deterministic layers" referenced elsewhere
 
-When other docs say *"five deterministic layers cannot be prompt-injected"*, they mean: L0 (`command_shield`), L1 (Policy Registry floor), L2 (AE catastrophic path), L3a (`DeterministicGuardian`, including `TerminalChecker`), and L4 (adapter `quick_check()`) from View B. L3b (the AIGuardian) is the only AI-decision point in the deterministic stack.
+When other docs say *"five deterministic layers cannot be prompt-injected"*, they mean: L0 (`command_shield`), L1 (terminal bundle system floor), L2 (AE catastrophic path), L3a (`DeterministicGuardian`, including bundle constraint enforcement), and L4 (adapter `quick_check()`) from View B. L3b (the AIGuardian) is the only AI-decision point in the deterministic stack.
 
 ### Why `command_shield` and adapter `quick_check()` are listed as separate layers
 

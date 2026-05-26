@@ -192,8 +192,8 @@ These are the strongest parts of the system. If these gates block, the AI does n
 | # | Layer | What it checks | Can it be prompt-injected? |
 |---|---|---|---|
 | 1 | `command_shield` | Terminal command patterns, normalization, AST decomposition, capability tag emission | No — pure regex/AST |
-| 2 | `DeterministicGuardian` (pre-AE pass) | Permission check (deny-by-default), per-action constraints, domain module gates, `TerminalChecker` blocklist/allowlist, capability tag policy (`deny_capabilities`, `allow_capabilities`), passive-read fast-path, read-only RUN_COMMAND fast-path | No — deterministic rule evaluation (fnmatch + set intersection) |
-| 3 | Policy Registry floor | System blocked patterns always merged | No — code, not AI |
+| 2 | `DeterministicGuardian` (pre-AE pass) | Permission check (deny-by-default); `DeterministicRunner` + action bundles for constraint enforcement, domain gates, structural/allow gates; terminal blocklist/allowlist and capability tag policy (`deny_capabilities`, `allow_capabilities`); passive-read fast-path; read-only RUN_COMMAND fast-path | No — deterministic rule evaluation (fnmatch + set intersection) |
+| 3 | Terminal bundle system floor | `SYSTEM_TERMINAL_BLOCKED_PATTERNS` merged at `TerminalActionBundle.enforce_constraints` — users can append, never remove | No — code, not AI |
 | 4 | Analysis Engine catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
 | 5 | Adapter `quick_check()` | Last-resort pattern match at execution boundary, after Guardian approval, before invoking the underlying tool | No — pure regex |
 

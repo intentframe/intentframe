@@ -30,7 +30,7 @@ See [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md
 
 A compromised agent can inject any text into `reason`, `data`, and `target` fields. These fields flow into the Guardian's prompt. The defense is not "detect and filter injection" — it is structural:
 
-1. **Five deterministic layers cannot be prompt-injected** — `command_shield`, `DeterministicGuardian`, Policy Registry floor, AE catastrophic path, adapter `quick_check()`. Each is pure code/regex/AST with no AI component.
+1. **Five deterministic layers cannot be prompt-injected** — `command_shield`, `DeterministicGuardian` (including bundle constraint enforcement), terminal bundle system floor, AE catastrophic path, adapter `quick_check()`. Each is pure code/regex/AST with no AI component.
 
 2. **AE field bounds close the transitive path** — all AE free-text fields have `maxLength`/`maxItems` constraints (largest: 600 chars). No single field can carry a complete jailbreak payload (typical requirement: 800–1500+ chars). `_detect_overflow()` flags anomalies.
 

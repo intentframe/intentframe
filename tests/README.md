@@ -73,10 +73,11 @@ layer is bypassed or compromised, the others still block.
 
 | Test Class | Layer | What It Covers |
 |---|---|---|
-| `TestPolicyRegistryFloor` | Layer 1 — Policy Registry | System blocked patterns (`sudo`, `rm -rf /`, etc.) are always merged into user policy. Users can append but never remove system patterns. No duplicates. Allowed commands preserved alongside blocklist. |
-| `TestAnalysisEngineCatastrophic` | Layer 2 — Analysis Engine | `_try_catastrophic_report()` returns deterministic `CRITICAL`/`IRREVERSIBLE` reports for known patterns **without calling AI**. Safe commands return `None` (fall through to AI). Non-RUN_COMMAND skipped. |
-| `TestTerminalCheckerBlocklist` | Layer 3 — Guardian | `TerminalChecker.check()` enforces blocklist (substring match) and allowlist (glob match). Blocklist beats allowlist. Empty blocklist allows all. Custom user patterns work. |
-| `TestTerminalCheckerSummarize` | Layer 3 — Guardian | Human-readable constraint summaries for Guardian prompts. |
+| `TestTerminalBundleSystemFloor` | Layer 1 — Terminal bundle | `SYSTEM_TERMINAL_BLOCKED_PATTERNS` enforced by `TerminalActionBundle.enforce_constraints`. Users can append but never remove system patterns. No duplicates. Allowed commands preserved alongside blocklist. |
+| `TestTerminalCatastrophicPatterns` | Layer 2 — Analysis Engine | `try_catastrophic_report()` returns deterministic `CRITICAL`/`IRREVERSIBLE` reports for known patterns **without calling AI**. Safe commands return `None` (fall through to AI). Non-RUN_COMMAND skipped. |
+| `TestTerminalBundleBlocklist` | Layer 3 — Terminal bundle | `enforce_constraints` enforces blocklist (substring match) and allowlist (glob match). Blocklist beats allowlist. Empty blocklist allows all (subject to system floor). Custom user patterns work. |
+| `TestTerminalBundleDescribe` | Layer 3 — Terminal bundle | Human-readable constraint summaries for Guardian prompts via `describe_constraints`. |
+| `TestTerminalBundleCapabilities` | Layer 3 — Terminal bundle | `deny_capabilities` / `allow_capabilities` enforcement using `CommandIntel` from command_shield. |
 | `TestAdapterCommandShieldFloor` | Layer 4 — Executor | `TerminalAdapter` calls `command_shield.quick_check()` as a non-negotiable last resort. Blocks catastrophic commands. Returns well-formed `ExecutionResult`. Allows safe commands and safe `rm` paths. 50+ patterns loaded. |
 | `TestComponentIndependence` | All layers | Walks `sudo` through **every layer** independently and proves each one blocks it. Verifies all layers know the original 6 blocked patterns. |
 | `TestEdgeCases` | Layer 4 | Empty command, missing command key, wrong action type, pattern hidden in middle of chained command, `TerminalConstraints` model is frozen (immutable). |
@@ -99,8 +100,8 @@ Intent arrives
 └────────────────────┬────────────────────────────┘
                      ▼
 ┌─────────────────────────────────────────────────┐
-│  Layer 1: Policy Registry floor                  │ ← test_terminal_blocklist.py
-│  System patterns always merged, can't be removed │
+│  Layer 1: Terminal bundle system floor           │ ← test_terminal_blocklist.py
+│  SYSTEM_TERMINAL_BLOCKED_PATTERNS at enforce time│
 └────────────────────┬────────────────────────────┘
                      ▼
 ┌─────────────────────────────────────────────────┐
@@ -109,8 +110,8 @@ Intent arrives
 └────────────────────┬────────────────────────────┘
                      ▼
 ┌─────────────────────────────────────────────────┐
-│  Layer 3: Guardian — TerminalChecker             │ ← test_terminal_blocklist.py
-│  Blocklist/allowlist constraint enforcement      │
+│  Layer 3: Terminal bundle — enforce_constraints  │ ← test_terminal_blocklist.py
+│  Blocklist/allowlist/capability enforcement      │
 └────────────────────┬────────────────────────────┘
                      ▼
 ┌─────────────────────────────────────────────────┐

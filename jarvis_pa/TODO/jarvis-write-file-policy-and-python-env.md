@@ -289,7 +289,7 @@ The original 7a sketch (`FileIntel` plumbing + tri-class destination classifier 
 
 `RUN_COMMAND` is fully covered by the macOS Seatbelt profile (`executor/sandbox/planner.py`, `executor/sandbox/platforms/macos.py`). The profile honors `NON_NEGOTIABLE_DENY_WRITE` (`executor/sandbox/templates.py:76-84`) so a shell command that tries to write `~/Library/LaunchAgents/com.evil.plist` is denied at the kernel regardless of policy.
 
-`WRITE_FILE` does **not** go through that profile. It lands in `executor/platforms/macos/virtual_filesystem.py:160-176`, which does a plain `real_path.write_text(content)` after a mount-writability check. The non-negotiable deny list is never consulted. The policy-level `FileConstraints` is a pure `fnmatch` allow-list with no deny vocabulary (`policy_registry/constraints/file.py:8-19`, `intentframe_components/guardian/checkers/file.py:39-48`).
+`WRITE_FILE` does **not** go through that profile. It lands in `executor/platforms/macos/virtual_filesystem.py:160-176`, which does a plain `real_path.write_text(content)` after a mount-writability check. The non-negotiable deny list is never consulted. The policy-level `FileConstraints` is a pure `fnmatch` allow-list with no deny vocabulary (`intentframe_native_bundles/actions/files/constraints.py`, enforced via `FilesActionBundle.enforce_constraints`).
 
 Net effect: `WRITE_FILE` to a launchd plist, a shell rc file, `~/.ssh/authorized_keys`, `/etc/sudoers.d/*`, `.github/workflows/*`, etc. is only prevented by whatever the user's `allowed_paths` happens to exclude. A broad allow like `allowed_paths: ["~/*"]` or the root-demo `allowed_paths: ["/*"]` allows all of them.
 
