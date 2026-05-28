@@ -105,7 +105,7 @@ class TerminalAdapter(CapabilityAdapter):
         if not command:
             return ExecutionResult(success=False, error="No command provided")
 
-        from intentframe_native_bundles.executor.floors import check_terminal_execute
+        from intentframe_native_bundles.shared.floors import check_terminal_execute
 
         report = check_terminal_execute(command)
         if report.is_catastrophic:
