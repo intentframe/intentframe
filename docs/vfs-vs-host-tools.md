@@ -82,7 +82,7 @@ privilege, not availability or absence.
 **The correct tool for `/var/root` or any root-filesystem operation is
 `run_command`.** In the root-demo deployment, `run_command` subprocesses are
 escalated via `sudo -n` (configured in `jarvis_pa/executor_root.yaml` under
-`sandbox.escalate: sudo`), so they actually execute as root and succeed.
+`pack_options.sandbox.escalate: sudo`), so they actually execute as root and succeed.
 
 **Routing rule for agents and prompts:**
 
@@ -162,7 +162,7 @@ deliberately, not mix both by default.
 In the root-demo profile, `RUN_COMMAND` is the **only** tool that can
 successfully operate on root-owned paths such as `/var/root`. This is
 because the executor sandboxes shell subprocesses with `sudo -n` escalation
-(see `jarvis_pa/executor_root.yaml` → `sandbox.escalate: sudo`), whereas
+(see `jarvis_pa/executor_root.yaml` → `pack_options.sandbox.escalate: sudo`), whereas
 the `HostFilesAdapter` Python code runs in the non-root server process.
 
 This creates a deliberate privilege split:

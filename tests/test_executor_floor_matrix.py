@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 from action_registry import ActionType
-from executor_sdk.config.schema import HostFilesConfig
 from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
+from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 from resource_registry.floor import DENY_WRITE_PREFIXES
 
 
@@ -24,7 +24,7 @@ def permissive_adapter() -> HostFilesAdapter:
         allowed_read_paths=["/"],
         allowed_write_paths=["/"],
     )
-    return HostFilesAdapter(host_files_cfg=cfg)
+    return HostFilesAdapter(host_files_options=cfg)
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_floor_fires_before_ceiling_on_host_files(tmp_path: Path) -> None:
         allowed_read_paths=["/etc"],
         allowed_write_paths=["/etc"],
     )
-    adapter = HostFilesAdapter(host_files_cfg=cfg)
+    adapter = HostFilesAdapter(host_files_options=cfg)
     result = _run(
         adapter,
         ActionType.WRITE_HOST_FILE.value,

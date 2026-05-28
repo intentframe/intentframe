@@ -327,13 +327,14 @@ job. The sandbox is a consistent safety net, not a policy engine.
 ### Configuration
 
 ```yaml
-sandbox:
-  enabled: true
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-  # All commands run under file_read_write (the max).
+pack_options:
+  sandbox:
+    enabled: true
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+    # All commands run under file_read_write (the max).
 ```
 
 ### Platform support

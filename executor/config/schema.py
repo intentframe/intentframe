@@ -18,7 +18,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from executor_sdk.config.schema import HostFilesConfig as HostFilesConfig  # re-exported
 from executor_sdk.constants import (
     DEFAULT_ADAPTER_TIMEOUT,
     DEFAULT_GRPC_PORT,
@@ -34,7 +33,6 @@ __all__ = [
     "CredentialConfig",
     "WorkerPoolConfig",
     "AdapterConfig",
-    "HostFilesConfig",
     "StorageConfig",
     "LoggingConfig",
 ]
@@ -234,17 +232,13 @@ class ExecutorConfig(BaseModel):
     worker_pool: WorkerPoolConfig = Field(default_factory=WorkerPoolConfig)
     adapters: AdapterConfig = Field(default_factory=AdapterConfig)
     filesystem: FilesystemConfig = Field(default_factory=FilesystemConfig)
-    host_files: HostFilesConfig = Field(
-        description=(
-            "Host-file allowlists (read + write).  Required: every YAML "
-            "must declare intent explicitly — empty lists are allowed "
-            "and mean 'no host-file paths', pair that with the adapter "
-            "absent from adapters.enabled to fully opt out."
-        ),
-    )
-    sandbox: dict[str, Any] = Field(
+    pack_options: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
-        description="Opaque sandbox options consumed by executor packs/adapters.",
+        description=(
+            "Opaque executor-pack/adaptor options keyed by pack-owned feature "
+            "or adapter ID. Core validates only that each slice is a mapping; "
+            "packs own their own schema validation."
+        ),
     )
     storage: StorageConfig = Field(default_factory=StorageConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

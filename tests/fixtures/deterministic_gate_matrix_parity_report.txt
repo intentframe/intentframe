@@ -1,6 +1,6 @@
 DETERMINISTIC GATE MATRIX PARITY REPORT
 ========================================================================
-Generated:        2026-05-28 13:31:58 UTC
+Generated:        2026-05-28 15:34:35 UTC
 Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/deterministic_gate_matrix_baseline.txt
 Legacy commit:      66e567c
 Verify script:      tests/verify_deterministic_gate_matrix.py

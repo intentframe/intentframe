@@ -76,39 +76,41 @@ Wiring: `intentframe_executor_pack_macos/adapters/terminal.py` creates the engin
 
 ## Configuration
 
-Sandbox config lives in executor YAML (`jarvis_pa/executor.yaml`):
+Sandbox config lives in the macOS pack's opaque executor YAML slice (`pack_options.sandbox`):
 
 ```yaml
-sandbox:
-  enabled: true
-  working_directory: ~/
-  allowed_write_paths:
-    - ~/
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-    - network_outbound
-  # executor_venv_path: null           # auto-resolve to ~/.intentframe-venvs/executor
-  # executor_venv_required: true       # fail-closed at startup if missing
-  # escalate: none                     # "sudo" only for root demo profile
+pack_options:
+  sandbox:
+    enabled: true
+    working_directory: ~/
+    allowed_write_paths:
+      - ~/
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+      - network_outbound
+    # executor_venv_path: null           # auto-resolve to ~/.intentframe-venvs/executor
+    # executor_venv_required: true       # fail-closed at startup if missing
+    # escalate: none                     # "sudo" only for root demo profile
 ```
 
 The root demo profile (`jarvis_pa/executor_root.yaml`) sets `escalate: sudo`:
 
 ```yaml
-sandbox:
-  enabled: true
-  working_directory: /
-  allowed_write_paths:
-    - /
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-    - network_outbound
-    - unrestricted
-  escalate: sudo
+pack_options:
+  sandbox:
+    enabled: true
+    working_directory: /
+    allowed_write_paths:
+      - /
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+      - network_outbound
+      - unrestricted
+    escalate: sudo
 ```
 
 ### Fields
@@ -322,7 +324,7 @@ This is the fail-closed guarantee: if the sandbox can't be applied, the command 
 - It does not allow agent-authored `sudo`. `sudo` in a command string is blocked by `command_shield` before it ever reaches the sandbox.
 - It does not use VFS mounts. Write paths come from `SandboxConfig`, not `MountPointResolver`.
 
-The `escalate: sudo` path is the one narrow exception to the "no sudo" rule — the sandbox engine itself prepends `sudo -n` to the `sandbox-exec` argv during the root demo mode, as an internal implementation detail invisible to the agent. This is only armed when both the executor config opts in (`sandbox.escalate: sudo`) and the gateway has confirmed the machine-level capability is present (`INTENTFRAME_ESCALATION_ARMED=1`).
+The `escalate: sudo` path is the one narrow exception to the "no sudo" rule — the sandbox engine itself prepends `sudo -n` to the `sandbox-exec` argv during the root demo mode, as an internal implementation detail invisible to the agent. This is only armed when both the executor config opts in (`pack_options.sandbox.escalate: sudo`) and the gateway has confirmed the machine-level capability is present (`INTENTFRAME_ESCALATION_ARMED=1`).
 
 ---
 

@@ -31,11 +31,12 @@ import asyncio
 import mimetypes
 import os
 from pathlib import Path
+from typing import Any
 
 from action_registry import ActionType
 from executor_sdk.adapters.base import CapabilityAdapter
-from executor_sdk.config.schema import HostFilesConfig
 from executor_sdk.models import AdapterManifest, ExecutionResult
+from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 from resource_registry.floor import canonicalize_real_path
 
 # MIME types we refuse up-front rather than surfacing cryptic decode
@@ -92,10 +93,18 @@ class HostFilesAdapter(CapabilityAdapter):
 
     def __init__(
         self,
-        host_files_cfg: HostFilesConfig,
+        pack_options: dict[str, dict[str, Any]] | None = None,
+        host_files_options: dict[str, Any] | HostFilesConfig | None = None,
         **_kwargs,
     ) -> None:
-        self._cfg = host_files_cfg
+        raw_config = host_files_options
+        if raw_config is None and pack_options is not None:
+            raw_config = pack_options.get("host_files")
+
+        if isinstance(raw_config, HostFilesConfig):
+            self._cfg = raw_config
+        else:
+            self._cfg = HostFilesConfig.model_validate(raw_config or {})
 
     def supported_actions(self) -> list[str]:
         return [

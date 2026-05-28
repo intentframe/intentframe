@@ -11,7 +11,7 @@
 # Differences from the user-mode policy (intentionally small)
 # -----------------------------------------------------------
 # * Host-file `allowed_host_paths` broadened from `~/*` to `/*` to mirror
-#   `jarvis_pa/executor_root.yaml::host_files.allowed_{read,write}_paths`.
+#   `jarvis_pa/executor_root.yaml::pack_options.host_files.allowed_{read,write}_paths`.
 # * `agent_id` is `jarvis_root`.
 # * `RUN_COMMAND.constraints.deny_capabilities` is intentionally identical
 #   to the user-mode policy — the language surface IntentFrame is willing

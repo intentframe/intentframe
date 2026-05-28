@@ -48,18 +48,17 @@ adapters:
     - files
     - user_io
 
-# ─── HOST_FILE allowlists (required) ─────────────────────────────────────────
-# Required even when the demo does not enable host-file tools.
-# Use plain roots like ``~/Documents`` if you enable them later.
-# Do not use globs here. Trailing "/" has no special meaning.
-# Empty lists here mean "no host-file access".
-host_files:
-  allowed_read_paths: []
-  allowed_write_paths: []
+# ─── Executor pack options ───────────────────────────────────────────────────
+# Opaque config slices owned and validated by executor packs.
+pack_options:
+  # Empty lists mean "no host-file access" if host-file tools are enabled later.
+  host_files:
+    allowed_read_paths: []
+    allowed_write_paths: []
 
 # ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
 # Demo does not enable the terminal adapter, so sandbox config is omitted.
-# If terminal is added to adapters.enabled, add a sandbox: section here.
+# If terminal is added to adapters.enabled, add pack_options.sandbox here.
 # See jarvis_pa/executor.yaml or executor/config/executor.yaml for examples.
 
 storage:

@@ -44,20 +44,6 @@ adapters:
     - spotlight
     - http_api
 
-# ─── HOST_FILE allowlists ────────────────────────────────────────────────────
-# Real-path allowlist for host-file tools.
-# Use plain roots like ``~/`` or ``~/Documents``.
-# Do not use globs here. ``~/Documents`` already covers files under it.
-# ``~/Documents/`` works the same as ``~/Documents``.
-# Keep this in sync with the host-file ``allowed_host_paths`` declared in
-# ``jarvis_pa/jarvis/policies/jarvis.yaml`` (the runtime policy seed).
-# Pinned by ``tests/test_jarvis_host_scope_mirror.py``.
-host_files:
-  allowed_read_paths:
-    - ~/
-  allowed_write_paths:
-    - ~/
-
 # ─── Virtual Filesystem Mounts ───────────────────────────────────────────────
 # Agent sees /home/ — never learns the real path (/Users/username/, C:\Users\...).
 # The VFS translates /home/ → ~ at runtime via expand_path().
@@ -69,19 +55,31 @@ filesystem:
       real_path: ~/
       writable: true
 
-# ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
-# Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
-# All commands run under the highest-privilege template in allowed_templates.
-sandbox:
-  enabled: true
-  working_directory: ~/
-  allowed_write_paths:
-    - ~/
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-    - network_outbound
+# ─── Executor pack options ───────────────────────────────────────────────────
+# Opaque config slices owned and validated by executor packs.
+pack_options:
+  # Real-path allowlist for host-file tools.
+  # Keep this in sync with the host-file ``allowed_host_paths`` declared in
+  # ``jarvis_pa/jarvis/policies/jarvis.yaml`` (the runtime policy seed).
+  # Pinned by ``tests/test_jarvis_host_scope_mirror.py``.
+  host_files:
+    allowed_read_paths:
+      - ~/
+    allowed_write_paths:
+      - ~/
+
+  # Kernel-enforced sandbox for shell commands (macOS Seatbelt / sandbox-exec).
+  # All commands run under the highest-privilege template in allowed_templates.
+  sandbox:
+    enabled: true
+    working_directory: ~/
+    allowed_write_paths:
+      - ~/
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+      - network_outbound
 
 storage:
   database_path: null

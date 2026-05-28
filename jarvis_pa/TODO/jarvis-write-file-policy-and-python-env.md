@@ -225,14 +225,14 @@ Instead, each agent (or task/session) should get a dedicated Python environment 
 
 ### Current state (implemented)
 
-The executor now has a dedicated venv at `~/.intentframe-venvs/executor` (sibling of `~/.intentframe/`, not nested under it — the latter is in `NON_NEGOTIABLE_DENY_ACCESS` and would make `exec` of the venv's `python3` fail in the sandbox). Provisioned by `intentframe_setup.sh` via `uv venv --seed`. The path is configurable via `--executor-venv` (setup flag), `INTENTFRAME_EXECUTOR_VENV` (env var), or `sandbox.executor_venv_path` (runtime). The macOS sandbox engine explicitly exposes that venv to sandboxed `RUN_COMMAND` via env overrides:
+The executor now has a dedicated venv at `~/.intentframe-venvs/executor` (sibling of `~/.intentframe/`, not nested under it — the latter is in `NON_NEGOTIABLE_DENY_ACCESS` and would make `exec` of the venv's `python3` fail in the sandbox). Provisioned by `intentframe_setup.sh` via `uv venv --seed`. The path is configurable via `--executor-venv` (setup flag), `INTENTFRAME_EXECUTOR_VENV` (env var), or `pack_options.sandbox.executor_venv_path` (runtime). The macOS sandbox engine explicitly exposes that venv to sandboxed `RUN_COMMAND` via env overrides:
 
 - `PATH` is prepended with `<venv>/bin` on top of the system-derived `PATH` from `/etc/paths`.
 - `VIRTUAL_ENV` is set to the venv path.
 - `PYTHONNOUSERSITE=1` is set to block `pip install --user` escapes.
 - `PYTHONHOME` is never set (venvs break if it is).
 
-This means in the normal case `python`, `python3`, `pip`, and `uv pip install` all resolve to the executor venv. `<repo>/.venv` (the gateway's venv) and `~/Library/Python/...` (user site) are structurally protected from pollution. The config knobs are `sandbox.executor_venv_path` (absolute path, `None` = auto-resolve) and `sandbox.executor_venv_required` (default `True` → fail-closed at startup if the venv is missing).
+This means in the normal case `python`, `python3`, `pip`, and `uv pip install` all resolve to the executor venv. `<repo>/.venv` (the gateway's venv) and `~/Library/Python/...` (user site) are structurally protected from pollution. The config knobs are `pack_options.sandbox.executor_venv_path` (absolute path, `None` = auto-resolve) and `pack_options.sandbox.executor_venv_required` (default `True` → fail-closed at startup if the venv is missing).
 
 Path resolution is identity-aware: it uses `SUDO_USER` if present, else the current uid's HOME, so the design works whether the executor runs as a regular user or as root. Bare root with no `SUDO_USER` fails loud rather than silently picking `/var/root/`.
 

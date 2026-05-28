@@ -162,8 +162,7 @@ def build_gateway(
         "credential_vault": credential_vault,
         "mount_resolver": mount_resolver,
         "base_path": base_path,
-        "executor_config": config,
-        "host_files_cfg": config.host_files,
+        "pack_options": config.pack_options,
     }
 
     dispatcher = ActionDispatcher()

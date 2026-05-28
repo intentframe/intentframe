@@ -7,9 +7,9 @@
 #
 # Only three things differ from the default profile:
 #
-#   1. ``host_files.allowed_{read,write}_paths`` broadened to ``/``.
+#   1. ``pack_options.host_files.allowed_{read,write}_paths`` broadened to ``/``.
 #   2. ``filesystem.mounts`` exposes the real root as the virtual root.
-#   3. ``sandbox`` targets ``/`` and lists the ``unrestricted`` template.
+#   3. ``pack_options.sandbox`` targets ``/`` and lists the ``unrestricted`` template.
 #
 # Everything else (transport, auth, credentials, worker pool, adapter set,
 # storage, logging) is intentionally identical to the default executor.yaml
@@ -67,56 +67,57 @@ adapters:
     - spotlight
     - http_api
 
-# ─── HOST_FILE allowlists (root profile) ─────────────────────────────────────
-# Real-path allowlist for host-file tools.  Broadened to ``/`` so the
-# root-profile agent can operate on system paths.  The non-negotiable
-# deny base in ``resource_registry/floor.py`` still protects LaunchAgents,
-# /etc sensitive files, sudoers, sshd_config, PAM, kexts, Keychains,
-# Messages, Mail, ~/.ssh, ~/.gnupg, and shell rc files regardless of what
-# this allow-list says.
-# Keep this mirror in sync with the host-file ``allowed_host_paths``
-# declared in ``jarvis_pa/jarvis/policies/jarvis_root.yaml`` (the runtime
-# policy seed for the root-mode Jarvis variant).
-host_files:
-  allowed_read_paths:
-    - /
-  allowed_write_paths:
-    - /
-
 # ─── Virtual Filesystem Mounts (root profile) ────────────────────────────────
 # The virtual root and real root coincide so the agent sees the same path
 # shape the operator does.  VFS path-resolution, floor checks, and the
-# sandbox write scope all line up against ``/`` as the workspace root.
+# pack sandbox write scope all line up against ``/`` as the workspace root.
 filesystem:
   mounts:
     - virtual_path: /
       real_path: /
       writable: true
 
-# ─── RUN_COMMAND Sandboxing (root profile) ───────────────────────────────────
-# ``unrestricted`` is listed so the planner can pick it when the root-profile
-# demo runs admin-style commands (``cat /etc/hosts``, ``ls /``, log
-# inspection).  The two non-negotiable deny lists enforced on every
-# template (including ``unrestricted``) still block IntentFrame internals,
-# raw device writes, and the root-demo hardening set.
-sandbox:
-  enabled: true
-  working_directory: /
-  allowed_write_paths:
-    - /
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-    - network_outbound
-    - unrestricted
-  # Per-command root escalation.  ``sudo`` asks the sandbox engine to prepend
-  # ``sudo -n`` to the sandbox-exec argv so the kernel-sandboxed subprocess
-  # briefly runs as UID 0.  Only takes effect when the gateway advertises
-  # INTENTFRAME_ESCALATION_ARMED=1 (set iff intentframe_setup_root_demo.sh
-  # has installed /etc/sudoers.d/intentframe-run).  Disarmed machines
-  # silently run unprivileged, so this file is safe to ship.
-  escalate: sudo
+# ─── Executor pack options (root profile) ────────────────────────────────────
+# Opaque config slices owned and validated by executor packs.
+pack_options:
+  # Real-path allowlist for host-file tools. Broadened to ``/`` so the
+  # root-profile agent can operate on system paths. The non-negotiable
+  # deny base in ``resource_registry/floor.py`` still protects LaunchAgents,
+  # /etc sensitive files, sudoers, sshd_config, PAM, kexts, Keychains,
+  # Messages, Mail, ~/.ssh, ~/.gnupg, and shell rc files regardless of what
+  # this allow-list says.
+  # Keep this mirror in sync with the host-file ``allowed_host_paths``
+  # declared in ``jarvis_pa/jarvis/policies/jarvis_root.yaml`` (the runtime
+  # policy seed for the root-mode Jarvis variant).
+  host_files:
+    allowed_read_paths:
+      - /
+    allowed_write_paths:
+      - /
+
+  # ``unrestricted`` is listed so the planner can pick it when the root-profile
+  # demo runs admin-style commands (``cat /etc/hosts``, ``ls /``, log
+  # inspection). The two non-negotiable deny lists enforced on every
+  # template (including ``unrestricted``) still block IntentFrame internals,
+  # raw device writes, and the root-demo hardening set.
+  sandbox:
+    enabled: true
+    working_directory: /
+    allowed_write_paths:
+      - /
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+      - network_outbound
+      - unrestricted
+    # Per-command root escalation. ``sudo`` asks the sandbox engine to prepend
+    # ``sudo -n`` to the sandbox-exec argv so the kernel-sandboxed subprocess
+    # briefly runs as UID 0. Only takes effect when the gateway advertises
+    # INTENTFRAME_ESCALATION_ARMED=1 (set iff intentframe_setup_root_demo.sh
+    # has installed /etc/sudoers.d/intentframe-run). Disarmed machines
+    # silently run unprivileged, so this file is safe to ship.
+    escalate: sudo
 
 storage:
   database_path: null

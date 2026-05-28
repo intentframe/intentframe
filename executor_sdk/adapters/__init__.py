@@ -9,10 +9,8 @@ and gets back an ExecutionResult.
 Platform-specific adapter implementations register themselves via
 register_adapter() and are instantiated at startup from config.
 
-Available adapters:
-    Platform-neutral: executor/adapters/console_user_io.py (console-based user I/O; core-only, not exported from executor_sdk)
-
-Implementations registered by executor packs (e.g. intentframe_executor_pack_macos):
+Implementations are registered by executor packs (e.g.
+intentframe_executor_pack_macos, intentframe_executor_pack_console).
 """
 
 from __future__ import annotations

@@ -267,7 +267,7 @@ class MacOSSandboxEngine(SandboxEngine):
         #                             /etc/sudoers.d/intentframe-run).
         #   2. Session intent      -- plan.sandbox_escalate == "sudo"
         #                             (propagated from executor.yaml::
-        #                             sandbox.escalate).
+        #                             pack_options.sandbox.escalate).
         # When both are true the whole sandbox-exec invocation runs via
         # ``sudo -n`` so the kernel sandbox itself runs under UID 0.  If
         # sudoers has been revoked mid-session, ``sudo -n`` will exit
@@ -289,10 +289,10 @@ class MacOSSandboxEngine(SandboxEngine):
         if escalate and env_armed:
             if not self._sudo:
                 raise RuntimeError(
-                    "sandbox.escalate=sudo requested and "
+                    "pack_options.sandbox.escalate=sudo requested and "
                     "INTENTFRAME_ESCALATION_ARMED=1, but 'sudo' was not "
                     "found on PATH at engine init. Reinstall root-demo "
-                    "or set sandbox.escalate=none."
+                    "or set pack_options.sandbox.escalate=none."
                 )
             preserved = "PATH,VIRTUAL_ENV,PYTHONNOUSERSITE,TMPDIR"
             argv = [
@@ -308,7 +308,7 @@ class MacOSSandboxEngine(SandboxEngine):
             )
         elif escalate and not env_armed:
             logger.warning(
-                "sandbox.escalate=sudo requested but "
+                "pack_options.sandbox.escalate=sudo requested but "
                 "INTENTFRAME_ESCALATION_ARMED is not set -- running "
                 "unprivileged. Install root-demo with "
                 "'sudo bash intentframe_setup_root_demo.sh' to enable "

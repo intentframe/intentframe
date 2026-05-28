@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from typing import Any
 
 from action_registry import ActionType
 from command_shield.env import clean_env
@@ -40,7 +41,7 @@ class TerminalAdapter(CapabilityAdapter):
         sandbox_engine=None,
         sandbox_planner=None,
         sandbox_config=None,
-        executor_config=None,
+        pack_options: dict[str, dict[str, Any]] | None = None,
         **_kwargs,
     ) -> None:
         from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
@@ -49,8 +50,8 @@ class TerminalAdapter(CapabilityAdapter):
         from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
 
         raw_config = sandbox_config
-        if raw_config is None and executor_config is not None:
-            raw_config = getattr(executor_config, "sandbox", None)
+        if raw_config is None and pack_options is not None:
+            raw_config = pack_options.get("sandbox")
 
         if isinstance(raw_config, SandboxConfig):
             self._sandbox_config = raw_config
@@ -75,8 +76,8 @@ class TerminalAdapter(CapabilityAdapter):
                         "Expected a Python venv with bin/python3 at: "
                         f"{resolved or '<unresolved>'}. "
                         "Run `bash intentframe_setup.sh` to provision it, or "
-                        "set `sandbox.executor_venv_required: false` to allow "
-                        "fallback to system python3."
+                        "set `pack_options.sandbox.executor_venv_required: false` "
+                        "to allow fallback to system python3."
                     )
             else:
                 logger.warning(

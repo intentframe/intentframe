@@ -250,9 +250,11 @@ class ExecutorBridge:
         Returns:
             ExecutorBridge ready to forward intents.
         """
-        # ── Register macOS platform ──────────────────────────────────────
+        # ── Register executor packs ──────────────────────────────────────
+        from intentframe_executor_pack_console import register_all as register_console_pack
         from intentframe_executor_pack_macos import register_all
 
+        register_console_pack()
         register_all()
 
         # ── Auth verifier ────────────────────────────────────────────────
@@ -300,7 +302,7 @@ class ExecutorBridge:
         # ── Adapters ─────────────────────────────────────────────────────
         from executor.dispatch import ActionDispatcher
         from intentframe_executor_pack_macos.adapters.files import FilesAdapter
-        from executor.adapters.console_user_io import ConsoleUserIOAdapter
+        from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
 
         dispatcher = ActionDispatcher(catalog=catalog)
         dispatcher.register(FilesAdapter(mount_resolver=resolver, base_path=base_path))

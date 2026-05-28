@@ -347,7 +347,7 @@ entry_2: hash(entry_data_2 + H1) = H2
 ...
 ```
 
-Implementation: `executor/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`intentframe_executor_pack_macos/audit_logger.py`) stores `prev_hash` and `entry_hash` columns in every row.
+Implementation: `executor_sdk/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`intentframe_executor_pack_macos/audit_logger.py`) stores `prev_hash` and `entry_hash` columns in every row.
 
 **What this proves:** modifying any historical audit entry invalidates that entry's hash AND every subsequent entry's chain link. `audit_logger.verify_integrity()` walks the entire chain and detects any modification or insertion.
 

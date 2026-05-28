@@ -148,7 +148,7 @@ class SandboxPlanner:
             if config.executor_venv_required:
                 logger.error(
                     "Executor venv unresolved (no SUDO_USER, running as "
-                    "root, and sandbox.executor_venv_path not set). "
+                    "root, and pack_options.sandbox.executor_venv_path not set). "
                     "Sandboxed RUN_COMMAND will have no Python venv."
                 )
             return None

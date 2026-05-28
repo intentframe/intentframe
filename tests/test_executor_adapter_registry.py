@@ -9,16 +9,16 @@ import pytest
 
 from action_registry import ActionCatalog
 from executor_sdk.adapters.base import CapabilityAdapter
-from executor_sdk.config.schema import HostFilesConfig
 from executor.dispatch import ActionDispatcher
 from intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
+from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 
 
 def _instantiate_adapter(adapter_id: str, cls: type[CapabilityAdapter]) -> CapabilityAdapter:
     kwargs: dict = {}
     if adapter_id == "host_files":
         root = tempfile.mkdtemp(prefix="if_registry_")
-        kwargs["host_files_cfg"] = HostFilesConfig(
+        kwargs["host_files_options"] = HostFilesConfig(
             allowed_read_paths=[root],
             allowed_write_paths=[root],
         )

@@ -91,7 +91,7 @@ macOS-managed (not under ~/.intentframe/):
 
 - **Single root.** Everything IntentFrame writes lives under `~/.intentframe/` (plus the executor venv at `~/.intentframe-venvs/executor/` and credentials in the macOS Keychain). Backing up this directory backs up your IntentFrame state. Deleting it resets the system.
 - **No plaintext credentials anywhere on disk.** `~/.intentframe/email/config.yaml` stores email addresses but never passwords. The credential vault reads from the macOS Keychain. `pydantic.SecretStr` ensures secrets show as `**********` in logs and tracebacks.
-- **Audit trail is tamper-evident.** Every audit row links to the previous row's SHA-256 hash. Modifying any historical entry invalidates every later entry. See `executor/services/hash_chain.py` and [threat-model.md § Shipped Hardening](threat-model.md#shipped-hardening-beyond-the-core-pipeline).
+- **Audit trail is tamper-evident.** Every audit row links to the previous row's SHA-256 hash. Modifying any historical entry invalidates every later entry. See `executor_sdk/services/hash_chain.py` and [threat-model.md § Shipped Hardening](threat-model.md#shipped-hardening-beyond-the-core-pipeline).
 - **Logs may contain intent text.** Logs include action types, target descriptions, reason strings, and decision paths. They do not include credentials (scrubbed by `intentframe_credentials.redaction.redact_credentials`). They may include filesystem paths and email subject lines that flowed through the pipeline.
 - **No data is encrypted at rest by IntentFrame.** SQLite databases are plaintext (relying on filesystem permissions). If you need at-rest encryption, use FileVault (macOS) or LUKS (Linux). This is a documented gap, not a hidden choice.
 

@@ -1,6 +1,6 @@
 """Mirror-invariant test: ``jarvis_pa/executor.yaml`` ↔ Jarvis user-mode policy seed.
 
-The executor YAML's ``host_files.allowed_write_paths`` is the adapter's
+The executor YAML's ``pack_options.host_files.allowed_write_paths`` is the adapter's
 hard ceiling.  The runtime policy seed (loaded from
 ``jarvis_pa/jarvis/policies/jarvis.yaml`` via
 ``intentframe_gateway.bootstrap._build_default_policy()`` on every
@@ -64,7 +64,7 @@ def _normalize_root(raw: str) -> str:
 def executor_scopes() -> tuple[set[str], set[str]]:
     with JARVIS_EXECUTOR_YAML.open() as fh:
         cfg = yaml.safe_load(fh)
-    host_files = cfg.get("host_files") or {}
+    host_files = (cfg.get("pack_options") or {}).get("host_files") or {}
     reads = {_normalize_root(p) for p in host_files.get("allowed_read_paths", [])}
     writes = {_normalize_root(p) for p in host_files.get("allowed_write_paths", [])}
     return reads, writes
@@ -123,8 +123,12 @@ class TestScopeMirror:
         # mirror invariant becomes trivially true but the configured
         # capability is silently gone — catch that here.
         reads, writes = executor_scopes
-        assert reads, "jarvis_pa/executor.yaml host_files.allowed_read_paths is empty"
-        assert writes, "jarvis_pa/executor.yaml host_files.allowed_write_paths is empty"
+        assert reads, (
+            "jarvis_pa/executor.yaml pack_options.host_files.allowed_read_paths is empty"
+        )
+        assert writes, (
+            "jarvis_pa/executor.yaml pack_options.host_files.allowed_write_paths is empty"
+        )
         assert policy_host_paths, "bootstrap._build_default_policy host_constraint is empty"
 
 

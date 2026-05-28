@@ -1,4 +1,4 @@
-"""Public config fragments used by executor packs."""
+"""Configuration schema for the macOS host-files adapter."""
 
 from __future__ import annotations
 
@@ -9,27 +9,9 @@ class HostFilesConfig(BaseModel):
     """Configuration for the HOST_FILE action family.
 
     The HOST_FILE adapter operates on real host filesystem paths rather
-    than virtual-filesystem paths.  These allowlists are the executor-
-    side ceiling — the per-action policy constraints
-    (``HostFileConstraints.allowed_host_paths``) ride alongside and
-    must not grant paths that this config denies.
-
-    Both lists are normalized at load time via
-    :func:`resource_registry.floor.canonicalize_real_path` so that a
-    YAML-supplied ``~/Documents`` and a runtime-supplied
-    ``/Users/<me>/Documents`` compare as the same path.
-
-    These entries are executor-side *scope roots*, not policy-style
-    glob patterns.  Nested access is admitted by subtree containment
-    under the canonicalized root; trailing ``/`` carries no special
-    meaning here because canonicalization strips it.
-
-    This field is **required** on :class:`ExecutorConfig` (no default
-    factory): host-file access is a security-sensitive surface and
-    every executor YAML must declare intent explicitly.  Empty lists
-    are permitted and mean "no host-file paths allowed" — paired with
-    ``host_files`` absent from ``adapters.enabled`` that is the
-    deliberate "demo declines host-file access" declaration.
+    than virtual-filesystem paths. These allowlists are the executor-side
+    ceiling; the per-action policy constraints ride alongside and must not
+    grant paths that this config denies.
     """
 
     model_config = ConfigDict(extra="forbid")

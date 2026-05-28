@@ -20,12 +20,12 @@ from unittest.mock import AsyncMock, patch
 
 from action_registry import ActionType
 from executor_sdk.adapters.base import CapabilityAdapter
-from executor.adapters.console_user_io import ConsoleUserIOAdapter
-from executor_sdk.config.schema import HostFilesConfig
 from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
 from executor_sdk.models import AdapterManifest, ExecutionResult
+from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
 from intentframe_executor_pack_macos.adapters.files import FilesAdapter
 from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
+from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 from intentframe_executor_pack_macos.adapters.http_api import HttpApiAdapter
 from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 from executor_sdk.services.virtual_filesystem import MountPointConfig
@@ -238,7 +238,7 @@ def _host_files_adapter(root: Path) -> HostFilesAdapter:
         allowed_read_paths=[str(root)],
         allowed_write_paths=[str(root)],
     )
-    return HostFilesAdapter(host_files_cfg=cfg)
+    return HostFilesAdapter(host_files_options=cfg)
 
 
 def _files_adapter(root: Path) -> FilesAdapter:
@@ -341,7 +341,7 @@ def action_cases() -> tuple[ActionCase, ...]:
             allowed_read_paths=["/etc"],
             allowed_write_paths=["/etc"],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         return _run(
             adapter.safe_execute(
                 ActionType.WRITE_HOST_FILE.value,
@@ -354,7 +354,7 @@ def action_cases() -> tuple[ActionCase, ...]:
             allowed_read_paths=["/etc"],
             allowed_write_paths=["/etc"],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         return _run(
             adapter.safe_execute(
                 ActionType.DELETE_HOST_FILE.value,
@@ -372,7 +372,7 @@ def action_cases() -> tuple[ActionCase, ...]:
                 allowed_read_paths=[str(inside)],
                 allowed_write_paths=[str(inside)],
             )
-            adapter = HostFilesAdapter(host_files_cfg=cfg)
+            adapter = HostFilesAdapter(host_files_options=cfg)
             return _run(
                 adapter.safe_execute(
                     ActionType.WRITE_HOST_FILE.value,
@@ -390,7 +390,7 @@ def action_cases() -> tuple[ActionCase, ...]:
                 allowed_read_paths=[str(inside)],
                 allowed_write_paths=[str(inside)],
             )
-            adapter = HostFilesAdapter(host_files_cfg=cfg)
+            adapter = HostFilesAdapter(host_files_options=cfg)
             (outside / "secret.txt").write_text("x")
             return _run(
                 adapter.safe_execute(
@@ -762,18 +762,25 @@ def capture_action_rows() -> tuple[ActionRow, ...]:
 def capture_manifest_rows() -> tuple[ManifestRow, ...]:
     import importlib
 
-    from executor_sdk.adapters import _ADAPTER_REGISTRY, register_adapter
+    from executor_sdk.adapters import _ADAPTER_REGISTRY
+    from intentframe_executor_pack_console.adapters import (
+        register_all_adapters as register_console_adapters,
+    )
     from intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
 
     _ADAPTER_REGISTRY.clear()
     register_all_adapters()
-    register_adapter("console_user_io", ConsoleUserIOAdapter)
+    register_console_adapters()
 
     rows: list[ManifestRow] = []
     seen: set[str] = set()
 
     specs = list(_ADAPTER_SPECS) + [
-        ("console_user_io", "executor.adapters.console_user_io", "ConsoleUserIOAdapter"),
+        (
+            "console_user_io",
+            "intentframe_executor_pack_console.adapters.console_user_io",
+            "ConsoleUserIOAdapter",
+        ),
     ]
     for adapter_id, module_path, class_name in specs:
         if adapter_id in seen:
@@ -785,7 +792,7 @@ def capture_manifest_rows() -> tuple[ManifestRow, ...]:
             if adapter_id == "host_files":
                 with _temp_dirs(prefix="if_manifest_") as root:
                     instance = cls(
-                        host_files_cfg=HostFilesConfig(
+                        host_files_options=HostFilesConfig(
                             allowed_read_paths=[str(root)],
                             allowed_write_paths=[str(root)],
                         )

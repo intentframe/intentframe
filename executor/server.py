@@ -43,6 +43,7 @@ _PLATFORM_REGISTRY = {
     "macos": "intentframe_executor_pack_macos",
     "darwin": "intentframe_executor_pack_macos",
 }
+_NEUTRAL_PACKS = ("intentframe_executor_pack_console",)
 
 
 def _register_platform(platform_name: str) -> None:
@@ -62,6 +63,11 @@ def _register_platform(platform_name: str) -> None:
         )
 
     import importlib
+    for neutral_pack in _NEUTRAL_PACKS:
+        mod = importlib.import_module(neutral_pack)
+        mod.register_all()
+        logger.info("Neutral executor pack registered: %s", neutral_pack)
+
     mod = importlib.import_module(module_path)
     mod.register_all()
     logger.info("Platform registered: %s", platform_name)
