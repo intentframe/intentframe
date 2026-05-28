@@ -333,7 +333,7 @@ class ExecutorBridge:
                 return []
 
         # ── Wire gateway ─────────────────────────────────────────────────
-        from executor.services.credential_scrubber import CredentialScrubber
+        from executor_sdk.services.credential_scrubber import CredentialScrubber
         from executor_sdk.services.hash_chain import HashChain
 
         gateway = ExecutorGateway(

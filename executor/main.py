@@ -33,7 +33,7 @@ from executor.dispatch import ActionDispatcher
 from executor_sdk.exceptions import ConfigurationError, ExecutorError
 from executor.gateway import ExecutorGateway
 from executor_sdk.services.audit_logger import create_audit_logger
-from executor.services.credential_scrubber import CredentialScrubber
+from executor_sdk.services.credential_scrubber import CredentialScrubber
 from executor_sdk.services.credential_vault import create_credential_vault
 from executor_sdk.services.hash_chain import HashChain
 from executor_sdk.services.state_store import create_state_store

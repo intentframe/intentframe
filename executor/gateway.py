@@ -47,7 +47,7 @@ from executor_sdk.models import (
     SecurityEventType,
 )
 from executor_sdk.services.audit_logger import AuditLogger
-from executor.services.credential_scrubber import CredentialScrubber
+from executor_sdk.services.credential_scrubber import CredentialScrubber
 from executor_sdk.services.credential_vault import CredentialVault
 from executor_sdk.services.hash_chain import HashChain
 from executor_sdk.services.state_store import StateStore
