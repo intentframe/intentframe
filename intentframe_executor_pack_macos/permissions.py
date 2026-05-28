@@ -18,7 +18,7 @@ logger = logging.getLogger("executor.permissions")
 async def _query_platform_server() -> dict | None:
     """Query the platform server's /permissions endpoint."""
     try:
-        from executor.platforms.macos.adapters._platform_client import platform_permissions
+        from .adapters._platform_client import platform_permissions
         return await platform_permissions()
     except Exception as exc:
         logger.warning(

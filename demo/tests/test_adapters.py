@@ -33,22 +33,22 @@ from executor.models import AdapterManifest
 
 # All adapters declared in executor/platforms/macos/adapters/__init__.py
 ADAPTER_SPECS: list[tuple[str, str, str]] = [
-    ("files", "executor.platforms.macos.adapters.files", "FilesAdapter"),
-    ("terminal", "executor.platforms.macos.adapters.terminal", "TerminalAdapter"),
-    ("http_api", "executor.platforms.macos.adapters.http_api", "HttpApiAdapter"),
-    ("user_io", "executor.platforms.macos.adapters.user_io", "UserIOAdapter"),
-    ("notifications", "executor.platforms.macos.adapters.notifications", "NotificationsAdapter"),
-    ("clipboard", "executor.platforms.macos.adapters.clipboard", "ClipboardAdapter"),
-    ("shortcuts", "executor.platforms.macos.adapters.shortcuts", "ShortcutsAdapter"),
-    ("spotlight", "executor.platforms.macos.adapters.spotlight", "SpotlightAdapter"),
-    ("calendar", "executor.platforms.macos.adapters.calendar", "CalendarAdapter"),
-    ("reminders", "executor.platforms.macos.adapters.reminders", "RemindersAdapter"),
-    ("contacts", "executor.platforms.macos.adapters.contacts", "ContactsAdapter"),
-    ("mail", "executor.platforms.macos.adapters.mail", "MailAdapter"),
-    ("notes", "executor.platforms.macos.adapters.notes", "NotesAdapter"),
-    ("messages", "executor.platforms.macos.adapters.messages", "MessagesAdapter"),
-    ("browser", "executor.platforms.macos.adapters.browser", "BrowserAdapter"),
-    ("system", "executor.platforms.macos.adapters.system", "SystemAdapter"),
+    ("files", "intentframe_executor_pack_macos.adapters.files", "FilesAdapter"),
+    ("terminal", "intentframe_executor_pack_macos.adapters.terminal", "TerminalAdapter"),
+    ("http_api", "intentframe_executor_pack_macos.adapters.http_api", "HttpApiAdapter"),
+    ("user_io", "intentframe_executor_pack_macos.adapters.user_io", "UserIOAdapter"),
+    ("notifications", "intentframe_executor_pack_macos.adapters.notifications", "NotificationsAdapter"),
+    ("clipboard", "intentframe_executor_pack_macos.adapters.clipboard", "ClipboardAdapter"),
+    ("shortcuts", "intentframe_executor_pack_macos.adapters.shortcuts", "ShortcutsAdapter"),
+    ("spotlight", "intentframe_executor_pack_macos.adapters.spotlight", "SpotlightAdapter"),
+    ("calendar", "intentframe_executor_pack_macos.adapters.calendar", "CalendarAdapter"),
+    ("reminders", "intentframe_executor_pack_macos.adapters.reminders", "RemindersAdapter"),
+    ("contacts", "intentframe_executor_pack_macos.adapters.contacts", "ContactsAdapter"),
+    ("mail", "intentframe_executor_pack_macos.adapters.mail", "MailAdapter"),
+    ("notes", "intentframe_executor_pack_macos.adapters.notes", "NotesAdapter"),
+    ("messages", "intentframe_executor_pack_macos.adapters.messages", "MessagesAdapter"),
+    ("browser", "intentframe_executor_pack_macos.adapters.browser", "BrowserAdapter"),
+    ("system", "intentframe_executor_pack_macos.adapters.system", "SystemAdapter"),
 ]
 
 # Adapters that rely on optional deps not in the default install
@@ -113,7 +113,7 @@ def main() -> None:
     from executor.adapters import _ADAPTER_REGISTRY, create_adapter
     _ADAPTER_REGISTRY.clear()
 
-    from executor.platforms.macos.adapters import register_all_adapters
+    from intentframe_executor_pack_macos.adapters import register_all_adapters
     register_all_adapters()
 
     registered_ids = sorted(_ADAPTER_REGISTRY.keys())

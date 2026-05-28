@@ -7,6 +7,6 @@ register their implementations into the executor's plugin registries
 so the config-driven startup can instantiate the right components.
 
 Usage:
-    from executor.platforms.macos import register_all
+    from intentframe_executor_pack_macos import register_all
     register_all()  # Registers all macOS implementations
 """

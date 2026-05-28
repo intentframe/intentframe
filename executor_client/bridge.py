@@ -251,12 +251,12 @@ class ExecutorBridge:
             ExecutorBridge ready to forward intents.
         """
         # ── Register macOS platform ──────────────────────────────────────
-        from executor.platforms.macos import register_all
+        from intentframe_executor_pack_macos import register_all
 
         register_all()
 
         # ── Auth verifier ────────────────────────────────────────────────
-        from executor.platforms.macos.auth import GuardianHMACVerifier
+        from intentframe_executor_pack_macos.auth import GuardianHMACVerifier
 
         auth_verifier = GuardianHMACVerifier(secret_key=hmac_key)
 
@@ -265,8 +265,8 @@ class ExecutorBridge:
             storage_dir = Path(tempfile.mkdtemp(prefix="intentframe_demo_"))
             db_path = str(storage_dir / "demo_executor.db")
 
-        from executor.platforms.macos.audit_logger import SQLiteAuditLogger
-        from executor.platforms.macos.state_store import SQLiteStateStore
+        from intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
+        from intentframe_executor_pack_macos.state_store import SQLiteStateStore
 
         audit_logger = SQLiteAuditLogger(db_path=db_path)
         state_store = SQLiteStateStore(db_path=db_path)
@@ -299,7 +299,7 @@ class ExecutorBridge:
 
         # ── Adapters ─────────────────────────────────────────────────────
         from executor.dispatch import ActionDispatcher
-        from executor.platforms.macos.adapters.files import FilesAdapter
+        from intentframe_executor_pack_macos.adapters.files import FilesAdapter
         from executor.adapters.console_user_io import ConsoleUserIOAdapter
 
         dispatcher = ActionDispatcher(catalog=catalog)

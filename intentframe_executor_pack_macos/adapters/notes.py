@@ -16,7 +16,7 @@ import logging
 from action_registry import ActionType
 from executor.adapters.base import CapabilityAdapter
 from executor.models import AdapterManifest, ExecutionResult
-from executor.platforms.macos.adapters._platform_client import (
+from ._platform_client import (
     platform_execute,
     platform_rollback,
 )

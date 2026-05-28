@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 
 from executor.exceptions import VirtualFileSystemError
-from executor.platforms.macos.virtual_filesystem import LocalVirtualFileSystem
+from intentframe_executor_pack_macos.virtual_filesystem import LocalVirtualFileSystem
 from executor.sandbox.templates import NON_NEGOTIABLE_DENY_WRITE
 from executor.sandbox.venv import owner_home
 from executor.services.virtual_filesystem import MountPointConfig

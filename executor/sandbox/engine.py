@@ -48,7 +48,7 @@ def create_sandbox_engine(platform: str) -> SandboxEngine | None:
     """Factory: return the appropriate engine for *platform*, or ``None``."""
     resolved = _resolve_platform(platform)
     if resolved == "macos":
-        from executor.sandbox.platforms.macos import MacOSSandboxEngine
+        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
 
         return MacOSSandboxEngine()
     return None

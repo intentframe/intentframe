@@ -238,7 +238,7 @@ async def main() -> None:
             _dump("STAGE 9: Runtime audit log entry", runtime.get_audit_log())
 
             print("\n--- Mail adapter dispatch check ---")
-            from executor.platforms.macos.adapters.mail import (
+            from intentframe_executor_pack_macos.adapters.mail import (
                 _ACCOUNT_ACTIONS,
                 _MESSAGE_ACTIONS,
             )

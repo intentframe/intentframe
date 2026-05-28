@@ -174,7 +174,7 @@ def canonicalize_real_path(raw: str) -> str:
       (host-file floor gates)
     - :class:`intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`
       (per-action allowlist match)
-    - :class:`executor.platforms.macos.adapters.host_files.HostFilesAdapter`
+    - :class:`intentframe_executor_pack_macos.adapters.host_files.HostFilesAdapter`
       (pre-I/O enforcement)
 
     All three must agree on the canonical string form before calling
@@ -182,7 +182,7 @@ def canonicalize_real_path(raw: str) -> str:
     one canonicalization but not another.
 
     Semantics mirror
-    :func:`executor.platforms.macos.virtual_filesystem._canonical_real_path`
+    :func:`intentframe_executor_pack_macos.virtual_filesystem._canonical_real_path`
     (re-implemented here rather than imported so ``resource_registry``
     stays free of ``executor`` deps):
 

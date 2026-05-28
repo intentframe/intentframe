@@ -1,0 +1,244 @@
+EXECUTOR ACTION MATRIX PARITY REPORT
+========================================================================
+Generated:          2026-05-28 09:26:37 UTC
+Baseline fixture:   /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/executor_action_matrix_baseline.txt
+Baseline commit:    5c266a4
+Verify script:      tests/verify_executor_action_matrix.py
+
+OVERALL:            PASS  (55/55 rows match)
+
+ROW DETAILS
+------------------------------------------------------------------------
+[PASS] action:browser_validation_missing_url
+       baseline: OPEN_URL|false|-|url|validation|false|-|-
+       current:  OPEN_URL|false|-|url|validation|false|-|-
+
+[PASS] action:calendar_validation_empty_params
+       baseline: CREATE_EVENT|false|-|validation|validation|false|-|-
+       current:  CREATE_EVENT|false|-|validation|validation|false|-|-
+
+[PASS] action:clipboard_validation_unknown_action
+       baseline: NOT_CLIPBOARD|false|-|unknown|validation|false|-|-
+       current:  NOT_CLIPBOARD|false|-|unknown|validation|false|-|-
+
+[PASS] action:console_user_io_confirmation_extras
+       baseline: GET_CONFIRMATION|true|confirmed,response|-|none|false|-|user_response_token
+       current:  GET_CONFIRMATION|true|confirmed,response|-|none|false|-|user_response_token
+
+[PASS] action:console_user_io_show_message
+       baseline: SHOW_MESSAGE|true|shown|-|none|false|-|-
+       current:  SHOW_MESSAGE|true|shown|-|none|false|-|-
+
+[PASS] action:console_user_io_unknown_action
+       baseline: NOT_USER_IO|false|-|unknown|validation|false|-|-
+       current:  NOT_USER_IO|false|-|unknown|validation|false|-|-
+
+[PASS] action:contacts_validation_empty_params
+       baseline: ADD_CONTACT|false|-|validation|validation|false|-|-
+       current:  ADD_CONTACT|false|-|validation|validation|false|-|-
+
+[PASS] action:host_files_ceiling_read_outside
+       baseline: READ_HOST_FILE|false|-|allowlist|ceiling|false|-|-
+       current:  READ_HOST_FILE|false|-|allowlist|ceiling|false|-|-
+
+[PASS] action:host_files_ceiling_write_outside
+       baseline: WRITE_HOST_FILE|false|-|allowlist|ceiling|false|-|-
+       current:  WRITE_HOST_FILE|false|-|allowlist|ceiling|false|-|-
+
+[PASS] action:host_files_floor_delete_sudoers
+       baseline: DELETE_HOST_FILE|false|-|floor|floor|false|-|-
+       current:  DELETE_HOST_FILE|false|-|floor|floor|false|-|-
+
+[PASS] action:host_files_floor_write_sudoers
+       baseline: WRITE_HOST_FILE|false|-|floor|floor|false|-|-
+       current:  WRITE_HOST_FILE|false|-|floor|floor|false|-|-
+
+[PASS] action:host_files_validation_bad_content
+       baseline: WRITE_HOST_FILE|false|-|content|validation|false|-|-
+       current:  WRITE_HOST_FILE|false|-|content|validation|false|-|-
+
+[PASS] action:host_files_validation_missing_path
+       baseline: READ_HOST_FILE|false|-|path|validation|false|-|-
+       current:  READ_HOST_FILE|false|-|path|validation|false|-|-
+
+[PASS] action:host_files_write_read_roundtrip
+       baseline: READ_HOST_FILE|true|content,limit,offset,path,total_lines,truncated|-|none|false|-|-
+       current:  READ_HOST_FILE|true|content,limit,offset,path,total_lines,truncated|-|none|false|-|-
+
+[PASS] action:host_files_write_rollback
+       baseline: WRITE_HOST_FILE|true|bytes_written,path|-|none|true|host_file_write:|-
+       current:  WRITE_HOST_FILE|true|bytes_written,path|-|none|true|host_file_write:|-
+
+[PASS] action:http_api_credentials_kwarg
+       baseline: HTTP_GET|false|-|connection|none|false|-|-
+       current:  HTTP_GET|false|-|connection|none|false|-|-
+
+[PASS] action:http_api_missing_url
+       baseline: HTTP_GET|false|-|url|validation|false|-|-
+       current:  HTTP_GET|false|-|url|validation|false|-|-
+
+[PASS] action:mail_validation_missing_account
+       baseline: SEND_EMAIL|false|-|edi|validation|false|-|-
+       current:  SEND_EMAIL|false|-|edi|validation|false|-|-
+
+[PASS] action:messages_validation_empty_params
+       baseline: SEND_MESSAGE|false|-|validation|validation|false|-|-
+       current:  SEND_MESSAGE|false|-|validation|validation|false|-|-
+
+[PASS] action:notes_validation_empty_params
+       baseline: CREATE_NOTE|false|-|validation|validation|false|-|-
+       current:  CREATE_NOTE|false|-|validation|validation|false|-|-
+
+[PASS] action:notifications_validation_empty_params
+       baseline: SHOW_NOTIFICATION|false|-|validation|validation|false|-|-
+       current:  SHOW_NOTIFICATION|false|-|validation|validation|false|-|-
+
+[PASS] action:reminders_validation_empty_params
+       baseline: CREATE_REMINDER|false|-|validation|validation|false|-|-
+       current:  CREATE_REMINDER|false|-|validation|validation|false|-|-
+
+[PASS] action:safe_execute_credentials_accepted
+       baseline: PROBE_CREDS|true|credentials_seen|-|none|false|-|-
+       current:  PROBE_CREDS|true|credentials_seen|-|none|false|-|-
+
+[PASS] action:safe_execute_exception_envelope
+       baseline: PROBE_BOOM|false|-|unavailable|exception|false|-|-
+       current:  PROBE_BOOM|false|-|unavailable|exception|false|-|-
+
+[PASS] action:safe_execute_timeout_envelope
+       baseline: PROBE_HANG|false|-|timed_out|timeout|false|-|-
+       current:  PROBE_HANG|false|-|timed_out|timeout|false|-|-
+
+[PASS] action:shortcuts_validation_missing_name
+       baseline: RUN_SHORTCUT|false|-|name|validation|false|-|-
+       current:  RUN_SHORTCUT|false|-|name|validation|false|-|-
+
+[PASS] action:spotlight_validation_missing_query
+       baseline: SEARCH_SPOTLIGHT|false|-|query|validation|false|-|-
+       current:  SEARCH_SPOTLIGHT|false|-|query|validation|false|-|-
+
+[PASS] action:system_validation_platform_action
+       baseline: SET_VOLUME|false|-|validation|validation|false|-|-
+       current:  SET_VOLUME|false|-|validation|validation|false|-|-
+
+[PASS] action:terminal_catastrophic_blocked
+       baseline: RUN_COMMAND|false|-|catastrophic|floor|false|-|-
+       current:  RUN_COMMAND|false|-|catastrophic|floor|false|-|-
+
+[PASS] action:terminal_missing_command
+       baseline: RUN_COMMAND|false|-|command|validation|false|-|-
+       current:  RUN_COMMAND|false|-|command|validation|false|-|-
+
+[PASS] action:terminal_sandbox_disabled_echo
+       baseline: RUN_COMMAND|true|command,return_code,stderr,stdout|-|none|false|-|-
+       current:  RUN_COMMAND|true|command,return_code,stderr,stdout|-|none|false|-|-
+
+[PASS] action:terminal_sandbox_unavailable
+       baseline: RUN_COMMAND|false|-|unavailable|unavailable|false|-|-
+       current:  RUN_COMMAND|false|-|unavailable|unavailable|false|-|-
+
+[PASS] action:terminal_unknown_action
+       baseline: NOT_A_COMMAND|false|-|unknown|validation|false|-|-
+       current:  NOT_A_COMMAND|false|-|unknown|validation|false|-|-
+
+[PASS] action:user_io_validation_empty_params
+       baseline: NOT_USER_IO|false|-|unknown|validation|false|-|-
+       current:  NOT_USER_IO|false|-|unknown|validation|false|-|-
+
+[PASS] action:vfs_floor_write_trap
+       baseline: WRITE_FILE|false|-|floor|floor|false|-|-
+       current:  WRITE_FILE|false|-|floor|floor|false|-|-
+
+[PASS] action:vfs_write_read_roundtrip
+       baseline: READ_FILE|true|content,limit,offset,path,total_lines,truncated|-|none|false|-|-
+       current:  READ_FILE|true|content,limit,offset,path,total_lines,truncated|-|none|false|-|-
+
+[PASS] action:vfs_write_rollback
+       baseline: WRITE_FILE|true|bytes_written,path|-|none|true|file_write:|-
+       current:  WRITE_FILE|true|bytes_written,path|-|none|true|file_write:|-
+
+[PASS] manifest:browser
+       baseline: 3|false|1.0.0|GET_PAGE_CONTENT,OPEN_URL,SEARCH_WEB
+       current:  3|false|1.0.0|GET_PAGE_CONTENT,OPEN_URL,SEARCH_WEB
+
+[PASS] manifest:calendar
+       baseline: 6|false|1.0.0|CREATE_EVENT,DELETE_EVENT,LIST_CALENDARS,LIST_EVENTS,SEARCH_EVENTS,UPDATE_EVENT
+       current:  6|false|1.0.0|CREATE_EVENT,DELETE_EVENT,LIST_CALENDARS,LIST_EVENTS,SEARCH_EVENTS,UPDATE_EVENT
+
+[PASS] manifest:clipboard
+       baseline: 2|false|1.0.0|GET_CLIPBOARD,SET_CLIPBOARD
+       current:  2|false|1.0.0|GET_CLIPBOARD,SET_CLIPBOARD
+
+[PASS] manifest:console_user_io
+       baseline: 3|false|1.0.0|ASK_USER,GET_CONFIRMATION,SHOW_MESSAGE
+       current:  3|false|1.0.0|ASK_USER,GET_CONFIRMATION,SHOW_MESSAGE
+
+[PASS] manifest:contacts
+       baseline: 5|false|1.0.0|ADD_CONTACT,DELETE_CONTACT,GET_CONTACT,SEARCH_CONTACTS,UPDATE_CONTACT
+       current:  5|false|1.0.0|ADD_CONTACT,DELETE_CONTACT,GET_CONTACT,SEARCH_CONTACTS,UPDATE_CONTACT
+
+[PASS] manifest:files
+       baseline: 5|false|1.0.0|APPEND_ROW,DELETE_FILE,LIST_DIRECTORY,READ_FILE,WRITE_FILE
+       current:  5|false|1.0.0|APPEND_ROW,DELETE_FILE,LIST_DIRECTORY,READ_FILE,WRITE_FILE
+
+[PASS] manifest:host_files
+       baseline: 4|false|1.0.0|DELETE_HOST_FILE,LIST_HOST_DIRECTORY,READ_HOST_FILE,WRITE_HOST_FILE
+       current:  4|false|1.0.0|DELETE_HOST_FILE,LIST_HOST_DIRECTORY,READ_HOST_FILE,WRITE_HOST_FILE
+
+[PASS] manifest:http_api
+       baseline: 4|true|1.0.0|HTTP_DELETE,HTTP_GET,HTTP_POST,HTTP_PUT
+       current:  4|true|1.0.0|HTTP_DELETE,HTTP_GET,HTTP_POST,HTTP_PUT
+
+[PASS] manifest:mail
+       baseline: 10|false|1.0.0|DELETE_EMAIL,DOWNLOAD_ATTACHMENT,FORWARD_EMAIL,GET_EMAIL,MARK_READ_EMAIL,MOVE_EMAIL,READ_EMAIL,REPLY_EMAIL,SEARCH_EMAIL,SEND_EMAIL
+       current:  10|false|1.0.0|DELETE_EMAIL,DOWNLOAD_ATTACHMENT,FORWARD_EMAIL,GET_EMAIL,MARK_READ_EMAIL,MOVE_EMAIL,READ_EMAIL,REPLY_EMAIL,SEARCH_EMAIL,SEND_EMAIL
+
+[PASS] manifest:messages
+       baseline: 2|false|1.0.0|READ_MESSAGES,SEND_MESSAGE
+       current:  2|false|1.0.0|READ_MESSAGES,SEND_MESSAGE
+
+[PASS] manifest:notes
+       baseline: 4|false|1.0.0|CREATE_NOTE,DELETE_NOTE,LIST_NOTES,READ_NOTE
+       current:  4|false|1.0.0|CREATE_NOTE,DELETE_NOTE,LIST_NOTES,READ_NOTE
+
+[PASS] manifest:notifications
+       baseline: 1|false|1.0.0|SHOW_NOTIFICATION
+       current:  1|false|1.0.0|SHOW_NOTIFICATION
+
+[PASS] manifest:reminders
+       baseline: 6|false|1.0.0|COMPLETE_REMINDER,CREATE_REMINDER,DELETE_REMINDER,LIST_REMINDERS,LIST_REMINDER_LISTS,UPDATE_REMINDER
+       current:  6|false|1.0.0|COMPLETE_REMINDER,CREATE_REMINDER,DELETE_REMINDER,LIST_REMINDERS,LIST_REMINDER_LISTS,UPDATE_REMINDER
+
+[PASS] manifest:shortcuts
+       baseline: 2|false|1.0.0|LIST_SHORTCUTS,RUN_SHORTCUT
+       current:  2|false|1.0.0|LIST_SHORTCUTS,RUN_SHORTCUT
+
+[PASS] manifest:spotlight
+       baseline: 1|false|1.0.0|SEARCH_SPOTLIGHT
+       current:  1|false|1.0.0|SEARCH_SPOTLIGHT
+
+[PASS] manifest:system
+       baseline: 9|false|1.0.0|GET_BRIGHTNESS,GET_DARK_MODE,GET_MUTE,GET_SYSTEM_INFO,GET_VOLUME,SET_BRIGHTNESS,SET_VOLUME,TOGGLE_DARK_MODE,TOGGLE_MUTE
+       current:  9|false|1.0.0|GET_BRIGHTNESS,GET_DARK_MODE,GET_MUTE,GET_SYSTEM_INFO,GET_VOLUME,SET_BRIGHTNESS,SET_VOLUME,TOGGLE_DARK_MODE,TOGGLE_MUTE
+
+[PASS] manifest:terminal
+       baseline: 1|false|1.0.0|RUN_COMMAND
+       current:  1|false|1.0.0|RUN_COMMAND
+
+[PASS] manifest:user_io
+       baseline: 4|false|1.0.0|ASK_USER,GET_CONFIRMATION,SHOW_MESSAGE,SHOW_OPTIONS
+       current:  4|false|1.0.0|ASK_USER,GET_CONFIRMATION,SHOW_MESSAGE,SHOW_OPTIONS
+
+EXECUTION CONTRACT
+------------------------------------------------------------------------
+baseline safe_execute: yes
+current  safe_execute: yes
+match:                 PASS
+
+SNAPSHOT HASHES
+------------------------------------------------------------------------
+baseline sha256: c15f9826b8098d2e2a845d13ca6198c36f515b394ad63a9eb7afffff77b32535
+current  sha256: c15f9826b8098d2e2a845d13ca6198c36f515b394ad63a9eb7afffff77b32535
+
+All action/manifest rows and execution contract match the baseline.
+Executor action parity with commit 5c266a4 is VERIFIED.

@@ -17,7 +17,7 @@ from action_registry import ActionType
 from executor.adapters.base import CapabilityAdapter
 from executor.exceptions import VirtualFileSystemError
 from executor.models import AdapterManifest, ExecutionResult
-from executor.platforms.macos.virtual_filesystem import LocalVirtualFileSystem
+from ..virtual_filesystem import LocalVirtualFileSystem
 from executor.services.virtual_filesystem import MountPointResolver
 
 

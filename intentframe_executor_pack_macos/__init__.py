@@ -6,7 +6,7 @@ plugin registries: transport, auth, credential vault, audit logger,
 state store, and capability adapters.
 
 Usage:
-    from executor.platforms.macos import register_all
+    from intentframe_executor_pack_macos import register_all
     register_all()
 
     # Now config-driven startup can create macOS components:
@@ -40,21 +40,21 @@ def register_all() -> None:
 
 
 def _register_transport() -> None:
-    from executor.platforms.macos.transport import UnixSocketTransport
+    from .transport import UnixSocketTransport
     from executor.transport import register_transport
 
     register_transport("unix_socket", UnixSocketTransport)
 
 
 def _register_auth() -> None:
-    from executor.platforms.macos.auth import GuardianHMACVerifier
+    from .auth import GuardianHMACVerifier
     from executor.auth import register_auth_verifier
 
     register_auth_verifier("guardian_hmac", GuardianHMACVerifier)
 
 
 def _register_credential_vault() -> None:
-    from executor.platforms.macos.credential_vault import KeychainVault
+    from .credential_vault import KeychainVault
     from executor.services.credential_vault import register_credential_vault
 
     register_credential_vault("keyring", KeychainVault)
@@ -63,8 +63,8 @@ def _register_credential_vault() -> None:
 
 
 def _register_storage() -> None:
-    from executor.platforms.macos.audit_logger import SQLiteAuditLogger
-    from executor.platforms.macos.state_store import SQLiteStateStore
+    from .audit_logger import SQLiteAuditLogger
+    from .state_store import SQLiteStateStore
     from executor.services.audit_logger import register_audit_logger
     from executor.services.state_store import register_state_store
 
@@ -73,6 +73,6 @@ def _register_storage() -> None:
 
 
 def _register_adapters() -> None:
-    from executor.platforms.macos.adapters import register_all_adapters
+    from .adapters import register_all_adapters
 
     register_all_adapters()

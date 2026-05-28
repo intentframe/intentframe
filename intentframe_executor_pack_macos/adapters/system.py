@@ -18,7 +18,7 @@ import platform
 
 from executor.adapters.base import CapabilityAdapter
 from executor.models import AdapterManifest, ExecutionResult
-from executor.platforms.macos.adapters._platform_client import platform_execute
+from ._platform_client import platform_execute
 
 _PLATFORM_ACTIONS = {
     "SET_VOLUME", "GET_VOLUME", "TOGGLE_MUTE", "GET_MUTE",

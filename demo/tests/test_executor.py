@@ -299,7 +299,7 @@ def main():
     header("TEST 10: HASH CHAIN INTEGRITY")
     print("  Verifying tamper-evident audit trail...")
 
-    from executor.platforms.macos.audit_logger import SQLiteAuditLogger
+    from intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
     logger = SQLiteAuditLogger(db_path=DB_PATH)
     chain_valid = bridge._run_async(logger.verify_chain_integrity())
     logger.close()

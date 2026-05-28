@@ -40,8 +40,8 @@ _gateway = None
 _worker_pool = None
 
 _PLATFORM_REGISTRY = {
-    "macos": "executor.platforms.macos",
-    "darwin": "executor.platforms.macos",
+    "macos": "intentframe_executor_pack_macos",
+    "darwin": "intentframe_executor_pack_macos",
 }
 
 
@@ -75,7 +75,7 @@ async def lifespan(app: FastAPI):
 
     if sys.platform == "darwin":
         try:
-            from executor.platforms.macos.permissions import check_permissions
+            from intentframe_executor_pack_macos.permissions import check_permissions
             check_permissions(config.adapters.enabled)
         except Exception as exc:
             logger.warning("Platform server permission check failed: %s", exc)
