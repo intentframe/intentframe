@@ -16,8 +16,8 @@ from __future__ import annotations
 import asyncio
 import platform
 
-from executor.adapters.base import CapabilityAdapter
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.models import AdapterManifest, ExecutionResult
 from ._platform_client import platform_execute
 
 _PLATFORM_ACTIONS = {

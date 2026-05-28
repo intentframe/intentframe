@@ -3,15 +3,15 @@ Credential vault — re-exported from the shared ``intentframe_credentials`` pac
 
 All executor code continues to import from this module unchanged::
 
-    from executor.services.credential_vault import CredentialVault
-    from executor.services.credential_vault import create_credential_vault
+    from executor_sdk.services.credential_vault import CredentialVault
+    from executor_sdk.services.credential_vault import create_credential_vault
 
 Under the hood everything is now backed by ``intentframe_credentials``.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 from intentframe_credentials.backends import service_backend as _sb  # noqa: F401 — registers "service"
 from intentframe_credentials.protocol import (
@@ -20,15 +20,12 @@ from intentframe_credentials.protocol import (
     register_backend as register_credential_vault,
 )
 
-from executor.exceptions import ConfigurationError
-
-if TYPE_CHECKING:
-    from executor.config.schema import CredentialConfig
+from executor_sdk.exceptions import ConfigurationError
 
 __all__ = ["CredentialVault", "register_credential_vault", "create_credential_vault"]
 
 
-def create_credential_vault(config: CredentialConfig) -> CredentialVault:
+def create_credential_vault(config: Any) -> CredentialVault:
     """Instantiate the configured credential vault from the registry.
 
     Adapts the executor-specific ``CredentialConfig`` to the shared

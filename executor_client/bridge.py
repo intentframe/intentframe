@@ -272,7 +272,7 @@ class ExecutorBridge:
         state_store = SQLiteStateStore(db_path=db_path)
 
         # ── Virtual filesystem from ExecutorView mounts ──────────────────
-        from executor.services.virtual_filesystem import (
+        from executor_sdk.services.virtual_filesystem import (
             MountPointConfig,
             MountPointResolver,
         )
@@ -312,7 +312,7 @@ class ExecutorBridge:
         worker_pool = WorkerPool(max_workers=4, default_timeout=30.0)
 
         # ── Credential vault (no-op for demo) ────────────────────────────
-        from executor.services.credential_vault import CredentialVault
+        from executor_sdk.services.credential_vault import CredentialVault
 
         class _DemoVault(CredentialVault):
             """No-op vault -- demo adapters don't need credentials."""
@@ -334,7 +334,7 @@ class ExecutorBridge:
 
         # ── Wire gateway ─────────────────────────────────────────────────
         from executor.services.credential_scrubber import CredentialScrubber
-        from executor.services.hash_chain import HashChain
+        from executor_sdk.services.hash_chain import HashChain
 
         gateway = ExecutorGateway(
             auth_verifier=auth_verifier,

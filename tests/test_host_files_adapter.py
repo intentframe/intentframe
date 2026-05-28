@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from action_registry import ActionType
-from executor.config.schema import HostFilesConfig
+from executor_sdk.config.schema import HostFilesConfig
 from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
 
 

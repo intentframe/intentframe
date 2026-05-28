@@ -1,4 +1,4 @@
-"""Tests for executor.sandbox -- classifier, planner, engine, and adapter integration.
+"""Tests for intentframe_executor_pack_macos.sandbox -- classifier, planner, engine, and adapter integration.
 
 Covers:
     - Classifier: capability detection, opaque detection, edge cases
@@ -21,13 +21,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from executor.config.schema import SandboxConfig
-from executor.sandbox.capabilities import Capability, CapabilityReport
-from executor.sandbox.classifier import classify
-from executor.sandbox.engine import SandboxedCommand
-from executor.sandbox.pathing import canonical_sandbox_path
-from executor.sandbox.planner import ExecutionPlan, SandboxPlanner
-from executor.sandbox.templates import (
+from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
+from intentframe_executor_pack_macos.sandbox.capabilities import Capability, CapabilityReport
+from intentframe_executor_pack_macos.sandbox.classifier import classify
+from intentframe_executor_pack_macos.sandbox import SandboxedCommand
+from intentframe_executor_pack_macos.sandbox.pathing import canonical_sandbox_path
+from intentframe_executor_pack_macos.sandbox.plan import ExecutionPlan
+from intentframe_executor_pack_macos.sandbox.planner import SandboxPlanner
+from intentframe_executor_pack_macos.sandbox.templates import (
     NON_NEGOTIABLE_DENY_ACCESS,
     NON_NEGOTIABLE_DENY_WRITE,
     SandboxTemplate,
@@ -266,7 +267,7 @@ class TestTemplates:
         assert minimum_template(caps) == SandboxTemplate.UNRESTRICTED
 
     def test_template_order_is_monotonic(self) -> None:
-        from executor.sandbox.templates import TEMPLATE_ORDER
+        from intentframe_executor_pack_macos.sandbox.templates import TEMPLATE_ORDER
         for i in range(len(TEMPLATE_ORDER) - 1):
             a = TEMPLATE_CAPABILITIES[TEMPLATE_ORDER[i]]
             b = TEMPLATE_CAPABILITIES[TEMPLATE_ORDER[i + 1]]
@@ -393,7 +394,7 @@ class TestPlanner:
     def test_invalid_template_name_warns(self, caplog) -> None:
         """Unrecognised template names emit a warning, valid ones still work."""
         import logging
-        with caplog.at_level(logging.WARNING, logger="executor.sandbox.planner"):
+        with caplog.at_level(logging.WARNING, logger="intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(allowed=["pure_compute", "bogus_template"])
         assert planner.template == SandboxTemplate.PURE_COMPUTE
         assert "bogus_template" in caplog.text
@@ -401,7 +402,7 @@ class TestPlanner:
     def test_all_invalid_templates_logs_error(self, caplog) -> None:
         """If every template name is invalid, an error is logged and fallback is used."""
         import logging
-        with caplog.at_level(logging.WARNING, logger="executor.sandbox.planner"):
+        with caplog.at_level(logging.WARNING, logger="intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(allowed=["typo_one", "typo_two"])
         assert planner.template == SandboxTemplate.FILE_READ_ONLY
         assert "No valid templates" in caplog.text
@@ -490,14 +491,14 @@ class TestPlannerConfigShapes:
 
 class TestEngineFactory:
     def test_create_macos_engine(self) -> None:
-        from executor.sandbox.engine import create_sandbox_engine
-        with patch("executor.sandbox.engine._resolve_platform", return_value="macos"):
+        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
+        with patch("intentframe_executor_pack_macos.sandbox._resolve_platform", return_value="macos"):
             engine = create_sandbox_engine("auto")
             assert engine is not None
 
     def test_create_unsupported_returns_none(self) -> None:
-        from executor.sandbox.engine import create_sandbox_engine
-        with patch("executor.sandbox.engine._resolve_platform", return_value="windows"):
+        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
+        with patch("intentframe_executor_pack_macos.sandbox._resolve_platform", return_value="windows"):
             engine = create_sandbox_engine("auto")
             assert engine is None
 
@@ -1496,6 +1497,16 @@ finally:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+class _UnavailableSandboxEngine:
+    """Fake engine: sandbox enabled but platform mechanism not usable."""
+
+    def available(self) -> bool:
+        return False
+
+    def wrap(self, command: str, plan) -> None:
+        raise RuntimeError("wrap should not run when engine is unavailable")
+
+
 class TestTerminalAdapterSandbox:
     """Test the actual TerminalAdapter.execute() with sandbox wiring."""
 
@@ -1513,8 +1524,7 @@ class TestTerminalAdapterSandbox:
 
         cfg = SandboxConfig(enabled=True)
         adapter = TerminalAdapter(
-            sandbox_engine=None,
-            sandbox_planner=None,
+            sandbox_engine=_UnavailableSandboxEngine(),
             sandbox_config=cfg,
         )
         result = _run(adapter.execute("RUN_COMMAND", {"command": "echo hi"}))
@@ -1524,7 +1534,7 @@ class TestTerminalAdapterSandbox:
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_sandbox_enabled_wraps_and_succeeds(self) -> None:
         from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
-        from executor.sandbox.engine import create_sandbox_engine
+        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
 
         cfg = SandboxConfig(
             enabled=True,
@@ -1547,7 +1557,7 @@ class TestTerminalAdapterSandbox:
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_adapter_preserves_original_command_in_data(self) -> None:
         from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
-        from executor.sandbox.engine import create_sandbox_engine
+        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
 
         cfg = SandboxConfig(enabled=True)
         planner = SandboxPlanner(cfg)
@@ -1652,14 +1662,14 @@ class TestExecutorVenvResolver:
     """SUDO_USER → uid HOME → None fallback chain, plus config override."""
 
     def test_explicit_config_path_is_returned_absolute(self, tmp_path, monkeypatch) -> None:
-        from executor.sandbox.venv import resolve_executor_venv_path
+        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         cfg = SandboxConfig(executor_venv_path=str(tmp_path))
         monkeypatch.delenv("SUDO_USER", raising=False)
         resolved = resolve_executor_venv_path(cfg)
         assert resolved == os.path.realpath(str(tmp_path))
 
     def test_explicit_tilde_path_expands_against_owner_home(self, monkeypatch) -> None:
-        from executor.sandbox.venv import resolve_executor_venv_path
+        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         cfg = SandboxConfig(executor_venv_path="~/custom-venv")
         monkeypatch.delenv("SUDO_USER", raising=False)
         resolved = resolve_executor_venv_path(cfg)
@@ -1668,7 +1678,7 @@ class TestExecutorVenvResolver:
         assert os.path.isabs(resolved)
 
     def test_default_path_when_unconfigured(self, monkeypatch) -> None:
-        from executor.sandbox.venv import resolve_executor_venv_path
+        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         cfg = SandboxConfig()
         monkeypatch.delenv("SUDO_USER", raising=False)
         resolved = resolve_executor_venv_path(cfg)
@@ -1680,7 +1690,7 @@ class TestExecutorVenvResolver:
     def test_sudo_user_overrides_current_home(self, monkeypatch) -> None:
         """When SUDO_USER is set, it's the authoritative owner."""
         import pwd
-        from executor.sandbox.venv import resolve_executor_venv_path
+        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         me = pwd.getpwuid(os.getuid())
         monkeypatch.setenv("SUDO_USER", me.pw_name)
         monkeypatch.setenv("HOME", "/tmp/nonsense-home")
@@ -1690,7 +1700,7 @@ class TestExecutorVenvResolver:
         assert resolved.startswith(os.path.realpath(me.pw_dir))
 
     def test_bogus_sudo_user_falls_back_to_uid_home(self, monkeypatch) -> None:
-        from executor.sandbox.venv import resolve_executor_venv_path
+        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         monkeypatch.setenv("SUDO_USER", "definitely-not-a-real-user-xyz-1234")
         cfg = SandboxConfig()
         resolved = resolve_executor_venv_path(cfg)
@@ -1700,16 +1710,16 @@ class TestExecutorVenvResolver:
 
 class TestExecutorVenvValidator:
     def test_missing_dir_rejected(self, tmp_path) -> None:
-        from executor.sandbox.venv import validate_executor_venv
+        from intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
         assert validate_executor_venv(str(tmp_path / "does-not-exist")) is False
 
     def test_dir_without_python_rejected(self, tmp_path) -> None:
-        from executor.sandbox.venv import validate_executor_venv
+        from intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
         (tmp_path / "bin").mkdir()
         assert validate_executor_venv(str(tmp_path)) is False
 
     def test_valid_fake_venv_accepted(self, tmp_path) -> None:
-        from executor.sandbox.venv import validate_executor_venv
+        from intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
         path = _fake_venv(str(tmp_path / "venv"))
         assert validate_executor_venv(path) is True
 
@@ -1736,7 +1746,7 @@ class TestExecutionPlanVenvThreading:
         returns None and main.py is responsible for fail-closed behavior."""
         import logging
         missing = str(tmp_path / "not-a-venv")
-        with caplog.at_level(logging.ERROR, logger="executor.sandbox.planner"):
+        with caplog.at_level(logging.ERROR, logger="intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(
                 executor_venv_path=missing,
                 executor_venv_required=True,
@@ -1747,7 +1757,7 @@ class TestExecutionPlanVenvThreading:
     def test_missing_optional_venv_warns(self, tmp_path, caplog) -> None:
         import logging
         missing = str(tmp_path / "not-a-venv")
-        with caplog.at_level(logging.WARNING, logger="executor.sandbox.planner"):
+        with caplog.at_level(logging.WARNING, logger="intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(
                 executor_venv_path=missing,
                 executor_venv_required=False,
@@ -1927,18 +1937,18 @@ class TestPlannerRejectsVenvUnderDenyAccess:
         an unreadable binary. This reproduces the original bug: the path
         was a valid venv, but the sandbox would deny reads on it."""
         import logging
-        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         denied_root = tmp_path / "denied"
         denied_root.mkdir()
         venv = _fake_venv(str(denied_root / "venvs" / "executor"))
 
         monkeypatch.setattr(
-            "executor.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            "intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
             NON_NEGOTIABLE_DENY_ACCESS + (str(denied_root),),
         )
 
-        with caplog.at_level(logging.ERROR, logger="executor.sandbox.planner"):
+        with caplog.at_level(logging.ERROR, logger="intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(
                 executor_venv_path=venv,
                 executor_venv_required=True,
@@ -1952,14 +1962,14 @@ class TestPlannerRejectsVenvUnderDenyAccess:
         """Sanity check: a venv that doesn't collide with any deny path
         passes the cross-check and surfaces on the plan. Ensures the
         guard isn't rejecting every venv."""
-        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         venv = _fake_venv(str(tmp_path / "clean-venv"))
         elsewhere = tmp_path / "other"
         elsewhere.mkdir()
 
         monkeypatch.setattr(
-            "executor.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            "intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
             NON_NEGOTIABLE_DENY_ACCESS + (str(elsewhere),),
         )
         planner = _make_planner(
@@ -1973,7 +1983,7 @@ class TestPlannerRejectsVenvUnderDenyAccess:
     ) -> None:
         """``/a/bad`` must not be treated as under ``/a/b``. Pure-prefix
         collision would be a bug (rejects legitimate paths)."""
-        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         deny = tmp_path / "deny"
         deny.mkdir()
@@ -1982,7 +1992,7 @@ class TestPlannerRejectsVenvUnderDenyAccess:
         venv = _fake_venv(str(sibling / "venv"))
 
         monkeypatch.setattr(
-            "executor.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            "intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
             NON_NEGOTIABLE_DENY_ACCESS + (str(deny),),
         )
         planner = _make_planner(
@@ -2073,8 +2083,8 @@ class TestSeatbeltProductionDenyBehavior:
         picks must not start with any production deny-access entry.
         Protects against someone accidentally changing the default back
         to under ``~/.intentframe/``."""
-        from executor.sandbox.venv import _DEFAULT_VENV_RELATIVE
-        from executor.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_executor_pack_macos.sandbox.venv import _DEFAULT_VENV_RELATIVE
+        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         for deny in NON_NEGOTIABLE_DENY_ACCESS:
             # Normalize: deny entries use ~ prefix; compare relative parts.

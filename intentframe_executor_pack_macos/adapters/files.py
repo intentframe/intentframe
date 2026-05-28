@@ -14,11 +14,11 @@ import asyncio
 from pathlib import Path
 
 from action_registry import ActionType
-from executor.adapters.base import CapabilityAdapter
-from executor.exceptions import VirtualFileSystemError
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.exceptions import VirtualFileSystemError
+from executor_sdk.models import AdapterManifest, ExecutionResult
 from ..virtual_filesystem import LocalVirtualFileSystem
-from executor.services.virtual_filesystem import MountPointResolver
+from executor_sdk.services.virtual_filesystem import MountPointResolver
 
 
 class FilesAdapter(CapabilityAdapter):
@@ -107,7 +107,7 @@ class FilesAdapter(CapabilityAdapter):
 
             if action == "DELETE_FILE":
                 # Delegated to the VFS so the deny-write floor applies symmetrically
-                # with WRITE_FILE (see executor/platforms/macos/virtual_filesystem.py
+                # with WRITE_FILE (see intentframe_executor_pack_macos/virtual_filesystem.py
                 # and resource_registry/floor.py).  Previously this adapter reached
                 # into the resolver directly and bypassed the floor entirely.
                 self._vfs.delete_file(path)

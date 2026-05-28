@@ -17,13 +17,10 @@ Implementations to create later:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Any
 
-from executor.exceptions import ConfigurationError
-from executor.models import RollbackEntry, RollbackStatus
-
-if TYPE_CHECKING:
-    from executor.config.schema import StorageConfig
+from executor_sdk.exceptions import ConfigurationError
+from executor_sdk.models import RollbackEntry, RollbackStatus
 
 __all__ = ["StateStore", "register_state_store", "create_state_store"]
 
@@ -39,7 +36,7 @@ def register_state_store(
     _STATE_REGISTRY[backend] = store_class
 
 
-def create_state_store(config: StorageConfig) -> StateStore:
+def create_state_store(config: Any) -> StateStore:
     """Instantiate the configured state store from the registry."""
     store_class = _STATE_REGISTRY.get(config.state_backend)
     if store_class is None:

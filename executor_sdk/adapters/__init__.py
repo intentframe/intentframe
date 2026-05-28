@@ -10,30 +10,23 @@ Platform-specific adapter implementations register themselves via
 register_adapter() and are instantiated at startup from config.
 
 Available adapters:
-    Platform-neutral: console_user_io.py (console-based user I/O)
+    Platform-neutral: executor/adapters/console_user_io.py (console-based user I/O; core-only, not exported from executor_sdk)
 
-Implementations to create later (per platform):
-    macOS: mail.py, calendar.py, contacts.py, files.py, notes.py,
-           reminders.py, browser.py, messages.py, terminal.py,
-           http_api.py, shortcuts.py, system.py, clipboard.py,
-           notifications.py, spotlight.py, filesystem_watch.py, user_io.py
-    Cloud: s3.py, ses.py, lambda_invoke.py, etc.
+Implementations registered by executor packs (e.g. intentframe_executor_pack_macos):
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from executor.adapters.base import CapabilityAdapter
-from executor.adapters.console_user_io import ConsoleUserIOAdapter
-from executor.exceptions import ConfigurationError
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
     pass
 
 __all__ = [
     "CapabilityAdapter",
-    "ConsoleUserIOAdapter",
     "register_adapter",
     "create_adapter",
 ]

@@ -16,9 +16,9 @@ import logging
 import struct
 from pathlib import Path
 
-from executor.constants import DEFAULT_UNIX_SOCKET_PATH
-from executor.models import ExecutionRequest, ExecutionResult
-from executor.transport.base import RequestHandler, TransportServer
+from executor_sdk.constants import DEFAULT_UNIX_SOCKET_PATH
+from executor_sdk.models import ExecutionRequest, ExecutionResult
+from executor_sdk.transport.base import RequestHandler, TransportServer
 
 logger = logging.getLogger(__name__)
 

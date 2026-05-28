@@ -28,16 +28,16 @@ import logging
 import time
 from typing import Any
 
-from executor.auth.base import AuthVerifier
+from executor_sdk.auth.base import AuthVerifier
 from executor.dispatch import ActionDispatcher
-from executor.exceptions import (
+from executor_sdk.exceptions import (
     AdapterNotFoundError,
     AuditError,
     AuthenticationError,
     CredentialError,
     ExecutorError,
 )
-from executor.models import (
+from executor_sdk.models import (
     AuditEntry,
     ExecutionRequest,
     ExecutionResult,
@@ -46,11 +46,11 @@ from executor.models import (
     SecurityEvent,
     SecurityEventType,
 )
-from executor.services.audit_logger import AuditLogger
+from executor_sdk.services.audit_logger import AuditLogger
 from executor.services.credential_scrubber import CredentialScrubber
-from executor.services.credential_vault import CredentialVault
-from executor.services.hash_chain import HashChain
-from executor.services.state_store import StateStore
+from executor_sdk.services.credential_vault import CredentialVault
+from executor_sdk.services.hash_chain import HashChain
+from executor_sdk.services.state_store import StateStore
 from executor.worker_pool import WorkerPool
 
 logger = logging.getLogger(__name__)
@@ -284,7 +284,7 @@ class ExecutorGateway:
         result = await adapter.safe_rollback(rollback_id)
 
         # Update rollback status
-        from executor.models import RollbackStatus
+        from executor_sdk.models import RollbackStatus
 
         new_status = RollbackStatus.EXECUTED if result.success else RollbackStatus.FAILED
         try:

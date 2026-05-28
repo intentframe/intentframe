@@ -29,13 +29,10 @@ Implementations to create later:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Any
 
-from executor.exceptions import ConfigurationError
-from executor.models import AuditEntry, SecurityEvent
-
-if TYPE_CHECKING:
-    from executor.config.schema import StorageConfig
+from executor_sdk.exceptions import ConfigurationError
+from executor_sdk.models import AuditEntry, SecurityEvent
 
 __all__ = ["AuditLogger", "register_audit_logger", "create_audit_logger"]
 
@@ -51,7 +48,7 @@ def register_audit_logger(
     _AUDIT_REGISTRY[backend] = logger_class
 
 
-def create_audit_logger(config: StorageConfig) -> AuditLogger:
+def create_audit_logger(config: Any) -> AuditLogger:
     """Instantiate the configured audit logger from the registry."""
     logger_class = _AUDIT_REGISTRY.get(config.audit_backend)
     if logger_class is None:

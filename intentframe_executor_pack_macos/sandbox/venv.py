@@ -45,7 +45,7 @@ import os
 import pwd
 from pathlib import Path
 
-from executor.config.schema import SandboxConfig
+from .config import SandboxConfig
 
 logger = logging.getLogger(__name__)
 

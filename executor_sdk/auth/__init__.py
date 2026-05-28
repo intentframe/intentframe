@@ -16,13 +16,10 @@ Implementations to create later:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
-from executor.auth.base import AuthVerifier
-from executor.exceptions import ConfigurationError
-
-if TYPE_CHECKING:
-    from executor.config.schema import AuthConfig
+from executor_sdk.auth.base import AuthVerifier
+from executor_sdk.exceptions import ConfigurationError
 
 __all__ = ["AuthVerifier", "register_auth_verifier", "create_auth_verifier"]
 
@@ -42,7 +39,7 @@ def register_auth_verifier(
     _AUTH_REGISTRY[auth_type] = verifier_class
 
 
-def create_auth_verifier(config: AuthConfig) -> AuthVerifier:
+def create_auth_verifier(config: Any) -> AuthVerifier:
     """Instantiate the configured auth verifier from the registry.
 
     Args:

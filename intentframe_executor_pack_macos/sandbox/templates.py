@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from executor.sandbox.capabilities import Capability
+from .capabilities import Capability
 
 
 class SandboxTemplate(str, Enum):

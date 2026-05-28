@@ -23,8 +23,8 @@ import os
 
 from action_registry import ActionType
 from command_shield.env import clean_env
-from executor.adapters.base import CapabilityAdapter
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.models import AdapterManifest, ExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +40,49 @@ class TerminalAdapter(CapabilityAdapter):
         sandbox_engine=None,
         sandbox_planner=None,
         sandbox_config=None,
+        executor_config=None,
         **_kwargs,
     ) -> None:
+        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
+        from intentframe_executor_pack_macos.sandbox.planner import SandboxPlanner
+        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
+
+        raw_config = sandbox_config
+        if raw_config is None and executor_config is not None:
+            raw_config = getattr(executor_config, "sandbox", None)
+
+        if isinstance(raw_config, SandboxConfig):
+            self._sandbox_config = raw_config
+        elif raw_config is None:
+            self._sandbox_config = SandboxConfig()
+        else:
+            self._sandbox_config = SandboxConfig.model_validate(raw_config)
+
         self._sandbox_engine = sandbox_engine
         self._sandbox_planner = sandbox_planner
-        self._sandbox_config = sandbox_config
+        if self._sandbox_config.enabled:
+            self._sandbox_engine = self._sandbox_engine or MacOSSandboxEngine()
+            if self._sandbox_engine.available():
+                self._sandbox_planner = self._sandbox_planner or SandboxPlanner(self._sandbox_config)
+                if (
+                    self._sandbox_config.executor_venv_required
+                    and self._sandbox_planner.executor_venv_path is None
+                ):
+                    resolved = resolve_executor_venv_path(self._sandbox_config)
+                    raise RuntimeError(
+                        "Executor venv is required but not usable. "
+                        "Expected a Python venv with bin/python3 at: "
+                        f"{resolved or '<unresolved>'}. "
+                        "Run `bash intentframe_setup.sh` to provision it, or "
+                        "set `sandbox.executor_venv_required: false` to allow "
+                        "fallback to system python3."
+                    )
+            else:
+                logger.warning(
+                    "Sandbox enabled but engine unavailable on this platform -- "
+                    "RUN_COMMAND will be rejected at request time"
+                )
 
     def supported_actions(self) -> list[str]:
         return [ActionType.RUN_COMMAND.value]

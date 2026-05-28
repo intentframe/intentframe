@@ -28,7 +28,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from executor.exceptions import VirtualFileSystemError
+from executor_sdk.exceptions import VirtualFileSystemError
 from intentframe_core.paths import normalize_virtual_path
 
 __all__ = [

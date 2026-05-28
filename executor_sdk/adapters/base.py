@@ -22,8 +22,8 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 
-from executor.constants import DEFAULT_ADAPTER_TIMEOUT
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.constants import DEFAULT_ADAPTER_TIMEOUT
+from executor_sdk.models import AdapterManifest, ExecutionResult
 
 logger = logging.getLogger(__name__)
 

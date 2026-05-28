@@ -17,12 +17,12 @@ Services are either:
         - HashChain (SHA-256 chain for audit trail integrity)
 """
 
-from executor.services.audit_logger import AuditLogger
+from executor_sdk.services.audit_logger import AuditLogger
 from executor.services.credential_scrubber import CredentialScrubber
-from executor.services.credential_vault import CredentialVault
-from executor.services.hash_chain import HashChain
-from executor.services.state_store import StateStore
-from executor.services.virtual_filesystem import MountPointResolver, VirtualFileSystem
+from executor_sdk.services.credential_vault import CredentialVault
+from executor_sdk.services.hash_chain import HashChain
+from executor_sdk.services.state_store import StateStore
+from executor_sdk.services.virtual_filesystem import MountPointResolver, VirtualFileSystem
 
 __all__ = [
     "AuditLogger",

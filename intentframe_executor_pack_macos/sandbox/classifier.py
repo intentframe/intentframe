@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 import shlex
 
-from executor.sandbox.capabilities import Capability, CapabilityReport
+from .capabilities import Capability, CapabilityReport
 
 # ---------------------------------------------------------------------------
 # Tool / verb tables

@@ -21,8 +21,8 @@ import hashlib
 import hmac as hmac_module
 import logging
 
-from executor.auth.base import AuthVerifier
-from executor.models import AuthorizationProof, AuthResult
+from executor_sdk.auth.base import AuthVerifier
+from executor_sdk.models import AuthorizationProof, AuthResult
 
 logger = logging.getLogger(__name__)
 

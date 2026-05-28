@@ -24,7 +24,7 @@ def _run(adapter: TerminalAdapter, command: str):
 
 @pytest.fixture
 def terminal_adapter() -> TerminalAdapter:
-    from executor.config.schema import SandboxConfig
+    from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
 
     return TerminalAdapter(sandbox_config=SandboxConfig(enabled=False))
 

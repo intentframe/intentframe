@@ -13,43 +13,21 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
-from typing import Literal
 
-from executor.config.schema import SandboxConfig
+from .config import SandboxConfig
 
 logger = logging.getLogger(__name__)
-from executor.sandbox.pathing import canonical_sandbox_path
-from executor.sandbox.templates import (
+from .pathing import canonical_sandbox_path
+from .plan import ExecutionPlan
+from .templates import (
     NON_NEGOTIABLE_DENY_ACCESS,
     NON_NEGOTIABLE_DENY_WRITE,
     SandboxTemplate,
     TEMPLATE_ORDER,
 )
-from executor.sandbox.venv import resolve_executor_venv_path, validate_executor_venv
+from .venv import resolve_executor_venv_path, validate_executor_venv
 
 _TEMPLATE_RANK = {t: i for i, t in enumerate(TEMPLATE_ORDER)}
-
-
-@dataclass(frozen=True)
-class ExecutionPlan:
-    """Everything the engine needs to build a sandbox profile.
-
-    All paths are canonical (realpath-resolved).
-    """
-
-    template: SandboxTemplate
-    allowed_read_paths: tuple[str, ...]
-    allowed_write_paths: tuple[str, ...]
-    deny_write_paths: tuple[str, ...]
-    deny_access_paths: tuple[str, ...]
-    working_directory: str | None = None
-    executor_venv_path: str | None = None
-    # Per-command privilege-escalation intent propagated from
-    # ``SandboxConfig.escalate``.  The engine combines it with the
-    # runtime ``INTENTFRAME_ESCALATION_ARMED`` env (machine capability)
-    # to decide whether to prepend ``sudo -n`` to the argv.
-    sandbox_escalate: Literal["none", "sudo"] = "none"
 
 
 class SandboxPlanner:
@@ -161,10 +139,9 @@ class SandboxPlanner:
 
         Cases (1) and (2) log an error when
         ``executor_venv_required=True``; case (3) always logs an
-        error. The startup layer
-        (``executor.main.build_gateway``) is responsible for turning
-        ``None`` + ``executor_venv_required=True`` into a fail-closed
-        ConfigurationError.
+        error. ``TerminalAdapter`` construction is responsible for
+        turning ``None`` + ``executor_venv_required=True`` into a
+        fail-closed ``RuntimeError`` when the terminal adapter loads.
         """
         path = resolve_executor_venv_path(config)
         if path is None:

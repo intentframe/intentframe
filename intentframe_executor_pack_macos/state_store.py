@@ -14,8 +14,8 @@ import sqlite3
 import threading
 from pathlib import Path
 
-from executor.models import RollbackEntry, RollbackStatus, _utc_now
-from executor.services.state_store import StateStore
+from executor_sdk.models import RollbackEntry, RollbackStatus, _utc_now
+from executor_sdk.services.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 

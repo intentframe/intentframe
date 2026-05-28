@@ -20,11 +20,12 @@ import json
 import logging
 import os
 import shutil
+import sys
 from pathlib import Path
 
-from executor.sandbox.engine import SandboxedCommand, SandboxEngine
-from executor.sandbox.planner import ExecutionPlan
-from executor.sandbox.templates import SandboxTemplate
+from .engine import SandboxedCommand, SandboxEngine
+from .plan import ExecutionPlan
+from .templates import SandboxTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -432,3 +433,21 @@ def _deny_override_rules(plan: ExecutionPlan) -> list[str]:
     for p in plan.deny_access_paths:
         rules.append(f"(deny file-read* file-write* (subpath {_q(p)}))")
     return rules
+
+
+def create_sandbox_engine(platform: str = "auto") -> MacOSSandboxEngine | None:
+    """Return the macOS sandbox engine for supported platform names."""
+    resolved = _resolve_platform(platform)
+    if resolved == "macos":
+        return MacOSSandboxEngine()
+    return None
+
+
+def _resolve_platform(platform: str) -> str:
+    if platform != "auto":
+        return platform.lower()
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform.startswith("linux"):
+        return "linux"
+    return sys.platform

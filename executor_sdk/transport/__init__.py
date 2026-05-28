@@ -17,13 +17,10 @@ Implementations to create later:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
-from executor.exceptions import ConfigurationError
-from executor.transport.base import TransportServer
-
-if TYPE_CHECKING:
-    from executor.config.schema import TransportConfig
+from executor_sdk.exceptions import ConfigurationError
+from executor_sdk.transport.base import TransportServer
 
 __all__ = ["TransportServer", "register_transport", "create_transport"]
 
@@ -43,7 +40,7 @@ def register_transport(
     _TRANSPORT_REGISTRY[transport_type] = transport_class
 
 
-def create_transport(config: TransportConfig) -> TransportServer:
+def create_transport(config: Any) -> TransportServer:
     """Instantiate the configured transport from the registry.
 
     Args:

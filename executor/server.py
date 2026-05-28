@@ -27,9 +27,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from executor.config import load_config
-from executor.exceptions import ConfigurationError
+from executor_sdk.exceptions import ConfigurationError
 from executor.main import build_gateway
-from executor.models import (
+from executor_sdk.models import (
     ExecutionRequest,
     ExecutionResult,
 )

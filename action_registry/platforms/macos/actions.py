@@ -3,7 +3,7 @@ macOS-specific action registrations.
 
 Registers actions that are only available on macOS (Spotlight, Shortcuts,
 macOS-native apps, etc.).  Maps 1:1 with executor adapters in
-executor/platforms/macos/adapters/.
+intentframe_executor_pack_macos/adapters/.
 
 Universal actions (READ_FILE, SEND_EMAIL, etc.) are already registered
 by catalog.register_defaults().  This module adds macOS-specific ones

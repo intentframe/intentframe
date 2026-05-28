@@ -18,8 +18,8 @@ import sqlite3
 import threading
 from pathlib import Path
 
-from executor.models import AuditEntry, ExecutionStatus, SecurityEvent
-from executor.services.audit_logger import AuditLogger
+from executor_sdk.models import AuditEntry, ExecutionStatus, SecurityEvent
+from executor_sdk.services.audit_logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ class SQLiteAuditLogger(AuditLogger):
         if not rows:
             return True
 
-        from executor.services.hash_chain import HashChain
+        from executor_sdk.services.hash_chain import HashChain
 
         # Only exclude the hash chain fields themselves and the auto-increment id.
         # Every other field is covered by the hash.

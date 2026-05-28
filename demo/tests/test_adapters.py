@@ -28,10 +28,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from executor.adapters.base import CapabilityAdapter
-from executor.models import AdapterManifest
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.models import AdapterManifest
 
-# All adapters declared in executor/platforms/macos/adapters/__init__.py
+# All adapters declared in intentframe_executor_pack_macos/adapters/__init__.py
 ADAPTER_SPECS: list[tuple[str, str, str]] = [
     ("files", "intentframe_executor_pack_macos.adapters.files", "FilesAdapter"),
     ("terminal", "intentframe_executor_pack_macos.adapters.terminal", "TerminalAdapter"),
@@ -110,7 +110,7 @@ def main() -> None:
     # ── Test 6: register_all_adapters() ───────────────────────────────
     header("REGISTRY: register_all_adapters()")
 
-    from executor.adapters import _ADAPTER_REGISTRY, create_adapter
+    from executor_sdk.adapters import _ADAPTER_REGISTRY, create_adapter
     _ADAPTER_REGISTRY.clear()
 
     from intentframe_executor_pack_macos.adapters import register_all_adapters

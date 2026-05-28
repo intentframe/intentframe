@@ -41,32 +41,32 @@ def register_all() -> None:
 
 def _register_transport() -> None:
     from .transport import UnixSocketTransport
-    from executor.transport import register_transport
+    from executor_sdk.transport import register_transport
 
     register_transport("unix_socket", UnixSocketTransport)
 
 
 def _register_auth() -> None:
     from .auth import GuardianHMACVerifier
-    from executor.auth import register_auth_verifier
+    from executor_sdk.auth import register_auth_verifier
 
     register_auth_verifier("guardian_hmac", GuardianHMACVerifier)
 
 
 def _register_credential_vault() -> None:
     from .credential_vault import KeychainVault
-    from executor.services.credential_vault import register_credential_vault
+    from executor_sdk.services.credential_vault import register_credential_vault
 
     register_credential_vault("keyring", KeychainVault)
     # "service" backend is auto-registered by the import in
-    # executor.services.credential_vault (service_backend module-level call)
+    # executor_sdk.services.credential_vault (service_backend module-level call)
 
 
 def _register_storage() -> None:
     from .audit_logger import SQLiteAuditLogger
     from .state_store import SQLiteStateStore
-    from executor.services.audit_logger import register_audit_logger
-    from executor.services.state_store import register_state_store
+    from executor_sdk.services.audit_logger import register_audit_logger
+    from executor_sdk.services.state_store import register_state_store
 
     register_audit_logger("sqlite", SQLiteAuditLogger)
     register_state_store("sqlite", SQLiteStateStore)

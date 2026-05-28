@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from executor.models import AuthorizationProof, AuthResult
+from executor_sdk.models import AuthorizationProof, AuthResult
 
 
 class AuthVerifier(ABC):

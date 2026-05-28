@@ -33,9 +33,9 @@ import os
 from pathlib import Path
 
 from action_registry import ActionType
-from executor.adapters.base import CapabilityAdapter
-from executor.config.schema import HostFilesConfig
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.config.schema import HostFilesConfig
+from executor_sdk.models import AdapterManifest, ExecutionResult
 from resource_registry.floor import canonicalize_real_path
 
 # MIME types we refuse up-front rather than surfacing cryptic decode

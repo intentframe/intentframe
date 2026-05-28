@@ -28,8 +28,8 @@ import logging
 from pathlib import Path
 
 from action_registry import ActionType
-from executor.adapters.base import CapabilityAdapter
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.models import AdapterManifest, ExecutionResult
 
 logger = logging.getLogger(__name__)
 

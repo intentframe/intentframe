@@ -24,7 +24,7 @@ import hashlib
 import json
 from typing import Any
 
-from executor.constants import GENESIS_HASH, HASH_ALGORITHM
+from executor_sdk.constants import GENESIS_HASH, HASH_ALGORITHM
 
 __all__ = ["HashChain"]
 

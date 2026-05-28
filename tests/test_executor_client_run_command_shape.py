@@ -32,7 +32,7 @@ from executor_client.http_client import _RESULT_MAP
 
 
 def _adapter_run_command_data() -> dict:
-    """Shape emitted by executor/platforms/macos/adapters/terminal.py."""
+    """Shape emitted by intentframe_executor_pack_macos/adapters/terminal.py."""
     return {
         "stdout": "",
         "stderr": "ps: illegal option -- -\nusage: ps ...\n",

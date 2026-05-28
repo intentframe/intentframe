@@ -461,7 +461,7 @@ The defense-in-depth claim also depends on details below the Guardian. IntentFra
 
 Important implementation details to preserve in the public argument:
 
-- Every `RUN_COMMAND` subprocess is wrapped in a **kernel-enforced macOS Seatbelt SBPL profile** (`executor/sandbox/platforms/macos.py`) launched via `sandbox-exec`. The profile is dynamically built per execution from the planner's capability set, with `(deny default)` and a curated allowlist. Even root-UID subprocesses cannot violate the profile without a kernel exploit.
+- Every `RUN_COMMAND` subprocess is wrapped in a **kernel-enforced macOS Seatbelt SBPL profile** (`intentframe_executor_pack_macos/sandbox/`) launched via `sandbox-exec`. The profile is dynamically built per execution from the planner's capability set, with `(deny default)` and a curated allowlist. Even root-UID subprocesses cannot violate the profile without a kernel exploit.
 - Policy can select sandbox templates per intent.
 - A hardened deny-path set protects sensitive root surfaces such as LaunchAgents, LaunchDaemons, `/etc`, `/System`, SSH configuration, `sudoers`, PAM, keychains, mail stores, shell startup files, `.ssh`, and `.gnupg`.
 - VFS mounts (Workspace Resource Registry) constrain what execution adapters can reach by mapping virtual paths per user; the real on-disk path is never exposed to the Agent.

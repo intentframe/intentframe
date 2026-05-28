@@ -19,15 +19,16 @@ from typing import Callable
 from unittest.mock import AsyncMock, patch
 
 from action_registry import ActionType
-from executor.adapters.base import CapabilityAdapter
+from executor_sdk.adapters.base import CapabilityAdapter
 from executor.adapters.console_user_io import ConsoleUserIOAdapter
-from executor.config.schema import HostFilesConfig, SandboxConfig
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.config.schema import HostFilesConfig
+from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
+from executor_sdk.models import AdapterManifest, ExecutionResult
 from intentframe_executor_pack_macos.adapters.files import FilesAdapter
 from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
 from intentframe_executor_pack_macos.adapters.http_api import HttpApiAdapter
 from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
-from executor.services.virtual_filesystem import MountPointConfig
+from executor_sdk.services.virtual_filesystem import MountPointConfig
 
 BASELINE_COMMIT = "5c266a4"
 
@@ -246,7 +247,7 @@ def _files_adapter(root: Path) -> FilesAdapter:
         real_path=str(root),
         writable=True,
     )
-    from executor.services.virtual_filesystem import MountPointResolver
+    from executor_sdk.services.virtual_filesystem import MountPointResolver
 
     resolver = MountPointResolver([mount], root)
     return FilesAdapter(mount_resolver=resolver, base_path=root)
@@ -466,7 +467,7 @@ def action_cases() -> tuple[ActionCase, ...]:
                 real_path=str(symlink),
                 writable=True,
             )
-            from executor.services.virtual_filesystem import MountPointResolver
+            from executor_sdk.services.virtual_filesystem import MountPointResolver
 
             resolver = MountPointResolver([mount], tmp)
             adapter = FilesAdapter(mount_resolver=resolver, base_path=tmp)
@@ -482,6 +483,15 @@ def action_cases() -> tuple[ActionCase, ...]:
     add("vfs_floor_write_trap", "files", "WRITE_FILE", "floor", vfs_floor_write)
 
     # ── terminal ────────────────────────────────────────────────────────
+    class UnavailableSandboxEngine:
+        """Simulates a platform where sandbox-exec (or equivalent) is missing."""
+
+        def available(self) -> bool:
+            return False
+
+        def wrap(self, command: str, plan) -> None:
+            raise RuntimeError("wrap should not run when engine is unavailable")
+
     def terminal_disabled_echo() -> ExecutionResult:
         adapter = TerminalAdapter(sandbox_config=SandboxConfig(enabled=False))
         return _run(
@@ -490,8 +500,7 @@ def action_cases() -> tuple[ActionCase, ...]:
 
     def terminal_unavailable() -> ExecutionResult:
         adapter = TerminalAdapter(
-            sandbox_engine=None,
-            sandbox_planner=None,
+            sandbox_engine=UnavailableSandboxEngine(),
             sandbox_config=SandboxConfig(enabled=True),
         )
         return _run(adapter.safe_execute("RUN_COMMAND", {"command": "echo hi"}))
@@ -753,7 +762,7 @@ def capture_action_rows() -> tuple[ActionRow, ...]:
 def capture_manifest_rows() -> tuple[ManifestRow, ...]:
     import importlib
 
-    from executor.adapters import _ADAPTER_REGISTRY, register_adapter
+    from executor_sdk.adapters import _ADAPTER_REGISTRY, register_adapter
     from intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
 
     _ADAPTER_REGISTRY.clear()

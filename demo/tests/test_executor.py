@@ -228,7 +228,7 @@ def main():
     print("  Expected: gateway rejects -- HMAC mismatch")
 
     # Manually build a request with a bad signature
-    from executor.models import AuthorizationProof, ExecutionRequest, RequestMetadata
+    from executor_sdk.models import AuthorizationProof, ExecutionRequest, RequestMetadata
 
     bad_request = ExecutionRequest(
         action_type="LIST_DIRECTORY",

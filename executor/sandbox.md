@@ -1,6 +1,8 @@
 # Executor Sandbox
 
-> Kernel-enforced sandboxing for `RUN_COMMAND`. Confined entirely to the executor — the agent, pipeline, Guardian, and wire protocol know nothing about it.
+> Kernel-enforced sandboxing for `RUN_COMMAND`. Confined to the macOS executor pack — the agent, pipeline, Guardian, and wire protocol know nothing about it.
+
+Implementation lives in `intentframe_executor_pack_macos/sandbox/`. Core `executor/` passes an opaque `sandbox:` dict from YAML; `TerminalAdapter` owns engine/planner setup.
 
 ---
 
@@ -29,7 +31,7 @@ RUN_COMMAND arrives at TerminalAdapter
     │
     ├── planner.plan(cwd)                uses max(allowed_templates) from config
     │       │
-    │       ├── reads SandboxConfig from executor.yaml
+    │       ├── reads sandbox options from executor.yaml (parsed by TerminalAdapter)
     │       ├── derives write paths from config.allowed_write_paths
     │       ├── canonicalizes all paths via pathing.canonical_sandbox_path()
     │       │
@@ -57,20 +59,20 @@ The engine returns a `SandboxedCommand` dataclass with an `argv` list and `env_o
 ## Module Layout
 
 ```
-executor/sandbox/
-├── __init__.py
+intentframe_executor_pack_macos/sandbox/
+├── __init__.py          MacOSSandboxEngine + dynamic SBPL profile generator + create_sandbox_engine()
+├── config.py            SandboxConfig (parsed from executor YAML sandbox: dict)
+├── plan.py              ExecutionPlan dataclass
+├── engine.py            SandboxEngine ABC + SandboxedCommand
 ├── capabilities.py      Capability enum + CapabilityReport dataclass
 ├── classifier.py        Deterministic command analysis (shlex-based, not used in execution path)
 ├── templates.py         SandboxTemplate enum, capability lattice, deny lists
 ├── pathing.py           canonical_sandbox_path() — realpath normalization
-├── planner.py           SandboxPlanner + ExecutionPlan
-├── engine.py            SandboxEngine ABC + SandboxedCommand + platform factory
-└── platforms/
-    ├── __init__.py
-    └── macos.py         MacOSSandboxEngine + dynamic SBPL profile generator
+├── planner.py           SandboxPlanner
+└── venv.py              Executor venv resolution + validation
 ```
 
----
+Wiring: `intentframe_executor_pack_macos/adapters/terminal.py` creates the engine and planner when sandbox is enabled.
 
 ## Configuration
 
@@ -118,7 +120,7 @@ sandbox:
 | `working_directory` | Default cwd for sandboxed commands. Expanded via `os.path.expanduser()` at runtime. Defaults to `~/`. |
 | `allowed_write_paths` | Paths where sandboxed commands can write. Expanded + canonicalized at runtime. Defaults to `["~/"]`. |
 | `executor_venv_path` | Absolute path to the executor's dedicated Python venv. `None` = auto-resolve to `<owner_home>/.intentframe-venvs/executor`. Owner is `SUDO_USER` if set, else the running uid's HOME; bare root with no `SUDO_USER` resolves to `None`. Provisioned by `intentframe_setup.sh` via `uv venv --seed`. Must not sit under any `NON_NEGOTIABLE_DENY_ACCESS` entry (e.g. `~/.intentframe/`); the planner rejects such paths at startup because the sandbox would deny reads on `bin/python3`, breaking exec. |
-| `executor_venv_required` | Default `True`. When `True`, executor startup fails if the venv is missing or lacks `bin/python3`. Set `False` to fall back silently to system `python3`. |
+| `executor_venv_required` | Default `True`. When `True`, loading `TerminalAdapter` fails if the venv is missing or lacks `bin/python3`. Set `False` to fall back silently to system `python3`. |
 | `escalate` | `"none"` (default) or `"sudo"`. When `"sudo"`, the macOS engine prepends `sudo -n --preserve-env=PATH,VIRTUAL_ENV,PYTHONNOUSERSITE,TMPDIR` to the `sandbox-exec` argv so the child kernel-sandbox wrapper runs as root. The executor service process itself remains the normal user in the supported root-demo flow. This only takes effect when the gateway also sets `INTENTFRAME_ESCALATION_ARMED=1` (set iff `intentframe_setup_root_demo.sh` has installed the narrow sudoers entry). |
 
 ### Executor venv exposure
@@ -253,7 +255,7 @@ All paths in the `ExecutionPlan` are canonical — resolved via `os.path.realpat
 
 The macOS kernel (Seatbelt) enforces rules against canonical paths. If the SBPL profile says `(allow file-write* (subpath "/var/folders/..."))` but the kernel sees `/private/var/folders/...`, the rule doesn't match and the write is denied.
 
-`executor/sandbox/pathing.py` provides `canonical_sandbox_path()` which the planner applies to:
+`intentframe_executor_pack_macos/sandbox/pathing.py` provides `canonical_sandbox_path()` which the planner applies to:
 - every path in `SandboxConfig.allowed_write_paths`
 - working directory
 - all deny list paths
@@ -286,13 +288,13 @@ The generated Seatbelt profile follows this order (last-match-wins):
 7. **Config-derived write allow rules**: `(allow file-write* (subpath ...))` for each path in `allowed_write_paths` (only for `file_read_write` and higher templates)
 8. **Non-negotiable deny overrides**: deny-write for system dirs, deny-access for `~/.intentframe` (always last)
 
-The profile is generated entirely in Python code (`executor/sandbox/platforms/macos.py`), following Anthropic's `sandbox-runtime` pattern. There is no static `.sbpl` file.
+The profile is generated entirely in Python code (`intentframe_executor_pack_macos/sandbox/__init__.py`), following Anthropic's `sandbox-runtime` pattern. There is no static `.sbpl` file.
 
 ---
 
 ## Classifier (Library Only)
 
-The classifier (`executor/sandbox/classifier.py`) performs deterministic, shlex-based analysis of command strings. It is **not used in the execution path** — the planner applies the same template to all commands regardless of what the classifier would say.
+The classifier (`intentframe_executor_pack_macos/sandbox/classifier.py`) performs deterministic, shlex-based analysis of command strings. It is **not used in the execution path** — the planner applies the same template to all commands regardless of what the classifier would say.
 
 The classifier module is retained as a library for potential use in auditing or logging (e.g. "this command would have needed network access"). It does not affect sandbox behavior.
 
@@ -300,11 +302,11 @@ The classifier module is retained as a library for potential use in auditing or 
 
 ## Engine Availability
 
-The sandbox engine checks for the `sandbox-exec` binary at startup. If unavailable:
+When sandbox is enabled, `TerminalAdapter` auto-creates `MacOSSandboxEngine` and checks for the `sandbox-exec` binary. If unavailable:
 
-- The executor logs a warning
+- The adapter logs a warning at construction time
 - Every `RUN_COMMAND` is rejected with "Sandbox enabled but engine unavailable"
-- This is per-request rejection, not a startup failure — the executor still serves other action types
+- This is per-request rejection, not a gateway startup failure — the executor still serves other action types
 
 This is the fail-closed guarantee: if the sandbox can't be applied, the command doesn't run.
 
@@ -366,5 +368,5 @@ The enforcement tests run actual commands through `sandbox-exec` and verify the 
 
 | Doc | Relationship |
 |---|---|
-| `executor/plan.md` | Overall executor architecture. Sandbox is a capability of the Terminal adapter (Layer 3). |
+| `executor/plan.md` | Overall executor architecture. Sandbox is a capability of the Terminal adapter (Layer 3), implemented in the macOS pack. |
 | `TODO/executor-only-run-command-sandbox.md` | Original design doc. Implementation has since been simplified — classifier removed from execution path, uniform template selection. |

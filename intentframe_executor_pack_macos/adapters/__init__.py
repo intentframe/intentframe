@@ -19,7 +19,7 @@ from __future__ import annotations
 import importlib
 import logging
 
-from executor.adapters import register_adapter
+from executor_sdk.adapters import register_adapter
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ import tempfile
 import pytest
 
 from action_registry import ActionCatalog
-from executor.adapters.base import CapabilityAdapter
-from executor.config.schema import HostFilesConfig
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.config.schema import HostFilesConfig
 from executor.dispatch import ActionDispatcher
 from intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
 
@@ -27,7 +27,7 @@ def _instantiate_adapter(adapter_id: str, cls: type[CapabilityAdapter]) -> Capab
 
 @pytest.fixture
 def loaded_adapters() -> list[tuple[str, CapabilityAdapter]]:
-    from executor.adapters import _ADAPTER_REGISTRY
+    from executor_sdk.adapters import _ADAPTER_REGISTRY
 
     _ADAPTER_REGISTRY.clear()
     register_all_adapters()

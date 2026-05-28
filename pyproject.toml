@@ -65,6 +65,7 @@ include = [
     "intentframe_dashboard*",
     "executor*",
     "executor_client*",
+    "executor_sdk*",
     "intentframe_executor_pack_macos*",
     "resource_registry*",
     "policy_registry*",

@@ -22,7 +22,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 
-from executor.models import ExecutionRequest, ExecutionResult
+from executor_sdk.models import ExecutionRequest, ExecutionResult
 
 # Type alias for the handler the gateway injects into the transport.
 # Transport calls this for every valid inbound request.

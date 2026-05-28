@@ -16,8 +16,8 @@ import logging
 import mimetypes
 from pathlib import Path
 
-from executor.exceptions import VirtualFileSystemError
-from executor.services.virtual_filesystem import (
+from executor_sdk.exceptions import VirtualFileSystemError
+from executor_sdk.services.virtual_filesystem import (
     MountPointConfig,
     MountPointResolver,
     VirtualFileSystem,
@@ -186,7 +186,7 @@ class LocalVirtualFileSystem(VirtualFileSystem):
            fall under :data:`resource_registry.floor.DENY_WRITE_PREFIXES`.
            This is symmetric with the Seatbelt ``NON_NEGOTIABLE_DENY_WRITE``
            list enforced for ``RUN_COMMAND`` in
-           ``executor/sandbox/platforms/macos.py``; without this check the
+           ``intentframe_executor_pack_macos/sandbox``; without this check the
            VFS would let WRITE_FILE bypass the floor the sandbox otherwise
            guarantees.
         """

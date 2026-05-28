@@ -154,7 +154,7 @@ Together with policy-registry, this is the "configuration plane" — what the us
 | | |
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/executor.sock`. Runs in its own Python virtualenv (`~/.intentframe-venvs/executor/`) so its dependencies are isolated from the rest of the system. |
-| **Source** | `executor/server.py`, `executor/gateway.py`, `executor/platforms/macos/adapters/*.py` |
+| **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_executor_pack_macos/adapters/*.py` |
 | **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
 | **Storage** | SQLite audit DB; in-memory credential cache (loaded from vault) |
 | **OpenAI calls** | No |

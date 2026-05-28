@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import subprocess
 
-from executor.adapters.base import CapabilityAdapter
-from executor.models import AdapterManifest, ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.models import AdapterManifest, ExecutionResult
 
 
 class ShortcutsAdapter(CapabilityAdapter):
