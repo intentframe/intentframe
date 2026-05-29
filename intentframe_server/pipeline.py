@@ -210,11 +210,8 @@ class IntentFrameRuntime:
             "action": intent.action.value,
             "success": result.success,
             "target": intent.target or "",
-            "command": (intent.data or {}).get("command", "")[:500],
             "error": result.error,
             "data": data_summary,
-            "stderr": (result.data or {}).get("stderr", "")[:1000] if result.data else None,
-            "return_code": (result.data or {}).get("return_code") if result.data else None,
         }
         level = logging.INFO if result.success else logging.WARNING
         try:
@@ -751,22 +748,11 @@ class IntentFrameRuntime:
             if self.verbose:
                 status = 'Success' if result.success else 'Failed'
                 print(f"    │  Result: {status:<49} │")
-                action_name = intent.action.value
-                if action_name in ("ASK_USER", "GET_CONFIRMATION", "SHOW_OPTIONS"):
-                    prompt = (intent.data or {}).get("prompt", "")
-                    if prompt:
-                        prompt_short = prompt[:52] + "…" if len(prompt) > 52 else prompt
-                        print(f"    │  Prompt: {prompt_short:<49} │")
-                    if result.success and result.data:
-                        resp = result.data.get("response") or result.data.get("selection") or ""
-                        if resp:
-                            resp_short = resp[:52] + "…" if len(resp) > 52 else resp
-                            print(f"    │  User:   {resp_short:<49} │")
-                elif action_name == "SHOW_MESSAGE":
-                    msg = (intent.data or {}).get("message", "")
-                    if msg:
-                        msg_short = msg[:52] + "…" if len(msg) > 52 else msg
-                        print(f"    │  Shown:  {msg_short:<49} │")
+                # Adapter-owned lines; substrate only truncates and boxes.
+                if result.display_summary:
+                    for _line in result.display_summary.splitlines():
+                        _line = _line[:52] + "…" if len(_line) > 52 else _line
+                        print(f"    │  {_line:<56} │")
                 if not result.success and result.error:
                     hint = result.error.replace("\n", " ")
                     hint = hint[:49] + "…" if len(hint) > 49 else hint
@@ -783,14 +769,9 @@ class IntentFrameRuntime:
 
             self._log_executor_result(intent, result)
             
-            # Log the outcome
+            # Outcome: request params stay in audit_entry["data"]; executor payload here.
             audit_entry["executed"] = result.success
-            action_name = intent.action.value
-            if result.success and result.data and action_name in (
-                "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
-            ):
-                audit_entry["user_prompt"] = (intent.data or {}).get("prompt", "")
-                audit_entry["user_response"] = result.data
+            audit_entry["result_data"] = result.data
             self.audit_log.append(audit_entry)
             
             return result

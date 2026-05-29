@@ -173,6 +173,10 @@ class ExecutionResult(BaseModel):
         extras: Adapter-stamped metadata. For user-IO actions,
             the I/O adapter sets ``extras["user_response_token"]`` — a
             SHA-256 attestation that the user saw a prompt and responded.
+        display_summary: Optional human-readable lines for substrate verbose
+            output (newline-separated, no box formatting). Adapters set this
+            when they want a tailored banner; empty means the pipeline falls
+            back to generic ``data`` / ``error`` rendering.
     """
 
     model_config = ConfigDict(frozen=False)
@@ -186,6 +190,7 @@ class ExecutionResult(BaseModel):
     rollback_available: bool = False
     rollback_id: str | None = None
     extras: dict[str, Any] = Field(default_factory=dict)
+    display_summary: str = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

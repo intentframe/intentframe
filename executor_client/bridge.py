@@ -116,6 +116,7 @@ class ExecutorBridge:
             error=prod_result.error,
             execution_id=prod_result.execution_id,
             timestamp=prod_result.timestamp,
+            display_summary=prod_result.display_summary,
         )
 
     # ── Request Translation: Demo -> Production ──────────────────────────

@@ -13,6 +13,9 @@ This adapter stamps successful user-IO results with a
 "I showed this prompt, user responded with this."  The adapter is
 the witness; the token is its attestation.
 
+Sets ``display_summary`` on each result so the runtime verbose banner
+can print human lines without action-specific pipeline logic.
+
 Actions: ASK_USER, SHOW_MESSAGE, GET_CONFIRMATION, SHOW_OPTIONS
 """
 
@@ -83,11 +86,19 @@ class UserIOAdapter(CapabilityAdapter):
 
         result = self._run_osascript(script)
         if result is None:
-            return ExecutionResult(success=True, data={"response": None, "cancelled": True})
+            return ExecutionResult(
+                success=True,
+                data={"response": None, "cancelled": True},
+                display_summary=f"Prompt: {prompt}\n(cancelled)",
+            )
 
         # Parse "button returned:OK, text returned:value"
         text = self._parse_text_returned(result)
-        exec_result = ExecutionResult(success=True, data={"response": text, "cancelled": False})
+        exec_result = ExecutionResult(
+            success=True,
+            data={"response": text, "cancelled": False},
+            display_summary=f"Prompt: {prompt}\nUser: {text or '(empty)'}",
+        )
         exec_result.extras["user_response_token"] = self._compute_user_response_token(
             prompt=prompt, response=text or "", timestamp=exec_result.timestamp,
         )
@@ -105,7 +116,11 @@ class UserIOAdapter(CapabilityAdapter):
         )
 
         self._run_osascript(script)
-        return ExecutionResult(success=True, data={"shown": True})
+        return ExecutionResult(
+            success=True,
+            data={"shown": True},
+            display_summary=f"Shown: {message}",
+        )
 
     def _get_confirmation(self, params: dict) -> ExecutionResult:
         """Show a yes/no confirmation dialog."""
@@ -126,7 +141,11 @@ class UserIOAdapter(CapabilityAdapter):
             confirmed = "Yes" in result
             response_str = "yes" if confirmed else "no"
 
-        exec_result = ExecutionResult(success=True, data={"confirmed": confirmed})
+        exec_result = ExecutionResult(
+            success=True,
+            data={"confirmed": confirmed},
+            display_summary=f"Prompt: {prompt}\nUser: {response_str}",
+        )
         exec_result.extras["user_response_token"] = self._compute_user_response_token(
             prompt=prompt, response=response_str, timestamp=exec_result.timestamp,
         )
@@ -150,10 +169,18 @@ class UserIOAdapter(CapabilityAdapter):
 
         result = self._run_osascript(script)
         if result is None or result.strip() == "false":
-            return ExecutionResult(success=True, data={"selection": None, "cancelled": True})
+            return ExecutionResult(
+                success=True,
+                data={"selection": None, "cancelled": True},
+                display_summary=f"Prompt: {prompt}\n(cancelled)",
+            )
 
         selection = result.strip()
-        exec_result = ExecutionResult(success=True, data={"selection": selection, "cancelled": False})
+        exec_result = ExecutionResult(
+            success=True,
+            data={"selection": selection, "cancelled": False},
+            display_summary=f"Prompt: {prompt}\nUser: {selection}",
+        )
         exec_result.extras["user_response_token"] = self._compute_user_response_token(
             prompt=prompt, response=selection, timestamp=exec_result.timestamp,
         )

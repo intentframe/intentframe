@@ -115,13 +115,20 @@ class ValidationResult(BaseModel):
 
 
 class ExecutionResult(BaseModel):
-    """Result from Executor after performing an action."""
+    """Result from Executor after performing an action.
+
+    ``display_summary`` is an optional renderer-friendly string from the
+    executor (often newline-separated). The runtime prints it in verbose mode
+    without knowing action-specific field names; structured ``data`` remains
+    the machine-readable payload.
+    """
     success: bool
     data: Any = None
     error: Optional[str] = None
 
     execution_id: str = ""
     timestamp: str = ""
+    display_summary: str = ""
 
 
 class UserContext(BaseModel):
