@@ -283,6 +283,120 @@ Reads from `os.environ` using the convention `<NAMESPACE>_<KEY>` (upper-cased, d
 # GITHUB_MYORG_TOKEN in env → get("github.myorg", "token")
 ```
 
+### `hashicorp` (headless / cloud / on-prem)
+
+Stores secrets in a HashiCorp Vault KV v2 engine over its HTTP API. Use this on headless servers where the OS keyring is unavailable (no Keychain / GNOME Keyring daemon). Works on any cloud, bare metal, or Kubernetes that can reach a Vault.
+
+Install with the extra:
+
+```bash
+pip install 'intentframe-credentials[hashicorp]'   # or: uv sync --extra hashicorp
+```
+
+**Storage layout.** Each IntentFrame *namespace* maps to one KV v2 secret at `<prefix>/<namespace>`, and each *key* is a field within that secret. This mirrors how the keyring backend groups credentials and lets `list_keys` work natively. Example: `email.you@gmail.com` → secret `intentframe/email.you@gmail.com` with fields `password`, `username`.
+
+**Configuration — all via env vars (no code changes):**
+
+| Env var | Purpose |
+|---|---|
+| `VAULT_ADDR` | Vault address, e.g. `https://vault.mycorp.com:8200` (required) |
+| `VAULT_TOKEN` | Static token (auth option A) — **takes precedence over AppRole** |
+| `VAULT_ROLE_ID` / `VAULT_SECRET_ID` | AppRole login (auth option B, preferred for long-running services) |
+| `VAULT_NAMESPACE` | Vault Enterprise namespace (optional) |
+| `VAULT_KV_MOUNT` | KV v2 mount point (default `secret`) |
+| `VAULT_PATH_PREFIX` | Path prefix (default `intentframe`) |
+| `VAULT_RENEW` | Token renewal loop on/off (default `true`) |
+
+Every option can also be passed to the constructor (`HashiCorpVault(addr=..., role_id=...)`), and constructor options take precedence over env vars.
+
+**Selecting the backend.** The vault **service** chooses its storage backend from `IF_VAULT_BACKEND` (default `keyring`). Set it to `hashicorp` to run the service against Vault:
+
+```bash
+export IF_VAULT_BACKEND=hashicorp
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_ROLE_ID=...        # or VAULT_TOKEN=... for a quick test
+export VAULT_SECRET_ID=...
+uv run uvicorn intentframe_credentials.server:app --uds ~/.intentframe/run/credential-vault.sock
+```
+
+Consumers (executor, dashboard) keep using the `service` backend over UDS exactly as before — only the service's persistence changed.
+
+#### Token renewal
+
+`hvac` does **not** renew tokens automatically; it only exposes one-shot `renew_self` / `login` calls. The backend runs its own async loop that:
+
+1. Looks up the token TTL; if the token has no expiry (e.g. a root/dev token) it stops — nothing to do.
+2. Sleeps until ~half the TTL has elapsed, then calls `renew_self`.
+3. If the token isn't renewable (hit `token_max_ttl`) or renewal fails, it falls back to an **AppRole re-login** (`role_id` + `secret_id`) to mint a fresh token. A static token with no AppRole and no recovery path stops the loop with a logged error.
+
+The loop starts lazily on first use and is cancelled on `close()` (the service calls this on shutdown). Disable it with `VAULT_RENEW=false`.
+
+> For an effectively non-expiring service token, configure the role with `token_period` (periodic tokens renew indefinitely and never hit a max-TTL cap). Using `token_max_ttl` instead is fine — the backend recovers via re-login — but you'll see a one-line renewal-failure warning each time the cap is reached.
+
+#### Production AppRole setup
+
+Create a scoped policy (KV v2 splits *data* and *metadata* paths; `renew-self`/`lookup-self` come from the built-in `default` policy):
+
+```hcl
+# intentframe-policy.hcl
+path "secret/data/intentframe/*" {
+  capabilities = ["create", "update", "read", "delete"]
+}
+path "secret/metadata/intentframe/*" {
+  capabilities = ["read", "list", "delete"]
+}
+```
+
+```bash
+vault policy write intentframe intentframe-policy.hcl
+vault auth enable approle
+vault write auth/approle/role/intentframe \
+    token_policies=intentframe \
+    token_ttl=1h token_max_ttl=4h    # or: token_period=1h for indefinite renewal
+
+# Fetch the credentials your service will use as VAULT_ROLE_ID / VAULT_SECRET_ID:
+vault read   auth/approle/role/intentframe/role-id
+vault write -f auth/approle/role/intentframe/secret-id
+```
+
+#### Local testing with Docker
+
+Helper scripts live in [`scripts/`](scripts/). They spin up a dev Vault, configure a short-lived AppRole, and exercise the backend.
+
+```bash
+# 1. Recreate a dev Vault + configure AppRole (token_ttl=20s, token_max_ttl=60s).
+#    `eval` also exports VAULT_ADDR / VAULT_ROLE_ID / VAULT_SECRET_ID into your shell.
+eval "$(./scripts/vault_dev_setup.sh)"
+unset VAULT_TOKEN     # ensure AppRole (not a leftover static token) is used
+
+# 2. CRUD smoke test — runs the full store/get/has/list/delete contract.
+uv run python scripts/vault_smoke_test.py
+
+# 3. Renewal demo — watch the token renew every ~10s and re-login at the 60s cap.
+uv run python scripts/vault_renewal_demo.py --seconds 80
+
+# 4. (optional) pytest integration suite — skipped automatically unless VAULT_ADDR is set.
+uv run pytest tests/test_hashicorp_backend.py -v
+```
+
+Manual one-liner if you'd rather not use the setup script (root token, no AppRole — the renewal loop will no-op since root tokens don't expire):
+
+```bash
+docker run -d --name vault-dev --cap-add=IPC_LOCK -p 8200:8200 \
+    -e VAULT_DEV_ROOT_TOKEN_ID=dev-root-token hashicorp/vault:latest
+
+export VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=dev-root-token
+uv run python scripts/vault_smoke_test.py
+```
+
+Inspect what got written from the other side:
+
+```bash
+docker exec -e VAULT_ADDR=http://127.0.0.1:8200 -e VAULT_TOKEN=dev-root-token \
+    vault-dev vault kv get secret/intentframe/<namespace>
+# or open the UI at http://127.0.0.1:8200 (token: dev-root-token)
+```
+
 ---
 
 ## Redaction

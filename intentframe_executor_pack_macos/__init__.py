@@ -57,9 +57,10 @@ def _register_credential_vault() -> None:
     from .credential_vault import KeychainVault
     from executor_sdk.services.credential_vault import register_credential_vault
 
+    # The SDK already auto-registers all backends (keyring/env/hashicorp/
+    # service) on import.  We re-assert "keyring" here to document that the
+    # macOS platform's credential store is the OS Keychain.
     register_credential_vault("keyring", KeychainVault)
-    # "service" backend is auto-registered by the import in
-    # executor_sdk.services.credential_vault (service_backend module-level call)
 
 
 def _register_storage() -> None:

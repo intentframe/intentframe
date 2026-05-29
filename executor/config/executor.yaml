@@ -38,7 +38,8 @@ auth:
     # audience: "executor"
 
 # ─── Credentials: Where secrets are stored ───────────────────────────────────
-# Backends: service (vault service over UDS, default), keyring (OS native), env (dev/test ONLY)
+# Backends: service (vault service over UDS, default), keyring (OS native),
+#           hashicorp (HashiCorp Vault KV v2, headless/cloud), env (dev/test ONLY)
 credentials:
   backend: service
   options: {}
@@ -48,6 +49,14 @@ credentials:
     # ── service options (default) ──
     # Talks to the supervisor-managed vault over UDS.
     # socket_path: "~/.intentframe/run/credential-vault.sock"
+    #
+    # ── hashicorp options (if backend: hashicorp) ──
+    # Stores secrets in HashiCorp Vault KV v2. Options override env vars
+    # (VAULT_ADDR, VAULT_TOKEN / VAULT_ROLE_ID+VAULT_SECRET_ID, etc.).
+    # addr: "https://vault.mycorp.com:8200"
+    # kv_mount: "secret"
+    # path_prefix: "intentframe"
+    # The vault SERVICE itself selects storage via IF_VAULT_BACKEND=hashicorp.
 
 # ─── Worker Pool: Concurrency limits ────────────────────────────────────────
 worker_pool:

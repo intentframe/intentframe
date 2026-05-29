@@ -90,6 +90,7 @@ class CredentialConfig(BaseModel):
     Backends:
         service: Vault service over UDS (default — uses the supervisor-managed vault)
         keyring: OS native keyring directly (macOS Keychain, Windows Credential Locker)
+        hashicorp: HashiCorp Vault KV v2 over HTTP (headless / cloud / on-prem)
         env: Environment variables (development/testing ONLY)
     """
 
@@ -97,7 +98,7 @@ class CredentialConfig(BaseModel):
 
     backend: str = Field(
         default="service",
-        description="Credential backend: service, keyring, env",
+        description="Credential backend: service, keyring, hashicorp, env",
     )
     options: dict[str, Any] = Field(
         default_factory=dict,
