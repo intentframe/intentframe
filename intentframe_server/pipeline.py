@@ -55,7 +55,6 @@ from intentframe_server.runtime_context_for_llms import (
     onboarding_runtime_context_for_llm,
 )
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +144,6 @@ class IntentFrameRuntime:
         execution_context: Optional[ExecutionContext] = None,
         onboarding_engine: Optional[OnboardingEngine] = None,
         policy_client: Optional[PolicyRegistryClient] = None,
-        resource_client: Optional[ResourceRegistryClient] = None,
         deterministic_guardian: Optional[DeterministicGuardian] = None,
         verbose: bool = True,
     ):
@@ -158,7 +156,6 @@ class IntentFrameRuntime:
         )
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
-        self._resource_client = resource_client or ResourceRegistryClient()
         self.deterministic_guardian = deterministic_guardian or DeterministicGuardian(
             verbose=verbose,
         )
@@ -377,19 +374,6 @@ class IntentFrameRuntime:
             domains.update(user_context.domain_constraints.keys())
         return domains
 
-    def _resolve_workspace(self, workspace_id: str) -> tuple[list[str], dict[str, str]]:
-        """Fetch the ClientView from the Resource Registry.
-
-        Returns (virtual_paths, path_permissions) or empty defaults
-        if the workspace doesn't exist yet.
-        """
-        try:
-            view = self._resource_client.client_view(workspace_id)
-            return view.virtual_paths, view.permissions
-        except (KeyError, Exception) as exc:
-            logger.debug("No workspace '%s' in resource registry: %s", workspace_id, exc)
-            return [], {}
-
     async def handshake(
         self, 
         capabilities: AgentCapabilities, 
@@ -417,7 +401,6 @@ class IntentFrameRuntime:
             RuntimeContext with everything agent needs to work effectively
         """
         user_context = self._resolve_user_context(user_context)
-        virtual_paths, path_permissions = self._resolve_workspace(user_context.user_id)
 
         if not self.onboarding_engine:
             if self.verbose:
@@ -431,8 +414,6 @@ class IntentFrameRuntime:
                 guardrails=[],
                 available_actions=capabilities.action_types,
                 onboarded_agent_type=capabilities.agent_type,
-                virtual_paths=virtual_paths,
-                path_permissions=path_permissions,
             )
         else:
             num_actions = len(user_context.allowed_actions)
@@ -452,8 +433,6 @@ class IntentFrameRuntime:
                     self._substrate_contexts
                 ),
             )
-            context.virtual_paths = virtual_paths
-            context.path_permissions = path_permissions
 
             if self.verbose:
                 print(f"\n    ╔══════════════════════════════════════════════════════════╗")

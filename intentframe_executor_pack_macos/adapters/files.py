@@ -11,14 +11,31 @@ Actions: LIST_DIRECTORY, READ_FILE, WRITE_FILE, APPEND_ROW, DELETE_FILE
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
+from typing import Any
 
 from action_registry import ActionType
 from executor_sdk.adapters.base import CapabilityAdapter
 from executor_sdk.exceptions import VirtualFileSystemError
 from executor_sdk.models import AdapterManifest, ExecutionResult
+from executor_sdk.services.virtual_filesystem import MountPointConfig, expand_path
 from ..virtual_filesystem import LocalVirtualFileSystem
-from executor_sdk.services.virtual_filesystem import MountPointResolver
+from .files_config import FilesConfig, FilesMount
+
+logger = logging.getLogger(__name__)
+
+
+def _mounts_from_config(entries: list[FilesMount]) -> list[MountPointConfig]:
+    return [
+        MountPointConfig(
+            virtual_path=m.virtual_path,
+            real_path=expand_path(m.real_path),
+            writable=m.writable,
+            file_filter=m.file_filter,
+        )
+        for m in entries
+    ]
 
 
 class FilesAdapter(CapabilityAdapter):
@@ -26,14 +43,57 @@ class FilesAdapter(CapabilityAdapter):
 
     def __init__(
         self,
-        mount_resolver: MountPointResolver | None = None,
-        base_path: Path | None = None,
+        pack_options: dict[str, dict[str, Any]] | None = None,
+        files_options: dict[str, Any] | FilesConfig | None = None,
         **_kwargs,
     ) -> None:
-        self._vfs = LocalVirtualFileSystem(
-            mount_resolver=mount_resolver,
-            base_path=base_path,
-        )
+        raw = files_options
+        if raw is None and pack_options is not None:
+            raw = pack_options.get("files")
+
+        cfg = raw if isinstance(raw, FilesConfig) else FilesConfig.model_validate(raw or {})
+
+        default_base = Path(expand_path(cfg.base_path)) if cfg.base_path else Path.home()
+        mounts, base_path = self._resolve_mounts(cfg, default_base)
+        self._vfs = LocalVirtualFileSystem(mounts=mounts, base_path=base_path)
+
+    @staticmethod
+    def _resolve_mounts(
+        cfg: FilesConfig, default_base: Path
+    ) -> tuple[list[MountPointConfig], Path]:
+        """Build mount list from registry (if workspace_id set) or static config."""
+        if cfg.workspace_id:
+            try:
+                from resource_registry.client import ResourceRegistryClient
+
+                rr = ResourceRegistryClient()
+                view = rr.executor_view(cfg.workspace_id)
+                rr.close()
+                eff_base = view.base_path or default_base
+                mounts = [
+                    MountPointConfig(
+                        virtual_path=m.virtual_path,
+                        real_path=expand_path(m.real_path),
+                        writable=m.writable,
+                        file_filter=m.file_filter,
+                    )
+                    for m in view.mounts
+                ]
+                logger.info(
+                    "VFS mounts from resource registry: workspace=%s, %d mounts",
+                    cfg.workspace_id,
+                    len(mounts),
+                )
+                return mounts, eff_base
+            except Exception as exc:
+                logger.debug(
+                    "Resource registry unavailable for workspace=%r (%s), "
+                    "falling back to static mounts",
+                    cfg.workspace_id,
+                    exc,
+                )
+
+        return _mounts_from_config(cfg.mounts), default_base
 
     def supported_actions(self) -> list[str]:
         return [

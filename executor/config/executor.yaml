@@ -87,6 +87,16 @@ adapters:
 # ─── Executor pack options ──────────────────────────────────────────────────
 # Opaque config slices owned and validated by executor packs.
 pack_options:
+  # VFS mount table for the files adapter.
+  # List virtual-to-real path mappings here when the ``files`` adapter is enabled.
+  # files:
+  #   base_path: null   # base for relative real_path values; null = home dir
+  #   mounts:
+  #     - virtual_path: /home/
+  #       real_path: ~/
+  #       writable: true
+  #   workspace_id: null  # optional: resolve mounts from resource registry instead
+
   # Real-path allowlist for host-file tools.
   # Empty lists + no ``host_files`` adapter means "no host-file access".
   host_files:

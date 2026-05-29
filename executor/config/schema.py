@@ -139,32 +139,6 @@ class AdapterConfig(BaseModel):
     )
 
 
-class MountConfig(BaseModel):
-    """Configuration for a single virtual-to-real path mapping."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    virtual_path: str
-    real_path: str
-    writable: bool = False
-    file_filter: str | None = None
-
-
-class FilesystemConfig(BaseModel):
-    """Configuration for the virtual filesystem."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    base_path: str | None = Field(
-        default=None,
-        description="Base path for resolving relative mount paths. None = home dir.",
-    )
-    mounts: list[MountConfig] = Field(
-        default_factory=list,
-        description="Virtual-to-real path mount points.",
-    )
-
-
 class StorageConfig(BaseModel):
     """Configuration for database, log file paths, and backend selection.
 
@@ -231,7 +205,6 @@ class ExecutorConfig(BaseModel):
     credentials: CredentialConfig = Field(default_factory=CredentialConfig)
     worker_pool: WorkerPoolConfig = Field(default_factory=WorkerPoolConfig)
     adapters: AdapterConfig = Field(default_factory=AdapterConfig)
-    filesystem: FilesystemConfig = Field(default_factory=FilesystemConfig)
     pack_options: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description=(

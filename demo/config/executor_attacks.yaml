@@ -28,16 +28,6 @@ worker_pool:
   max_workers: 4
   default_timeout_seconds: 30.0
 
-filesystem:
-  base_path: demo
-  mounts:
-    - virtual_path: "/invoices/"
-      real_path: "demo_data/attack_invoices_sandbox"
-      file_filter: "*.md"
-    - virtual_path: "/expense_tracker.md"
-      real_path: "demo_data/expense_tracker.md"
-      writable: true
-
 adapters:
   enabled:
     - files
@@ -46,6 +36,17 @@ adapters:
 # ─── Executor pack options ───────────────────────────────────────────────────
 # Opaque config slices owned and validated by executor packs.
 pack_options:
+  # VFS mount table for the files adapter.
+  files:
+    base_path: demo
+    mounts:
+      - virtual_path: "/invoices/"
+        real_path: "demo_data/attack_invoices_sandbox"
+        file_filter: "*.md"
+      - virtual_path: "/expense_tracker.md"
+        real_path: "demo_data/expense_tracker.md"
+        writable: true
+
   # Empty lists mean "no host-file access" if host-file tools are enabled later.
   host_files:
     allowed_read_paths: []

@@ -24,11 +24,11 @@ from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
 from executor_sdk.models import AdapterManifest, ExecutionResult
 from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
 from intentframe_executor_pack_macos.adapters.files import FilesAdapter
+from intentframe_executor_pack_macos.adapters.files_config import FilesConfig, FilesMount
 from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
 from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 from intentframe_executor_pack_macos.adapters.http_api import HttpApiAdapter
 from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
-from executor_sdk.services.virtual_filesystem import MountPointConfig
 
 BASELINE_COMMIT = "5c266a4"
 
@@ -242,15 +242,11 @@ def _host_files_adapter(root: Path) -> HostFilesAdapter:
 
 
 def _files_adapter(root: Path) -> FilesAdapter:
-    mount = MountPointConfig(
-        virtual_path="/work/",
-        real_path=str(root),
-        writable=True,
+    cfg = FilesConfig(
+        base_path=str(root),
+        mounts=[FilesMount(virtual_path="/work/", real_path=str(root), writable=True)],
     )
-    from executor_sdk.services.virtual_filesystem import MountPointResolver
-
-    resolver = MountPointResolver([mount], root)
-    return FilesAdapter(mount_resolver=resolver, base_path=root)
+    return FilesAdapter(files_options=cfg)
 
 
 def _platform_validation_response(*_args, **_kwargs) -> dict:
@@ -462,15 +458,11 @@ def action_cases() -> tuple[ActionCase, ...]:
         with _temp_dirs(prefix="if_vfs_trap_") as tmp:
             symlink = tmp / "floor"
             symlink.symlink_to("/System")
-            mount = MountPointConfig(
-                virtual_path="/trap/",
-                real_path=str(symlink),
-                writable=True,
+            cfg = FilesConfig(
+                base_path=str(tmp),
+                mounts=[FilesMount(virtual_path="/trap/", real_path=str(symlink), writable=True)],
             )
-            from executor_sdk.services.virtual_filesystem import MountPointResolver
-
-            resolver = MountPointResolver([mount], tmp)
-            adapter = FilesAdapter(mount_resolver=resolver, base_path=tmp)
+            adapter = FilesAdapter(files_options=cfg)
             return _run(
                 adapter.safe_execute(
                     ActionType.WRITE_FILE.value,

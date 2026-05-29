@@ -44,20 +44,20 @@ adapters:
     - spotlight
     - http_api
 
-# ─── Virtual Filesystem Mounts ───────────────────────────────────────────────
-# Agent sees /home/ — never learns the real path (/Users/username/, C:\Users\...).
-# The VFS translates /home/ → ~ at runtime via expand_path().
-# Cloud-synced folders (iCloud, Dropbox, Google Drive) appear as local
-# directories under /home/ so no cloud API is needed.
-filesystem:
-  mounts:
-    - virtual_path: /home/
-      real_path: ~/
-      writable: true
-
 # ─── Executor pack options ───────────────────────────────────────────────────
 # Opaque config slices owned and validated by executor packs.
 pack_options:
+  # VFS mount table for the files adapter.
+  # Agent sees /home/ — never learns the real path (/Users/username/, C:\Users\...).
+  # The VFS translates /home/ → ~ at runtime via expand_path().
+  # Cloud-synced folders (iCloud, Dropbox, Google Drive) appear as local
+  # directories under /home/ so no cloud API is needed.
+  # Mirrors WORKSPACE_MOUNTS in intentframe_gateway/bootstrap.py.
+  files:
+    mounts:
+      - virtual_path: /home/
+        real_path: ~/
+        writable: true
   # Real-path allowlist for host-file tools.
   # Keep this in sync with the host-file ``allowed_host_paths`` declared in
   # ``jarvis_pa/jarvis/policies/jarvis.yaml`` (the runtime policy seed).

@@ -108,60 +108,11 @@ def build_gateway(
         config.worker_pool.default_timeout_seconds,
     )
 
-    # ── Virtual FileSystem (for file adapters) ────────────────────────────
-    # Try Resource Registry first (single source of truth), fall back to
-    # executor.yaml filesystem config for standalone / dev usage.
-    from pathlib import Path
-
-    from executor_sdk.services.virtual_filesystem import (
-        MountPointConfig,
-        MountPointResolver,
-        expand_path,
-    )
-
-    mount_configs: list[MountPointConfig] = []
-    base_path = Path.home()
-
-    try:
-        from resource_registry.client import ResourceRegistryClient
-        rr = ResourceRegistryClient()
-        workspace_id = overrides.get("workspace_id", "jarvis_default")
-        view = rr.executor_view(workspace_id)
-        base_path = view.base_path or Path.home()
-        mount_configs = [
-            MountPointConfig(
-                virtual_path=m.virtual_path,
-                real_path=expand_path(m.real_path),
-                writable=m.writable,
-                file_filter=m.file_filter,
-            )
-            for m in view.mounts
-        ]
-        logger.info("VFS mounts from resource registry: workspace=%s, %d mounts", workspace_id, len(mount_configs))
-        rr.close()
-    except Exception as exc:
-        logger.debug("Resource registry unavailable (%s), using executor.yaml filesystem config", exc)
-
-    if not mount_configs:
-        base_path = Path(expand_path(config.filesystem.base_path)) if config.filesystem.base_path else Path.home()
-        mount_configs = [
-            MountPointConfig(
-                virtual_path=expand_path(m.virtual_path),
-                real_path=expand_path(m.real_path),
-                writable=m.writable,
-                file_filter=m.file_filter,
-            )
-            for m in config.filesystem.mounts
-        ]
-
-    mount_resolver = MountPointResolver(mount_configs, base_path)
-
     # ── Adapters ──────────────────────────────────────────────────────────
-    # All possible adapter dependencies -- each adapter takes what it needs
+    # All possible adapter dependencies -- each adapter takes what it needs.
+    # VFS mount resolution is owned by the files adapter via pack_options.files.
     adapter_deps: dict[str, Any] = {
         "credential_vault": credential_vault,
-        "mount_resolver": mount_resolver,
-        "base_path": base_path,
         "pack_options": config.pack_options,
     }
 

@@ -68,8 +68,8 @@ RESOURCE_REGISTRY_SOCKET = "~/.intentframe/run/resource-registry.sock"
 # Workspace mounts live in the resource registry rather than the policy
 # registry, so they stay inline here (and in
 # ``intentframe_gateway/bootstrap.py``) instead of being part of the
-# YAML seed.  Mirrors ``jarvis_pa/executor.yaml::filesystem.mounts`` and
-# ``jarvis_pa/executor_root.yaml::filesystem.mounts``.
+# YAML seed.  Mirrors ``jarvis_pa/executor.yaml::pack_options.files.mounts``
+# and ``jarvis_pa/executor_root.yaml::pack_options.files.mounts``.
 WORKSPACE_MOUNTS = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]

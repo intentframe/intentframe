@@ -274,22 +274,21 @@ class ExecutorBridge:
         state_store = SQLiteStateStore(db_path=db_path)
 
         # ── Virtual filesystem from ExecutorView mounts ──────────────────
-        from executor_sdk.services.virtual_filesystem import (
-            MountPointConfig,
-            MountPointResolver,
-        )
+        from intentframe_executor_pack_macos.adapters.files_config import FilesConfig, FilesMount
 
         base_path = executor_view.base_path
-        mount_configs = [
-            MountPointConfig(
-                virtual_path=m.virtual_path,
-                real_path=m.real_path,
-                writable=m.writable,
-                file_filter=m.file_filter,
-            )
-            for m in executor_view.mounts
-        ]
-        resolver = MountPointResolver(mount_configs, base_path)
+        files_cfg = FilesConfig(
+            base_path=str(base_path) if base_path is not None else None,
+            mounts=[
+                FilesMount(
+                    virtual_path=m.virtual_path,
+                    real_path=m.real_path,
+                    writable=m.writable,
+                    file_filter=m.file_filter,
+                )
+                for m in executor_view.mounts
+            ],
+        )
 
         # ── Action Catalog (source of truth) ──────────────────────────
         from action_registry import ActionCatalog
@@ -305,7 +304,7 @@ class ExecutorBridge:
         from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
 
         dispatcher = ActionDispatcher(catalog=catalog)
-        dispatcher.register(FilesAdapter(mount_resolver=resolver, base_path=base_path))
+        dispatcher.register(FilesAdapter(files_options=files_cfg))
         dispatcher.register(ConsoleUserIOAdapter())  # console IO, not osascript
 
         # ── Worker pool ──────────────────────────────────────────────────

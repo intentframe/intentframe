@@ -30,18 +30,6 @@ worker_pool:
   max_workers: 4
   default_timeout_seconds: 30.0
 
-# ─── Demo filesystem mounts ──────────────────────────────────────────────────
-# Mirrors the workspace created in demo/main.py _create_registry()
-filesystem:
-  base_path: demo
-  mounts:
-    - virtual_path: "/invoices/"
-      real_path: "demo_data"
-      file_filter: "*.md"
-    - virtual_path: "/expense_tracker.md"
-      real_path: "demo_data/expense_tracker.md"
-      writable: true
-
 # ─── Demo adapters ───────────────────────────────────────────────────────────
 adapters:
   enabled:
@@ -51,6 +39,18 @@ adapters:
 # ─── Executor pack options ───────────────────────────────────────────────────
 # Opaque config slices owned and validated by executor packs.
 pack_options:
+  # VFS mount table for the files adapter.
+  # Mirrors the workspace declared in demo/config/dashboard.yaml workspaces:.
+  files:
+    base_path: demo
+    mounts:
+      - virtual_path: "/invoices/"
+        real_path: "demo_data"
+        file_filter: "*.md"
+      - virtual_path: "/expense_tracker.md"
+        real_path: "demo_data/expense_tracker.md"
+        writable: true
+
   # Empty lists mean "no host-file access" if host-file tools are enabled later.
   host_files:
     allowed_read_paths: []

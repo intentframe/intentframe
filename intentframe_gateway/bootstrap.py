@@ -84,8 +84,8 @@ __all__ = [
 #
 # Workspace mounts live in the resource registry, not the policy
 # registry, so they intentionally stay inline here rather than moving
-# into a YAML.  Mirrors ``jarvis_pa/executor.yaml::filesystem.mounts``
-# and ``jarvis_pa/executor_root.yaml::filesystem.mounts``.
+# into a YAML.  Mirrors ``jarvis_pa/executor.yaml::pack_options.files.mounts``
+# and ``jarvis_pa/executor_root.yaml::pack_options.files.mounts``.
 WORKSPACE_MOUNTS: list[dict[str, Any]] = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
@@ -137,10 +137,9 @@ def _workspace_id_for(variant: JarvisVariant, user_id: str) -> str:
     Returns the bare ``user_id``; both variants share the same slot.
     The resource registry is in-memory and re-built on every supervisor
     start, so only one variant is ever live in it at a time — meaning
-    no per-variant suffix is needed for isolation, and (importantly)
-    pipeline lookups via ``_resolve_workspace(user_id)`` find the slot
-    we seeded.  ``variant`` is kept on the signature so we can still
-    distinguish in audit logs / metadata without changing the key.
+    no per-variant suffix is needed for isolation.  ``variant`` is kept
+    on the signature so we can still distinguish in audit logs / metadata
+    without changing the key.
     """
     del variant  # workspace_id no longer encodes the variant
     return user_id
