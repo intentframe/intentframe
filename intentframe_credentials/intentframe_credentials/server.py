@@ -25,7 +25,7 @@ from intentframe_credentials.models import (
     StoreRequest,
     mask_value,
 )
-from intentframe_credentials.protocol import CredentialVault
+from intentframe_credentials.protocol import CredentialVault, create_vault
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +60,6 @@ async def lifespan(_app: FastAPI):  # noqa: ANN201
     if _vault is None:
         import importlib
         import os
-
-        from intentframe_credentials.protocol import create_vault
 
         # Backend is env-driven so a deployer can switch storage (e.g.
         # keyring on a laptop, hashicorp on a headless server) without
