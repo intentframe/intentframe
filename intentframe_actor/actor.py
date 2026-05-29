@@ -186,15 +186,15 @@ class Actor:
 
     # ── Internal ──────────────────────────────────────────────────────
 
-    _RESERVED_KEYS = frozenset({"action", "target", "reason"})
+    _RESERVED_KEYS = frozenset({"action", "target", "reason", "display_subject"})
 
     def _build_intent(self, agent_request: Dict[str, Any]) -> IntentFrame:
         """Parse a raw agent request dict into a signed IntentFrame.
 
-        Fields ``action``, ``target``, and ``reason`` are extracted into
-        their dedicated IntentFrame fields.  All remaining keys are
-        captured into ``IntentFrame.data`` so they arrive as adapter
-        params without any per-action translation layer.
+        Fields ``action``, ``target``, ``reason``, and ``display_subject``
+        are extracted into their dedicated IntentFrame fields.  All
+        remaining keys are captured into ``IntentFrame.data`` so they
+        arrive as adapter params without any per-action translation layer.
 
         Backward compatibility: if the caller passes an explicit ``data``
         dict (legacy style) with no other extra keys, it is used as-is.
@@ -245,6 +245,7 @@ class Actor:
             target=agent_request.get("target", ""),
             data=data,
             reason=agent_request.get("reason", ""),
+            display_subject=agent_request.get("display_subject", ""),
             agent_id=self.agent_id,
             session_id=session_id,
             sequence_id=self._sequence_id,

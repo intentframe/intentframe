@@ -44,6 +44,7 @@ class IntentFrame(BaseModel):
     target: str
     data: Optional[Dict[str, Any]] = None
     reason: str = ""
+    display_subject: str = ""
 
     agent_id: str = ""
     session_id: str = ""
