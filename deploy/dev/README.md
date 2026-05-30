@@ -61,6 +61,8 @@ export OPENAI_API_KEY=sk-...
 docker compose -f docker-compose.dev.yml up --build
 ```
 
+For running tests from another terminal, prefer detached mode — see [Logs](#logs).
+
 > If you already run a local Vault on host port `8200`, either stop it or set
 > `VAULT_HOST_PORT=8201` so the bundled Vault publishes on a free port.
 
@@ -189,6 +191,71 @@ python demo/tests/root_demo/test_gray_area.py \
 |---|---|---|
 | Root **dry-run** (attack/benign/gray_area sweeps) | ✅ | Pure pipeline; no host commands needed |
 | **Real root** (`sudo -n sandbox-exec`, real stdout) | ❌ | macOS-only; run on Mac host |
+
+## Logs
+
+Run the stack in the background so you can tail logs from another terminal
+(foreground `up` attaches to stdout; **Ctrl+C stops the whole stack**):
+
+```bash
+cd deploy/dev
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+### Compose log stream (bootstrap + uvicorn stdout)
+
+All services:
+
+```bash
+docker compose -f docker-compose.dev.yml logs -f
+```
+
+One service:
+
+```bash
+docker compose -f docker-compose.dev.yml logs -f intentframe-runtime
+docker compose -f docker-compose.dev.yml logs -f intentframe-edge
+docker compose -f docker-compose.dev.yml logs -f vault
+```
+
+### Per-service log files inside the runtime container
+
+The supervisor writes each supervised service to its own file under
+`/home/intentframe/.intentframe/logs/` (on the `if-data` volume):
+
+| File | Service |
+|---|---|
+| `intentframe-core.log` | Pipeline / Guardian / dry-run or executor bridge |
+| `policy-registry.log` | Policy registry |
+| `resource-registry.log` | Resource registry |
+| `executor.log` | Executor (only when `INTENTFRAME_EXECUTOR_MODE=real`) |
+
+Tail **intentframe-core** (most useful while running tests):
+
+```bash
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/intentframe-core.log
+```
+
+Tail all supervised services at once:
+
+```bash
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/*.log
+```
+
+Follow a specific service:
+
+```bash
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/policy-registry.log
+```
+
+Stop the stack when done:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
 
 ## Files
 
