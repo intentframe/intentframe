@@ -74,6 +74,8 @@ include = [
     "supervisor*",
     "intentframe_gateway*",
     "intentframe_cli*",
+    "intentframe_edge*",
+    "intentframe_proxy*",
 ]
 
 [dependency-groups]
@@ -87,6 +89,7 @@ intentframe = "supervisor.main:main"
 intentframe-backend = "supervisor.main:backend_main"
 intentframe-gateway-cli = "intentframe_cli.main:main"
 intentframe-gateway-backend = "intentframe_gateway.entry:backend_main"
+intentframe-edge = "intentframe_edge.__main__:main"
 
 
 [tool.pytest.ini_options]

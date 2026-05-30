@@ -15,7 +15,7 @@ from starlette.requests import HTTPConnection
 
 from fastapi import APIRouter, Request, WebSocket
 
-from intentframe_gateway.proxy import proxy_websocket
+from intentframe_proxy.proxy import proxy_websocket
 
 router = APIRouter(prefix="/jarvis", tags=["jarvis"])
 

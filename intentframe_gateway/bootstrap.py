@@ -64,7 +64,7 @@ from jarvis.policies import (
 )
 
 from intentframe_gateway.config import GatewayConfig
-from intentframe_gateway.proxy import UDSProxy
+from intentframe_proxy.proxy import UDSProxy
 from policy_registry.seeds import load_policy_seed, resolve_seed_path
 
 logger = logging.getLogger(__name__)
@@ -296,7 +296,7 @@ class Bootstrapper:
             if not sock_path.exists():
                 logger.warning("No resource-registry socket — skipping workspace seed")
                 return
-            from intentframe_gateway.proxy import UDSProxy as _P
+            from intentframe_proxy.proxy import UDSProxy as _P
             rr_proxy = _P(socket_path=str(sock_path), base_url="http://resource-registry")
 
         client = await rr_proxy._get_client()

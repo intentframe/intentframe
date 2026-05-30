@@ -1,9 +1,9 @@
 """Generic UDS proxy helper.
 
 Forwards HTTP requests to a backend service over a Unix Domain Socket.
-Reuses the httpx UDS transport pattern already established across
-intentframe_server/client.py, policy_registry/client.py, and
-intentframe_credentials/client.py.
+Shared by ``intentframe_gateway`` (consumer product API) and
+``intentframe_edge`` (B2B network ingress). Uses the same httpx UDS
+transport pattern as intentframe_server/client.py and the registry clients.
 """
 
 from __future__ import annotations

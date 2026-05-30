@@ -103,6 +103,8 @@ class Actor:
         agent_id: str | None = None,
         user_id: str | None = None,
         socket_path: str = "~/.intentframe/run/intentframe.sock",
+        *,
+        base_url: str | None = None,
     ) -> None:
         """
         Args:
@@ -113,9 +115,13 @@ class Actor:
                 Falls back to ``INTENTFRAME_USER_ID`` (and, for one
                 release, ``JARVIS_USER_ID``).  Required — raises if
                 neither is set.
-            socket_path: UDS path to the IntentFrame Runtime.
+            socket_path: UDS path to a local IntentFrame Runtime.
+            base_url: Network URL of a remote runtime reached through the
+                IntentFrame edge (e.g. ``https://intentframe.acme.com``).
+                Falls back to the ``INTENTFRAME_CORE_URL`` env var.  When
+                set, it takes precedence over ``socket_path``.
 
-        The ``(user_id, agent_id)`` pair is used by the gateway to look
+        The ``(user_id, agent_id)`` pair is used by the runtime to look
         up the correct policy slot, so empty/None values are rejected
         loudly rather than silently routing to the wrong policy.
         """
@@ -125,12 +131,16 @@ class Actor:
         self.agent_capabilities: Optional[AgentCapabilities] = None
 
         self._socket_path = socket_path
+        self._base_url = base_url
         self._sequence_id = 0
         self._client: Optional[AsyncIntentFrameClient] = None
 
     def _get_client(self) -> AsyncIntentFrameClient:
         if self._client is None:
-            self._client = AsyncIntentFrameClient(socket_path=self._socket_path)
+            self._client = AsyncIntentFrameClient(
+                socket_path=self._socket_path,
+                base_url=self._base_url,
+            )
         return self._client
 
     # ── Handshake ─────────────────────────────────────────────────────
