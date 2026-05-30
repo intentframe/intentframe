@@ -1,0 +1,152 @@
+# IntentFrame dev stack — self-contained: clone refactor-substrate + a Vault.
+#
+#   vault                : HashiCorp Vault (dev mode) — the credential store
+#   intentframe-runtime  : credential-vault (HashiCorp backend) + supervisor (4 UDS svcs)
+#   intentframe-edge      : HTTP front door (:8443) → the runtime's UDS sockets
+#
+# The runtime seeds OPENAI_API_KEY into the Vault and then fetches it back to
+# inject into the supervisor (see deploy/dev/entrypoint.dev.sh). One command
+# starts everything — no pre-existing Vault required.
+#
+# Dev-mode Vault is in-memory/ephemeral, but that's fine: seed_vault.py re-seeds
+# on every runtime start, and the runtime waits for Vault to be healthy first.
+# This is a DEV convenience only — production (deploy/docker-compose.yml) points
+# at the org's externally managed Vault and ships no Vault service.
+#
+# Quick start (from this directory):
+#   export OPENAI_API_KEY=sk-...
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Want to use an EXTERNAL Vault instead of the bundled one? Override VAULT_ADDR
+# (e.g. http://host.docker.internal:8200) and VAULT_TOKEN, and the bundled vault
+# service can be ignored (or remove its depends_on).
+#
+# Then run your tests from the Mac (see deploy/dev/README.md):
+#   export INTENTFRAME_CORE_URL=http://localhost:8443
+#   export INTENTFRAME_POLICY_URL=http://localhost:8443
+#   export INTENTFRAME_RESOURCE_URL=http://localhost:8443
+#   python -m demo.tests.test_attacks 1 2 3
+#
+# Root dry-run tests (attacks/benign/gray_area sweeps against the container):
+#   export INTENTFRAME_EXECUTOR_MODE=dry_run
+#   docker compose -f docker-compose.dev.yml up --build
+#   # then from the Mac:
+#   python demo/tests/root_demo/test_attacks.py 1 3
+#
+# NOTE: real root mode (sudo -n sandbox-exec, real stdout) is macOS-only and
+# must be run on the Mac host — not against this Linux container.
+
+services:
+  vault:
+    image: hashicorp/vault:latest
+    # dev mode auto-initialises + unseals and mounts KV v2 at secret/.
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "${VAULT_TOKEN:-dev-root-token}"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports:
+      # Published so you can inspect from the Mac (vault kv get secret/...).
+      # Change VAULT_HOST_PORT if 8200 is taken by another local Vault.
+      - "${VAULT_HOST_PORT:-8200}:8200"
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  intentframe-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        IF_GIT_REPO: "${IF_GIT_REPO:-https://github.com/intentframe/intentframe.git}"
+        IF_GIT_BRANCH: "${IF_GIT_BRANCH:-refactor-substrate}"
+    image: intentframe-dev:refactor-substrate
+    # One container == one supervisor == one writer. Do not scale.
+    deploy:
+      replicas: 1
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      # Seeded into the vault on startup, then fetched back as runtime_env.
+      OPENAI_API_KEY: "${OPENAI_API_KEY:?set OPENAI_API_KEY}"
+      # credential-vault storage → the bundled HashiCorp Vault (by service name).
+      IF_VAULT_BACKEND: "hashicorp"
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      # Auth: a static token (simplest for dev) OR AppRole.
+      VAULT_TOKEN: "${VAULT_TOKEN:-dev-root-token}"
+      VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
+      VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
+      VAULT_KV_MOUNT: "${VAULT_KV_MOUNT:-secret}"
+      VAULT_PATH_PREFIX: "${VAULT_PATH_PREFIX:-intentframe}"
+      # Executor config — select based on which tests you are running:
+      #
+      #   demo/config/executor_hashicorp.yaml          ← dashboard, basic pipeline tests
+      #   demo/config/executor_attacks_hashicorp.yaml  ← test_attacks, test_advanced_attacks,
+      #                                                   test_redteam_attacks
+      #
+      # Root dry-run tests (root_demo/*) don't care — the executor service is not
+      # started in dry_run mode; EXECUTOR_CONFIG is only consumed by the executor
+      # service when INTENTFRAME_EXECUTOR_MODE=real.
+      #
+      # Override from your shell:
+      #   export EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml
+      EXECUTOR_CONFIG: "${EXECUTOR_CONFIG:-/app/demo/config/executor_hashicorp.yaml}"
+      # Executor mode:
+      #   real     — starts the executor service (default; for dashboard / pipeline tests)
+      #   dry_run  — skips the executor service; use for root-demo sweeps on this Linux container
+      # IMPORTANT: real root mode (sudo -n sandbox-exec) is macOS-only — always
+      # use dry_run on this Linux container for root-demo tests.
+      INTENTFRAME_EXECUTOR_MODE: "${INTENTFRAME_EXECUTOR_MODE:-real}"
+      # Required for root dry-run: tells the in-process executor to report uid=0
+      # so the root-demo runner accepts the preflight and Guardian reasons in root
+      # context. Has no effect when INTENTFRAME_EXECUTOR_MODE=real.
+      INTENTFRAME_DRY_RUN_CONTEXT: "${INTENTFRAME_DRY_RUN_CONTEXT:-user}"
+    extra_hosts:
+      # Only needed if you override VAULT_ADDR to reach a Vault on the host
+      # (Linux needs this; Docker Desktop resolves host.docker.internal natively).
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - if-run:/home/intentframe/.intentframe/run     # UDS sockets
+      - if-data:/home/intentframe/.intentframe         # policy/resource/audit + credential metadata
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--unix-socket",
+             "/home/intentframe/.intentframe/run/intentframe.sock",
+             "http://core/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 90s
+
+  intentframe-edge:
+    image: intentframe-dev:refactor-substrate
+    depends_on:
+      intentframe-runtime:
+        condition: service_healthy
+    # Override the runtime entrypoint: run the edge instead.
+    entrypoint: ["python", "-m", "intentframe_edge"]
+    environment:
+      INTENTFRAME_EDGE_HOST: "0.0.0.0"
+      INTENTFRAME_EDGE_PORT: "8443"
+      # Optional coarse bearer auth / TLS — see deploy/README.md.
+      # INTENTFRAME_EDGE_TOKEN: "${INTENTFRAME_EDGE_TOKEN:-}"
+    ports:
+      - "8443:8443"
+    volumes:
+      # Edge connects to the runtime's sockets; UDS connect needs write on the
+      # socket inode, so mount the run volume read-write.
+      - if-run:/home/intentframe/.intentframe/run
+    healthcheck:
+      test: ["CMD-SHELL",
+             "curl -fsSk https://localhost:8443/health || curl -fsS http://localhost:8443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  if-run:
+  if-data:

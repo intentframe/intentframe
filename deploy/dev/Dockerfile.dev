@@ -1,0 +1,48 @@
+# IntentFrame dev image — clone a branch from GitHub and run the full runtime.
+#
+# Unlike deploy/Dockerfile (which COPYs the local working tree), this image
+# fetches a branch from GitHub at build time so you can run a remote-as-built
+# container and point your local tests at it. Defaults to refactor-substrate.
+#
+# Build (the build context is irrelevant — everything comes from the clone):
+#   docker build -f deploy/dev/Dockerfile.dev -t intentframe-dev:refactor-substrate .
+#
+# Private repo? Pass an authenticated URL via build-arg (don't bake tokens into
+# layers in production images — this is a dev image):
+#   docker build -f deploy/dev/Dockerfile.dev \
+#     --build-arg IF_GIT_REPO=https://<TOKEN>@github.com/intentframe/intentframe.git \
+#     -t intentframe-dev:refactor-substrate .
+
+FROM python:3.14-slim
+
+ARG IF_GIT_REPO=https://github.com/intentframe/intentframe.git
+ARG IF_GIT_BRANCH=refactor-substrate
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir uv
+
+# Non-root runtime user; sockets/state live under its home.
+RUN useradd --create-home --uid 10001 intentframe
+
+WORKDIR /app
+RUN git clone --branch "${IF_GIT_BRANCH}" --depth 1 "${IF_GIT_REPO}" /app
+
+# Resolve the uv workspace into /app/.venv (macOS-only deps are skipped on
+# Linux via environment markers in pyproject.toml), then hand /app to the user.
+RUN uv sync --no-dev \
+ && chmod +x /app/deploy/dev/entrypoint.dev.sh \
+ && chown -R intentframe:intentframe /app /home/intentframe
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    HOME=/home/intentframe \
+    PYTHONUNBUFFERED=1 \
+    INTENTFRAME_EXECUTOR_MODE=real \
+    EXECUTOR_CONFIG=/app/demo/config/executor_hashicorp.yaml
+
+USER intentframe
+RUN mkdir -p /home/intentframe/.intentframe/run /home/intentframe/.intentframe/data
+
+# Default role is the runtime; compose overrides `entrypoint` for the edge.
+ENTRYPOINT ["/app/deploy/dev/entrypoint.dev.sh"]
