@@ -125,6 +125,14 @@ Every step is fail-closed: any failure, any timeout, any unexpected exception
 becomes a clean `ExecutionResult(success=False)` returned to the caller. The
 gateway never crashes because an adapter misbehaved.
 
+`WorkerPool` concurrency is an executor-local ceiling, not the top-level
+security model. In the supervised IntentFrame runtime, Core submits one
+approved execution at a time and waits for the result before the next intent is
+evaluated. That is what preserves the "one writer per protected environment"
+property. A higher executor `max_workers` value only says the executor can
+bound and time out concurrent adapter calls if they arrive; it does not replace
+the Core/supervisor singleton guarantee.
+
 ---
 
 ## 5. Credential isolation
