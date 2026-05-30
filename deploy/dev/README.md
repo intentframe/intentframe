@@ -194,12 +194,50 @@ python demo/tests/root_demo/test_gray_area.py \
 
 ## Logs
 
-Run the stack in the background so you can tail logs from another terminal
-(foreground `up` attaches to stdout; **Ctrl+C stops the whole stack**):
+### Stay attached to a live tail (recommended)
+
+Start the stack in the **background**, then attach your terminal to a log stream.
+**Ctrl+C only disconnects the tail** — the containers keep running.
+
+**Terminal 1 — start stack:**
 
 ```bash
 cd deploy/dev
+export OPENAI_API_KEY=sk-...
 docker compose -f docker-compose.dev.yml up -d --build
+```
+
+**Terminal 2 — attach to the log you care about** (pick one):
+
+```bash
+cd deploy/dev
+
+# Dashboard / pipeline / Guardian (most useful while running demo_dashboard.py)
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/intentframe-core.log
+
+# Executor startup / pack loading / health-check failures
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/executor.log
+
+# All supervised services interleaved (core + registries + executor)
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/*.log
+
+# Bootstrap only (entrypoint, credential-vault, seed, supervisor — not file logs)
+docker compose -f docker-compose.dev.yml logs -f intentframe-runtime
+```
+
+> **Note:** `docker compose up` (without `-d`) also streams logs, but mixing
+> bootstrap + all services in one scrollback is noisy, and it does **not**
+> show the per-service files under `~/.intentframe/logs/`. Prefer `up -d` +
+> `exec tail -f` above.
+
+Foreground `up` without `-d` attaches stdout for every service; **Ctrl+C stops
+the whole stack**:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ### Compose log stream (bootstrap + uvicorn stdout)
@@ -221,34 +259,98 @@ docker compose -f docker-compose.dev.yml logs -f vault
 ### Per-service log files inside the runtime container
 
 The supervisor writes each supervised service to its own file under
-`/home/intentframe/.intentframe/logs/` (on the `if-data` volume):
+`/home/intentframe/.intentframe/logs/` (on the `if-data` volume). Run these
+from `deploy/dev` while the stack is up (`up -d`).
 
-| File | Service |
-|---|---|
-| `intentframe-core.log` | Pipeline / Guardian / dry-run or executor bridge |
-| `policy-registry.log` | Policy registry |
-| `resource-registry.log` | Resource registry |
-| `executor.log` | Executor (only when `INTENTFRAME_EXECUTOR_MODE=real`) |
+| Log file | Service | What you'll see |
+|---|---|---|
+| `intentframe-core.log` | intentframe-core | Pipeline, Guardian, Actor, dry-run or executor bridge |
+| `policy-registry.log` | policy-registry | Policy registry HTTP/UDS server |
+| `resource-registry.log` | resource-registry | Resource registry HTTP/UDS server |
+| `executor.log` | executor | Executor gateway startup, pack loading, adapter wiring *(only when `INTENTFRAME_EXECUTOR_MODE=real`)* |
 
-Tail **intentframe-core** (most useful while running tests):
+**Follow (live tail) — one file each:**
+
+```bash
+# Pipeline / Guardian / tests hitting core (most useful during dashboard runs)
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/intentframe-core.log
+
+# Policy registry
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/policy-registry.log
+
+# Resource registry (workspace mounts registered by dashboard/tests)
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/resource-registry.log
+
+# Executor — start here when executor health check fails or pack errors
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -f /home/intentframe/.intentframe/logs/executor.log
+```
+
+**Snapshot (last 100 lines, no follow):**
 
 ```bash
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
-  tail -f /home/intentframe/.intentframe/logs/intentframe-core.log
+  tail -n 100 /home/intentframe/.intentframe/logs/intentframe-core.log
+
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -n 100 /home/intentframe/.intentframe/logs/policy-registry.log
+
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -n 100 /home/intentframe/.intentframe/logs/resource-registry.log
+
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  tail -n 100 /home/intentframe/.intentframe/logs/executor.log
 ```
 
-Tail all supervised services at once:
+**Search for errors in executor log** (common after stale Docker cache or pack misconfig):
+
+```bash
+docker compose -f docker-compose.dev.yml exec intentframe-runtime \
+  grep -iE 'error|exception|configuration|failed|traceback' \
+  /home/intentframe/.intentframe/logs/executor.log
+```
+
+**Follow all supervised services at once:**
 
 ```bash
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
   tail -f /home/intentframe/.intentframe/logs/*.log
 ```
 
-Follow a specific service:
+**List log files and sizes** (confirm `executor.log` exists — it is absent in `dry_run` mode):
 
 ```bash
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
-  tail -f /home/intentframe/.intentframe/logs/policy-registry.log
+  ls -la /home/intentframe/.intentframe/logs/
+```
+
+### Bootstrap logs (not in `~/.intentframe/logs/`)
+
+These run **before** the supervisor and only appear in the compose log stream for
+`intentframe-runtime` (stdout/stderr), not as separate files:
+
+| Source | What you'll see |
+|---|---|
+| `entrypoint.dev.sh` | `[entrypoint]` vault wait, seed, supervisor launch |
+| `credential-vault` | Uvicorn for `intentframe_credentials.server` (HashiCorp backend) |
+| `seed_vault.py` | `[seed] stored openai/api_key ...` |
+| `inject_and_exec.py` | `[bootstrap] injected N runtime_env var(s) from vault` |
+
+```bash
+# Full runtime bootstrap + supervisor (includes credential-vault + entrypoint)
+docker compose -f docker-compose.dev.yml logs -f intentframe-runtime
+
+# Last 200 lines only (after a failed start)
+docker compose -f docker-compose.dev.yml logs --tail=200 intentframe-runtime
+
+# HashiCorp Vault container (dev mode, KV v2)
+docker compose -f docker-compose.dev.yml logs -f vault
+
+# HTTP edge proxy (:8443 → UDS backends)
+docker compose -f docker-compose.dev.yml logs -f intentframe-edge
 ```
 
 Stop the stack when done:
@@ -256,6 +358,110 @@ Stop the stack when done:
 ```bash
 docker compose -f docker-compose.dev.yml down
 ```
+
+## Clean slate (remove everything)
+
+Use this when you hit **stale Docker layers** (build log shows `CACHED` on the
+`git clone` step after you pushed new commits), executor health-check failures,
+or you want a completely fresh stack with no leftover volumes or images.
+
+All commands assume you are in `deploy/dev`. Compose project name is `dev`
+(volumes appear as `dev-if-run`, `dev-if-data`; network as `dev_default`).
+
+### Stop only (keep volumes)
+
+Preserves `if-run` / `if-data` (UDS sockets, registry state, credential metadata):
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+### Remove compose stack (containers, network, named volumes)
+
+Deletes everything this compose file created, including persistent state:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v --remove-orphans
+```
+
+### Remove dev images
+
+```bash
+docker rmi intentframe-dev:refactor-substrate 2>/dev/null || true
+```
+
+The bundled Vault image is shared with other projects — remove only if you want
+to force a re-pull:
+
+```bash
+# optional
+docker rmi hashicorp/vault:latest 2>/dev/null || true
+```
+
+### Clear Docker build cache
+
+**Required** when `up --build` reuses a cached `git clone` with old code. Docker
+will not re-clone GitHub until this layer is busted:
+
+```bash
+docker builder prune -f
+```
+
+Aggressive — clears **all** unused build cache on this machine:
+
+```bash
+docker builder prune -af
+```
+
+### Full reset + rebuild (recommended after executor/pack changes)
+
+One-shot: tear down, remove images, clear build cache, rebuild without cache,
+start fresh:
+
+```bash
+cd deploy/dev
+
+docker compose -f docker-compose.dev.yml down -v --remove-orphans
+docker rmi intentframe-dev:refactor-substrate 2>/dev/null || true
+docker builder prune -f
+
+export OPENAI_API_KEY=sk-...
+docker compose -f docker-compose.dev.yml build --no-cache
+docker compose -f docker-compose.dev.yml up
+```
+
+Confirm the build log shows a **fresh** `git clone` (not `CACHED`), then:
+
+```bash
+curl -fsS http://localhost:8443/health
+```
+
+### Verify nothing dev-related remains (optional)
+
+```bash
+docker compose -f docker-compose.dev.yml ps -a
+docker volume ls | grep -E '^local +dev-'
+docker network ls | grep dev
+docker images | grep intentframe-dev
+```
+
+If orphaned `dev-*` resources linger after `down -v`:
+
+```bash
+docker volume rm dev-if-run dev-if-data 2>/dev/null || true
+docker network rm dev_default 2>/dev/null || true
+```
+
+### Nuclear option (whole-machine Docker cleanup)
+
+**Destructive** — removes all stopped containers, unused networks, dangling
+images, and unused volumes **across every project**, not just this stack:
+
+```bash
+docker system prune -af --volumes
+```
+
+Only use when you intentionally want to wipe Docker state machine-wide.
 
 ## Files
 
