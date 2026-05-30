@@ -7,7 +7,7 @@
 #   3. seed secrets into the vault   (seed_vault.py — reads OPENAI_API_KEY, etc.)
 #   4. fetch runtime_env from vault and exec supervisor   (inject_and_exec.py)
 #
-# Unlike deploy/entrypoint.sh (which expects OPENAI_API_KEY to already be in the
+# Unlike deploy/prod/entrypoint.sh (which expects OPENAI_API_KEY to already be in the
 # process env), this path proves the full flow: the key is *seeded into* the
 # vault, then *fetched from* the vault and injected into the supervisor.
 #

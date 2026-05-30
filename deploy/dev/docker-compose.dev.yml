@@ -10,7 +10,7 @@
 #
 # Dev-mode Vault is in-memory/ephemeral, but that's fine: seed_vault.py re-seeds
 # on every runtime start, and the runtime waits for Vault to be healthy first.
-# This is a DEV convenience only — production (deploy/docker-compose.yml) points
+# This is a DEV convenience only — production (deploy/prod/docker-compose.yml) points
 # at the org's externally managed Vault and ships no Vault service.
 #
 # Quick start (from this directory):
@@ -122,7 +122,18 @@ services:
       start_period: 90s
 
   intentframe-edge:
+    # Same locally-built image as the runtime. Declaring `build` (not just
+    # `image`) tells Compose this image is built here, so it never tries to pull
+    # intentframe-dev:refactor-substrate from a registry (which would fail with
+    # "pull access denied"). Compose dedupes by image tag, so it builds once.
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        IF_GIT_REPO: "${IF_GIT_REPO:-https://github.com/intentframe/intentframe.git}"
+        IF_GIT_BRANCH: "${IF_GIT_BRANCH:-refactor-substrate}"
     image: intentframe-dev:refactor-substrate
+    pull_policy: never
     depends_on:
       intentframe-runtime:
         condition: service_healthy
@@ -131,7 +142,7 @@ services:
     environment:
       INTENTFRAME_EDGE_HOST: "0.0.0.0"
       INTENTFRAME_EDGE_PORT: "8443"
-      # Optional coarse bearer auth / TLS — see deploy/README.md.
+      # Optional coarse bearer auth / TLS — see deploy/prod/README.md.
       # INTENTFRAME_EDGE_TOKEN: "${INTENTFRAME_EDGE_TOKEN:-}"
     ports:
       - "8443:8443"

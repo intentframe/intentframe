@@ -4,10 +4,10 @@ Run the **whole IntentFrame runtime in a container built from a GitHub branch**
 (default `refactor-substrate`), backed by your **existing host HashiCorp Vault**,
 then run your local tests against it.
 
-This is the *dev* counterpart to `../` (the production `deploy/`). The key
+This is the *dev* counterpart to `../prod/` (the production B2B deploy). The key
 difference is the secret flow:
 
-| | `deploy/` (prod) | `deploy/dev/` (this) |
+| | `deploy/prod/` | `deploy/dev/` (this) |
 |---|---|---|
 | Image source | local working tree (`COPY .`) | `git clone` a GitHub branch |
 | OpenAI key | passed in env, inherited by supervisor | **seeded into Vault, then fetched from Vault** and injected |

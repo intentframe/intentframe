@@ -790,6 +790,11 @@ dependencies = [
     { name = "websockets" },
 ]
 
+[package.optional-dependencies]
+hashicorp = [
+    { name = "intentframe-credentials", extra = ["hashicorp"] },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -804,6 +809,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "intentframe-credentials", editable = "intentframe_credentials" },
+    { name = "intentframe-credentials", extras = ["hashicorp"], marker = "extra == 'hashicorp'", editable = "intentframe_credentials" },
     { name = "jarvis-pa", editable = "jarvis_pa" },
     { name = "jarvis-telegram", editable = "jarvis_telegram" },
     { name = "keyring", marker = "sys_platform == 'darwin'" },
@@ -822,6 +828,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"] },
     { name = "websockets", specifier = ">=14.0" },
 ]
+provides-extras = ["hashicorp"]
 
 [package.metadata.requires-dev]
 dev = [

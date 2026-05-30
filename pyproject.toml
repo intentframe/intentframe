@@ -47,6 +47,12 @@ dependencies = [
     "rich>=13.0",
 ]
 
+[project.optional-dependencies]
+# Headless/cloud credential storage. Activates the intentframe-credentials
+# workspace member's `hashicorp` extra (hvac) so `uv sync --extra hashicorp`
+# pulls it in. Off by default so laptop/consumer installs stay lean.
+hashicorp = ["intentframe-credentials[hashicorp]"]
+
 [project.urls]
 Homepage = "https://github.com/intentframe/intentframe"
 Repository = "https://github.com/intentframe/intentframe"

@@ -229,7 +229,7 @@ intentframe_proxy/           # shared HTTP→UDS forwarder (gateway + edge)
 ├── __init__.py
 └── proxy.py                 # UDSProxy class + proxy_websocket() helper
 
-intentframe_edge/            # B2B network edge (see deploy/README.md)
+intentframe_edge/            # B2B network edge (see deploy/prod/README.md)
 ├── app.py                   # path-routes HTTP/TLS → runtime UDS sockets
 ├── config.py
 └── __main__.py

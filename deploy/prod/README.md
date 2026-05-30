@@ -39,7 +39,7 @@ export VAULT_ADDR=https://vault.acme.com:8200
 export VAULT_ROLE_ID=...
 export VAULT_SECRET_ID=...
 
-docker compose -f deploy/docker-compose.yml up --build
+docker compose -f deploy/prod/docker-compose.yml up --build
 ```
 
 Health checks:
