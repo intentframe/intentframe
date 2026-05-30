@@ -111,8 +111,17 @@ python demo/demo_dashboard.py
 
 ### 2b. Invoice attack suites (`test_attacks`, `test_advanced_attacks`, `test_redteam_attacks`)
 
-These tests populate `demo_data/attack_invoices_sandbox` per-attack and register
-a workspace that points at that subdirectory. The executor config must match.
+Three separate runners share `demo/config/test_policy.yaml` but differ in setup:
+
+| Runner | Attacks | Calls `populate_attack_sandbox()`? | Typical over HTTP |
+|---|---|---|---|
+| `test_attacks.py` | 1–6 | Yes (legacy; only attack **4** prelude reads care) | Defense ✅ |
+| `test_advanced_attacks.py` | 7–14 | Yes (legacy; all `APPEND_ROW`, block before executor) | Defense ✅ |
+| `test_redteam_attacks.py` | 15–24 | **No** — raw JSON only | Defense ✅; attack **16** ALLOWs by design |
+
+For container runs, set `EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml` before
+`up` (see [§2d](#2d-when-to-restart-the-container)). Defense validation (`blocked_count`
+in audit) works over HTTP without shared `demo/` mounts — see [§2c](#2c-limitations-when-running-tests-over-http).
 
 ```bash
 # override EXECUTOR_CONFIG before up:
@@ -205,9 +214,13 @@ touch files:
 
 For everything else (attacks 1–3, 5–14, most redteam), you are validating
 **whether IntentFrame blocked the attack** — that works over HTTP without shared
-`demo/` mounts.
+`demo/` mounts. Verified example: `test_advanced_attacks.py` attacks 7–14 all
+block at Guardian with no executor I/O over HTTP.
 
 #### What `populate_attack_sandbox()` does (and when you can ignore it)
+
+**Only** `test_attacks.py` and `test_advanced_attacks.py` call this helper (from
+`demo/tests/invoice_attack_pipeline.py`). `test_redteam_attacks.py` does not.
 
 Attack invoice **sources** are in git under `demo/demo_data/attacks/<scenario>/`.
 The harness copies them into `demo/demo_data/attack_invoices_sandbox/` (gitignored
@@ -247,6 +260,31 @@ whether the attack was blocked:
 - **AI invoice agent / some live agent tests** — agents that call `asyncio.run()`
   separately for handshake and run on the same `Actor` can hit HTTP keep-alive /
   event-loop lifecycle issues; stub-pipeline attack tests avoid this by design.
+
+### 2d. When to restart the container
+
+Mac-side `INTENTFRAME_*_URL` exports do **not** require a restart. Container env
+is fixed at **`docker compose up`** time — change it, then recreate the stack.
+
+| Change | Restart? | How |
+|---|---|---|
+| Run a different test against same stack (same `EXECUTOR_CONFIG`, `real` mode) | No | Export `INTENTFRAME_*_URL` on Mac only |
+| Dashboard ↔ invoice attacks (`EXECUTOR_CONFIG`) | **Yes** | `down`, set `EXECUTOR_CONFIG`, `up --build` |
+| Real executor ↔ root dry-run (`INTENTFRAME_EXECUTOR_MODE`) | **Yes** | `down`, set `dry_run` + `INTENTFRAME_DRY_RUN_CONTEXT=root`, `up` |
+| Code changes after git push (stale cached `git clone` layer) | **Yes** | See [Clean slate](#clean-slate-remove-everything) |
+
+```bash
+cd deploy/dev
+docker compose -f docker-compose.dev.yml down
+
+# example: switch to attack executor profile
+export EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml
+export OPENAI_API_KEY=sk-...
+docker compose -f docker-compose.dev.yml up --build
+```
+
+`down` without `-v` keeps registry/audit volumes; add `-v` only when you want a
+fully clean state.
 
 ## 3. Root dry-run tests against the container
 

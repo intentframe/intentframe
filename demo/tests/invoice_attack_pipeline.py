@@ -7,11 +7,21 @@ resetting only per-attack state (tracker, sandbox, audit) between runs.  The
 single-session pattern means onboarding fires exactly once per test run
 regardless of how many attacks are exercised.
 
+Callers:
+  - ``test_attacks.py`` and ``test_advanced_attacks.py`` call
+    ``populate_attack_sandbox()`` before each attack (legacy invoice/VFS setup).
+    Most fixtures submit ``APPEND_ROW`` directly and block before executor I/O;
+    only attack 4 prelude reads on ``/invoices/`` care about the sandbox.
+  - ``test_redteam_attacks.py`` does **not** use this module's sandbox helpers.
+
 Prerequisites:
   - Repo root as current working directory when starting supervisor.
   - Supervisor with attack executor config::
 
       EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+
+  Over HTTP against ``deploy/dev/`` container: defense validation works without
+  Mac/container filesystem sync; see ``deploy/dev/README.md`` §2c.
 """
 
 from __future__ import annotations
