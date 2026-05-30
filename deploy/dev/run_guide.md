@@ -131,6 +131,12 @@ python -m demo.tests.test_redteam_attacks
 
 Your `PolicyRegistryClient()`, `ResourceRegistryClient()`, `IntentFrameClient()`, and `Actor(...)` all pick up these env vars automatically — no test code changes needed.
 
+> **Defense validation works over HTTP; executor side effects are partial.**
+> Most attacks block before the executor runs — audit `BLOCK` / `blocked_count`
+> is enough. Filesystem sync only matters for ALLOW paths (e.g. redteam attack 16)
+> or allowed prelude reads on `/invoices/`. See
+> [README.md §2c](README.md#2c-limitations-when-running-tests-over-http).
+
 ---
 
 ## Troubleshooting checklist

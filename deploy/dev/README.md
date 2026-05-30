@@ -135,6 +135,118 @@ python demo/tests/test_redteam_attacks.py
 > Each test prints an ALERT banner stating which config the supervisor must be
 > running with; if it doesn't match, restart the stack with the right
 > `EXECUTOR_CONFIG`.
+>
+> **Executor side effects over HTTP are partial** — most attacks block before the
+> executor runs, so defense validation (`blocked_count` in audit) works fine.
+> See [§2c](#2c-limitations-when-running-tests-over-http) for when filesystem
+> sync matters (ALLOW paths only).
+
+### 2c. Limitations when running tests over HTTP
+
+When tests run on your Mac (or CI) and the runtime lives in a container reached
+via `INTENTFRAME_*_URL=http://localhost:8443`, **HTTP carries intents, policy,
+and audit — not filesystem mutations**.
+
+The pipeline only calls the executor on **ALLOW**:
+
+```
+DeterministicGuardian → (BLOCK → return, no executor)
+                      → Analysis Engine → Guardian → (BLOCK → return)
+                                                    → (ALLOW → executor.execute)
+```
+
+So for invoice attack suites, **defense validation over HTTP is usually fine**.
+The harness checks `blocked_count` / `decision == "BLOCK"` in the audit log —
+that all happens in the container before any executor I/O. Most attacks submit
+high-amount `APPEND_ROW` intents or path violations and are blocked by
+deterministic gates or AI Guardian without ever reaching the executor.
+
+#### What works over HTTP
+
+| Suite | Over HTTP | Notes |
+|---|---|---|
+| `demo/demo_dashboard.py` | ✅ | Static `demo_data/` baked into the image |
+| Invoice attack **defense** checks (`test_attacks*`, advanced, redteam) | ✅ | Audit `BLOCK` / `blocked_count` — no executor needed for most attacks |
+| Root demo **dry-run** sweeps (`demo/tests/root_demo/*`) | ✅ | No executor service; synthetic `RUN_COMMAND` |
+| Policy / resource seeding from test harness | ✅ | Registry clients talk to the edge |
+| Actor → core pipeline (handshake, submit, audit) | ✅ | One `asyncio.run()` session per run |
+
+#### What is partial or local-only
+
+| Suite | Over HTTP | Why |
+|---|---|---|
+| Invoice attack **executor side effects** (writes to `/expense_tracker.md`, allowed `APPEND_ROW`s) | ⚠️ Partial | Only matters when Guardian **ALLOW**s — see below |
+| Attacks with allowed **prelude reads** on `/invoices/` (e.g. attack 4) | ⚠️ Partial | Early `READ_FILE` / `LIST_DIRECTORY` may reach executor before later intents block |
+| Root demo **real** mode (`sudo -n sandbox-exec`) | ❌ | macOS-only |
+| `demo/tests/test_adapters.py` | ❌ | macOS adapter imports / PyObjC |
+
+#### When the filesystem split actually matters
+
+Most attack JSON fixtures submit intents **directly** through the stub agent —
+they do not depend on reading poisoned invoice markdown. `test_redteam_attacks.py`
+does not call `populate_attack_sandbox()` at all.
+
+`test_attacks.py` and `test_advanced_attacks.py` still call
+`populate_attack_sandbox()` before each attack, but for most scenarios that call
+is **legacy setup** — the submitted intents carry their own `data`/`reason` and
+block on policy or AI before executor I/O.
+
+The sandbox split only bites when an intent is **ALLOW**ed and the executor must
+touch files:
+
+- **Known gap / allowed path** — redteam attack 16 (salami slicing): five
+  `$4,000` `APPEND_ROW`s each under the per-intent limit; today they may ALLOW
+  and reach the executor (writes to `/expense_tracker.md` in the **container**,
+  not on your Mac).
+- **Prelude reads** — attack 4 (path traversal): starts with allowed
+  `LIST_DIRECTORY` / `READ_FILE` on `/invoices/` before later reads block; empty
+  container sandbox can make those executor reads fail even though later path
+  blocks still defend correctly.
+
+For everything else (attacks 1–3, 5–14, most redteam), you are validating
+**whether IntentFrame blocked the attack** — that works over HTTP without shared
+`demo/` mounts.
+
+#### What `populate_attack_sandbox()` does (and when you can ignore it)
+
+Attack invoice **sources** are in git under `demo/demo_data/attacks/<scenario>/`.
+The harness copies them into `demo/demo_data/attack_invoices_sandbox/` (gitignored
+scratch dir) before each attack — see `invoice_attack_pipeline.py`. The executor
+config mounts that sandbox as `/invoices/`.
+
+Locally, test harness and executor share one filesystem. Over HTTP, Mac-side
+`populate_attack_sandbox()` and `reset_expense_tracker()` do **not** update the
+container's `/app/demo/demo_data/…` unless you bind-mount or populate inside the
+container.
+
+```
+Mac (test harness)                         Container (executor)
+─────────────────                          ──────────────────────
+populate_attack_sandbox()                  only consulted on ALLOW
+  writes demo/demo_data/                     or allowed prelude reads
+  attack_invoices_sandbox/        ≠          on /invoices/ or /expense_tracker.md
+```
+
+#### Workarounds (only if you need executor side-effect fidelity)
+
+Pick one when you care about **what the executor actually wrote**, not just
+whether the attack was blocked:
+
+1. **Run attack tests locally** — supervisor on the Mac with
+   `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml`.
+2. **Bind-mount `demo/`** into `intentframe-runtime` so Mac-side staging is visible
+   to the container executor (not in the default compose file today).
+3. **Populate inside the container** before attacks that need `/invoices/` reads.
+
+#### Other HTTP caveats
+
+- **`EXECUTOR_CONFIG` must match the suite** — dashboard vs attack configs mount
+  different VFS paths (§2b footgun).
+- **Rebuild after code changes** — stale Docker cache can serve an old `git clone`
+  layer; see [Clean slate](#clean-slate-remove-everything).
+- **AI invoice agent / some live agent tests** — agents that call `asyncio.run()`
+  separately for handshake and run on the same `Actor` can hit HTTP keep-alive /
+  event-loop lifecycle issues; stub-pipeline attack tests avoid this by design.
 
 ## 3. Root dry-run tests against the container
 
