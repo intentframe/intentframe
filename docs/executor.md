@@ -125,6 +125,14 @@ Every step is fail-closed: any failure, any timeout, any unexpected exception
 becomes a clean `ExecutionResult(success=False)` returned to the caller. The
 gateway never crashes because an adapter misbehaved.
 
+`WorkerPool` concurrency is an executor-local ceiling, not the top-level
+security model. In the supervised IntentFrame runtime, Core submits one
+approved execution at a time and waits for the result before the next intent is
+evaluated. That is what preserves the "one writer per protected environment"
+property. A higher executor `max_workers` value only says the executor can
+bound and time out concurrent adapter calls if they arrive; it does not replace
+the Core/supervisor singleton guarantee.
+
 ---
 
 ## 5. Credential isolation
@@ -202,13 +210,34 @@ TelegramAdapter(CapabilityAdapter)
   └── rollback()           → returns failure ("Messages are irreversible")
 ```
 
-**Step 2: register**
+**Step 2: register inside an executor pack**
+
+Adapters are not loaded automatically. Your pack's `register_all()` (or
+`register_all_adapters()`) must call `register_adapter()` so the executor
+knows the adapter exists when that pack is listed in config:
 
 ```python
-register_adapter("telegram", TelegramAdapter)
+# my_org_pack/adapters/__init__.py
+from executor_sdk.adapters import register_adapter
+from my_org_pack.adapters.telegram import TelegramAdapter
+
+def register_all_adapters() -> None:
+    register_adapter("telegram", TelegramAdapter)
 ```
 
-**Step 3: enable in config**
+Third-party packs can advertise themselves under the
+`intentframe.executor_packs` entry-point group in `pyproject.toml` so
+deployments reference them by short name.
+
+**Step 3: list the pack in config**
+
+```yaml
+# executor.yaml
+packs:
+  - my_org_pack          # or full module path / entry-point name
+```
+
+**Step 4: enable the adapter**
 
 ```yaml
 # executor.yaml
@@ -216,6 +245,9 @@ adapters:
   enabled:
     - telegram
 ```
+
+Both steps are required: `packs:` loads implementations at startup;
+`adapters.enabled` selects which registered adapters the gateway wires up.
 
 ### What you get for free
 
@@ -252,8 +284,8 @@ The current macOS deployment ships 18 adapters:
 | System | Browser, System, Clipboard, Shortcuts, Spotlight, Filesystem Watch |
 
 Each adapter implements the same contract and inherits the same security
-guarantees. New deployments simply enable a different set of adapters in
-`executor.yaml`.
+guarantees. New deployments choose which **executor packs** to load (`packs:`)
+and which adapters to enable (`adapters.enabled`) in `executor.yaml`.
 
 ---
 
@@ -327,13 +359,14 @@ job. The sandbox is a consistent safety net, not a policy engine.
 ### Configuration
 
 ```yaml
-sandbox:
-  enabled: true
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-  # All commands run under file_read_write (the max).
+pack_options:
+  sandbox:
+    enabled: true
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+    # All commands run under file_read_write (the max).
 ```
 
 ### Platform support

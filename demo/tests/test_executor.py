@@ -228,7 +228,7 @@ def main():
     print("  Expected: gateway rejects -- HMAC mismatch")
 
     # Manually build a request with a bad signature
-    from executor.models import AuthorizationProof, ExecutionRequest, RequestMetadata
+    from executor_sdk.models import AuthorizationProof, ExecutionRequest, RequestMetadata
 
     bad_request = ExecutionRequest(
         action_type="LIST_DIRECTORY",
@@ -299,7 +299,7 @@ def main():
     header("TEST 10: HASH CHAIN INTEGRITY")
     print("  Verifying tamper-evident audit trail...")
 
-    from executor.platforms.macos.audit_logger import SQLiteAuditLogger
+    from intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
     logger = SQLiteAuditLogger(db_path=DB_PATH)
     chain_valid = bridge._run_async(logger.verify_chain_integrity())
     logger.close()

@@ -8,7 +8,10 @@
 # Start supervisor from repo root:
 #   EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
 
-platform: auto
+# Runs locally on a Mac host: the macOS pack supplies the GUI `user_io`
+# (osascript dialogs) plus the portable base (files VFS, sqlite, hmac, uds).
+packs:
+  - intentframe_executor_pack_macos
 
 transport:
   type: unix_socket
@@ -28,33 +31,33 @@ worker_pool:
   max_workers: 4
   default_timeout_seconds: 30.0
 
-filesystem:
-  base_path: demo
-  mounts:
-    - virtual_path: "/invoices/"
-      real_path: "demo_data/attack_invoices_sandbox"
-      file_filter: "*.md"
-    - virtual_path: "/expense_tracker.md"
-      real_path: "demo_data/expense_tracker.md"
-      writable: true
-
 adapters:
   enabled:
     - files
     - user_io
 
-# ─── HOST_FILE allowlists (required) ─────────────────────────────────────────
-# Required even when this suite does not enable host-file tools.
-# Use plain roots like ``~/Documents`` if you enable them later.
-# Do not use globs here. Trailing "/" has no special meaning.
-# Empty lists here mean "no host-file access".
-host_files:
-  allowed_read_paths: []
-  allowed_write_paths: []
+# ─── Executor pack options ───────────────────────────────────────────────────
+# Opaque config slices owned and validated by executor packs.
+pack_options:
+  # VFS mount table for the files adapter.
+  files:
+    base_path: demo
+    mounts:
+      - virtual_path: "/invoices/"
+        real_path: "demo_data/attack_invoices_sandbox"
+        file_filter: "*.md"
+      - virtual_path: "/expense_tracker.md"
+        real_path: "demo_data/expense_tracker.md"
+        writable: true
+
+  # Empty lists mean "no host-file access" if host-file tools are enabled later.
+  host_files:
+    allowed_read_paths: []
+    allowed_write_paths: []
 
 # ─── RUN_COMMAND Sandboxing ───────────────────────────────────────────────────
 # Attack tests do not enable the terminal adapter, so sandbox config is omitted.
-# If terminal is added to adapters.enabled, add a sandbox: section here.
+# If terminal is added to adapters.enabled, add pack_options.sandbox here.
 # See jarvis_pa/executor.yaml or executor/config/executor.yaml for examples.
 
 storage:

@@ -24,6 +24,8 @@ IntentFrame is meant to be that for AI agents on your device:
 
 The user-visible consequence: when you have Jarvis running locally, the Telegram bridge running for remote access, the invoice bot running in `external_agents/`, and tomorrow some new agent you've added — they are *not* four security stories that have to be kept in sync. They are four clients of the same security story, and the story is told by the runtime, not by the agents. Your trust footprint is the runtime, not the agent fleet.
 
+The singleton boundary is the **security lane**: one runtime process tree protects one machine/environment. The `intentframe-core` pipeline serializes the full lifecycle of each intent — evaluation, decision, execution, and audit — so each action is judged against a stable environment and recorded in causal order. Executor `worker_pool.max_workers` is only a capacity ceiling inside the executor service; it is not the security boundary and must not be used to justify multiple writers into the same environment.
+
 ---
 
 ## Why singletonness is load-bearing

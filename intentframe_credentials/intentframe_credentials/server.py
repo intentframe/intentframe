@@ -25,7 +25,7 @@ from intentframe_credentials.models import (
     StoreRequest,
     mask_value,
 )
-from intentframe_credentials.protocol import CredentialVault
+from intentframe_credentials.protocol import CredentialVault, create_vault
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +58,19 @@ async def lifespan(_app: FastAPI):  # noqa: ANN201
     global _vault, _meta  # noqa: PLW0603
 
     if _vault is None:
-        from intentframe_credentials.backends import keyring_backend as _kb  # noqa: F401
-        from intentframe_credentials.protocol import create_vault
+        import importlib
+        import os
 
-        _vault = create_vault("keyring")
+        # Backend is env-driven so a deployer can switch storage (e.g.
+        # keyring on a laptop, hashicorp on a headless server) without
+        # any code change. Defaults to keyring for local/dev parity.
+        backend = os.environ.get("IF_VAULT_BACKEND", "keyring")
+        # Import the matching backend module to trigger self-registration.
+        importlib.import_module(
+            f"intentframe_credentials.backends.{backend}_backend",
+        )
+
+        _vault = create_vault(backend)
 
     backend_name = type(_vault).__name__
 
@@ -73,6 +82,11 @@ async def lifespan(_app: FastAPI):  # noqa: ANN201
 
     yield
 
+    # Some backends (e.g. hashicorp) hold a token-renewal task that must
+    # be cancelled on shutdown.  Close it if the backend supports it.
+    close = getattr(_vault, "close", None)
+    if callable(close):
+        await close()
     await _meta.close()
     logger.info("credential vault service stopped")
 

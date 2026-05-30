@@ -1,4 +1,4 @@
-"""Unit tests for :class:`executor.platforms.macos.adapters.host_files.HostFilesAdapter`.
+"""Unit tests for :class:`intentframe_executor_pack_macos.adapters.host_files.HostFilesAdapter`.
 
 The adapter is the final wall before real-path I/O.  It runs two
 independent checks on every call:
@@ -22,8 +22,8 @@ from pathlib import Path
 import pytest
 
 from action_registry import ActionType
-from executor.config.schema import HostFilesConfig
-from executor.platforms.macos.adapters.host_files import HostFilesAdapter
+from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
+from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 
 
 def _run(adapter: HostFilesAdapter, action, params):
@@ -37,7 +37,7 @@ def sandbox(tmp_path: Path):
         allowed_read_paths=[str(tmp_path)],
         allowed_write_paths=[str(tmp_path)],
     )
-    return HostFilesAdapter(host_files_cfg=cfg), tmp_path
+    return HostFilesAdapter(host_files_options=cfg), tmp_path
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -114,7 +114,7 @@ class TestFloorWall:
             allowed_read_paths=["/etc"],
             allowed_write_paths=["/etc"],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         r = _run(adapter, ActionType.WRITE_HOST_FILE, {
             "path": "/etc/sudoers",
             "content": "x",
@@ -127,7 +127,7 @@ class TestFloorWall:
             allowed_read_paths=["/etc"],
             allowed_write_paths=["/etc"],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         r = _run(adapter, ActionType.DELETE_HOST_FILE, {"path": "/etc/sudoers"})
         assert not r.success
         assert "floor" in r.error.lower()
@@ -147,7 +147,7 @@ class TestCeilingWall:
             allowed_read_paths=[str(inside)],
             allowed_write_paths=[str(inside)],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         r = _run(adapter, ActionType.WRITE_HOST_FILE, {
             "path": str(outside / "escape.txt"),
             "content": "x",
@@ -166,7 +166,7 @@ class TestCeilingWall:
             allowed_read_paths=[str(inside)],
             allowed_write_paths=[str(inside)],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         (outside / "secret.txt").write_text("x")
         r = _run(adapter, ActionType.READ_HOST_FILE, {
             "path": str(outside / "secret.txt"),
@@ -176,7 +176,7 @@ class TestCeilingWall:
     def test_empty_write_allowlist_refuses_all_writes(self, tmp_path):
         # Zero-trust mode: empty list means *no* host-file writes permitted.
         cfg = HostFilesConfig(allowed_read_paths=[], allowed_write_paths=[])
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         r = _run(adapter, ActionType.WRITE_HOST_FILE, {
             "path": str(tmp_path / "x.txt"),
             "content": "x",
@@ -193,7 +193,7 @@ class TestCeilingWall:
             allowed_read_paths=[str(allowed)],
             allowed_write_paths=[str(allowed)],
         )
-        adapter = HostFilesAdapter(host_files_cfg=cfg)
+        adapter = HostFilesAdapter(host_files_options=cfg)
         r = _run(adapter, ActionType.WRITE_HOST_FILE, {
             "path": str(sibling / "sneaky.txt"),
             "content": "x",

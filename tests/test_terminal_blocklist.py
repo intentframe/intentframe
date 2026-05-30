@@ -40,7 +40,7 @@ from intentframe_bundle_sdk.types import (
     PhaseDecision,
 )
 from action_registry.types import ActionType
-from executor.platforms.macos.adapters.terminal import TerminalAdapter
+from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 from command_shield import quick_check
 from command_shield.patterns import COMPILED_PATTERNS
 

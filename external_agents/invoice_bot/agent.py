@@ -333,9 +333,9 @@ class AIInvoiceAgent:
             # Extract financial limit from API constraints if present
             api_limit = None
             for action, perm in runtime_ctx.allowed_actions.items():
-                if perm.constraints and hasattr(perm.constraints, "max_amount"):
-                    if perm.constraints.max_amount is not None:
-                        api_limit = perm.constraints.max_amount
+                if perm.constraints and "max_amount" in perm.constraints:
+                    if perm.constraints["max_amount"] is not None:
+                        api_limit = perm.constraints["max_amount"]
                         break
             financial_limit = api_limit or 0.0
             guardrails = runtime_ctx.guardrails

@@ -19,10 +19,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+hashicorp = [
+    "hvac>=2.0",
+]
 dev = [
     "pytest>=9.0",
     "pytest-asyncio>=0.23",
+    "hvac>=2.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["hatchling"]

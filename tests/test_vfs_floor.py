@@ -9,7 +9,7 @@ Covers:
       writable — the core gap Phase 7a closes.
     - ``APPEND_ROW`` path (which goes through ``write_file``) inherits
       the floor check for free.
-    - Symmetry: every entry in ``executor.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE``
+    - Symmetry: every entry in ``intentframe_executor_pack_macos.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE``
       is covered by ``resource_registry.floor.DENY_WRITE_PREFIXES`` so
       the sandbox and the file-tool floor cannot drift.
 
@@ -27,11 +27,11 @@ from pathlib import Path
 
 import pytest
 
-from executor.exceptions import VirtualFileSystemError
-from executor.platforms.macos.virtual_filesystem import LocalVirtualFileSystem
-from executor.sandbox.templates import NON_NEGOTIABLE_DENY_WRITE
-from executor.sandbox.venv import owner_home
-from executor.services.virtual_filesystem import MountPointConfig
+from executor_sdk.exceptions import VirtualFileSystemError
+from intentframe_executor_pack_macos.virtual_filesystem import LocalVirtualFileSystem
+from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_WRITE
+from intentframe_executor_pack_macos.sandbox.venv import owner_home
+from executor_sdk.services.virtual_filesystem import MountPointConfig
 from resource_registry.floor import DENY_WRITE_PREFIXES, match_deny_prefix
 
 

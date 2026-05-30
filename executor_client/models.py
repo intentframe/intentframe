@@ -73,7 +73,11 @@ class ExecutionRequest(BaseModel):
 
 
 class ExecutionResult(BaseModel):
-    """Inbound execution result — what we receive from the executor service."""
+    """Inbound execution result — what we receive from the executor service.
+
+    ``display_summary`` is forwarded unchanged to ``intentframe_core`` types
+    for verbose pipeline output.
+    """
 
     model_config = ConfigDict(frozen=False)
 
@@ -86,3 +90,4 @@ class ExecutionResult(BaseModel):
     rollback_available: bool = False
     rollback_id: str | None = None
     extras: dict[str, Any] = Field(default_factory=dict)
+    display_summary: str = ""

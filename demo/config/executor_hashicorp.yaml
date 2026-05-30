@@ -1,0 +1,86 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Demo Executor Configuration — HashiCorp / containerized runtime
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Same demo pipeline as demo/config/executor.yaml, used when the whole runtime
+# runs inside a container with the credential-vault backed by HashiCorp Vault:
+#
+#   EXECUTOR_CONFIG=demo/config/executor_hashicorp.yaml python -m supervisor.main start
+#
+# IMPORTANT — the executor's credential backend stays `service`:
+#   The executor talks to the supervisor-managed vault over UDS. It is the
+#   *vault service* that selects HashiCorp storage, via IF_VAULT_BACKEND=hashicorp
+#   + VAULT_* env vars (see deploy/dev/). Setting backend: hashicorp here would
+#   make the executor bypass the single vault service — don't.
+#
+# NOTE — transport.socket_path below is informational: when launched by the
+# supervisor each service is bound with `uvicorn --uds <run_dir>/executor.sock`,
+# which overrides this value. It is kept for standalone runs / parity.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─── Executor packs ──────────────────────────────────────────────────────────
+# Container-only config (Linux). Packs are explicit (no platform defaults):
+#   posix   -- portable base: files VFS, sqlite storage, guardian_hmac auth,
+#              unix_socket transport (no macOS/osascript dependency).
+#   console -- neutral user-IO adapters, incl. simulated_user_io (headless).
+# Another org swaps these for their own pack (module path, or a short name from
+# the 'intentframe.executor_packs' entry-point group).
+packs:
+  - intentframe_executor_pack_posix
+  - intentframe_executor_pack_console
+
+transport:
+  type: unix_socket
+  options:
+    socket_path: /tmp/intentframe/executor.sock
+
+auth:
+  type: guardian_hmac
+  options:
+    # Must match the signer used by intentframe-core / the demo bridge
+    # (executor_client/bridge.py _DEMO_HMAC_KEY).
+    secret_key: "intentframe_demo_secret_key_do_not_use_in_production"
+
+credentials:
+  backend: service
+  options: {}
+
+worker_pool:
+  max_workers: 4
+  default_timeout_seconds: 30.0
+
+# ─── Demo adapters ───────────────────────────────────────────────────────────
+# simulated_user_io (neutral pack) is fully headless: it never reads stdin and
+# never opens a dialog, so it is safe in the container and in CI. Swap for
+# `console_user_io` for an interactive TTY, or the macOS `user_io` (osascript
+# dialogs, Mac host only).
+adapters:
+  enabled:
+    - files
+    - simulated_user_io
+
+# ─── Executor pack options ───────────────────────────────────────────────────
+pack_options:
+  # VFS mount table for the files adapter. Paths are relative to the repo root
+  # (the supervisor's working directory inside the container).
+  files:
+    base_path: demo
+    mounts:
+      - virtual_path: "/invoices/"
+        real_path: "demo_data"
+        file_filter: "*.md"
+      - virtual_path: "/expense_tracker.md"
+        real_path: "demo_data/expense_tracker.md"
+        writable: true
+
+  host_files:
+    allowed_read_paths: []
+    allowed_write_paths: []
+
+storage:
+  database_path: null
+  log_path: null
+
+logging:
+  level: INFO
+  format: console

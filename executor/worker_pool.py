@@ -23,9 +23,9 @@ import asyncio
 import logging
 import time
 
-from executor.adapters.base import CapabilityAdapter
-from executor.constants import DEFAULT_ADAPTER_TIMEOUT, DEFAULT_MAX_WORKERS
-from executor.models import ExecutionResult
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.constants import DEFAULT_ADAPTER_TIMEOUT, DEFAULT_MAX_WORKERS
+from executor_sdk.models import ExecutionResult
 
 logger = logging.getLogger(__name__)
 

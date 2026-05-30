@@ -28,7 +28,6 @@ Usage (config-driven):
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -37,7 +36,7 @@ from policy_registry.models import ActionPermission, SemanticIntentLimit, UserPo
 from resource_registry.client import ResourceRegistryClient
 from resource_registry.models import ResourceMount
 
-from intentframe_server.client import AsyncIntentFrameClient
+from intentframe_server.client import IntentFrameClient
 
 from intentframe_dashboard.manifest import AgentManifest
 from intentframe_dashboard.loader import scan_agents
@@ -66,7 +65,7 @@ class IntentFrameDashboard:
     ) -> None:
         self._policy_client = PolicyRegistryClient()
         self._resource_client = ResourceRegistryClient()
-        self._server_client = AsyncIntentFrameClient()
+        self._server_client = IntentFrameClient()
         self._venv_manager = VenvManager()
         self._runner = Runner()
         self._socket_path = socket_path
@@ -91,7 +90,7 @@ class IntentFrameDashboard:
     def close(self) -> None:
         self._policy_client.close()
         self._resource_client.close()
-        asyncio.run(self._server_client.close())
+        self._server_client.close()
 
     # ── User & Policy Management ─────────────────────────────────────
 
@@ -235,7 +234,7 @@ class IntentFrameDashboard:
 
     def get_audit_log(self) -> List[Dict[str, Any]]:
         """Retrieve the full audit trail from the IntentFrame Core service."""
-        return asyncio.run(self._server_client.get_audit_log())
+        return self._server_client.get_audit_log()
 
 
 # ═════════════════════════════════════════════════════════════════════════════

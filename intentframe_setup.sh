@@ -73,7 +73,7 @@ done
 #
 # The executor itself can still run as root later — it just needs
 # to know which user's ~/.intentframe-venvs/executor to look at.
-# That resolution lives in executor/sandbox/venv.py and uses the
+# That resolution lives in intentframe_executor_pack_macos/sandbox/venv.py and uses the
 # same SUDO_USER → uid HOME fallback chain.
 
 if [[ "$(id -u)" -eq 0 && -z "${SUDO_USER:-}" ]]; then

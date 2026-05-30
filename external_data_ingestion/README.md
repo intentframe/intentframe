@@ -288,7 +288,7 @@ If an operation targets an account that isn't configured, `AccountNotFoundError`
 
 ### IntentFrame executor and Jarvis
 
-The macOS **mail adapter** (`executor/platforms/macos/adapters/mail.py`) uses **`get_active_accounts()`** to validate `account_email` on SEND/READ/SEARCH. If those actions arrive **without** `account_email`, the adapter returns failure and the error string includes the current active account emails (same source as `get_active_accounts()`). That gives consumers a hint in logs or error handling; it is **not** a substitute for a first-class “list mail accounts” action in the registry.
+The macOS **mail adapter** (`intentframe_executor_pack_macos/adapters/mail.py`) uses **`get_active_accounts()`** to validate `account_email` on SEND/READ/SEARCH. If those actions arrive **without** `account_email`, the adapter returns failure and the error string includes the current active account emails (same source as `get_active_accounts()`). That gives consumers a hint in logs or error handling; it is **not** a substitute for a first-class “list mail accounts” action in the registry.
 
 **Jarvis** (`jarvis_pa`) exposes email tools with **required** `account_email` parameters (`jarvis/tools.py`), so the LLM is not steered to omit the field to trigger that error path. For end-to-end “discover then read” flows, either the user supplies the address, it is stored in workspace memory, or a future `LIST_EMAIL_ACCOUNTS`-style action and Jarvis tool would be needed. See `jarvis_pa/README.md` → *Email and account discovery*.
 

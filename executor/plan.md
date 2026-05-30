@@ -1267,7 +1267,7 @@ See `executor/sandbox.md` for the full implementation reference.
 
 ### New module
 
-`executor/sandbox/` — planner, pathing, templates, engine, macOS platform.
+`intentframe_executor_pack_macos/sandbox/` — planner, pathing, templates, engine, macOS Seatbelt engine.
 Dynamic SBPL profile generation following Anthropic's `sandbox-runtime` pattern.
 
 The engine returns a `SandboxedCommand(argv, env_overrides)` dataclass. The adapter
@@ -1278,12 +1278,11 @@ no `shlex.quote()` issues.
 
 | File | Change |
 |---|---|
-| `executor/config/schema.py` | Added `SandboxConfig` with `working_directory`, `allowed_write_paths` |
-| `executor/main.py` | Engine/planner init from `SandboxConfig` (no VFS dependency) |
-| `executor/platforms/macos/adapters/terminal.py` | Classify → plan → wrap → `create_subprocess_exec` with `env_overrides` |
-| `executor/sandbox/engine.py` | `SandboxedCommand` dataclass (argv + env_overrides) |
-| `executor/sandbox/planner.py` | Write paths from `SandboxConfig`, not VFS mounts |
-| `executor/sandbox/platforms/macos.py` | Global `(allow file-read*)`, clean `PATH` override, config-driven writes |
+| `executor/config/schema.py` | `sandbox:` is an opaque dict; typed `SandboxConfig` lives in the macOS pack |
+| `intentframe_executor_pack_macos/adapters/terminal.py` | Owns sandbox engine/planner init; classify → plan → wrap → `create_subprocess_exec` |
+| `intentframe_executor_pack_macos/sandbox/engine.py` | `SandboxedCommand` dataclass (argv + env_overrides) |
+| `intentframe_executor_pack_macos/sandbox/planner.py` | Write paths from `SandboxConfig`, not VFS mounts |
+| `intentframe_executor_pack_macos/sandbox/__init__.py` | Global `(allow file-read*)`, clean `PATH` override, config-driven writes |
 | `jarvis_pa/executor.yaml` | `sandbox:` section with `working_directory` and `allowed_write_paths` |
 
 ### Default Jarvis sandbox behavior

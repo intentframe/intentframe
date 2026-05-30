@@ -55,7 +55,6 @@ from intentframe_server.runtime_context_for_llms import (
     onboarding_runtime_context_for_llm,
 )
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
 
 logger = logging.getLogger(__name__)
 
@@ -90,37 +89,6 @@ def _get_executor_logger() -> logging.Logger:
     return _executor_logger
 
 
-_BANNER_SUBJECT_KEYS: tuple[str, ...] = (
-    "command",
-    "url",
-    "query",
-    "rfc_message_id",
-    "title",
-    "to",
-    "prompt",
-    "content",
-)
-
-
-def _banner_subject(intent: IntentFrame) -> str:
-    """Pick the most relevant display subject for the verbose intent banner.
-
-    Only the host-file action family populates ``intent.target``; every other
-    action family leaves ``target`` empty and stores its meaningful subject in
-    a ``data`` field (``command`` for RUN_COMMAND, ``url`` for browser, etc.).
-    Falls back through ``_BANNER_SUBJECT_KEYS`` so new action types that use
-    one of those common keys get a useful banner automatically.
-    """
-    if intent.target:
-        return str(intent.target)
-    data = intent.data or {}
-    for key in _BANNER_SUBJECT_KEYS:
-        value = data.get(key)
-        if value:
-            return str(value)
-    return ""
-
-
 class IntentFrameRuntime:
     """
     Stateless security gateway.
@@ -145,7 +113,6 @@ class IntentFrameRuntime:
         execution_context: Optional[ExecutionContext] = None,
         onboarding_engine: Optional[OnboardingEngine] = None,
         policy_client: Optional[PolicyRegistryClient] = None,
-        resource_client: Optional[ResourceRegistryClient] = None,
         deterministic_guardian: Optional[DeterministicGuardian] = None,
         verbose: bool = True,
     ):
@@ -158,7 +125,6 @@ class IntentFrameRuntime:
         )
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
-        self._resource_client = resource_client or ResourceRegistryClient()
         self.deterministic_guardian = deterministic_guardian or DeterministicGuardian(
             verbose=verbose,
         )
@@ -213,11 +179,8 @@ class IntentFrameRuntime:
             "action": intent.action.value,
             "success": result.success,
             "target": intent.target or "",
-            "command": (intent.data or {}).get("command", "")[:500],
             "error": result.error,
             "data": data_summary,
-            "stderr": (result.data or {}).get("stderr", "")[:1000] if result.data else None,
-            "return_code": (result.data or {}).get("return_code") if result.data else None,
         }
         level = logging.INFO if result.success else logging.WARNING
         try:
@@ -377,19 +340,6 @@ class IntentFrameRuntime:
             domains.update(user_context.domain_constraints.keys())
         return domains
 
-    def _resolve_workspace(self, workspace_id: str) -> tuple[list[str], dict[str, str]]:
-        """Fetch the ClientView from the Resource Registry.
-
-        Returns (virtual_paths, path_permissions) or empty defaults
-        if the workspace doesn't exist yet.
-        """
-        try:
-            view = self._resource_client.client_view(workspace_id)
-            return view.virtual_paths, view.permissions
-        except (KeyError, Exception) as exc:
-            logger.debug("No workspace '%s' in resource registry: %s", workspace_id, exc)
-            return [], {}
-
     async def handshake(
         self, 
         capabilities: AgentCapabilities, 
@@ -417,7 +367,6 @@ class IntentFrameRuntime:
             RuntimeContext with everything agent needs to work effectively
         """
         user_context = self._resolve_user_context(user_context)
-        virtual_paths, path_permissions = self._resolve_workspace(user_context.user_id)
 
         if not self.onboarding_engine:
             if self.verbose:
@@ -431,8 +380,6 @@ class IntentFrameRuntime:
                 guardrails=[],
                 available_actions=capabilities.action_types,
                 onboarded_agent_type=capabilities.agent_type,
-                virtual_paths=virtual_paths,
-                path_permissions=path_permissions,
             )
         else:
             num_actions = len(user_context.allowed_actions)
@@ -452,8 +399,6 @@ class IntentFrameRuntime:
                     self._substrate_contexts
                 ),
             )
-            context.virtual_paths = virtual_paths
-            context.path_permissions = path_permissions
 
             if self.verbose:
                 print(f"\n    ╔══════════════════════════════════════════════════════════╗")
@@ -541,7 +486,7 @@ class IntentFrameRuntime:
         if self.verbose:
             reason = intent.reason or ""
 
-            subject = _banner_subject(intent)
+            subject = intent.display_subject or intent.target
             started_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             intent_header = f"INTENT #{req_num}  ·  {started_at}"
 
@@ -772,22 +717,11 @@ class IntentFrameRuntime:
             if self.verbose:
                 status = 'Success' if result.success else 'Failed'
                 print(f"    │  Result: {status:<49} │")
-                action_name = intent.action.value
-                if action_name in ("ASK_USER", "GET_CONFIRMATION", "SHOW_OPTIONS"):
-                    prompt = (intent.data or {}).get("prompt", "")
-                    if prompt:
-                        prompt_short = prompt[:52] + "…" if len(prompt) > 52 else prompt
-                        print(f"    │  Prompt: {prompt_short:<49} │")
-                    if result.success and result.data:
-                        resp = result.data.get("response") or result.data.get("selection") or ""
-                        if resp:
-                            resp_short = resp[:52] + "…" if len(resp) > 52 else resp
-                            print(f"    │  User:   {resp_short:<49} │")
-                elif action_name == "SHOW_MESSAGE":
-                    msg = (intent.data or {}).get("message", "")
-                    if msg:
-                        msg_short = msg[:52] + "…" if len(msg) > 52 else msg
-                        print(f"    │  Shown:  {msg_short:<49} │")
+                # Adapter-owned lines; substrate only truncates and boxes.
+                if result.display_summary:
+                    for _line in result.display_summary.splitlines():
+                        _line = _line[:52] + "…" if len(_line) > 52 else _line
+                        print(f"    │  {_line:<56} │")
                 if not result.success and result.error:
                     hint = result.error.replace("\n", " ")
                     hint = hint[:49] + "…" if len(hint) > 49 else hint
@@ -804,14 +738,9 @@ class IntentFrameRuntime:
 
             self._log_executor_result(intent, result)
             
-            # Log the outcome
+            # Outcome: request params stay in audit_entry["data"]; executor payload here.
             audit_entry["executed"] = result.success
-            action_name = intent.action.value
-            if result.success and result.data and action_name in (
-                "ASK_USER", "SHOW_MESSAGE", "GET_CONFIRMATION", "SHOW_OPTIONS",
-            ):
-                audit_entry["user_prompt"] = (intent.data or {}).get("prompt", "")
-                audit_entry["user_response"] = result.data
+            audit_entry["result_data"] = result.data
             self.audit_log.append(audit_entry)
             
             return result

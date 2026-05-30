@@ -34,12 +34,12 @@ The real executor path is a small privilege-separation path:
 
 1. The CLI can start the gateway with `--profile root`.
 2. The root profile uses `jarvis_pa/executor_root.yaml`.
-3. That YAML sets `sandbox.escalate: sudo`.
+3. That YAML sets `pack_options.sandbox.escalate: sudo`.
 4. A one-time installer writes a narrow sudoers entry for `sandbox-exec` and a user-space marker file.
 5. On gateway startup, the gateway detects whether that root-demo capability is armed and exports `INTENTFRAME_ESCALATION_ARMED=0|1` to the supervisor / executor.
 6. The executor only prepends `sudo -n` when **both** of these are true:
    - the machine capability is armed (`INTENTFRAME_ESCALATION_ARMED=1`)
-   - the loaded executor config explicitly asks for it (`sandbox.escalate: sudo`)
+   - the loaded executor config explicitly asks for it (`pack_options.sandbox.escalate: sudo`)
 
 So the root decision is split cleanly into:
 
@@ -60,7 +60,7 @@ The actual goal was narrower: let **`RUN_COMMAND`** execute under root for the d
 
 This shipped model preserves that boundary.
 
-Root operations on a computer are shell operations — `cat /etc/sudoers`, `tee /var/root/...`, `ls /var/db/sudo`. The root demo grants only `RUN_COMMAND` for that reason. Host-file, mail, calendar, and the other adapters target ordinary user-space workflows and are not part of the root surface; pairing them with the root profile would be a category mismatch (and they wouldn't escalate even if you tried, since `sandbox.escalate: sudo` only flows through the sandbox engine, which only wraps `RUN_COMMAND`).
+Root operations on a computer are shell operations — `cat /etc/sudoers`, `tee /var/root/...`, `ls /var/db/sudo`. The root demo grants only `RUN_COMMAND` for that reason. Host-file, mail, calendar, and the other adapters target ordinary user-space workflows and are not part of the root surface; pairing them with the root profile would be a category mismatch (and they wouldn't escalate even if you tried, since `pack_options.sandbox.escalate: sudo` only flows through the sandbox engine, which only wraps `RUN_COMMAND`).
 
 ---
 
@@ -104,7 +104,7 @@ if any later ALLOW result is missing the dry-run tag. This keeps the policy /
 Guardian test surface real while preventing accidental host mutation.
 
 Use real root-capable executor mode only when you explicitly need to validate the final
-executor/sandbox/sudo path.
+`intentframe_executor_pack_macos/sandbox` escalate/sudo path.
 
 ### 1. Install the root-demo capability once
 
@@ -152,7 +152,7 @@ set: profile, executor YAML, and machine capability for root-demo.
 **Faster dev loop** (no gateway process, no credential-vault checks, no
 CLI/gateway teardown cycle). This is only appropriate when
 `sudo bash intentframe_setup_root_demo.sh` has already been run
-successfully on this machine — otherwise `sandbox.escalate: sudo` in
+successfully on this machine — otherwise `pack_options.sandbox.escalate: sudo` in
 `executor_root.yaml` will not have a working `sudo -n` path.
 
 ```bash
@@ -293,7 +293,7 @@ The root-demo suite uses `root` so Guardian evaluates the same privilege
 posture it would see from the real root-capable executor path, without
 executing commands.
 
-### `sandbox.escalate`
+### `pack_options.sandbox.escalate`
 
 This lives in executor config and captures **intent**.
 

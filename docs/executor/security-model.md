@@ -338,13 +338,14 @@ approved the command.
 ### Executor config
 
 ```yaml
-sandbox:
-  enabled: true
-  allowed_templates:
-    - pure_compute
-    - file_read_only
-    - file_read_write
-    # All commands run under file_read_write (the max)
+pack_options:
+  sandbox:
+    enabled: true
+    allowed_templates:
+      - pure_compute
+      - file_read_only
+      - file_read_write
+      # All commands run under file_read_write (the max)
 ```
 
 This is deployment config, not user policy. A Jarvis deployment that needs

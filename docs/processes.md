@@ -154,7 +154,7 @@ Together with policy-registry, this is the "configuration plane" — what the us
 | | |
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/executor.sock`. Runs in its own Python virtualenv (`~/.intentframe-venvs/executor/`) so its dependencies are isolated from the rest of the system. |
-| **Source** | `executor/server.py`, `executor/gateway.py`, `executor/platforms/macos/adapters/*.py` |
+| **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_executor_pack_macos/adapters/*.py` |
 | **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
 | **Storage** | SQLite audit DB; in-memory credential cache (loaded from vault) |
 | **OpenAI calls** | No |
@@ -273,6 +273,8 @@ TCP would require either fixed port numbers (which conflict with anything else o
 
 **7. Multiple instances coexist by directory, not by port.**
 Different IntentFrame instances on the same machine can be isolated by giving each its own `INTENTFRAME_RUN_DIR`. If two instances try to share one directory, they compete for the same socket files; the supervisor and gateway both kill stale predecessors via PID files before binding (`supervisor/main.py::_kill_stale_supervisor`).
+
+The safety invariant is stronger than "no port conflicts": one protected environment should have one active supervisor/runtime/executor process tree. The local deployment gets this from the shared run directory, socket files, PID file, and the core pipeline lock. The executor's worker pool may be configured with a `max_workers` ceiling for robustness, but in the normal supervised path the core is the serialized caller. Do not treat executor worker count as permission to run multiple IntentFrame cores against the same machine or executor.
 
 **Tradeoffs we're accepting**
 

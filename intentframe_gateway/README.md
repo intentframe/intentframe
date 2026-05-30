@@ -201,7 +201,6 @@ intentframe_gateway/
 ├── __init__.py
 ├── server.py              # FastAPI app, lifespan (orchestration sequence, PID file)
 ├── entry.py               # Process entry point: backend_main() (native frontend)
-├── proxy.py               # UDSProxy class + proxy_websocket() helper
 ├── config.py              # GatewayConfig (Pydantic): socket paths, backends
 ├── config_loader.py       # System config YAML loader (~/.intentframe/gateway.yaml)
 ├── credential_gate.py     # Mandatory/optional credential checks + secret env builder
@@ -225,6 +224,15 @@ intentframe_gateway/
     │                       #               includes root_demo block in /system/health response
     ├── config_routes.py    # /config/*    — app preferences CRUD
     └── events_routes.py    # /events      — unified WS + SSE event stream
+
+intentframe_proxy/           # shared HTTP→UDS forwarder (gateway + edge)
+├── __init__.py
+└── proxy.py                 # UDSProxy class + proxy_websocket() helper
+
+intentframe_edge/            # B2B network edge (see deploy/prod/README.md)
+├── app.py                   # path-routes HTTP/TLS → runtime UDS sockets
+├── config.py
+└── __main__.py
 
 intentframe_cli/
 ├── __init__.py

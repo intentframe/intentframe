@@ -311,6 +311,28 @@ Attack intent files live in `demo/demo_data/attack_intents/` (1-14) and `demo/de
 
 ---
 
+## Running against the dev container (HTTP)
+
+The invoice attack suites (`test_attacks.py`, `test_advanced_attacks.py`,
+`test_redteam_attacks.py`) can validate **defense** (audit `BLOCK` /
+`blocked_count`) against the Linux container in `deploy/dev/` without code
+changes — set `INTENTFRAME_*_URL=http://localhost:8443` on your Mac and run the
+harness as usual.
+
+- **`populate_attack_sandbox()`** — only used by `test_attacks.py` and
+  `test_advanced_attacks.py`; most attacks ignore it because fixtures submit
+  `APPEND_ROW` directly and block before executor I/O. Advanced attacks 7–14 are
+  entirely Guardian-side over HTTP.
+- **Redteam attack 16** (salami slicing) is a documented **known gap** — five
+  `$4,000` ALLOWs by design; see [The Known Gap](#the-known-gap-attack-16-salami-slicing) below.
+- **Executor file side effects** (writes, prelude reads on `/invoices/`) need a
+  shared filesystem or local Mac supervisor — not required for defense summaries.
+
+Full matrix, restart rules, and workarounds:
+**[deploy/dev/README.md §2b–§2d](../../deploy/dev/README.md)**.
+
+---
+
 ## Related
 
 - **[security_analysis.md](./security_analysis.md)** — Full security analysis: threat model, OWASP LLM + Agentic Top 10 coverage, code change history, generalizability evaluation

@@ -17,8 +17,8 @@ import yaml
 from pydantic import ValidationError
 
 from executor.config.schema import ExecutorConfig
-from executor.constants import DEFAULT_CONFIG_FILENAME
-from executor.exceptions import ConfigurationError
+from executor_sdk.constants import DEFAULT_CONFIG_FILENAME
+from executor_sdk.exceptions import ConfigurationError
 
 __all__ = ["ExecutorConfig", "load_config"]
 

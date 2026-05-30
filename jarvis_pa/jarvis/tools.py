@@ -328,7 +328,7 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
     """Submit an action through the actor and return a string result."""
     payload = action.model_dump()
     action_type = payload.get("action", "UNKNOWN")
-    subject = (
+    payload["display_subject"] = (
         payload.get("target")
         or payload.get("message_id")
         or payload.get("command")
@@ -336,7 +336,9 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
         or payload.get("url")
         or ""
     )
-    logger.debug(f"actor.submit: {action_type} — {str(subject)[:60]}")
+    logger.debug(
+        f"actor.submit: {action_type} — {str(payload['display_subject'])[:60]}"
+    )
     try:
         result = await ctx.context.actor.submit(payload)
         return _render_result(result)

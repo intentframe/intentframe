@@ -37,15 +37,35 @@ class IntentFrameClient:
     Provides the same interface as IntentFrameRuntime but over HTTP/UDS.
     """
 
-    def __init__(self, socket_path: str = DEFAULT_SOCKET) -> None:
+    def __init__(
+        self,
+        socket_path: str = DEFAULT_SOCKET,
+        *,
+        base_url: str | None = None,
+    ) -> None:
+        """Connect over a network URL (``base_url``) or a local UDS.
+
+        ``base_url`` (or the ``INTENTFRAME_CORE_URL`` env var) makes the
+        client talk to a remote runtime through the IntentFrame edge,
+        e.g. ``https://intentframe.acme.com``.  When unset, the client
+        falls back to the local UDS at ``socket_path``.
+        """
         import os
-        self._socket = os.path.expanduser(socket_path)
-        self._transport = httpx.HTTPTransport(uds=self._socket)
-        self._client = httpx.Client(
-            transport=self._transport,
-            base_url="http://intentframe",
-            timeout=120.0,
-        )
+        base_url = base_url or os.environ.get("INTENTFRAME_CORE_URL")
+        if base_url:
+            self._socket = None
+            self._client = httpx.Client(
+                base_url=base_url.rstrip("/"),
+                timeout=120.0,
+            )
+        else:
+            self._socket = os.path.expanduser(socket_path)
+            self._transport = httpx.HTTPTransport(uds=self._socket)
+            self._client = httpx.Client(
+                transport=self._transport,
+                base_url="http://intentframe",
+                timeout=120.0,
+            )
 
     def close(self) -> None:
         self._client.close()
@@ -103,15 +123,34 @@ class AsyncIntentFrameClient:
     Used internally by Actor SDK to send IntentFrames to the Runtime.
     """
 
-    def __init__(self, socket_path: str = DEFAULT_SOCKET) -> None:
+    def __init__(
+        self,
+        socket_path: str = DEFAULT_SOCKET,
+        *,
+        base_url: str | None = None,
+    ) -> None:
+        """Connect over a network URL (``base_url``) or a local UDS.
+
+        ``base_url`` (or the ``INTENTFRAME_CORE_URL`` env var) makes the
+        client talk to a remote runtime through the IntentFrame edge.
+        When unset, it falls back to the local UDS at ``socket_path``.
+        """
         import os
-        self._socket = os.path.expanduser(socket_path)
-        self._transport = httpx.AsyncHTTPTransport(uds=self._socket)
-        self._client = httpx.AsyncClient(
-            transport=self._transport,
-            base_url="http://intentframe",
-            timeout=120.0,
-        )
+        base_url = base_url or os.environ.get("INTENTFRAME_CORE_URL")
+        if base_url:
+            self._socket = None
+            self._client = httpx.AsyncClient(
+                base_url=base_url.rstrip("/"),
+                timeout=120.0,
+            )
+        else:
+            self._socket = os.path.expanduser(socket_path)
+            self._transport = httpx.AsyncHTTPTransport(uds=self._socket)
+            self._client = httpx.AsyncClient(
+                transport=self._transport,
+                base_url="http://intentframe",
+                timeout=120.0,
+            )
 
     async def close(self) -> None:
         await self._client.aclose()

@@ -17,7 +17,7 @@ from datetime import datetime, UTC
 from typing import Any
 
 from intentframe_gateway.config import GatewayConfig
-from intentframe_gateway.proxy import UDSProxy
+from intentframe_proxy.proxy import UDSProxy
 
 logger = logging.getLogger(__name__)
 

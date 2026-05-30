@@ -12,7 +12,7 @@
 #      the action that's actually used at root.  The other adapters
 #      (host-file, mail, calendar, ...) target the operator's own user
 #      space and aren't part of the root surface; they also wouldn't
-#      escalate even if granted, because ``sandbox.escalate: sudo`` only
+#      escalate even if granted, because ``pack_options.sandbox.escalate: sudo`` only
 #      flows through the sandbox engine, which only wraps RUN_COMMAND.
 #      See ``docs/executor-root-mode.md`` -- "Why this shape exists".
 #   2. ``intent_limits`` is empty -- spend / deletion limits are irrelevant

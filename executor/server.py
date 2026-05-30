@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import platform as _platform
 import sys
 from contextlib import asynccontextmanager
 from typing import Any
@@ -27,9 +26,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from executor.config import load_config
-from executor.exceptions import ConfigurationError
+from executor_sdk.exceptions import ConfigurationError
+from executor_sdk.packs import ENTRY_POINT_GROUP
 from executor.main import build_gateway
-from executor.models import (
+from executor_sdk.models import (
     ExecutionRequest,
     ExecutionResult,
 )
@@ -39,43 +39,77 @@ logger = logging.getLogger(__name__)
 _gateway = None
 _worker_pool = None
 
-_PLATFORM_REGISTRY = {
-    "macos": "executor.platforms.macos",
-    "darwin": "executor.platforms.macos",
-}
 
+def _load_pack(ref: str) -> None:
+    """Load one executor pack by entry-point name or importable module path.
 
-def _register_platform(platform_name: str) -> None:
-    """Register platform-specific implementations from config.
+    A pack is anything exposing a module-level ``register_all()`` (see
+    ``executor_sdk.packs``). There are no built-in or platform-default packs;
+    deployments wire packs purely through ``packs:`` in executor.yaml.
 
-    Args:
-        platform_name: 'macos', 'linux', or 'auto' (detect from OS).
+    Resolution order for each ``ref``:
+      1. A distribution advertising ``ref`` under the
+         ``intentframe.executor_packs`` entry-point group (third-party packs
+         referenced by their short name).
+      2. An importable module path exposing ``register_all()`` (first-party
+         packs and anything referenced by full dotted module path).
     """
-    if platform_name == "auto":
-        platform_name = _platform.system().lower()
+    from importlib import import_module
+    from importlib.metadata import entry_points
 
-    module_path = _PLATFORM_REGISTRY.get(platform_name)
-    if module_path is None:
+    by_name = {ep.name: ep for ep in entry_points(group=ENTRY_POINT_GROUP)}
+    if ref in by_name:
+        register = by_name[ref].load()
+    else:
+        module = import_module(ref)
+        register = getattr(module, "register_all", None)
+        if register is None:
+            raise ConfigurationError(
+                f"Executor pack '{ref}' has no register_all() entry point and "
+                f"is not advertised under the '{ENTRY_POINT_GROUP}' group.",
+            )
+
+    register()
+    logger.info("Executor pack registered: %s", ref)
+
+
+def _register_packs(config) -> None:
+    """Load every configured executor pack once, in order (fail-closed).
+
+    Packs are entirely config-driven: ``executor.yaml`` must list the packs it
+    needs under ``packs:``. Nothing is loaded implicitly.
+    """
+    refs = list(config.packs)
+    if not refs:
         raise ConfigurationError(
-            f"Unsupported platform: '{platform_name}'. "
-            f"Available: {', '.join(sorted(_PLATFORM_REGISTRY))}",
+            "No executor packs configured. Set `packs:` in executor.yaml, e.g.\n"
+            "  packs:\n"
+            "    - intentframe_executor_pack_posix   # portable base\n"
+            "    - intentframe_executor_pack_console # console / simulated user_io\n"
+            "(or a pack advertised under the "
+            f"'{ENTRY_POINT_GROUP}' entry-point group).",
         )
 
-    import importlib
-    mod = importlib.import_module(module_path)
-    mod.register_all()
-    logger.info("Platform registered: %s", platform_name)
+    for ref in refs:
+        try:
+            _load_pack(ref)
+        except ConfigurationError:
+            raise
+        except Exception as exc:
+            raise ConfigurationError(
+                f"Failed to load executor pack '{ref}': {exc}",
+            ) from exc
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _gateway, _worker_pool
     config = load_config(config_path=os.environ.get("EXECUTOR_CONFIG"))
-    _register_platform(config.platform)
+    _register_packs(config)
 
     if sys.platform == "darwin":
         try:
-            from executor.platforms.macos.permissions import check_permissions
+            from intentframe_executor_pack_macos.permissions import check_permissions
             check_permissions(config.adapters.enabled)
         except Exception as exc:
             logger.warning("Platform server permission check failed: %s", exc)

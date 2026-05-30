@@ -31,7 +31,7 @@
 # -----------------
 # * `READ_HOST_FILE` / `LIST_HOST_DIRECTORY` / `WRITE_HOST_FILE` /
 #   `DELETE_HOST_FILE` `allowed_host_paths` MUST mirror
-#   `jarvis_pa/executor.yaml::host_files.allowed_{read,write}_paths`
+#   `jarvis_pa/executor.yaml::pack_options.host_files.allowed_{read,write}_paths`
 #   (modulo glob normalisation).  Pinned by
 #   `tests/test_jarvis_host_scope_mirror.py`.
 #

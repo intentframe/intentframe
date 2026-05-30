@@ -225,14 +225,14 @@ Instead, each agent (or task/session) should get a dedicated Python environment 
 
 ### Current state (implemented)
 
-The executor now has a dedicated venv at `~/.intentframe-venvs/executor` (sibling of `~/.intentframe/`, not nested under it — the latter is in `NON_NEGOTIABLE_DENY_ACCESS` and would make `exec` of the venv's `python3` fail in the sandbox). Provisioned by `intentframe_setup.sh` via `uv venv --seed`. The path is configurable via `--executor-venv` (setup flag), `INTENTFRAME_EXECUTOR_VENV` (env var), or `sandbox.executor_venv_path` (runtime). The macOS sandbox engine explicitly exposes that venv to sandboxed `RUN_COMMAND` via env overrides:
+The executor now has a dedicated venv at `~/.intentframe-venvs/executor` (sibling of `~/.intentframe/`, not nested under it — the latter is in `NON_NEGOTIABLE_DENY_ACCESS` and would make `exec` of the venv's `python3` fail in the sandbox). Provisioned by `intentframe_setup.sh` via `uv venv --seed`. The path is configurable via `--executor-venv` (setup flag), `INTENTFRAME_EXECUTOR_VENV` (env var), or `pack_options.sandbox.executor_venv_path` (runtime). The macOS sandbox engine explicitly exposes that venv to sandboxed `RUN_COMMAND` via env overrides:
 
 - `PATH` is prepended with `<venv>/bin` on top of the system-derived `PATH` from `/etc/paths`.
 - `VIRTUAL_ENV` is set to the venv path.
 - `PYTHONNOUSERSITE=1` is set to block `pip install --user` escapes.
 - `PYTHONHOME` is never set (venvs break if it is).
 
-This means in the normal case `python`, `python3`, `pip`, and `uv pip install` all resolve to the executor venv. `<repo>/.venv` (the gateway's venv) and `~/Library/Python/...` (user site) are structurally protected from pollution. The config knobs are `sandbox.executor_venv_path` (absolute path, `None` = auto-resolve) and `sandbox.executor_venv_required` (default `True` → fail-closed at startup if the venv is missing).
+This means in the normal case `python`, `python3`, `pip`, and `uv pip install` all resolve to the executor venv. `<repo>/.venv` (the gateway's venv) and `~/Library/Python/...` (user site) are structurally protected from pollution. The config knobs are `pack_options.sandbox.executor_venv_path` (absolute path, `None` = auto-resolve) and `pack_options.sandbox.executor_venv_required` (default `True` → fail-closed at startup if the venv is missing).
 
 Path resolution is identity-aware: it uses `SUDO_USER` if present, else the current uid's HOME, so the design works whether the executor runs as a regular user or as root. Bare root with no `SUDO_USER` fails loud rather than silently picking `/var/root/`.
 
@@ -287,9 +287,9 @@ The original 7a sketch (`FileIntel` plumbing + tri-class destination classifier 
 
 ### What we actually discovered
 
-`RUN_COMMAND` is fully covered by the macOS Seatbelt profile (`executor/sandbox/planner.py`, `executor/sandbox/platforms/macos.py`). The profile honors `NON_NEGOTIABLE_DENY_WRITE` (`executor/sandbox/templates.py:76-84`) so a shell command that tries to write `~/Library/LaunchAgents/com.evil.plist` is denied at the kernel regardless of policy.
+`RUN_COMMAND` is fully covered by the macOS Seatbelt profile (`intentframe_executor_pack_macos/sandbox/planner.py`, `intentframe_executor_pack_macos/sandbox/__init__.py`). The profile honors `NON_NEGOTIABLE_DENY_WRITE` (`intentframe_executor_pack_macos/sandbox/templates.py`) so a shell command that tries to write `~/Library/LaunchAgents/com.evil.plist` is denied at the kernel regardless of policy.
 
-`WRITE_FILE` does **not** go through that profile. It lands in `executor/platforms/macos/virtual_filesystem.py:160-176`, which does a plain `real_path.write_text(content)` after a mount-writability check. The non-negotiable deny list is never consulted. The policy-level `FileConstraints` is a pure `fnmatch` allow-list with no deny vocabulary (`intentframe_native_bundles/actions/files/constraints.py`, enforced via `FilesActionBundle.enforce_constraints`).
+`WRITE_FILE` does **not** go through that profile. It lands in `intentframe_executor_pack_macos/virtual_filesystem.py`, which does a plain `real_path.write_text(content)` after a mount-writability check. The non-negotiable deny list is never consulted. The policy-level `FileConstraints` is a pure `fnmatch` allow-list with no deny vocabulary (`intentframe_native_bundles/actions/files/constraints.py`, enforced via `FilesActionBundle.enforce_constraints`).
 
 Net effect: `WRITE_FILE` to a launchd plist, a shell rc file, `~/.ssh/authorized_keys`, `/etc/sudoers.d/*`, `.github/workflows/*`, etc. is only prevented by whatever the user's `allowed_paths` happens to exclude. A broad allow like `allowed_paths: ["~/*"]` or the root-demo `allowed_paths: ["/*"]` allows all of them.
 
@@ -307,10 +307,10 @@ Apply the same non-negotiable deny list to the file-tool path that the shell san
 
 Concrete changes:
 
-1. Promote `NON_NEGOTIABLE_DENY_WRITE` (or a parallel list with the same semantics) to a shared module the VFS can import without pulling in the sandbox engine — `executor/sandbox/templates.py` already works as the home since `executor/sandbox/planner.py` is the only consumer today.
+1. Promote `NON_NEGOTIABLE_DENY_WRITE` (or a parallel list with the same semantics) to a shared module the VFS can import without pulling in the sandbox engine — `intentframe_executor_pack_macos/sandbox/templates.py` already works as the home since the planner is the primary consumer today.
 2. Extend the list to cover the persistence/auto-load/secret-bearing categories the root-demo hardening already names (`TODO/root-demo-policy-driven-sandbox.md:262`): shell rc files (`.zshrc`, `.bashrc`, `.zprofile`, `.bash_profile`, `.zshenv`, `.profile`), `~/.ssh`, `~/.gnupg`, `~/.gitconfig`, git hooks (`.git/hooks/*`), `.github/workflows`, `/etc` sensitive files (`sudoers`, `sudoers.d`, `sshd_config`, `pam.d`), kext paths, `~/Library/Keychains`, `~/Library/Messages`, `~/Library/Mail`.
 3. Teach `LocalVirtualFileSystem.write_file` / `delete_file` / (future) `APPEND_ROW` to resolve the virtual path, canonicalize, and reject any target that is under a deny-list prefix — raising `VirtualFileSystemError` with a `matched_gate`-style reason string. Same fail-closed posture as the sandbox.
-4. Mirror the identity-aware `~` expansion from `executor/sandbox/venv.py` so the floor list resolves against the right home under both normal-user and `sudo root` executor processes (the same footgun `SandboxConfig.working_directory` has today).
+4. Mirror the identity-aware `~` expansion from `intentframe_executor_pack_macos/sandbox/venv.py` so the floor list resolves against the right home under both normal-user and `sudo root` executor processes (the same footgun `SandboxConfig.working_directory` has today).
 5. Add tests in `tests/test_sandbox.py` (or a new `tests/test_vfs_floor.py`) that attempt WRITE_FILE + DELETE_FILE against every deny-list entry and assert they fail — plus symmetry tests proving the shell sandbox and the VFS reject the same set.
 6. Retract the `Phase 7a shipped` line in `TODO/root-demo-policy-driven-sandbox.md:261` and replace it with what actually shipped once (1)–(5) land.
 
@@ -384,7 +384,7 @@ Why this is worth doing:
 
 Historical plan; current state is tracked in "Phase 7a — Revised Scope" above.
 
-1. Sandbox-floor parity for WRITE_FILE + DELETE_FILE (`executor/platforms/macos/virtual_filesystem.py` + tests). ✅ shipped.
+1. Sandbox-floor parity for WRITE_FILE + DELETE_FILE (`intentframe_executor_pack_macos/virtual_filesystem.py` + tests). ✅ shipped.
 2. Expand the floor list to the root-demo hardening set; share it between sandbox templates and VFS. ✅ shipped (`resource_registry/floor.py`).
 3. Retract / restate the `TODO/root-demo-policy-driven-sandbox.md:261` checklist entry. ✅ done.
 4. ~~Passive-write fast-path in `DeterministicGuardian`~~ — **reverted** before shipping, see the "Optional — passive-file fast-path for WRITE_FILE" block for rationale.  Replaced with the hard-BLOCK `write_file_sensitive_path` gate.
@@ -398,7 +398,7 @@ Historical plan; current state is tracked in "Phase 7a — Revised Scope" above.
 ### Near-term
 
 - ~~ship sandbox-floor parity for WRITE_FILE / DELETE_FILE~~ ✅ shipped.
-- ~~share the deny list between `executor/sandbox/templates.py` and the VFS~~ ✅ shipped via `resource_registry/floor.py`.
+- ~~share the deny list between `intentframe_executor_pack_macos/sandbox/templates.py` and the VFS~~ ✅ shipped via `resource_registry/floor.py`.
 - ~~passive-write fast-path in `DeterministicGuardian`~~ reverted by design — see "Optional — passive-file fast-path for WRITE_FILE".
 - `critical_write_file` full-body fork (`_CRITICAL_WRITE_FILE`) is shipped.  Content covers destination-payload cross-check, payload-signals consumption, and consumer-awareness.
 - fix `SandboxConfig.working_directory` to use the same identity-aware expansion as the executor venv (currently `os.path.expanduser` in `terminal.py` resolves against whatever HOME the executor process has — wrong under bare root).

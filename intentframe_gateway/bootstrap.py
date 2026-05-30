@@ -64,7 +64,7 @@ from jarvis.policies import (
 )
 
 from intentframe_gateway.config import GatewayConfig
-from intentframe_gateway.proxy import UDSProxy
+from intentframe_proxy.proxy import UDSProxy
 from policy_registry.seeds import load_policy_seed, resolve_seed_path
 
 logger = logging.getLogger(__name__)
@@ -84,8 +84,8 @@ __all__ = [
 #
 # Workspace mounts live in the resource registry, not the policy
 # registry, so they intentionally stay inline here rather than moving
-# into a YAML.  Mirrors ``jarvis_pa/executor.yaml::filesystem.mounts``
-# and ``jarvis_pa/executor_root.yaml::filesystem.mounts``.
+# into a YAML.  Mirrors ``jarvis_pa/executor.yaml::pack_options.files.mounts``
+# and ``jarvis_pa/executor_root.yaml::pack_options.files.mounts``.
 WORKSPACE_MOUNTS: list[dict[str, Any]] = [
     {"virtual_path": "/home/", "real_path": "~/", "writable": True},
 ]
@@ -137,10 +137,9 @@ def _workspace_id_for(variant: JarvisVariant, user_id: str) -> str:
     Returns the bare ``user_id``; both variants share the same slot.
     The resource registry is in-memory and re-built on every supervisor
     start, so only one variant is ever live in it at a time — meaning
-    no per-variant suffix is needed for isolation, and (importantly)
-    pipeline lookups via ``_resolve_workspace(user_id)`` find the slot
-    we seeded.  ``variant`` is kept on the signature so we can still
-    distinguish in audit logs / metadata without changing the key.
+    no per-variant suffix is needed for isolation.  ``variant`` is kept
+    on the signature so we can still distinguish in audit logs / metadata
+    without changing the key.
     """
     del variant  # workspace_id no longer encodes the variant
     return user_id
@@ -297,7 +296,7 @@ class Bootstrapper:
             if not sock_path.exists():
                 logger.warning("No resource-registry socket — skipping workspace seed")
                 return
-            from intentframe_gateway.proxy import UDSProxy as _P
+            from intentframe_proxy.proxy import UDSProxy as _P
             rr_proxy = _P(socket_path=str(sock_path), base_url="http://resource-registry")
 
         client = await rr_proxy._get_client()

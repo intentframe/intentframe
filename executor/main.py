@@ -26,18 +26,18 @@ import signal
 import sys
 from typing import Any
 
-from executor.adapters import create_adapter
-from executor.auth import create_auth_verifier
+from executor_sdk.adapters import create_adapter
+from executor_sdk.auth import create_auth_verifier
 from executor.config import ExecutorConfig, load_config
 from executor.dispatch import ActionDispatcher
-from executor.exceptions import ConfigurationError, ExecutorError
+from executor_sdk.exceptions import ConfigurationError, ExecutorError
 from executor.gateway import ExecutorGateway
-from executor.services.audit_logger import create_audit_logger
-from executor.services.credential_scrubber import CredentialScrubber
-from executor.services.credential_vault import create_credential_vault
-from executor.services.hash_chain import HashChain
-from executor.services.state_store import create_state_store
-from executor.transport import create_transport
+from executor_sdk.services.audit_logger import create_audit_logger
+from executor_sdk.services.credential_scrubber import CredentialScrubber
+from executor_sdk.services.credential_vault import create_credential_vault
+from executor_sdk.services.hash_chain import HashChain
+from executor_sdk.services.state_store import create_state_store
+from executor_sdk.transport import create_transport
 from executor.worker_pool import WorkerPool
 
 logger = logging.getLogger("executor")
@@ -108,100 +108,12 @@ def build_gateway(
         config.worker_pool.default_timeout_seconds,
     )
 
-    # ── Virtual FileSystem (for file adapters) ────────────────────────────
-    # Try Resource Registry first (single source of truth), fall back to
-    # executor.yaml filesystem config for standalone / dev usage.
-    from pathlib import Path
-
-    from executor.services.virtual_filesystem import (
-        MountPointConfig,
-        MountPointResolver,
-        expand_path,
-    )
-
-    mount_configs: list[MountPointConfig] = []
-    base_path = Path.home()
-
-    try:
-        from resource_registry.client import ResourceRegistryClient
-        rr = ResourceRegistryClient()
-        workspace_id = overrides.get("workspace_id", "jarvis_default")
-        view = rr.executor_view(workspace_id)
-        base_path = view.base_path or Path.home()
-        mount_configs = [
-            MountPointConfig(
-                virtual_path=m.virtual_path,
-                real_path=expand_path(m.real_path),
-                writable=m.writable,
-                file_filter=m.file_filter,
-            )
-            for m in view.mounts
-        ]
-        logger.info("VFS mounts from resource registry: workspace=%s, %d mounts", workspace_id, len(mount_configs))
-        rr.close()
-    except Exception as exc:
-        logger.debug("Resource registry unavailable (%s), using executor.yaml filesystem config", exc)
-
-    if not mount_configs:
-        base_path = Path(expand_path(config.filesystem.base_path)) if config.filesystem.base_path else Path.home()
-        mount_configs = [
-            MountPointConfig(
-                virtual_path=expand_path(m.virtual_path),
-                real_path=expand_path(m.real_path),
-                writable=m.writable,
-                file_filter=m.file_filter,
-            )
-            for m in config.filesystem.mounts
-        ]
-
-    mount_resolver = MountPointResolver(mount_configs, base_path)
-
-    # ── Sandbox Engine (RUN_COMMAND kernel-enforced sandboxing) ───────────
-    from executor.sandbox.engine import create_sandbox_engine
-    from executor.sandbox.planner import SandboxPlanner
-
-    sandbox_engine = None
-    sandbox_planner = None
-    if config.sandbox.enabled:
-        sandbox_engine = create_sandbox_engine(config.platform)
-        if sandbox_engine and sandbox_engine.available():
-            sandbox_planner = SandboxPlanner(config.sandbox)
-            logger.info("Sandbox engine: %s", type(sandbox_engine).__name__)
-            if (
-                config.sandbox.executor_venv_required
-                and sandbox_planner.executor_venv_path is None
-            ):
-                from executor.sandbox.venv import resolve_executor_venv_path
-                resolved = resolve_executor_venv_path(config.sandbox)
-                raise ConfigurationError(
-                    "Executor venv is required but not usable. "
-                    "Expected a Python venv with bin/python3 at: "
-                    f"{resolved or '<unresolved>'}. "
-                    "Run `bash intentframe_setup.sh` to provision it, or "
-                    "set `sandbox.executor_venv_required: false` to allow "
-                    "fallback to system python3.",
-                    details={
-                        "resolved_path": resolved,
-                        "configured_path": config.sandbox.executor_venv_path,
-                    },
-                )
-        else:
-            logger.warning(
-                "Sandbox enabled but engine unavailable on this platform "
-                "-- RUN_COMMAND will be rejected at request time"
-            )
-            sandbox_engine = None
-
     # ── Adapters ──────────────────────────────────────────────────────────
-    # All possible adapter dependencies -- each adapter takes what it needs
+    # All possible adapter dependencies -- each adapter takes what it needs.
+    # VFS mount resolution is owned by the files adapter via pack_options.files.
     adapter_deps: dict[str, Any] = {
         "credential_vault": credential_vault,
-        "mount_resolver": mount_resolver,
-        "base_path": base_path,
-        "sandbox_engine": sandbox_engine,
-        "sandbox_planner": sandbox_planner,
-        "sandbox_config": config.sandbox,
-        "host_files_cfg": config.host_files,
+        "pack_options": config.pack_options,
     }
 
     dispatcher = ActionDispatcher()
@@ -290,7 +202,7 @@ async def run(config: ExecutorConfig) -> None:
 
     if sys.platform == "darwin":
         try:
-            from executor.platforms.macos.permissions import check_permissions
+            from intentframe_executor_pack_macos.permissions import check_permissions
             check_permissions(config.adapters.enabled)
         except Exception as exc:
             logger.warning("Platform server permission check failed: %s", exc)

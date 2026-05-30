@@ -103,6 +103,8 @@ class Actor:
         agent_id: str | None = None,
         user_id: str | None = None,
         socket_path: str = "~/.intentframe/run/intentframe.sock",
+        *,
+        base_url: str | None = None,
     ) -> None:
         """
         Args:
@@ -113,9 +115,13 @@ class Actor:
                 Falls back to ``INTENTFRAME_USER_ID`` (and, for one
                 release, ``JARVIS_USER_ID``).  Required — raises if
                 neither is set.
-            socket_path: UDS path to the IntentFrame Runtime.
+            socket_path: UDS path to a local IntentFrame Runtime.
+            base_url: Network URL of a remote runtime reached through the
+                IntentFrame edge (e.g. ``https://intentframe.acme.com``).
+                Falls back to the ``INTENTFRAME_CORE_URL`` env var.  When
+                set, it takes precedence over ``socket_path``.
 
-        The ``(user_id, agent_id)`` pair is used by the gateway to look
+        The ``(user_id, agent_id)`` pair is used by the runtime to look
         up the correct policy slot, so empty/None values are rejected
         loudly rather than silently routing to the wrong policy.
         """
@@ -125,12 +131,16 @@ class Actor:
         self.agent_capabilities: Optional[AgentCapabilities] = None
 
         self._socket_path = socket_path
+        self._base_url = base_url
         self._sequence_id = 0
         self._client: Optional[AsyncIntentFrameClient] = None
 
     def _get_client(self) -> AsyncIntentFrameClient:
         if self._client is None:
-            self._client = AsyncIntentFrameClient(socket_path=self._socket_path)
+            self._client = AsyncIntentFrameClient(
+                socket_path=self._socket_path,
+                base_url=self._base_url,
+            )
         return self._client
 
     # ── Handshake ─────────────────────────────────────────────────────
@@ -186,15 +196,15 @@ class Actor:
 
     # ── Internal ──────────────────────────────────────────────────────
 
-    _RESERVED_KEYS = frozenset({"action", "target", "reason"})
+    _RESERVED_KEYS = frozenset({"action", "target", "reason", "display_subject"})
 
     def _build_intent(self, agent_request: Dict[str, Any]) -> IntentFrame:
         """Parse a raw agent request dict into a signed IntentFrame.
 
-        Fields ``action``, ``target``, and ``reason`` are extracted into
-        their dedicated IntentFrame fields.  All remaining keys are
-        captured into ``IntentFrame.data`` so they arrive as adapter
-        params without any per-action translation layer.
+        Fields ``action``, ``target``, ``reason``, and ``display_subject``
+        are extracted into their dedicated IntentFrame fields.  All
+        remaining keys are captured into ``IntentFrame.data`` so they
+        arrive as adapter params without any per-action translation layer.
 
         Backward compatibility: if the caller passes an explicit ``data``
         dict (legacy style) with no other extra keys, it is used as-is.
@@ -245,6 +255,7 @@ class Actor:
             target=agent_request.get("target", ""),
             data=data,
             reason=agent_request.get("reason", ""),
+            display_subject=agent_request.get("display_subject", ""),
             agent_id=self.agent_id,
             session_id=session_id,
             sequence_id=self._sequence_id,

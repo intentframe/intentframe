@@ -117,6 +117,7 @@ class ExecutorHTTPClient(Executor):
             error=wire_result.error,
             execution_id=wire_result.execution_id,
             timestamp=wire_result.timestamp,
+            display_summary=wire_result.display_summary,
         )
 
     def _to_execution_request(

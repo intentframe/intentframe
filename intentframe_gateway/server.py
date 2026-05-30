@@ -31,7 +31,7 @@ from intentframe_gateway.config import GatewayConfig, load_gateway_config
 from intentframe_gateway.credential_gate import CredentialGate
 from intentframe_gateway.escalation import detect_escalation_state
 from intentframe_gateway.process_manager import ProcessManager
-from intentframe_gateway.proxy import UDSProxy
+from intentframe_proxy.proxy import UDSProxy
 
 logger = logging.getLogger(__name__)
 

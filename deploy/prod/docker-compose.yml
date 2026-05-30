@@ -1,0 +1,87 @@
+# IntentFrame B2B deployment — one runtime + one network edge.
+#
+#   intentframe-runtime : vault + supervisor (4 UDS services). One writer.
+#   intentframe-edge     : HTTP(S) front door, forwards to the UDS sockets.
+#
+# The two services share the `if-run` volume so the edge can reach the
+# runtime's sockets. DevOps discipline: never scale the runtime, and never
+# point a second runtime at the same volume (single-writer per environment).
+#
+# Quick start:
+#   export OPENAI_API_KEY=sk-...
+#   export VAULT_ADDR=https://vault.acme.com:8200 VAULT_ROLE_ID=... VAULT_SECRET_ID=...
+#   docker compose -f deploy/prod/docker-compose.yml up --build
+
+services:
+  intentframe-runtime:
+    build:
+      context: ../..
+      dockerfile: deploy/prod/Dockerfile
+    image: intentframe:local
+    # One container == one supervisor == one writer. Do not scale.
+    deploy:
+      replicas: 1
+    environment:
+      # runtime_env secret — inherited by the supervised services
+      OPENAI_API_KEY: "${OPENAI_API_KEY:?set OPENAI_API_KEY}"
+      # credential-vault storage → HashiCorp (their existing cluster)
+      IF_VAULT_BACKEND: "hashicorp"
+      VAULT_ADDR: "${VAULT_ADDR:?set VAULT_ADDR}"
+      VAULT_ROLE_ID: "${VAULT_ROLE_ID:?set VAULT_ROLE_ID}"
+      VAULT_SECRET_ID: "${VAULT_SECRET_ID:?set VAULT_SECRET_ID}"
+      # real executor (set to dry_run to exercise the pipeline only)
+      INTENTFRAME_EXECUTOR_MODE: "${INTENTFRAME_EXECUTOR_MODE:-real}"
+    volumes:
+      - if-run:/home/intentframe/.intentframe/run     # UDS sockets
+      - if-data:/home/intentframe/.intentframe         # policy/resource/audit state
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--unix-socket",
+             "/home/intentframe/.intentframe/run/intentframe.sock",
+             "http://core/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+
+  intentframe-edge:
+    build:
+      context: ../..
+      dockerfile: deploy/prod/Dockerfile
+    image: intentframe:local
+    pull_policy: never
+    depends_on:
+      intentframe-runtime:
+        condition: service_healthy
+    # Override the runtime entrypoint: run the edge instead.
+    entrypoint: ["python", "-m", "intentframe_edge"]
+    environment:
+      INTENTFRAME_EDGE_HOST: "0.0.0.0"
+      INTENTFRAME_EDGE_PORT: "8443"
+      # Optional coarse auth on top of TLS:
+      # INTENTFRAME_EDGE_TOKEN: "${INTENTFRAME_EDGE_TOKEN:-}"
+      # Optional TLS / mTLS (mount certs and point at them):
+      # INTENTFRAME_EDGE_TLS_CERT: "/certs/server.pem"
+      # INTENTFRAME_EDGE_TLS_KEY:  "/certs/server-key.pem"
+      # INTENTFRAME_EDGE_TLS_CA:   "/certs/clients-ca.pem"
+    ports:
+      - "8443:8443"
+    volumes:
+      # The edge connects to the runtime's sockets, which needs read+write
+      # on the socket inodes — mount the same run volume read-write.
+      - if-run:/home/intentframe/.intentframe/run
+      # - ./certs:/certs:ro
+    healthcheck:
+      # Works whether the edge serves plain HTTP or TLS: try HTTPS (-k to
+      # skip cert verification for the loopback probe), fall back to HTTP.
+      # For mTLS, add --cert/--key for a probe cert or expose a plain
+      # health port.
+      test: ["CMD-SHELL",
+             "curl -fsSk https://localhost:8443/health || curl -fsS http://localhost:8443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  if-run:
+  if-data:

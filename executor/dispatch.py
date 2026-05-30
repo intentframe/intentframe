@@ -18,8 +18,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from executor.adapters.base import CapabilityAdapter
-from executor.exceptions import AdapterNotFoundError
+from executor_sdk.adapters.base import CapabilityAdapter
+from executor_sdk.exceptions import AdapterNotFoundError
 
 if TYPE_CHECKING:
     from action_registry.catalog import ActionCatalog

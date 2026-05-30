@@ -116,6 +116,7 @@ class ExecutorBridge:
             error=prod_result.error,
             execution_id=prod_result.execution_id,
             timestamp=prod_result.timestamp,
+            display_summary=prod_result.display_summary,
         )
 
     # ── Request Translation: Demo -> Production ──────────────────────────
@@ -250,13 +251,15 @@ class ExecutorBridge:
         Returns:
             ExecutorBridge ready to forward intents.
         """
-        # ── Register macOS platform ──────────────────────────────────────
-        from executor.platforms.macos import register_all
+        # ── Register executor packs ──────────────────────────────────────
+        from intentframe_executor_pack_console import register_all as register_console_pack
+        from intentframe_executor_pack_macos import register_all
 
+        register_console_pack()
         register_all()
 
         # ── Auth verifier ────────────────────────────────────────────────
-        from executor.platforms.macos.auth import GuardianHMACVerifier
+        from intentframe_executor_pack_macos.auth import GuardianHMACVerifier
 
         auth_verifier = GuardianHMACVerifier(secret_key=hmac_key)
 
@@ -265,29 +268,28 @@ class ExecutorBridge:
             storage_dir = Path(tempfile.mkdtemp(prefix="intentframe_demo_"))
             db_path = str(storage_dir / "demo_executor.db")
 
-        from executor.platforms.macos.audit_logger import SQLiteAuditLogger
-        from executor.platforms.macos.state_store import SQLiteStateStore
+        from intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
+        from intentframe_executor_pack_macos.state_store import SQLiteStateStore
 
         audit_logger = SQLiteAuditLogger(db_path=db_path)
         state_store = SQLiteStateStore(db_path=db_path)
 
         # ── Virtual filesystem from ExecutorView mounts ──────────────────
-        from executor.services.virtual_filesystem import (
-            MountPointConfig,
-            MountPointResolver,
-        )
+        from intentframe_executor_pack_macos.adapters.files_config import FilesConfig, FilesMount
 
         base_path = executor_view.base_path
-        mount_configs = [
-            MountPointConfig(
-                virtual_path=m.virtual_path,
-                real_path=m.real_path,
-                writable=m.writable,
-                file_filter=m.file_filter,
-            )
-            for m in executor_view.mounts
-        ]
-        resolver = MountPointResolver(mount_configs, base_path)
+        files_cfg = FilesConfig(
+            base_path=str(base_path) if base_path is not None else None,
+            mounts=[
+                FilesMount(
+                    virtual_path=m.virtual_path,
+                    real_path=m.real_path,
+                    writable=m.writable,
+                    file_filter=m.file_filter,
+                )
+                for m in executor_view.mounts
+            ],
+        )
 
         # ── Action Catalog (source of truth) ──────────────────────────
         from action_registry import ActionCatalog
@@ -299,11 +301,11 @@ class ExecutorBridge:
 
         # ── Adapters ─────────────────────────────────────────────────────
         from executor.dispatch import ActionDispatcher
-        from executor.platforms.macos.adapters.files import FilesAdapter
-        from executor.adapters.console_user_io import ConsoleUserIOAdapter
+        from intentframe_executor_pack_macos.adapters.files import FilesAdapter
+        from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
 
         dispatcher = ActionDispatcher(catalog=catalog)
-        dispatcher.register(FilesAdapter(mount_resolver=resolver, base_path=base_path))
+        dispatcher.register(FilesAdapter(files_options=files_cfg))
         dispatcher.register(ConsoleUserIOAdapter())  # console IO, not osascript
 
         # ── Worker pool ──────────────────────────────────────────────────
@@ -312,7 +314,7 @@ class ExecutorBridge:
         worker_pool = WorkerPool(max_workers=4, default_timeout=30.0)
 
         # ── Credential vault (no-op for demo) ────────────────────────────
-        from executor.services.credential_vault import CredentialVault
+        from executor_sdk.services.credential_vault import CredentialVault
 
         class _DemoVault(CredentialVault):
             """No-op vault -- demo adapters don't need credentials."""
@@ -333,8 +335,8 @@ class ExecutorBridge:
                 return []
 
         # ── Wire gateway ─────────────────────────────────────────────────
-        from executor.services.credential_scrubber import CredentialScrubber
-        from executor.services.hash_chain import HashChain
+        from executor_sdk.services.credential_scrubber import CredentialScrubber
+        from executor_sdk.services.hash_chain import HashChain
 
         gateway = ExecutorGateway(
             auth_verifier=auth_verifier,

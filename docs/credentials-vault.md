@@ -10,7 +10,7 @@ This document covers the vault from a user / operator / integrator perspective. 
 
 ## What it is
 
-A standalone process that runs alongside the rest of IntentFrame, exposes a small HTTP API over a Unix domain socket, and stores actual secret values in the OS keyring (macOS Keychain on macOS, Credential Manager on Windows, Secret Service on Linux).
+A standalone process that runs alongside the rest of IntentFrame, exposes a small HTTP API over a Unix domain socket, and stores actual secret values in a pluggable backend — the OS keyring on a workstation (macOS Keychain, Windows Credential Manager, Linux Secret Service), or a HashiCorp Vault for headless/cloud deployments (see [Backends](#backends)).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -261,15 +261,63 @@ For full client usage examples, see [`../intentframe_credentials/README.md`](../
 
 ## Backends
 
-The vault service uses one of three backends to physically store values:
+The vault service uses one of these backends to physically store values. The service selects its storage backend from the `IF_VAULT_BACKEND` environment variable (default `keyring`).
 
 | Backend | When | What it does |
 |---|---|---|
-| `keyring` | Production (default) | Delegates to OS keyring (macOS Keychain / Windows Credential Manager / Linux Secret Service). Service name format: `com.intentframe.vault.<namespace>` |
+| `keyring` | Production on a workstation (default) | Delegates to OS keyring (macOS Keychain / Windows Credential Manager / Linux Secret Service). Service name format: `com.intentframe.vault.<namespace>` |
+| `hashicorp` | Headless / cloud / on-prem | Stores secrets in a HashiCorp Vault KV v2 engine over HTTP. Use this where the OS keyring isn't available (cloud servers, containers, Kubernetes). Configured via `VAULT_*` env vars; supports AppRole auth with automatic token renewal |
 | `service` | Default for *consumers* (executor, dashboard) | `ServiceVault` — implements the `CredentialVault` ABC by calling `VaultClient` over UDS. Lets the executor's gateway call `vault.get(...)` without knowing the value lives in another process |
 | `env` | Dev / CI / testing | Reads `os.environ` using `<NAMESPACE>_<KEY>` convention. In-memory writes only — nothing is persisted |
 
-The keyring backend is what the production vault service uses. The service backend is what the executor uses to talk to the vault. The env backend is what tests use to skip the whole vault layer.
+The keyring backend is what the production vault service uses on a workstation. The hashicorp backend is the headless-friendly replacement for cloud deployments. The service backend is what the executor uses to talk to the vault. The env backend is what tests use to skip the whole vault layer.
+
+### Headless / cloud deployments (HashiCorp Vault)
+
+The OS keyring doesn't exist on a typical headless cloud server, so for those deployments point the vault service at a HashiCorp Vault instead:
+
+```bash
+export IF_VAULT_BACKEND=hashicorp
+export VAULT_ADDR=https://vault.mycorp.com:8200
+export VAULT_ROLE_ID=...        # AppRole, preferred for long-running services
+export VAULT_SECRET_ID=...
+```
+
+Everything else — the UDS service, delivery modes, metadata DB, CLI, and the `service` backend used by consumers — is unchanged; only where the values physically live changes. The backend keeps its Vault token alive with a renewal loop (and re-logs in via AppRole when the token's max TTL is reached). Full setup, policy, and local Docker testing instructions are in the implementation README: [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md#hashicorp-headless--cloud--on-prem).
+
+#### Deployment wiring — where the config actually goes
+
+Switching to HashiCorp is a **single-place change**, not a per-module one. The credential-vault service is started by the **gateway**, and it inherits the gateway's environment:
+
+```
+gateway process environment  (systemd unit / container env / shell)
+   │  os.environ  ──────────────────────────────────────────┐
+   │                                                         ▼
+   └─ ProcessManager.start_vault()  ──spawns──►  credential-vault service
+                                                  (intentframe_credentials.server:app)
+                                                     │ reads IF_VAULT_BACKEND
+                                                     │ backend reads VAULT_*
+                                                     ▼
+                                                  HashiCorp Vault (KV v2)
+```
+
+So you set `IF_VAULT_BACKEND` + `VAULT_*` once, in the gateway's launch environment. From there:
+
+| Component | Change needed | Why |
+|---|---|---|
+| **Gateway environment** | Set `IF_VAULT_BACKEND=hashicorp`, `VAULT_ADDR`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | The gateway propagates `os.environ` to the vault service it spawns. This is the single source of truth. |
+| **`intentframe_credentials`** | Install the extra (`uv sync --extra hashicorp`) | Needs `hvac`. There is no config file — the backend is **env-selected**, not file-configured. |
+| **Supervisor** | Nothing | It doesn't start the vault. It only propagates env to *its* children (executor, core), which reach the vault over UDS and never need `VAULT_*`. |
+| **Executor (`executor.yaml`)** | Nothing — keep `credentials.backend: service` | The executor talks to the vault **service over UDS** via `ServiceVault`. It never talks to HashiCorp directly; the service does the persisting. |
+
+The two settings that look alike but mean different things:
+
+- **`IF_VAULT_BACKEND`** (env var, read by the vault *service*) = *where secrets physically live* → set to `hashicorp`.
+- **`credentials.backend` in `executor.yaml`** (read by *consumers*) = *how a consumer reaches the vault* → keep `service` (UDS).
+
+You only flip the first. The `hashicorp` value also accepted by `executor.yaml`'s `credentials.backend` exists only for the unusual case of a consumer bypassing the service and hitting Vault directly — not the normal deployment.
+
+> **Use AppRole, not a static token, for the gateway.** `VAULT_TOKEN` takes precedence over AppRole in the backend, and a static token can't be re-issued when it expires. Set only `VAULT_ROLE_ID` / `VAULT_SECRET_ID` so the renewal loop can keep the long-running session alive.
 
 ---
 
@@ -293,7 +341,7 @@ The keyring backend is what the production vault service uses. The service backe
 
 - **No per-caller ACL on the vault socket.** All processes that can connect can call any endpoint. Filesystem permissions are the only barrier. Fine on a single-user device; needs caller-attested auth for multi-tenant or shared-host deployments.
 - **No automatic credential rotation.** Rotation is manual (re-store and restart consumers).
-- **No HSM / KMS backend yet.** The `keyring` backend covers OS-managed encryption; the `service` backend re-uses it. A direct `aws-kms` or `vault-hashicorp` backend is sketched in the implementation plan but not shipped.
+- **No HSM / KMS backend yet.** The `keyring` backend covers OS-managed encryption on a workstation, and the `hashicorp` backend covers headless/cloud storage via HashiCorp Vault (which provides its own at-rest encryption). A direct cloud-native `aws-kms` / GCP / Azure Key Vault backend is not shipped.
 - **Metadata SQLite is plaintext.** Use FileVault / LUKS for at-rest protection of the metadata inventory.
 
 ---
