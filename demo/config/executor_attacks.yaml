@@ -8,7 +8,10 @@
 # Start supervisor from repo root:
 #   EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
 
-platform: auto
+# Runs locally on a Mac host: the macOS pack supplies the GUI `user_io`
+# (osascript dialogs) plus the portable base (files VFS, sqlite, hmac, uds).
+packs:
+  - intentframe_executor_pack_macos
 
 transport:
   type: unix_socket

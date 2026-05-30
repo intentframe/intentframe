@@ -18,7 +18,11 @@
 #   credential-vault service over UDS; only the vault service talks HashiCorp.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-platform: auto
+# Container-only config (Linux). Packs are explicit (no platform defaults):
+# the portable POSIX base + the neutral console pack (simulated_user_io).
+packs:
+  - intentframe_executor_pack_posix
+  - intentframe_executor_pack_console
 
 transport:
   type: unix_socket
@@ -38,10 +42,12 @@ worker_pool:
   max_workers: 4
   default_timeout_seconds: 30.0
 
+# simulated_user_io (neutral pack) is fully headless: it never reads stdin and
+# never opens a dialog, so it is safe in the container and in CI.
 adapters:
   enabled:
     - files
-    - user_io
+    - simulated_user_io
 
 pack_options:
   files:

@@ -58,6 +58,14 @@ Homepage = "https://github.com/intentframe/intentframe"
 Repository = "https://github.com/intentframe/intentframe"
 Issues = "https://github.com/intentframe/intentframe/issues"
 
+# Executor packs advertise themselves here so deployments (including other
+# orgs) can reference them by short name in executor.yaml `packs:`. Each value
+# points at the pack's module-level register_all() callable.
+[project.entry-points."intentframe.executor_packs"]
+console = "intentframe_executor_pack_console:register_all"
+posix = "intentframe_executor_pack_posix:register_all"
+macos = "intentframe_executor_pack_macos:register_all"
+
 [tool.setuptools.packages.find]
 include = [
     "action_registry*",
@@ -73,6 +81,7 @@ include = [
     "executor_client*",
     "executor_sdk*",
     "intentframe_executor_pack_console*",
+    "intentframe_executor_pack_posix*",
     "intentframe_executor_pack_macos*",
     "resource_registry*",
     "policy_registry*",

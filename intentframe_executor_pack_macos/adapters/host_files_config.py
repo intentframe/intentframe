@@ -17,18 +17,21 @@ class HostFilesConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     allowed_read_paths: list[str] = Field(
+        default_factory=list,
         description=(
             "Real-path scope roots (with ~ allowed) that host-file reads may "
             "touch; subtree access is granted by containment under each "
-            "canonicalized root, not by glob or trailing-slash syntax."
+            "canonicalized root, not by glob or trailing-slash syntax. "
+            "Empty list = deny all reads (fail-closed default)."
         ),
     )
     allowed_write_paths: list[str] = Field(
+        default_factory=list,
         description=(
             "Real-path scope roots (with ~ allowed) that host-file "
             "writes/deletes may touch; subtree access is granted by "
             "containment under each canonicalized root, not by glob or "
-            "trailing-slash syntax."
+            "trailing-slash syntax. Empty list = deny all writes (fail-closed default)."
         ),
     )
 

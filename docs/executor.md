@@ -202,13 +202,34 @@ TelegramAdapter(CapabilityAdapter)
   └── rollback()           → returns failure ("Messages are irreversible")
 ```
 
-**Step 2: register**
+**Step 2: register inside an executor pack**
+
+Adapters are not loaded automatically. Your pack's `register_all()` (or
+`register_all_adapters()`) must call `register_adapter()` so the executor
+knows the adapter exists when that pack is listed in config:
 
 ```python
-register_adapter("telegram", TelegramAdapter)
+# my_org_pack/adapters/__init__.py
+from executor_sdk.adapters import register_adapter
+from my_org_pack.adapters.telegram import TelegramAdapter
+
+def register_all_adapters() -> None:
+    register_adapter("telegram", TelegramAdapter)
 ```
 
-**Step 3: enable in config**
+Third-party packs can advertise themselves under the
+`intentframe.executor_packs` entry-point group in `pyproject.toml` so
+deployments reference them by short name.
+
+**Step 3: list the pack in config**
+
+```yaml
+# executor.yaml
+packs:
+  - my_org_pack          # or full module path / entry-point name
+```
+
+**Step 4: enable the adapter**
 
 ```yaml
 # executor.yaml
@@ -216,6 +237,9 @@ adapters:
   enabled:
     - telegram
 ```
+
+Both steps are required: `packs:` loads implementations at startup;
+`adapters.enabled` selects which registered adapters the gateway wires up.
 
 ### What you get for free
 
@@ -252,8 +276,8 @@ The current macOS deployment ships 18 adapters:
 | System | Browser, System, Clipboard, Shortcuts, Spotlight, Filesystem Watch |
 
 Each adapter implements the same contract and inherits the same security
-guarantees. New deployments simply enable a different set of adapters in
-`executor.yaml`.
+guarantees. New deployments choose which **executor packs** to load (`packs:`)
+and which adapters to enable (`adapters.enabled`) in `executor.yaml`.
 
 ---
 

@@ -6,6 +6,14 @@
 #   EXECUTOR_CONFIG=jarvis_pa/executor.yaml python -m supervisor.main start
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ─── Executor packs ──────────────────────────────────────────────────────────
+# Jarvis runs on macOS and needs the native adapters (terminal/sandbox, mail,
+# calendar, contacts, messages, ...). The macOS pack also registers the
+# portable base (files VFS, sqlite storage, guardian_hmac auth, unix_socket
+# transport), so it is the only pack required here.
+packs:
+  - intentframe_executor_pack_macos
+
 transport:
   type: unix_socket
   options:

@@ -34,6 +34,7 @@ from executor_sdk.models import AdapterManifest
 # All adapters declared in intentframe_executor_pack_macos/adapters/__init__.py
 ADAPTER_SPECS: list[tuple[str, str, str]] = [
     ("files", "intentframe_executor_pack_macos.adapters.files", "FilesAdapter"),
+    ("host_files", "intentframe_executor_pack_macos.adapters.host_files", "HostFilesAdapter"),
     ("terminal", "intentframe_executor_pack_macos.adapters.terminal", "TerminalAdapter"),
     ("http_api", "intentframe_executor_pack_macos.adapters.http_api", "HttpApiAdapter"),
     ("user_io", "intentframe_executor_pack_macos.adapters.user_io", "UserIOAdapter"),

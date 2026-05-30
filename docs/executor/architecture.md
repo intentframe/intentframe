@@ -189,8 +189,11 @@ All extensible components use the same registration mechanism:
 │  ├── Audit Logger     register_audit_logger()                │
 │  └── State Store      register_state_store()                 │
 │                                                              │
-│  Registration: import time (platform modules)                │
+│  Registration: executor pack startup (`register_all()`)    │
 │  Instantiation: startup (config-driven via executor.yaml)    │
+│                                                              │
+│  Deployments list packs explicitly in executor.yaml `packs:`;│
+│  there are no built-in or platform-default packs.            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -215,13 +218,33 @@ TelegramAdapter(CapabilityAdapter)
 └── rollback()           → returns failure ("Messages are irreversible")
 ```
 
-### Step 2: register
+### Step 2: register inside an executor pack
+
+Call `register_adapter()` from your pack's `register_all()` (or
+`register_all_adapters()`). Registration only happens when the executor loads
+that pack — listing an adapter ID in `adapters.enabled` alone is not enough.
 
 ```python
-register_adapter("telegram", TelegramAdapter)
+# my_org_pack/adapters/__init__.py
+from executor_sdk.adapters import register_adapter
+from my_org_pack.adapters.telegram import TelegramAdapter
+
+def register_all_adapters() -> None:
+    register_adapter("telegram", TelegramAdapter)
 ```
 
-### Step 3: enable in config
+External orgs ship a pack module with `register_all()` and optionally advertise
+it under the `intentframe.executor_packs` entry-point group.
+
+### Step 3: list the pack in config
+
+```yaml
+# executor.yaml
+packs:
+  - my_org_pack
+```
+
+### Step 4: enable the adapter
 
 ```yaml
 # executor.yaml
@@ -229,6 +252,10 @@ adapters:
   enabled:
     - telegram
 ```
+
+`packs:` loads transport, auth, storage, and adapter registrations at startup.
+`adapters.enabled` selects which registered adapters the gateway instantiates.
+Both are required.
 
 ### What you get for free
 

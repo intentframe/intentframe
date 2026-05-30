@@ -266,7 +266,14 @@ docker compose -f docker-compose.dev.yml down
 | `seed_vault.py` | store `OPENAI_API_KEY` in Vault as `runtime_env` |
 | `inject_and_exec.py` | fetch `runtime_env` from Vault, `exec` the supervisor |
 | `docker-compose.dev.yml` | runtime + edge, wired to host Vault |
-| `../../demo/config/executor_hashicorp.yaml` | demo executor config used by the supervisor |
+| `../../demo/config/executor_hashicorp.yaml` | default executor config (dashboard + basic pipeline tests) |
+| `../../demo/config/executor_attacks_hashicorp.yaml` | executor config for invoice attack suites |
+
+Both HashiCorp configs are Linux/container-safe: they load the portable POSIX pack
+(`intentframe_executor_pack_posix`) plus the neutral console pack
+(`intentframe_executor_pack_console`), and enable `simulated_user_io` for
+headless user interaction (no stdin, no macOS dialogs). Override with
+`EXECUTOR_CONFIG` before `docker compose up` when running attack tests (see §2b).
 
 ## Notes
 

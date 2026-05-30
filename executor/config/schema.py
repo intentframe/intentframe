@@ -193,12 +193,17 @@ class ExecutorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    platform: str = Field(
-        default="auto",
+    packs: list[str] = Field(
+        default_factory=list,
         description=(
-            "Platform to register: 'macos', 'linux', or 'auto' (detect from OS). "
-            "Determines which auth verifiers, storage backends, and adapters "
-            "are available for the component configs below."
+            "Executor packs to load at startup, in order (required -- there are "
+            "no built-in or platform-default packs). Each entry is either an "
+            "importable module path exposing register_all() (e.g. "
+            "'intentframe_executor_pack_posix'), or the short name of a pack "
+            "advertised via the 'intentframe.executor_packs' entry-point group "
+            "(e.g. an external org's installed pack). Packs register the "
+            "transport, auth, credential, storage and adapter implementations "
+            "this executor uses, so at least one base pack is required."
         ),
     )
     transport: TransportConfig = Field(default_factory=TransportConfig)

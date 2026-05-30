@@ -11,6 +11,21 @@
 # Everything else (gateway logic, adapter pattern, audit trail) is the same.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ─── Executor packs: which implementations to load ───────────────────────────
+# Packs are explicit and required -- the executor ships no built-in or
+# platform-default packs. Each pack registers transport / auth / credential /
+# storage / adapter implementations. List the packs your deployment needs, in
+# order. An entry is either an importable module path exposing register_all(),
+# or the short name of a pack advertised under the 'intentframe.executor_packs'
+# entry-point group (how a third-party org plugs in its own pack).
+#
+# First-party packs available in this repo:
+#   intentframe_executor_pack_posix    portable base (files VFS, sqlite, hmac, uds)
+#   intentframe_executor_pack_console  console_user_io + simulated_user_io (headless)
+#   intentframe_executor_pack_macos    native macOS adapters (+ portable base)
+packs:
+  - intentframe_executor_pack_posix
+
 # ─── Transport: How requests arrive ──────────────────────────────────────────
 # Types: unix_socket (device default), grpc (cloud/device), rest (admin/debug)
 transport:

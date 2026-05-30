@@ -26,14 +26,31 @@ The IntentFrame container reaches the bundled Vault by service name
 
 ## Step 2 — push your changes to `refactor-substrate`
 
-The Dockerfile.dev clones from GitHub, so everything you just created must be in the branch before you build.
+The Dockerfile.dev clones from GitHub, so **every change the container needs must be on the branch before you build**. That includes deploy files, executor pack wiring, and the HashiCorp demo configs — not just `deploy/dev/`.
 
 ```bash
 cd /Users/prince/GitHub/orgs/intentframe/intentframe
-git add deploy/dev/ demo/config/executor_hashicorp.yaml
-git commit -m "add dev container: bundled vault + seeding bootstrap + compose"
+
+git add \
+  deploy/dev/ \
+  demo/config/executor_hashicorp.yaml \
+  demo/config/executor_attacks_hashicorp.yaml \
+  pyproject.toml \
+  executor/server.py \
+  executor/config/schema.py \
+  executor/config/executor.yaml \
+  executor_sdk/packs.py \
+  intentframe_executor_pack_posix/ \
+  intentframe_executor_pack_console/adapters/simulated_user_io.py \
+  intentframe_executor_pack_console/adapters/__init__.py \
+  intentframe_executor_pack_console/adapters/console_user_io.py \
+  intentframe_executor_pack_macos/
+
+git commit -m "executor: config-driven packs + POSIX base for Linux container"
 git push origin refactor-substrate
 ```
+
+If you changed other executor configs (e.g. `jarvis_pa/executor.yaml`), add those too before pushing.
 
 ---
 

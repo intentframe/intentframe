@@ -10,7 +10,12 @@
 #   2. adapters  — only the two the demo actually needs
 # ═══════════════════════════════════════════════════════════════════════════════
 
-platform: auto
+# ─── Executor packs ──────────────────────────────────────────────────────────
+# This demo runs locally on a Mac host, so it uses the macOS pack: it supplies
+# the GUI `user_io` (osascript dialogs) plus the portable base (files VFS,
+# sqlite storage, guardian_hmac auth, unix_socket transport).
+packs:
+  - intentframe_executor_pack_macos
 
 transport:
   type: unix_socket

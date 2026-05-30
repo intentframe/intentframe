@@ -18,7 +18,16 @@
 # which overrides this value. It is kept for standalone runs / parity.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-platform: auto
+# ─── Executor packs ──────────────────────────────────────────────────────────
+# Container-only config (Linux). Packs are explicit (no platform defaults):
+#   posix   -- portable base: files VFS, sqlite storage, guardian_hmac auth,
+#              unix_socket transport (no macOS/osascript dependency).
+#   console -- neutral user-IO adapters, incl. simulated_user_io (headless).
+# Another org swaps these for their own pack (module path, or a short name from
+# the 'intentframe.executor_packs' entry-point group).
+packs:
+  - intentframe_executor_pack_posix
+  - intentframe_executor_pack_console
 
 transport:
   type: unix_socket
@@ -41,10 +50,14 @@ worker_pool:
   default_timeout_seconds: 30.0
 
 # ─── Demo adapters ───────────────────────────────────────────────────────────
+# simulated_user_io (neutral pack) is fully headless: it never reads stdin and
+# never opens a dialog, so it is safe in the container and in CI. Swap for
+# `console_user_io` for an interactive TTY, or the macOS `user_io` (osascript
+# dialogs, Mac host only).
 adapters:
   enabled:
     - files
-    - user_io
+    - simulated_user_io
 
 # ─── Executor pack options ───────────────────────────────────────────────────
 pack_options:

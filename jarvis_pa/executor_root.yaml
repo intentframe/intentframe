@@ -29,6 +29,12 @@
 #   python -m supervisor.main start
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ─── Executor packs ──────────────────────────────────────────────────────────
+# Same pack set as the default profile: the macOS pack supplies the native
+# adapters plus the portable base (transport/auth/storage/files).
+packs:
+  - intentframe_executor_pack_macos
+
 transport:
   type: unix_socket
   options:

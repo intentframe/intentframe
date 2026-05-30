@@ -35,6 +35,12 @@ logger = logging.getLogger(__name__)
 class ConsoleUserIOAdapter(CapabilityAdapter):
     """Console-based user interaction adapter via stdin/stdout."""
 
+    def __init__(self, **_kwargs) -> None:
+        # Accept (and ignore) the dependency kwargs the config-driven gateway
+        # injects into every adapter (credential_vault, pack_options, ...), so
+        # this adapter can be loaded from `adapters.enabled` like the others.
+        pass
+
     def supported_actions(self) -> list[str]:
         return [
             ActionType.ASK_USER.value,
