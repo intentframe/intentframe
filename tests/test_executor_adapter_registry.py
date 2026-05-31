@@ -7,7 +7,6 @@ import tempfile
 
 import pytest
 
-from action_registry import ActionCatalog
 from executor_sdk.adapters.base import CapabilityAdapter
 from executor.dispatch import ActionDispatcher
 from intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
@@ -73,9 +72,7 @@ def test_manifest_adapter_id_matches_spec(loaded_adapters) -> None:
 
 
 def test_dispatcher_registers_all_macos_adapters(loaded_adapters) -> None:
-    catalog = ActionCatalog()
-    catalog.register_defaults()
-    dispatcher = ActionDispatcher(catalog=catalog)
+    dispatcher = ActionDispatcher()
     for _, instance in loaded_adapters:
         dispatcher.register(instance)
     assert len(dispatcher.registered_adapters) == len(loaded_adapters)

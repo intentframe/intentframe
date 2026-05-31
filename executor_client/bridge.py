@@ -291,7 +291,7 @@ class ExecutorBridge:
             ],
         )
 
-        # ── Action Catalog (source of truth) ──────────────────────────
+        # ── Action Catalog (demo-only drift check) ───────────────────────
         from action_registry import ActionCatalog
         from action_registry.platforms.macos import register_macos_actions
 
@@ -304,9 +304,22 @@ class ExecutorBridge:
         from intentframe_executor_pack_macos.adapters.files import FilesAdapter
         from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
 
-        dispatcher = ActionDispatcher(catalog=catalog)
-        dispatcher.register(FilesAdapter(files_options=files_cfg))
-        dispatcher.register(ConsoleUserIOAdapter())  # console IO, not osascript
+        dispatcher = ActionDispatcher()
+
+        def _register_demo_adapter(adapter: Any) -> None:
+            adapter_id = adapter.manifest().adapter_id
+            for action in adapter.supported_actions():
+                if not catalog.is_registered(action):
+                    logger.warning(
+                        "Adapter '%s' supports action '%s' which is not in "
+                        "the ActionCatalog. Register it or check for typos.",
+                        adapter_id,
+                        action,
+                    )
+            dispatcher.register(adapter)
+
+        _register_demo_adapter(FilesAdapter(files_options=files_cfg))
+        _register_demo_adapter(ConsoleUserIOAdapter())  # console IO, not osascript
 
         # ── Worker pool ──────────────────────────────────────────────────
         from executor.worker_pool import WorkerPool

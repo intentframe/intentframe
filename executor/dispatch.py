@@ -16,13 +16,9 @@ Design:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from executor_sdk.adapters.base import CapabilityAdapter
 from executor_sdk.exceptions import AdapterNotFoundError
-
-if TYPE_CHECKING:
-    from action_registry.catalog import ActionCatalog
 
 logger = logging.getLogger(__name__)
 
@@ -32,27 +28,17 @@ __all__ = ["ActionDispatcher"]
 class ActionDispatcher:
     """Routes action types to their registered capability adapters.
 
-    Optionally accepts an ActionCatalog for startup validation:
-    every action an adapter claims to handle must be registered in the
-    universal catalog.  This catches typos and drift at startup.
-
     Usage:
-        from action_registry import ActionCatalog
-
-        catalog = ActionCatalog()
-        catalog.register_defaults()
-
-        dispatcher = ActionDispatcher(catalog=catalog)
+        dispatcher = ActionDispatcher()
         dispatcher.register(mail_adapter)
         dispatcher.register(files_adapter)
 
         adapter = dispatcher.resolve("SEND_EMAIL")
     """
 
-    def __init__(self, catalog: ActionCatalog | None = None) -> None:
+    def __init__(self) -> None:
         self._action_to_adapter: dict[str, CapabilityAdapter] = {}
         self._adapter_registry: dict[str, CapabilityAdapter] = {}
-        self._catalog = catalog
 
     def register(self, adapter: CapabilityAdapter) -> None:
         """Register an adapter and all its supported actions.
@@ -60,11 +46,6 @@ class ActionDispatcher:
         Each action type in adapter.supported_actions() is mapped to
         this adapter. Duplicate action types raise ValueError to catch
         configuration errors at startup (not at runtime).
-
-        If an ActionCatalog was provided, every action is validated
-        against it — unrecognized actions trigger a warning (not a
-        hard error, since platform-specific actions may not yet be in
-        the catalog).
 
         Args:
             adapter: The adapter instance to register.
@@ -77,15 +58,6 @@ class ActionDispatcher:
         adapter_id = manifest.adapter_id
 
         for action in adapter.supported_actions():
-            # Catalog validation (warn on unknown)
-            if self._catalog is not None and not self._catalog.is_registered(action):
-                logger.warning(
-                    "Adapter '%s' supports action '%s' which is not in "
-                    "the ActionCatalog. Register it or check for typos.",
-                    adapter_id,
-                    action,
-                )
-
             existing = self._action_to_adapter.get(action)
             if existing is not None:
                 existing_id = existing.manifest().adapter_id
