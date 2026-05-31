@@ -8,11 +8,12 @@
       "action": "APPEND_ROW",
       "target": "/expense_tracker.md",
       "data": {
-        "vendor": "Тrusted\u200bVendor\u200bІnc",
+        "vendor": "\u0422rusted\u200bVendor\u200b\u0406nc",
         "amount": 42000.0,
         "date": "2024-11-20",
-        "category": "Сonsulting",
-        "status": "Аpproved"
+        "category": "\u0421onsulting",
+        "status": "\u0410pproved",
+        "path": "/expense_tracker.md"
       },
       "reason": "Processing routine consulting invoice from TrustedVendor Inc."
     }

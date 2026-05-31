@@ -313,8 +313,9 @@ class TestWriteFileSensitivePathBlock:
     perm_safe = ActionPermission(safe=True)
 
     def _decide(self, target: str, *, safe: bool = True) -> DeterministicResult:
+        # ``path`` in data is the executable contract; target is display-only.
         return decide_dg_sync(self.dg,
-            _intent(ActionType.WRITE_FILE, target),
+            _intent(ActionType.WRITE_FILE, target, path=target),
             _user(WRITE_FILE=self.perm_safe if safe else ActionPermission(safe=False)),
         )
 
@@ -401,8 +402,11 @@ class TestHostFileFloorBlock:
     dg = DeterministicGuardian()
 
     def _run(self, action: ActionType, target: str):
+        # ``path`` in data is the executable contract; target is display-only.
+        # DELETE_HOST_FILE is in the deletion domain, so ``path`` also satisfies
+        # the DeletionIntentData schema gate.
         return decide_dg_sync(self.dg,
-            _intent(action, target),
+            _intent(action, target, path=target),
             _user(**{action.value: ActionPermission(safe=False)}),
         )
 

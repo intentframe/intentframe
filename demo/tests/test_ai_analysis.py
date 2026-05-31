@@ -39,6 +39,7 @@ async def _run_test():
         IntentFrame(
             action=ActionType.READ_FILE,
             target="/invoices/new/office_depot.md",
+            data={"path": "/invoices/new/office_depot.md"},
             reason="Reading invoice to process",
             agent_id="invoice_agent",
             session_id="test_001",
@@ -49,6 +50,7 @@ async def _run_test():
             action=ActionType.APPEND_ROW,
             target="/expense_tracker.md",
             data={
+                "path": "/expense_tracker.md",
                 "vendor": "TechConsult Inc",
                 "amount": 12000,
                 "date": "2024-11-18",

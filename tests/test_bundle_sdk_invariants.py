@@ -234,7 +234,7 @@ def test_undecided_populates_constraint_context_and_calls_describe_once(
         target="/tmp/out.txt",
         reason="prompt ctx",
         agent_id="test",
-        data={"content": "x"},
+        data={"path": "/tmp/out.txt", "content": "x"},
     )
     permission = PolicyActionPermission(
         safe=False,
@@ -335,6 +335,79 @@ def test_block_has_no_constraint_context(
     assert result.bundle_ai_context is None
 
 
+def test_domain_schema_blocks_missing_finance_data() -> None:
+    bundle = FilesActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_FILE,
+        target="/tmp/x",
+        reason="finance shape",
+        agent_id="test",
+    )
+    permission = PolicyActionPermission(safe=True)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"READ_FILE": permission},
+        domain_constraints={"finance": {"max_amount": 1.0}},
+    )
+
+    import intentframe_bundle_sdk.registry as bundle_registry
+
+    previous = bundle_registry._ACTION_TO_DOMAINS.get(ActionType.READ_FILE.value)
+    bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = ("finance",)
+    try:
+        result = asyncio.run(
+            DeterministicRunner.run_action_bundle(
+                bundle,
+                intent,
+                permission,
+                user_context,
+            )
+        )
+    finally:
+        if previous is None:
+            bundle_registry._ACTION_TO_DOMAINS.pop(ActionType.READ_FILE.value, None)
+        else:
+            bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = previous
+
+    assert result.decision == "BLOCK"
+    assert result.matched_gate == "domain_schema"
+    assert "invalid intent shape" in result.reason
+    assert result.bundle_ai_context is None
+
+
+def test_domain_schema_blocks_deletion_when_path_only_in_target() -> None:
+    # ``path`` must be in IntentFrame.data (the executable contract). A path
+    # carried only in ``target`` (display/audit) does not satisfy the deletion
+    # schema and must BLOCK at the domain_schema gate.
+    bundle = FilesActionBundle()
+    intent = IntentFrame(
+        action=ActionType.DELETE_FILE,
+        target="/tmp/x",
+        reason="deletion shape",
+        agent_id="test",
+    )
+    permission = PolicyActionPermission(safe=False)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"DELETE_FILE": permission},
+        domain_constraints={"deletion": {"allowed_paths": ["/tmp/*"]}},
+    )
+
+    result = asyncio.run(
+        DeterministicRunner.run_action_bundle(
+            bundle,
+            intent,
+            permission,
+            user_context,
+        )
+    )
+
+    assert result.decision == "BLOCK"
+    assert result.matched_gate == "domain_schema"
+    assert "invalid intent shape" in result.reason
+    assert result.bundle_ai_context is None
+
+
 def test_missing_describe_falls_back_to_str_constraints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -350,7 +423,7 @@ def test_missing_describe_falls_back_to_str_constraints(
         target="/tmp/out.txt",
         reason="fallback",
         agent_id="test",
-        data={"content": "x"},
+        data={"path": "/tmp/out.txt", "content": "x"},
     )
     permission = PolicyActionPermission(safe=False, constraints=constraints)
     user_context = UserContext(
@@ -389,7 +462,7 @@ def test_routed_domain_constraints_rendered_on_undecided(
         target="/tmp/out.txt",
         reason="domain prompt",
         agent_id="test",
-        data={"content": "x"},
+        data={"path": "/tmp/out.txt", "amount": 100.0, "content": "x"},
     )
     permission = PolicyActionPermission(
         safe=False,

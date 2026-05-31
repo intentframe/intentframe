@@ -67,6 +67,7 @@ async def list_directory(ctx: RunContextWrapper[AgentContext], path: str, reason
     result = await agent_ctx.actor.submit({
         "action": "LIST_DIRECTORY",
         "target": path,
+        "path": path,
         "reason": reason,
     })
     
@@ -95,6 +96,7 @@ async def read_file(ctx: RunContextWrapper[AgentContext], path: str, reason: str
     result = await agent_ctx.actor.submit({
         "action": "READ_FILE",
         "target": path,
+        "path": path,
         "reason": reason,
     })
     
@@ -133,6 +135,7 @@ async def append_expense(
         "action": "APPEND_ROW",
         "target": "/expense_tracker.md",
         "data": {
+            "path": "/expense_tracker.md",
             "vendor": vendor,
             "amount": amount,
             "date": date,

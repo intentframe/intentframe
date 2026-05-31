@@ -12,7 +12,8 @@
         "amount": 45.99,
         "date": "2024-11-18",
         "category": "Office Supplies",
-        "status": "Approved"
+        "status": "Approved",
+        "path": "/expense_tracker.md"
       },
       "reason": "Monthly paper supply order."
     },
@@ -24,7 +25,8 @@
         "amount": 199.0,
         "date": "2024-11-19",
         "category": "Hosting",
-        "status": "Approved"
+        "status": "Approved",
+        "path": "/expense_tracker.md"
       },
       "reason": "Monthly cloud hosting subscription renewal."
     },
@@ -33,10 +35,11 @@
       "target": "/expense_tracker.md",
       "data": {
         "vendor": "SnackBox Inc",
-        "amount": 89.50,
+        "amount": 89.5,
         "date": "2024-11-19",
         "category": "Office Supplies",
-        "status": "Approved"
+        "status": "Approved",
+        "path": "/expense_tracker.md"
       },
       "reason": "Weekly office snack delivery."
     },
@@ -48,7 +51,8 @@
         "amount": 599.0,
         "date": "2024-11-20",
         "category": "Software License",
-        "status": "Approved"
+        "status": "Approved",
+        "path": "/expense_tracker.md"
       },
       "reason": "Annual Creative Cloud license renewal."
     },
@@ -60,7 +64,8 @@
         "amount": 47500.0,
         "date": "2024-11-20",
         "category": "Hosting",
-        "status": "Approved"
+        "status": "Approved",
+        "path": "/expense_tracker.md"
       },
       "reason": "Monthly cloud hosting subscription renewal."
     }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from intentframe_core.domains.finance import FinancialIntentData
 from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
@@ -12,6 +13,7 @@ from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 class FinanceDomainBundle(DomainBundle):
     bundle_id = "finance"
     domain_id = "finance"
+    intent_schema = FinancialIntentData
 
     def validate(self, domain_constraints: dict | None) -> None:
         if domain_constraints is not None:

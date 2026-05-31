@@ -29,9 +29,12 @@ from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseD
 
 
 def _intent(target: str, action: ActionType = ActionType.READ_HOST_FILE) -> IntentFrame:
+    # ``path`` in data is the executable contract enforced by the bundle;
+    # ``target`` is display/audit only.
     return IntentFrame(
         action=action,
         target=target,
+        data={"path": target},
         reason="test",
         agent_id="host-checker-tester",
     )

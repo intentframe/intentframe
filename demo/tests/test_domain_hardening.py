@@ -159,7 +159,7 @@ def test_deletion_module():
     intent = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/important/database.db",
-        data={"target_path": "/important/database.db", "irreversible": False},
+        data={"path": "/important/database.db", "irreversible": False},
     )
     ok, reason = _check_deletion(intent, constraints)
     check("Path /important/database.db not in [/tmp/*, /cache/] → BLOCK", not ok)
@@ -169,7 +169,7 @@ def test_deletion_module():
     intent2 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/tmp/scratch.log",
-        data={"target_path": "/tmp/scratch.log", "irreversible": True},
+        data={"path": "/tmp/scratch.log", "irreversible": True},
     )
     ok2, reason2 = _check_deletion(intent2, constraints)
     check("Path /tmp/scratch.log matches, but irreversible=True → BLOCK", not ok2)
@@ -179,7 +179,7 @@ def test_deletion_module():
     intent3 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/tmp/scratch.log",
-        data={"target_path": "/tmp/scratch.log", "irreversible": False},
+        data={"path": "/tmp/scratch.log", "irreversible": False},
     )
     ok3, _ = _check_deletion(intent3, constraints)
     check("Path matches, irreversible=False → pass", ok3)
@@ -188,7 +188,7 @@ def test_deletion_module():
     intent4 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/cache/old_data.bin",
-        data={"target_path": "/cache/old_data.bin", "irreversible": False},
+        data={"path": "/cache/old_data.bin", "irreversible": False},
     )
     ok4, _ = _check_deletion(intent4, constraints)
     check("Path /cache/old_data.bin prefix matches /cache/ → pass", ok4)
@@ -198,7 +198,7 @@ def test_deletion_module():
     intent5 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/anywhere/file.txt",
-        data={"target_path": "/anywhere/file.txt", "irreversible": True},
+        data={"path": "/anywhere/file.txt", "irreversible": True},
     )
     ok5, _ = _check_deletion(intent5, constraints2)
     check("No path restriction, block_irreversible=False → pass", ok5)
@@ -210,7 +210,7 @@ def test_deletion_module_host_file():
     ``UserPolicy.domain_constraints`` is keyed by ``DomainType``, so a
     single ``DeletionConstraints`` instance is shared across every
     ``DELETE_*`` action a user is granted.  ``DeletionModule`` matches
-    ``data["target_path"]`` with raw string / fnmatch — it is
+    ``data["path"]`` with raw string / fnmatch — it is
     *vocabulary-blind* (no normalize_virtual_path, no canonicalize_real_path).
     The plan calls out that mixing virtual (``/home/*``) and real
     (``~/Documents/*``) patterns is unsafe unless the namespaces are
@@ -239,7 +239,7 @@ def test_deletion_module_host_file():
     intent = IntentFrame(
         action=ActionType.DELETE_HOST_FILE,
         target="~/Documents/notes.md",
-        data={"target_path": "~/Documents/notes.md", "irreversible": True},
+        data={"path": "~/Documents/notes.md", "irreversible": True},
     )
     ok, _ = _check_deletion(intent, constraints_none)
     check(
@@ -274,7 +274,7 @@ def test_deletion_module_host_file():
     intent_real = IntentFrame(
         action=ActionType.DELETE_HOST_FILE,
         target="~/Documents/notes.md",
-        data={"target_path": "~/Documents/notes.md", "irreversible": False},
+        data={"path": "~/Documents/notes.md", "irreversible": False},
     )
     ok_cross, _ = _check_deletion(intent_real, constraints_virtual)
     check(
@@ -326,11 +326,11 @@ def test_actor_schema_validation():
         "action": "DELETE_FILE",
         "target": "/tmp/file.txt",
         "reason": "cleanup",
-        "data": {"target_path": "/tmp/file.txt"},
+        "data": {"path": "/tmp/file.txt"},
     })
-    check("DELETE_FILE with target_path → builds OK", intent2 is not None)
+    check("DELETE_FILE with path → builds OK", intent2 is not None)
 
-    # DELETE_FILE missing target_path → should raise ValueError
+    # DELETE_FILE missing path → should raise ValueError
     raised2 = False
     try:
         actor._build_intent({
@@ -341,17 +341,17 @@ def test_actor_schema_validation():
         })
     except ValueError as e:
         raised2 = True
-    check("DELETE_FILE without target_path → ValueError", raised2)
+    check("DELETE_FILE without path → ValueError", raised2)
 
     # DELETE_HOST_FILE (real-path parallel) — same DeletionIntentData schema.
     intent_host = actor._build_intent({
         "action": "DELETE_HOST_FILE",
         "target": "~/Documents/file.txt",
         "reason": "cleanup",
-        "data": {"target_path": "~/Documents/file.txt"},
+        "data": {"path": "~/Documents/file.txt"},
     })
     check(
-        "DELETE_HOST_FILE with target_path → builds OK",
+        "DELETE_HOST_FILE with path → builds OK",
         intent_host is not None,
     )
 
@@ -366,7 +366,7 @@ def test_actor_schema_validation():
     except ValueError:
         raised_host = True
     check(
-        "DELETE_HOST_FILE without target_path → ValueError",
+        "DELETE_HOST_FILE without path → ValueError",
         raised_host,
     )
 
@@ -572,7 +572,7 @@ def test_guardian_pipeline():
             "intent": IntentFrame(
                 action=ActionType.DELETE_FILE,
                 target="/important/database.db",
-                data={"target_path": "/important/database.db", "irreversible": False},
+                data={"path": "/important/database.db", "irreversible": False},
                 reason="Cleaning up old data",
                 agent_id="test_agent",
             ),
@@ -584,7 +584,7 @@ def test_guardian_pipeline():
             "intent": IntentFrame(
                 action=ActionType.DELETE_FILE,
                 target="/tmp/old_cache.bin",
-                data={"target_path": "/tmp/old_cache.bin", "irreversible": True},
+                data={"path": "/tmp/old_cache.bin", "irreversible": True},
                 reason="Removing stale cache",
                 agent_id="test_agent",
             ),

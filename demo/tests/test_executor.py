@@ -79,12 +79,20 @@ def intent(
     reason: str = "",
     data: dict | None = None,
 ) -> IntentFrame:
-    """Build an IntentFrame with auto-incrementing sequence."""
+    """Build an IntentFrame with auto-incrementing sequence.
+
+    ``path`` is the executable contract carried in ``data`` (the field file
+    adapters read). ``target`` is display/audit only; the executor no longer
+    translates it into ``params["path"]``. For these file-oriented demo cases
+    the path equals the target, so it is mirrored into ``data["path"]``.
+    """
+    merged = dict(data or {})
+    merged.setdefault("path", target)
     return IntentFrame(
         action=action,
         target=target,
         reason=reason,
-        data=data,
+        data=merged or None,
         agent_id="test-executor-agent",
         session_id="test-session-001",
         sequence_id=_next_seq(),

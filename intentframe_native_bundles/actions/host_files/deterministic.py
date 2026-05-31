@@ -21,9 +21,12 @@ def decide_host_file_floor(
     ctx: BundleContext,
 ) -> BundlePhaseOutcome | None:
     action = intent.action.value
+    # ``data["path"]`` is the executed resource (same field the adapter acts
+    # on). ``intent.target`` is display/audit only.
+    path = (intent.data or {}).get("path", "")
 
     if action == ActionType.WRITE_HOST_FILE.value:
-        canonical = canonicalize_real_path(intent.target)
+        canonical = canonicalize_real_path(path)
         matched = match_deny_prefix(canonical)
         if matched is not None:
             return BundlePhaseOutcome.block(
@@ -36,7 +39,7 @@ def decide_host_file_floor(
         return None
 
     if action == ActionType.DELETE_HOST_FILE.value:
-        canonical = canonicalize_real_path(intent.target)
+        canonical = canonicalize_real_path(path)
         matched = match_deny_prefix(canonical)
         if matched is not None:
             return BundlePhaseOutcome.block(

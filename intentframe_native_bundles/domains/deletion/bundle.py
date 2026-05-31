@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 
+from intentframe_core.domains.deletion import DeletionIntentData
 from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
@@ -14,6 +15,7 @@ from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 class DeletionDomainBundle(DomainBundle):
     bundle_id = "deletion"
     domain_id = "deletion"
+    intent_schema = DeletionIntentData
 
     def validate(self, domain_constraints: dict | None) -> None:
         if domain_constraints is not None:
@@ -31,12 +33,14 @@ class DeletionDomainBundle(DomainBundle):
         data = intent.data or {}
 
         if constraints.allowed_paths is not None:
-            target = data.get("target_path", intent.target)
-            if not self._path_matches(target, constraints.allowed_paths):
+            # ``data["path"]`` is the executed resource (same field the adapter
+            # acts on). No fallback to ``intent.target`` — target is display-only.
+            path = data.get("path", "")
+            if not self._path_matches(path, constraints.allowed_paths):
                 return BundlePhaseOutcome.block(
                     ctx,
                     reason=(
-                        f"Domain violation (deletion): Path '{target}' "
+                        f"Domain violation (deletion): Path '{path}' "
                         "not in allowed deletion paths"
                     ),
                     matched_gate="domain",

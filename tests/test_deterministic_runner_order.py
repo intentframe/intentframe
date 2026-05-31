@@ -61,6 +61,7 @@ def test_domain_runs_before_passive_read_allow(monkeypatch: pytest.MonkeyPatch) 
     intent = IntentFrame(
         action=ActionType.READ_FILE,
         target="/tmp/x",
+        data={"amount": 1.0},
         reason="order test",
         agent_id="test",
     )

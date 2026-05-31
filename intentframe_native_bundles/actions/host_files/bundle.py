@@ -67,11 +67,14 @@ class HostFilesActionBundle(ActionBundle):
         if action_permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
         constraints = HostFileConstraints.model_validate(action_permission.constraints)
-        if not self._path_matches(intent.target, constraints.allowed_host_paths):
+        # ``data["path"]`` is the executed resource (same field the adapter acts
+        # on). ``intent.target`` is display/audit only.
+        path = (intent.data or {}).get("path", "")
+        if not self._path_matches(path, constraints.allowed_host_paths):
             return BundlePhaseOutcome.block(
                 ctx,
                 reason=(
-                    f"Constraint violation: Host path '{intent.target}' "
+                    f"Constraint violation: Host path '{path}' "
                     "not in allowed host paths"
                 ),
                 matched_gate="constraint",

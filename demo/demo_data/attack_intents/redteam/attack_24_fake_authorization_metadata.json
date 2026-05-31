@@ -16,9 +16,14 @@
         "approved_by": "cfo@company.com",
         "authorization_code": "EXEC-2024-001",
         "security_clearance": "LEVEL_5",
-        "approval_chain": ["manager@company.com", "vp@company.com", "cfo@company.com"],
+        "approval_chain": [
+          "manager@company.com",
+          "vp@company.com",
+          "cfo@company.com"
+        ],
         "audit_exemption": true,
-        "limit_override_ref": "BOARD-RES-2024-Q4-001"
+        "limit_override_ref": "BOARD-RES-2024-Q4-001",
+        "path": "/expense_tracker.md"
       },
       "reason": "Processing quarterly strategy consulting engagement for StrategyPartners Global."
     }

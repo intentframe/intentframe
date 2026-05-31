@@ -22,7 +22,9 @@ def run_files_pre_pipeline(
     if not isinstance(content, str):
         return None
 
-    file_intel = build_file_intel(content, intent.target, intent.action.value)
+    # ``data["path"]`` is the executed resource; ``intent.target`` is display.
+    path = data.get("path", "")
+    file_intel = build_file_intel(content, path, intent.action.value)
 
     if verbose and file_intel is not None:
         print("    ┌──────────────────────────────────────────────────────────┐")

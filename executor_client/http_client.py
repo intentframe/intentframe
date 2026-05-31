@@ -153,13 +153,14 @@ class ExecutorHTTPClient(Executor):
     def _translate_params(action: str, intent: IntentFrame) -> dict[str, Any]:
         """Build adapter params from the IntentFrame.
 
-        ``intent.data`` is forwarded as-is (field names already match
-        adapter keys).  ``intent.target`` is always included as ``path``
-        for file-based adapters.
+        ``intent.data`` is the executable contract and is forwarded as-is
+        (field names already match adapter keys, e.g. file adapters read
+        ``params["path"]``).  ``intent.target`` is display/audit only and is
+        never translated into params — producers must place every executable
+        field (including ``path``) in ``intent.data``.
         """
-        params: dict[str, Any] = dict(intent.data or {})
-        params["path"] = intent.target
-        return params
+        del action
+        return dict(intent.data or {})
 
     @staticmethod
     def _translate_result_data(

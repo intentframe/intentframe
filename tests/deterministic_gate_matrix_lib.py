@@ -113,7 +113,7 @@ def gate_cases() -> tuple[GateCase, ...]:
     def domain_block(dg: DeterministicGuardian) -> DeterministicResult:
         return decide_dg_sync(
             dg,
-            _intent(ActionType.DELETE_FILE, "/tmp/foo", irreversible=True),
+            _intent(ActionType.DELETE_FILE, "/tmp/foo", path="/tmp/foo", irreversible=True),
             UserContext(
                 user_id="gate_matrix",
                 allowed_actions={"DELETE_FILE": perm_unsafe},
@@ -134,7 +134,7 @@ def gate_cases() -> tuple[GateCase, ...]:
     def write_file_sensitive_path_block(dg: DeterministicGuardian) -> DeterministicResult:
         return decide_dg_sync(
             dg,
-            _intent(ActionType.WRITE_FILE, "/home/.zshrc"),
+            _intent(ActionType.WRITE_FILE, "/home/.zshrc", path="/home/.zshrc"),
             _user(WRITE_FILE=perm_safe),
         )
 
@@ -151,7 +151,7 @@ def gate_cases() -> tuple[GateCase, ...]:
         )
         return decide_dg_sync(
             dg,
-            _intent(ActionType.WRITE_HOST_FILE, "/etc/sudoers"),
+            _intent(ActionType.WRITE_HOST_FILE, "/etc/sudoers", path="/etc/sudoers"),
             _user(WRITE_HOST_FILE=perm_unsafe),
         )
 
@@ -168,7 +168,7 @@ def gate_cases() -> tuple[GateCase, ...]:
         )
         return decide_dg_sync(
             dg,
-            _intent(ActionType.DELETE_HOST_FILE, "/etc/sudoers"),
+            _intent(ActionType.DELETE_HOST_FILE, "/etc/sudoers", path="/etc/sudoers"),
             _user(DELETE_HOST_FILE=perm_unsafe),
         )
 

@@ -34,9 +34,13 @@ from jarvis.types import AgentContext
 # ── Host-file actions ─────────────────────────────────────────────────
 # ``target`` carries a real host path like ``~/Documents/foo.txt``.
 
+# File tools: ``path`` is the executable field — it lands in IntentFrame.data
+# and is exactly what the executor adapter acts on (params["path"]) and what
+# deterministic/domain checks validate. ``target`` is display/audit only.
 class _ReadHostFileAction(BaseModel):
     action: str = "READ_HOST_FILE"
     target: str
+    path: str
     reason: str
     offset: int | None = None
     limit: int | None = None
@@ -44,24 +48,24 @@ class _ReadHostFileAction(BaseModel):
 class _WriteHostFileAction(BaseModel):
     action: str = "WRITE_HOST_FILE"
     target: str
+    path: str
     content: str
     reason: str
 
 class _ListHostDirectoryAction(BaseModel):
     action: str = "LIST_HOST_DIRECTORY"
     target: str
+    path: str
     reason: str
 
 class _DeleteHostFileAction(BaseModel):
     action: str = "DELETE_HOST_FILE"
     target: str
     reason: str
-    # DELETE_HOST_FILE is registered in ACTION_DOMAINS as DELETION, so the
-    # DeletionIntentData schema must be satisfied exactly like _DeleteAction.
-    # Populating target_path explicitly (rather than falling back to
-    # intent.target) keeps DeletionModule.check's raw-string path match
-    # deterministic — see the docstring on DeletionConstraints.
-    target_path: str
+    # DELETE_HOST_FILE is in the deletion domain; ``path`` satisfies
+    # DeletionIntentData and is the field both the domain policy and the
+    # executor act on. ``target`` is display/audit only.
+    path: str
     irreversible: bool = True
 
 class _CommandAction(BaseModel):
@@ -364,7 +368,7 @@ async def read_host_file(
     Response includes total_lines and truncated flag — call again
     with a higher offset to read more."""
     return await _submit(ctx, _ReadHostFileAction(
-        target=path, reason=reason, offset=offset, limit=limit,
+        target=path, path=path, reason=reason, offset=offset, limit=limit,
     ))
 
 
@@ -377,7 +381,7 @@ async def write_host_file(
 ) -> str:
     """Write content to a file (create or overwrite)."""
     return await _submit(ctx, _WriteHostFileAction(
-        target=path, content=content, reason=reason,
+        target=path, path=path, content=content, reason=reason,
     ))
 
 
@@ -389,7 +393,7 @@ async def list_host_directory(
 ) -> str:
     """List files and subdirectories at the given path."""
     return await _submit(ctx, _ListHostDirectoryAction(
-        target=path, reason=reason,
+        target=path, path=path, reason=reason,
     ))
 
 
@@ -401,7 +405,7 @@ async def delete_host_file(
 ) -> str:
     """Delete a file or empty directory."""
     return await _submit(ctx, _DeleteHostFileAction(
-        target=path, reason=reason, target_path=path,
+        target=path, path=path, reason=reason,
     ))
 
 

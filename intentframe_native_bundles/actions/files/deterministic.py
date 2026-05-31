@@ -15,13 +15,16 @@ def decide_write_file_sensitive_path(
 ) -> BundlePhaseOutcome | None:
     if intent.action.value != ActionType.WRITE_FILE.value:
         return None
-    if not is_sensitive_write_path(intent.target):
+    # ``data["path"]`` is the executed resource (same field the adapter acts
+    # on). ``intent.target`` is display/audit only.
+    path = (intent.data or {}).get("path", "")
+    if not is_sensitive_write_path(path):
         return None
     return BundlePhaseOutcome.block(
         ctx,
         reason=(
             f"Write to sensitive system location is not permitted: "
-            f"{intent.target!r}"
+            f"{path!r}"
         ),
         matched_gate="write_file_sensitive_path",
     )

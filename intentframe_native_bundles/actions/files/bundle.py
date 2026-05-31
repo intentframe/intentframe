@@ -69,10 +69,13 @@ class FilesActionBundle(ActionBundle):
         if action_permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
         constraints = FileConstraints.model_validate(action_permission.constraints)
-        if not self._path_matches(intent.target, constraints.allowed_paths):
+        # ``data["path"]`` is the executed resource (same field the adapter acts
+        # on). ``intent.target`` is display/audit only.
+        path = (intent.data or {}).get("path", "")
+        if not self._path_matches(path, constraints.allowed_paths):
             return BundlePhaseOutcome.block(
                 ctx,
-                reason=f"Constraint violation: Path '{intent.target}' not in allowed paths",
+                reason=f"Constraint violation: Path '{path}' not in allowed paths",
                 matched_gate="constraint",
             )
         return BundlePhaseOutcome.continue_(ctx)
