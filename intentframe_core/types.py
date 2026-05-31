@@ -8,7 +8,7 @@ Pydantic BaseModel for automatic JSON serialization over HTTP.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
@@ -59,6 +59,17 @@ class IntentFrame(BaseModel):
     signature: str = ""
 
 
+class PromptEvidence(BaseModel):
+    """Per-request prompt and LLM forensic evidence for audit logging."""
+
+    prompt_source: Optional[str] = None
+    prompt_label: Optional[str] = None
+    system_prompt: Optional[str] = None
+    request_prompt: Optional[str] = None
+    llm_output: Optional[Dict[str, Any]] = None
+    converted_output: Optional[Dict[str, Any]] = None
+
+
 class AnalysisReport(BaseModel):
     """
     Output from Analysis Engine - understanding, NOT decisions.
@@ -89,6 +100,7 @@ class AnalysisReport(BaseModel):
     ae_output_anomaly: bool = False
 
     report_integrity_flags: List[str] = Field(default_factory=list)
+    prompt_evidence: Optional[PromptEvidence] = None
 
 
 class ValidationResult(BaseModel):
@@ -113,6 +125,7 @@ class ValidationResult(BaseModel):
     decision_path: Literal["fast_path", "ai_path", "deterministic"] = "ai_path"
 
     modified_intent: Optional[IntentFrame] = None
+    prompt_evidence: Optional[PromptEvidence] = None
 
 
 class ExecutionResult(BaseModel):
@@ -122,6 +135,14 @@ class ExecutionResult(BaseModel):
     executor (often newline-separated). The runtime prints it in verbose mode
     without knowing action-specific field names; structured ``data`` remains
     the machine-readable payload.
+
+    Invariant — *every failure carries a reason*: a result with
+    ``success=False`` and no ``error`` is an auditability gap (the log can
+    no longer explain *why* an action failed). We normalise rather than
+    raise: this object is constructed *after* an action has already run, so
+    turning a missing-error into an exception here would destroy the audit
+    record of a side effect that already happened. Fail-open on the data
+    shape, never on the audit trail.
     """
     success: bool
     data: Any = None
@@ -130,6 +151,12 @@ class ExecutionResult(BaseModel):
     execution_id: str = ""
     timestamp: str = ""
     display_summary: str = ""
+
+    @model_validator(mode="after")
+    def _ensure_failure_has_reason(self) -> "ExecutionResult":
+        if not self.success and not (self.error or "").strip():
+            self.error = "Execution failed without an error message"
+        return self
 
 
 class UserContext(BaseModel):

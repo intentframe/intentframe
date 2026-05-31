@@ -35,6 +35,7 @@ from agents import Agent, ModelSettings, Runner
 from intentframe_core.types import (
     AnalysisReport,
     IntentFrame,
+    PromptEvidence,
     RuntimeContextForLLM,
     UserContext,
     ValidationResult,
@@ -142,12 +143,6 @@ class AIGuardian(Guardian):
         self.verbose = verbose
         self._agents: dict[str, Agent] = {}
         self._agent = self._get_agent(DEFAULT_GUARDIAN_SYSTEM_INSTRUCTIONS)
-        self.last_prompt_source: str | None = None
-        self.last_prompt_label: str | None = None
-        self.last_system_prompt: str | None = None
-        self.last_request_prompt: str | None = None
-        self.last_llm_output: dict[str, object] | None = None
-        self.last_converted_output: dict[str, object] | None = None
 
     def _get_agent(self, base_instructions: str) -> Agent:
         if base_instructions not in self._agents:
@@ -200,13 +195,6 @@ class AIGuardian(Guardian):
         del bundle_context
         action = intent.action.value
 
-        self.last_prompt_source = None
-        self.last_prompt_label = None
-        self.last_system_prompt = None
-        self.last_request_prompt = None
-        self.last_llm_output = None
-        self.last_converted_output = None
-
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
             if self.verbose:
@@ -218,7 +206,15 @@ class AIGuardian(Guardian):
                 message=f"Action '{action}' is not permitted by user policy",
                 decision_path="ai_path",
             )
-            self.last_converted_output = validation.model_dump(mode="json")
+            validation.prompt_evidence = PromptEvidence(
+                converted_output=validation.model_dump(
+                    mode="json",
+                    exclude={
+                        "prompt_evidence": True,
+                        "analysis": {"prompt_evidence": True},
+                    },
+                ),
+            )
             return validation
 
         permission = user_context.allowed_actions[action]
@@ -234,7 +230,15 @@ class AIGuardian(Guardian):
                 message=f"Permitted (fast-path): {action}",
                 decision_path="fast_path",
             )
-            self.last_converted_output = validation.model_dump(mode="json")
+            validation.prompt_evidence = PromptEvidence(
+                converted_output=validation.model_dump(
+                    mode="json",
+                    exclude={
+                        "prompt_evidence": True,
+                        "analysis": {"prompt_evidence": True},
+                    },
+                ),
+            )
             return validation
 
         # ── AI path: semantic validation ───────────────────────────
@@ -250,11 +254,7 @@ class AIGuardian(Guardian):
         system_instructions = self._resolve_system_instructions(ai_ctx)
         prompt_source = self._resolve_prompt_source(ai_ctx)
         prompt_label = self._resolve_prompt_label(ai_ctx)
-        self.last_prompt_source = prompt_source
-        self.last_prompt_label = prompt_label
-        self.last_request_prompt = prompt
         agent = self._get_agent(system_instructions)
-        self.last_system_prompt = agent.instructions
 
         if self.verbose:
             print(f"    │  AI judging: {action} (prompt={prompt_source}:{prompt_label})...")
@@ -270,13 +270,27 @@ class AIGuardian(Guardian):
         result = await Runner.run(agent, prompt)
 
         ai_output = result.final_output
-        self.last_llm_output = ai_output.model_dump(mode="json")
         validation = self._convert_to_result(intent, analysis, ai_output)
-        self.last_converted_output = validation.model_dump(mode="json")
+        llm_output = ai_output.model_dump(mode="json")
+        converted_output = validation.model_dump(
+            mode="json",
+            exclude={
+                "prompt_evidence": True,
+                "analysis": {"prompt_evidence": True},
+            },
+        )
+        validation.prompt_evidence = PromptEvidence(
+            prompt_source=prompt_source,
+            prompt_label=prompt_label,
+            system_prompt=agent.instructions,
+            request_prompt=prompt,
+            llm_output=llm_output,
+            converted_output=converted_output,
+        )
         log_output_dump(
             "guardian",
-            llm_output=self.last_llm_output,
-            converted_output=self.last_converted_output,
+            llm_output=llm_output,
+            converted_output=converted_output,
             prompt_source=prompt_source,
             prompt_label=prompt_label,
         )

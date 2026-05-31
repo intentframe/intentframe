@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from action_registry.types import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
-from intentframe_core.types import AnalysisReport, IntentFrame, UserContext, ValidationResult
+from intentframe_core.types import (
+    AnalysisReport,
+    IntentFrame,
+    PromptEvidence,
+    UserContext,
+)
 from intentframe_components.analysis.engine import AIAnalysisEngine, AIAnalysisOutput
 from intentframe_components.guardian.engine import AIGuardian, AIGuardianOutput
 from intentframe_components.prompt.logging import log_output_dump
@@ -47,7 +51,7 @@ class TestLogOutputDump:
 
 class TestAnalysisEngineOutputAudit:
     @pytest.mark.asyncio
-    async def test_sets_last_output_fields_after_llm(self, tmp_path, monkeypatch):
+    async def test_returns_output_evidence_after_llm(self, tmp_path, monkeypatch):
         monkeypatch.setenv("INTENTFRAME_LOG_DIR", str(tmp_path))
         engine = AIAnalysisEngine(verbose=False)
         llm_out = AIAnalysisOutput(
@@ -69,16 +73,17 @@ class TestAnalysisEngineOutputAudit:
         ):
             report = await engine.analyze(_intent())
 
-        assert engine.last_llm_output is not None
-        assert engine.last_llm_output["stated_intent"] == "List files"
-        assert engine.last_converted_output is not None
-        assert engine.last_converted_output["confidence"] == report.confidence
-        assert engine.last_converted_output["ae_output_anomaly"] is False
+        assert report.prompt_evidence is not None
+        assert report.prompt_evidence.llm_output is not None
+        assert report.prompt_evidence.llm_output["stated_intent"] == "List files"
+        assert report.prompt_evidence.converted_output is not None
+        assert report.prompt_evidence.converted_output["confidence"] == report.confidence
+        assert report.prompt_evidence.converted_output["ae_output_anomaly"] is False
 
 
 class TestGuardianOutputAudit:
     @pytest.mark.asyncio
-    async def test_fast_path_sets_converted_output_only(self):
+    async def test_fast_path_returns_converted_output_only(self):
         guardian = AIGuardian(verbose=False)
         analysis = AnalysisReport(
             stated_intent="ok",
@@ -93,9 +98,10 @@ class TestGuardianOutputAudit:
         )
         result = await guardian.validate(_intent(), analysis, user_context)
         assert result.decision_path == "fast_path"
-        assert guardian.last_llm_output is None
-        assert guardian.last_converted_output is not None
-        assert guardian.last_converted_output["decision"] == Decision.ALLOW.value
+        assert result.prompt_evidence is not None
+        assert result.prompt_evidence.llm_output is None
+        assert result.prompt_evidence.converted_output is not None
+        assert result.prompt_evidence.converted_output["decision"] == Decision.ALLOW.value
 
     @pytest.mark.asyncio
     async def test_ai_path_sets_both_output_fields(self, tmp_path, monkeypatch):
@@ -128,18 +134,21 @@ class TestGuardianOutputAudit:
             result = await guardian.validate(_intent(), analysis, user_context)
 
         assert result.decision == Decision.BLOCK
-        assert guardian.last_llm_output is not None
-        assert guardian.last_llm_output["decision"] == "BLOCK"
-        assert guardian.last_converted_output is not None
-        assert guardian.last_converted_output["decision"] == Decision.BLOCK.value
+        assert result.prompt_evidence is not None
+        assert result.prompt_evidence.llm_output is not None
+        assert result.prompt_evidence.llm_output["decision"] == "BLOCK"
+        assert result.prompt_evidence.converted_output is not None
+        assert result.prompt_evidence.converted_output["decision"] == Decision.BLOCK.value
 
 
 class TestPipelineOutputAuditFields:
     def test_add_output_audit_fields(self):
-        component = MagicMock()
-        component.last_llm_output = {"decision": "ALLOW"}
-        component.last_converted_output = {"decision": "ALLOW", "decision_path": "ai_path"}
+        artifact = MagicMock()
+        artifact.prompt_evidence = PromptEvidence(
+            llm_output={"decision": "ALLOW"},
+            converted_output={"decision": "ALLOW", "decision_path": "ai_path"},
+        )
         entry: dict = {}
-        IntentFrameRuntime._add_output_audit_fields(entry, "guardian", component)
+        IntentFrameRuntime._add_output_audit_fields(entry, "guardian", artifact)
         assert entry["guardian_llm_output"]["decision"] == "ALLOW"
         assert entry["guardian_converted_output"]["decision_path"] == "ai_path"

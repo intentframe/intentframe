@@ -1,9 +1,7 @@
-"""Regression: prompt forensic audit fields must never leak
-across requests.
+"""Regression: prompt forensic audit fields must never leak across requests.
 
-The AE and Guardian engines expose the source/label plus full system and
-request prompts that the pipeline copies into the audit entry. Any request
-that short-circuits before the AI path must not inherit stale forensic
+Prompt evidence now rides on the per-request AnalysisReport/ValidationResult
+objects. Any request that short-circuits before the AI path must not inherit
 evidence from a prior request in the same runtime.
 """
 
@@ -20,6 +18,7 @@ from intentframe_core.types import (
     AnalysisReport,
     ExecutionResult,
     IntentFrame,
+    PromptEvidence,
     UserContext,
     ValidationResult,
 )
@@ -74,23 +73,24 @@ def _safe_analysis() -> AnalysisReport:
 
 
 class _StubAE:
-    """AE stub that records prompt evidence whenever ``analyze`` is called."""
+    """AE stub that returns prompt evidence whenever ``analyze`` is called."""
 
     def __init__(self, prompt_label: str = "critical_run_command"):
         self._prompt_label = prompt_label
-        self.last_prompt_source: str | None = None
-        self.last_prompt_label: str | None = None
-        self.last_system_prompt: str | None = None
-        self.last_request_prompt: str | None = None
 
     async def analyze(self, intent, **_kwargs) -> AnalysisReport:
-        self.last_prompt_source = "bundle"
-        self.last_prompt_label = self._prompt_label
-        self.last_system_prompt = "ae system prompt"
-        self.last_request_prompt = "ae request prompt"
         report = _safe_analysis()
-        self.last_llm_output = {"stated_intent": "ok"}
-        self.last_converted_output = report.model_dump(mode="json")
+        report.prompt_evidence = PromptEvidence(
+            prompt_source="bundle",
+            prompt_label=self._prompt_label,
+            system_prompt="ae system prompt",
+            request_prompt="ae request prompt",
+            llm_output={"stated_intent": "ok"},
+            converted_output=report.model_dump(
+                mode="json",
+                exclude={"prompt_evidence": True},
+            ),
+        )
         return report
 
 
@@ -99,16 +99,8 @@ class _StubGuardian:
 
     def __init__(self, prompt_label: str = "fallback_default"):
         self._prompt_label = prompt_label
-        self.last_prompt_source: str | None = None
-        self.last_prompt_label: str | None = None
-        self.last_system_prompt: str | None = None
-        self.last_request_prompt: str | None = None
 
     async def validate(self, intent, analysis, user_context, **_kwargs):
-        self.last_prompt_source = "fallback_default"
-        self.last_prompt_label = self._prompt_label
-        self.last_system_prompt = "guardian system prompt"
-        self.last_request_prompt = "guardian request prompt"
         validation = ValidationResult(
             decision=Decision.ALLOW,
             intent=intent,
@@ -116,8 +108,20 @@ class _StubGuardian:
             message="allowed",
             decision_path="ai_path",
         )
-        self.last_llm_output = {"decision": "ALLOW"}
-        self.last_converted_output = validation.model_dump(mode="json")
+        validation.prompt_evidence = PromptEvidence(
+            prompt_source="fallback_default",
+            prompt_label=self._prompt_label,
+            system_prompt="guardian system prompt",
+            request_prompt="guardian request prompt",
+            llm_output={"decision": "ALLOW"},
+            converted_output=validation.model_dump(
+                mode="json",
+                exclude={
+                    "prompt_evidence": True,
+                    "analysis": {"prompt_evidence": True},
+                },
+            ),
+        )
         return validation
 
 
@@ -202,11 +206,12 @@ class TestPromptEvidenceDoesNotLeakAcrossRequests:
         assert "ae_llm_output" not in det_entry
         assert "guardian_converted_output" not in det_entry
 
-    def test_engines_last_prompt_evidence_cleared_at_request_start(self):
-        """Stronger invariant: the reset happens on the engine objects
-        themselves, not just on the audit entry.  This means any future
-        consumer reading prompt evidence (metrics exporter,
-        tracing hook, etc.) also sees a clean state, not just audit."""
+    def test_prompt_evidence_is_per_request_return_data_not_engine_state(self):
+        """Prompt evidence is no longer reset on long-lived engine objects.
+
+        The invariant is stronger now: skipped paths have no returned evidence
+        to audit, so stale evidence cannot leak from prior engine state.
+        """
         calls = iter([
             DeterministicResult(
                 decision=DeterministicDecision.UNDECIDED,
@@ -222,18 +227,15 @@ class TestPromptEvidenceDoesNotLeakAcrossRequests:
         runtime = _make_runtime(lambda *a, **kw: next(calls))
 
         _run(runtime.process_intent(_run_command_intent(), _user_context()))
-        assert runtime.analysis_engine.last_prompt_label == "critical_run_command"
-        assert runtime.analysis_engine.last_system_prompt == "ae system prompt"
-        assert runtime.guardian.last_prompt_label == "fallback_default"
-        assert runtime.guardian.last_system_prompt == "guardian system prompt"
 
         _run(runtime.process_intent(_read_email_intent(), _user_context()))
-        assert runtime.analysis_engine.last_prompt_label is None
-        assert runtime.analysis_engine.last_system_prompt is None
-        assert runtime.guardian.last_prompt_label is None
-        assert runtime.guardian.last_system_prompt is None
-        assert runtime.analysis_engine.last_llm_output is None
-        assert runtime.guardian.last_converted_output is None
+        det_entry = runtime.audit_log[1]
+        assert "ae_prompt_label" not in det_entry
+        assert "guardian_prompt_label" not in det_entry
+        assert "ae_llm_output" not in det_entry
+        assert "guardian_converted_output" not in det_entry
+        assert not hasattr(runtime.analysis_engine, "last_prompt_label")
+        assert not hasattr(runtime.guardian, "last_prompt_label")
 
     def test_deterministic_block_after_ai_path_has_no_prompt_evidence(self):
         """Deterministic BLOCK emits its own audit entry earlier in the
@@ -261,8 +263,8 @@ class TestPromptEvidenceDoesNotLeakAcrossRequests:
         assert det_entry["decision_path"] == "deterministic"
         assert "ae_prompt_label" not in det_entry
         assert "guardian_prompt_label" not in det_entry
-        assert runtime.analysis_engine.last_prompt_label is None
-        assert runtime.guardian.last_prompt_label is None
+        assert "ae_llm_output" not in det_entry
+        assert "guardian_converted_output" not in det_entry
 
 
 if __name__ == "__main__":
