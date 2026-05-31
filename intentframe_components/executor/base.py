@@ -35,8 +35,10 @@ class Executor(ABC):
         
         - Performs the actual I/O operation
         - Logs everything immutably
-        - Returns result for audit trail
+        - Returns the completed result for audit trail
         
         Does NOT make decisions about SHOULD this happen.
+        This method must not return a coroutine, future, or job handle;
+        callers rely on the returned ExecutionResult being final.
         """
         pass

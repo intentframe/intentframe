@@ -256,12 +256,16 @@ class IntentFrameRuntime:
         return fields
 
     @staticmethod
-    def _add_prompt_audit_fields(audit_entry: dict, prefix: str, component) -> None:
+    def _add_prompt_audit_fields(audit_entry: dict, prefix: str, artifact) -> None:
         """Attach prompt source/label and full prompt content when an AI call ran."""
-        prompt_label = getattr(component, "last_prompt_label", None)
-        prompt_source = getattr(component, "last_prompt_source", None)
-        system_prompt = getattr(component, "last_system_prompt", None)
-        request_prompt = getattr(component, "last_request_prompt", None)
+        evidence = getattr(artifact, "prompt_evidence", None)
+        if evidence is None:
+            return
+
+        prompt_label = evidence.prompt_label
+        prompt_source = evidence.prompt_source
+        system_prompt = evidence.system_prompt
+        request_prompt = evidence.request_prompt
 
         if not any((prompt_label, prompt_source, system_prompt, request_prompt)):
             return
@@ -272,10 +276,14 @@ class IntentFrameRuntime:
         audit_entry[f"{prefix}_request_prompt"] = request_prompt
 
     @staticmethod
-    def _add_output_audit_fields(audit_entry: dict, prefix: str, component) -> None:
+    def _add_output_audit_fields(audit_entry: dict, prefix: str, artifact) -> None:
         """Attach raw LLM output and converted pipeline artifact when set."""
-        llm_output = getattr(component, "last_llm_output", None)
-        converted_output = getattr(component, "last_converted_output", None)
+        evidence = getattr(artifact, "prompt_evidence", None)
+        if evidence is None:
+            return
+
+        llm_output = evidence.llm_output
+        converted_output = evidence.converted_output
 
         if llm_output is not None:
             audit_entry[f"{prefix}_llm_output"] = llm_output
@@ -470,18 +478,6 @@ class IntentFrameRuntime:
         """Internal implementation of intent processing."""
         self._request_counter += 1
         req_num = self._request_counter
-
-        # Per-request invariant: every intent starts with a clean prompt
-        # evidence slate.  Engines only populate these fields when their
-        # AI path actually runs, so paths that short-circuit before AE /
-        # Guardian must not inherit stale forensic data from a prior request.
-        for component in (self.analysis_engine, self.guardian):
-            component.last_prompt_source = None
-            component.last_prompt_label = None
-            component.last_system_prompt = None
-            component.last_request_prompt = None
-            component.last_llm_output = None
-            component.last_converted_output = None
 
         if self.verbose:
             reason = intent.reason or ""
@@ -691,10 +687,10 @@ class IntentFrameRuntime:
         # Prompt forensic audit — record what source/label was used plus
         # the exact system and request prompts sent to the model.  Fields
         # are absent when a component did not make an AI call.
-        self._add_prompt_audit_fields(audit_entry, "ae", self.analysis_engine)
-        self._add_output_audit_fields(audit_entry, "ae", self.analysis_engine)
-        self._add_prompt_audit_fields(audit_entry, "guardian", self.guardian)
-        self._add_output_audit_fields(audit_entry, "guardian", self.guardian)
+        self._add_prompt_audit_fields(audit_entry, "ae", analysis)
+        self._add_output_audit_fields(audit_entry, "ae", analysis)
+        self._add_prompt_audit_fields(audit_entry, "guardian", validation)
+        self._add_output_audit_fields(audit_entry, "guardian", validation)
         
         if validation.decision == Decision.ALLOW:
             # ───────────────────────────────────────────────────────────
@@ -713,6 +709,11 @@ class IntentFrameRuntime:
             
             intent_to_execute = validation.modified_intent or intent
             result = self.executor.execute(intent_to_execute)
+            if inspect.isawaitable(result):
+                raise TypeError(
+                    "Executor.execute() returned an awaitable; the runtime "
+                    "requires a completed ExecutionResult inside the lock."
+                )
             
             if self.verbose:
                 status = 'Success' if result.success else 'Failed'
