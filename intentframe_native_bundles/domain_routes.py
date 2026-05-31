@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from action_registry.types import ActionType, DomainType
+
 DOMAIN_ROUTES: dict[str, frozenset[str]] = {
-    "finance": frozenset({"PAY_INVOICE"}),
-    "deletion": frozenset({
-        "DELETE_FILE",
-        "DELETE_HOST_FILE",
-        "DELETE_EVENT",
-        "DELETE_REMINDER",
-        "DELETE_CONTACT",
-        "DELETE_NOTE",
+    DomainType.FINANCE.value: frozenset({ActionType.PAY_INVOICE.value}),
+    DomainType.DELETION.value: frozenset({
+        ActionType.DELETE_FILE.value,
+        ActionType.DELETE_HOST_FILE.value,
+        ActionType.DELETE_EVENT.value,
+        ActionType.DELETE_REMINDER.value,
+        ActionType.DELETE_CONTACT.value,
+        ActionType.DELETE_NOTE.value,
     }),
 }
