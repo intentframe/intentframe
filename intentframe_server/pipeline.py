@@ -465,6 +465,11 @@ class IntentFrameRuntime:
         Actor (external SDK) has already parsed the raw request into an
         IntentFrame and sent it here over HTTP.  Runtime only does:
         Analysis → Guardian → Executor.
+
+        Intent planes inside this call:
+          submitted_intent — frozen at entry; sole input to ``executor.execute()``.
+          effective_intent — after bundle enrichment; fed to AE, Guardian, audit.
+        Pipeline internals must not rewrite adapter params (see executor call below).
         """
         user_context = self._resolve_user_context(user_context)
         async with self._lock:
@@ -476,6 +481,10 @@ class IntentFrameRuntime:
         user_context: UserContext,
     ) -> ExecutionResult:
         """Internal implementation of intent processing."""
+        # Agent-developer contract: executor params == actor payload.
+        # Enrichment (``ctx.enriched_intent``), evidence, and AI context may
+        # rewrite ``intent`` below for governance; they must not reach adapters.
+        submitted_intent = intent.model_copy(deep=True)
         self._request_counter += 1
         req_num = self._request_counter
 
@@ -525,6 +534,7 @@ class IntentFrameRuntime:
             user_context,
             verbose=self.verbose,
         )
+        # Governance plane — enriched target/data for AE, Guardian, audit only.
         intent = (
             det_result.bundle_context.effective_intent
             if det_result.bundle_context is not None
@@ -702,13 +712,15 @@ class IntentFrameRuntime:
                 print(f"    │  {validation.message:<56} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
             
-            # Layer 5: Executor
+            # Layer 5: Executor — always ``submitted_intent``, never ``intent``
+            # (effective/enriched) and never ``validation.modified_intent``.
+            # Adapters consume exactly what the actor submitted; policy context
+            # belongs in evidence / external_context, not hidden param mutation.
             if self.verbose:
                 print(f"    ┌──────────────────────────────────────────────────────────┐")
                 print(f"    │  EXECUTOR: Performing action                             │")
             
-            intent_to_execute = validation.modified_intent or intent
-            result = self.executor.execute(intent_to_execute)
+            result = self.executor.execute(submitted_intent)
             if inspect.isawaitable(result):
                 raise TypeError(
                     "Executor.execute() returned an awaitable; the runtime "
@@ -737,9 +749,9 @@ class IntentFrameRuntime:
                     print(f"    │  Result Info:   {info:<49} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
 
-            self._log_executor_result(intent, result)
-            
-            # Outcome: request params stay in audit_entry["data"]; executor payload here.
+            self._log_executor_result(submitted_intent, result)
+
+            # audit_entry reflects enriched intent for observability; executor used submitted_intent.
             audit_entry["executed"] = result.success
             audit_entry["result_data"] = result.data
             self.audit_log.append(audit_entry)

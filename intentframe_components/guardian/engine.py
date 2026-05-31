@@ -9,7 +9,7 @@ Uses OpenAI Agents to make policy decisions based on:
 This is the "judge" - it makes ALLOW/BLOCK decisions.
 
 Decision semantics:
-    ALLOW – Action is authorized; execute as-is (or with modified_intent).
+    ALLOW – Action is authorized; runtime executes the actor-submitted intent.
     BLOCK – Hard policy violation, action rejected.
 
 Guardian does NOT construct alternatives or interact with the user.

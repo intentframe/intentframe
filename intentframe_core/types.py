@@ -108,8 +108,12 @@ class ValidationResult(BaseModel):
     Guardian's decision after validating an IntentFrame.
 
     Decisions:
-        ALLOW  - Action is authorized, execute as-is (or with modified_intent).
+        ALLOW  - Action is authorized.
         BLOCK  - Hard policy violation, action rejected.
+
+    Execution contract: ``IntentFrameRuntime`` always passes the actor-submitted
+    frame to ``executor.execute()``. ``modified_intent`` is reserved but unused;
+    Guardian validates, it does not rewrite adapter params.
 
     decision_path identifies which internal path produced this result.
     Used for audit logging and metrics; never affects behavior.
@@ -124,7 +128,7 @@ class ValidationResult(BaseModel):
     message: str = ""
     decision_path: Literal["fast_path", "ai_path", "deterministic"] = "ai_path"
 
-    modified_intent: Optional[IntentFrame] = None
+    modified_intent: Optional[IntentFrame] = None  # unused; runtime executes submitted intent only
     prompt_evidence: Optional[PromptEvidence] = None
 
 

@@ -102,6 +102,11 @@ class ExecutorHTTPClient(Executor):
         return resp.json()
 
     def execute(self, validated_intent: IntentFrame) -> IFExecutionResult:
+        """Forward an allowed intent to the executor.
+
+        ``validated_intent`` is the actor-submitted frame (post-guardian ALLOW),
+        not an enriched copy — pipeline enrichment must not alter adapter params.
+        """
         action = validated_intent.action.value
 
         request = self._to_execution_request(validated_intent, action)
