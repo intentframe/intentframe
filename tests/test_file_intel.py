@@ -1,4 +1,4 @@
-"""Realistic tests for ``intentframe_native_bundles.shared.files.file_intel``.
+"""Realistic tests for ``intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel``.
 
 These tests exercise the LAYER 2b FileIntel builder against real
 filesystem fixtures (``tmp_path``) rather than mocking ``os.stat``.
@@ -34,13 +34,13 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.shared.files.evidence import (
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.shared.files.evidence import (
     FILE_INTEL_EXTENSION_MAX_LEN,
     FILE_INTEL_PATH_MAX_LEN,
     FileIntel,
 )
-from intentframe_native_bundles.shared.files.file_intel import (
+from intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel import (
     build_destination_intel,
     build_file_intel,
     extension_of,
@@ -237,7 +237,7 @@ class TestBuildDestinationIntelHostFile:
         def _raising_lstat(path):
             raise PermissionError("EACCES simulated")
 
-        with patch("intentframe_native_bundles.shared.files.file_intel.os.lstat", side_effect=_raising_lstat):
+        with patch("intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel.os.lstat", side_effect=_raising_lstat):
             intel = build_destination_intel(WRITE_HOST_FILE, str(target))
 
         assert intel["destination_exists"] is None
@@ -402,7 +402,7 @@ class TestBuildFileIntel:
             raise RuntimeError("inspector exploded")
 
         with patch(
-            "intentframe_native_bundles.shared.files.file_intel.shield_inspect_code",
+            "intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel.shield_inspect_code",
             side_effect=_raising,
         ):
             intel = build_file_intel(
@@ -467,7 +467,7 @@ class TestBuildFileIntel:
         link.symlink_to(real)
 
         with patch(
-            "intentframe_native_bundles.shared.files.file_intel.Path.resolve",
+            "intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel.Path.resolve",
             return_value=Path(long_target),
         ):
             intel = build_file_intel(

@@ -6,10 +6,10 @@ import asyncio
 from dataclasses import dataclass
 from unittest.mock import patch
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from command_shield import Verdict, inspect_command
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_bundle_sdk.types import BundlePhaseOutcome
 from intentframe_components.guardian.deterministic import (
     DeterministicGuardian,
@@ -115,7 +115,7 @@ def run_dg_with_intel(
 ) -> DeterministicResult:
     """Pin checker gates with seeded command_intel (skips real shield)."""
 
-    from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY
 
     async def seed_prepare(self, intent, ctx, *, verbose=False):
         del intent, verbose

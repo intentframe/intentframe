@@ -236,7 +236,7 @@ RUN_COMMAND:
 `blocked_patterns` are direct string-level hard blocks.
 
 `deny_capabilities` are command-shield capability tags. The default list is
-mirrored from `intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+mirrored from `intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
 and pinned by tests. If you change the default deny surface in the codebase,
 update the capability constant first and keep the YAML parity test passing.
 
@@ -281,7 +281,7 @@ contacts.
 
 `recipient_sources` and `contact_sources` are stored opaquely in the policy
 registry and resolved at runtime by the email and message bundles during
-`enforce_constraints` (via `intentframe_native_bundles/platform/contacts_client.py`).
+`enforce_constraints` (via `intentframe_native_kit/intentframe_native_bundles/platform/contacts_client.py`).
 The registry does not expand contact lists at write time.
 
 ## Intent Limits

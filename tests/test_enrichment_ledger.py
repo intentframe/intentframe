@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import (
@@ -65,7 +65,7 @@ def test_record_enrichment_populates_ledger() -> None:
 
 def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> None:
     """prepare_evidence runs before enrich; ledger after enrich."""
-    from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 
     bundle = FilesActionBundle()
     order: list[str] = []
@@ -105,7 +105,7 @@ def test_runner_evidence_then_enrich_order(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_enrich_must_not_return_terminal() -> None:
-    from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 
     bundle = FilesActionBundle()
 

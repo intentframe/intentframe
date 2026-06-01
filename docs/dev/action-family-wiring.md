@@ -16,8 +16,8 @@ An agent submits an intent. It travels through several gates. Each gate is indep
 
 | Layer | Who | What |
 |---|---|---|
-| Core / Actor | Platform | `IntentFrame.action` is a plain `str`; Actor does not import `action_registry` |
-| Agent author (optional) | Jarvis, third-party agents | May import `action_registry` + per-tool Pydantic models for fail-fast pre-flight |
+| Core / Actor | Platform | `IntentFrame.action` is a plain `str`; Actor does not import `intentframe_native_kit.action_registry` |
+| Agent author (optional) | Jarvis, third-party agents | May import `intentframe_native_kit.action_registry` + per-tool Pydantic models for fail-fast pre-flight |
 | Substrate | Bundles, executor, policy | `ActionType` constants, `domain_routes.py`, bundle constraints — authoritative at runtime |
 
 ---
@@ -51,8 +51,8 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 
 ### 1. Action type + category
 
-- `action_registry/types.py` — add `ActionType.<NAME>` entries and map them to a new or existing `ActionCategory`.
-- `action_registry/catalog.py` / `action_registry/platforms/<os>/actions.py` — register the new actions in the catalog so adapters can claim them.
+- `intentframe_native_kit/action_registry/types.py` — add `ActionType.<NAME>` entries and map them to a new or existing `ActionCategory`.
+- `intentframe_native_kit/action_registry/catalog.py` / `intentframe_native_kit/action_registry/platforms/<os>/actions.py` — register the new actions in the catalog so adapters can claim them.
 
 ### 2. Executor adapter
 
@@ -62,15 +62,15 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 
 ### 3. Plugin constraint schemas (policy storage stays opaque dicts)
 
-- `intentframe_native_bundles/actions/<family>/constraints.py` — Pydantic models for action-level constraints (`FileConstraints`, `TerminalConstraints`, …). Use **disjoint field names** across families so validation is unambiguous.
-- `intentframe_native_bundles/domains/<domain>/constraints.py` — domain overlay schemas (`FinanceConstraints`, `DeletionConstraints`).
+- `intentframe_native_kit/intentframe_native_bundles/actions/<family>/constraints.py` — Pydantic models for action-level constraints (`FileConstraints`, `TerminalConstraints`, …). Use **disjoint field names** across families so validation is unambiguous.
+- `intentframe_native_kit/intentframe_native_bundles/domains/<domain>/constraints.py` — domain overlay schemas (`FinanceConstraints`, `DeletionConstraints`).
 - `policy_registry/models.py` — stores `ActionPermission.constraints` and `UserPolicy.domain_constraints` as opaque dicts only; no typed constraint unions in the registry layer.
 - `intentframe_bundle_sdk/loader.py` — single boot path: `ensure_loaded(packages)` registers bundles, then `validate_policy_against_registry(policy)` calls each bundle's `validate_constraints` / domain `validate` at startup.
 
 ### 4. Bundle SDK + deterministic gate
 
 - `intentframe_bundle_sdk/` — `ActionBundle` / `DomainBundle` hook contract, `DeterministicRunner` (fixed gate order), registry + domain routes.
-- `intentframe_native_bundles/domain_routes.py` — routing manifest (`domain_id` → action ids); registered via `register_domain_routes`.
+- `intentframe_native_kit/intentframe_native_bundles/domain_routes.py` — routing manifest (`domain_id` → action ids); registered via `register_domain_routes`.
 - `intentframe_components/guardian/deterministic.py` — permission gate + `DeterministicRunner`; blocks `no_bundle` / `no_enforcement`.
 - `intentframe_components/guardian/engine.py` — AI Guardian reads `bundle_ai_context.constraint_context` only (no checker dispatch).
 - `resource_registry/floor.py` — if this family writes to the host filesystem, extend `DENY_WRITE_PREFIXES` with any non-negotiable deny roots.
@@ -79,7 +79,7 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 
 Post-refactor, family-specific deterministic and prompt logic lives on the **ActionBundle**, not in substrate checkers or pipeline pre-hooks.
 
-- `intentframe_native_bundles/actions/<family>/bundle.py` — implement hooks as needed:
+- `intentframe_native_kit/intentframe_native_bundles/actions/<family>/bundle.py` — implement hooks as needed:
   - `prepare_evidence()` — e.g. command_shield BLOCK, file_intel (terminal/files)
   - `enrich()` — e.g. email intent resolution
   - `enforce_constraints()` — policy constraint enforcement
@@ -101,8 +101,8 @@ Post-refactor, family-specific deterministic and prompt logic lives on the **Act
   cross-referencing sibling file families unless you are intentionally
   building a comparison/test profile.
 - `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` — add the new action types so they appear in `AgentCapabilities` at handshake.
-- `intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` — implement the `onboarding_guardrails()` function and wire it in the bundle's `onboarding_guardrails()` override. Return a paste-ready markdown block (e.g. `### Email Actions (...)`) that the onboarding meta-LLM will see in the system-prompt middle section. Return `""` if the family has no onboarding copy of its own.
-- `intentframe_native_bundles/onboarding/manifest.py` — if the family participates in a **cross-bundle rule** (e.g. a guardrail that only makes sense when two families are both active), add a verbatim string to `ONBOARDING_MANIFEST.sections`. This is appended unconditionally to the middle section for all policies.
+- `intentframe_native_kit/intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` — implement the `onboarding_guardrails()` function and wire it in the bundle's `onboarding_guardrails()` override. Return a paste-ready markdown block (e.g. `### Email Actions (...)`) that the onboarding meta-LLM will see in the system-prompt middle section. Return `""` if the family has no onboarding copy of its own.
+- `intentframe_native_kit/intentframe_native_bundles/onboarding/manifest.py` — if the family participates in a **cross-bundle rule** (e.g. a guardrail that only makes sense when two families are both active), add a verbatim string to `ONBOARDING_MANIFEST.sections`. This is appended unconditionally to the middle section for all policies.
 - `tests/test_onboarding_sdk.py` — add a test asserting the bundle section appears in `render_onboarding_bundle_context` when its actions are granted, and is absent when they are not.
 - `tests/fixtures/onboarding/bundle_sections/<bundle_id>.txt` — run `python tests/inspect_onboarding_prompts.py --write-baseline` to regenerate golden fixtures after intentional content changes.
 
@@ -153,7 +153,7 @@ These are the files that **must** stay in sync but have no compiler-enforced rel
 |---|---|---|
 | `jarvis_pa/jarvis/policies/jarvis.yaml::allowed_actions` ↔ `ActionType` enum | YAML missing new actions | Handshake total count is lower than enum size; agent sees tool, policy denies at runtime |
 | `jarvis_pa/jarvis/agent.py::_ACTION_TYPES` ↔ `tools.py::ALL_TOOLS` | Agent advertises fewer actions than it can call | Onboarding prompt has no guardrails for the missing actions; agent still calls them, no policy-side guidance |
-| `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
+| `jarvis.yaml::RUN_COMMAND.deny_capabilities` ↔ `intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES` | YAML drifts from the named constant other tests reference | Pinned by `tests/test_seed_capability_parity.py`; failure tells you which side moved |
 | `executor.yaml::pack_options.host_files.allowed_write_paths` ↔ `jarvis.yaml::READ_HOST_FILE.constraints.allowed_host_paths` | Adapter ceiling and policy allowlist disagree | "Guardian approved, executor refused" inconsistency, and vice versa |
 | `passive_read_action_ids` on bundle ↔ policy `safe: true` | Passive-read list out of sync with policy | Read action pays full AE when it should ALLOW deterministically, or vice versa |
 | `DENY_WRITE_PREFIXES` ↔ canonicalizer used by that family | Deny list stores canonical form, checker compares raw form (or vice versa) | `/etc/sudoers` blocked but `/private/etc/sudoers` allowed, or similar macOS-only asymmetries |
@@ -196,11 +196,11 @@ When you see one of these, jump straight to the file named.
 | Symptom | Likely cause | File to inspect |
 |---|---|---|
 | Handshake action count is lower than you expected | `bootstrap.py` missing new actions | `intentframe_gateway/bootstrap.py` |
-| Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale, or `onboarding_guardrails()` not implemented | `jarvis_pa/jarvis/agent.py`, `intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` |
+| Onboarding prompt has no guidance for a new family | `_ACTION_TYPES` stale, or `onboarding_guardrails()` not implemented | `jarvis_pa/jarvis/agent.py`, `intentframe_native_kit/intentframe_native_bundles/actions/<family>/onboarding_guardrails.py` |
 | Agent tool call returns "action not allowed by policy" | Policy seeded without that action | `intentframe_gateway/bootstrap.py::_build_default_policy` |
 | Guardian approves but executor refuses | Policy allowlist wider than executor ceiling | `executor.yaml` vs policy constraint |
-| Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `intentframe_native_bundles/actions/*/constraints.py` |
-| Write action missing AE system prompt / external context | `build_ai_context()` not implemented or wrong bundle | `intentframe_native_bundles/actions/<family>/bundle.py` |
+| Pydantic `ValidationError` about `allowed_paths` vs `allowed_host_paths` | Field name mismatch → wrong constraint type picked | `intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py` |
+| Write action missing AE system prompt / external context | `build_ai_context()` not implemented or wrong bundle | `intentframe_native_kit/intentframe_native_bundles/actions/<family>/bundle.py` |
 | Read action ran full AE when policy marks it safe | Missing from `passive_read_action_ids` | Same bundle class |
 | RUN_COMMAND catastrophic not blocked pre-AE | `prepare_evidence()` not running shield | `actions/terminal/pre_pipeline.py` |
 | WRITE_FILE sensitive path not blocked | `structural_gates()` not wired | `actions/files/deterministic.py` |

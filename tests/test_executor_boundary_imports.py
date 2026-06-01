@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "intentframe_native_adapters",
-    "intentframe_native_bundles",
+    "intentframe_native_kit.intentframe_native_bundles",
 )
 
 STRICT_ROOTS = (
@@ -22,7 +22,7 @@ STRICT_ROOTS = (
 )
 
 # Substrate may reference bundle-owned floor helpers until executor SDK
-# owns its own copy.  macOS pack files moved to intentframe_executor_pack_macos.
+# owns its own copy.  macOS pack files moved to intentframe_native_kit.intentframe_executor_pack_macos.
 ALLOWLISTED_IMPORTS: dict[Path, frozenset[str]] = {}
 
 

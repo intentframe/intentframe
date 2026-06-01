@@ -16,23 +16,23 @@ ensure_test_bundles_loaded()
 
 def _fresh_bundle_instances() -> list[Any]:
     """Fresh instances for lifecycle tests — never mutate registry singletons."""
-    from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
-    from intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
-    from intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
-    from intentframe_native_bundles.actions.clipboard.bundle import ClipboardActionBundle
-    from intentframe_native_bundles.actions.contacts.bundle import ContactsActionBundle
-    from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
-    from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
-    from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
-    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
-    from intentframe_native_bundles.actions.notes.bundle import NotesActionBundle
-    from intentframe_native_bundles.actions.reminders.bundle import RemindersActionBundle
-    from intentframe_native_bundles.actions.spotlight.bundle import SpotlightActionBundle
-    from intentframe_native_bundles.actions.system.bundle import SystemActionBundle
-    from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-    from intentframe_native_bundles.actions.user_io.bundle import UserIoActionBundle
-    from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
-    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.clipboard.bundle import ClipboardActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.contacts.bundle import ContactsActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.notes.bundle import NotesActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.reminders.bundle import RemindersActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.spotlight.bundle import SpotlightActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.system.bundle import SystemActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.user_io.bundle import UserIoActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 
     return [
         TerminalActionBundle(),

@@ -626,8 +626,8 @@ Only use when you intentionally want to wipe Docker state machine-wide.
 | `../../demo/config/executor_attacks_hashicorp.yaml` | executor config for invoice attack suites |
 
 Both HashiCorp configs are Linux/container-safe: they load the portable POSIX pack
-(`intentframe_executor_pack_posix`) plus the neutral console pack
-(`intentframe_executor_pack_console`), and enable `simulated_user_io` for
+(`intentframe_native_kit.intentframe_executor_pack_posix`) plus the neutral console pack
+(`intentframe_native_kit.intentframe_executor_pack_console`), and enable `simulated_user_io` for
 headless user interaction (no stdin, no macOS dialogs). Override with
 `EXECUTOR_CONFIG` before `docker compose up` when running attack tests (see §2b).
 

@@ -202,7 +202,7 @@ async def run(config: ExecutorConfig) -> None:
 
     if sys.platform == "darwin":
         try:
-            from intentframe_executor_pack_macos.permissions import check_permissions
+            from intentframe_native_kit.intentframe_executor_pack_macos.permissions import check_permissions
             check_permissions(config.adapters.enabled)
         except Exception as exc:
             logger.warning("Platform server permission check failed: %s", exc)

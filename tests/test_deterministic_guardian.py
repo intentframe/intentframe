@@ -28,10 +28,10 @@ from __future__ import annotations
 
 import pytest
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles import passive_read_action_ids
-from intentframe_native_bundles.actions.terminal._read_only import READ_ONLY_INCOMPATIBLE
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles import passive_read_action_ids
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal._read_only import READ_ONLY_INCOMPATIBLE
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
@@ -39,7 +39,7 @@ from intentframe_components.guardian.deterministic import (
 )
 from intentframe_core.types import IntentFrame, UserContext
 from tests.deterministic_accuracy._helpers import decide_dg_sync, run_dg_with_intel
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 
@@ -515,7 +515,7 @@ class TestUndecidedDefault:
     dg = DeterministicGuardian()
 
     def test_send_email_with_constraints_falls_through(self):
-        from intentframe_native_bundles.actions.email.constraints import EmailConstraints
+        from intentframe_native_kit.intentframe_native_bundles.actions.email.constraints import EmailConstraints
         perm = ActionPermission(
             safe=False,
             constraints=EmailConstraints(allowed_recipients=["a@b.com"]).model_dump(
@@ -552,8 +552,8 @@ class TestFailClosedExceptionHandling:
         """
         dg = DeterministicGuardian()
 
-        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         async def raise_boom(self, intent, action_permission, ctx, *, verbose=False):
             del self, intent, action_permission, ctx, verbose

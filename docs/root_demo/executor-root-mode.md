@@ -104,7 +104,7 @@ if any later ALLOW result is missing the dry-run tag. This keeps the policy /
 Guardian test surface real while preventing accidental host mutation.
 
 Use real root-capable executor mode only when you explicitly need to validate the final
-`intentframe_executor_pack_macos/sandbox` escalate/sudo path.
+`intentframe_native_kit/intentframe_executor_pack_macos/sandbox` escalate/sudo path.
 
 ### 1. Install the root-demo capability once
 

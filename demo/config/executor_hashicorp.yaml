@@ -26,8 +26,8 @@
 # Another org swaps these for their own pack (module path, or a short name from
 # the 'intentframe.executor_packs' entry-point group).
 packs:
-  - intentframe_executor_pack_posix
-  - intentframe_executor_pack_console
+  - intentframe_native_kit.intentframe_executor_pack_posix
+  - intentframe_native_kit.intentframe_executor_pack_console
 
 transport:
   type: unix_socket

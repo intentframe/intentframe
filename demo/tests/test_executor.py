@@ -42,9 +42,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from resource_registry import ResourceRegistry, ResourceMount
 
-from action_registry import ActionType
+from intentframe_native_kit.action_registry import ActionType
 from intentframe_core import IntentFrame
-from executor_client import ExecutorBridge
+from intentframe_native_kit.extras.bridge import ExecutorBridge
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEMO_DATA = DEMO_ROOT / "demo_data"
@@ -307,7 +307,7 @@ def main():
     header("TEST 10: HASH CHAIN INTEGRITY")
     print("  Verifying tamper-evident audit trail...")
 
-    from intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
+    from intentframe_native_kit.intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
     logger = SQLiteAuditLogger(db_path=DB_PATH)
     chain_valid = bridge._run_async(logger.verify_chain_integrity())
     logger.close()

@@ -157,7 +157,7 @@ No. The executor service process is normally a normal-user process. Only the exe
 
 The gateway, policy services, agent process, and executor service itself all run as the normal user. Root capability is intentionally scoped to the narrowest possible path.
 
-Even when escalated, the subprocess is wrapped in a **macOS Seatbelt SBPL kernel sandbox** (`intentframe_executor_pack_macos/sandbox/`) — a dynamically-generated profile with `(deny default)` and a curated allowlist that the kernel enforces regardless of the subprocess's UID. Root capability is necessary for some legitimate operations but does not mean unrestricted execution.
+Even when escalated, the subprocess is wrapped in a **macOS Seatbelt SBPL kernel sandbox** (`intentframe_native_kit/intentframe_executor_pack_macos/sandbox/`) — a dynamically-generated profile with `(deny default)` and a curated allowlist that the kernel enforces regardless of the subprocess's UID. Root capability is necessary for some legitimate operations but does not mean unrestricted execution.
 
 See [docs/root_demo/executor-root-mode.md](root_demo/executor-root-mode.md) for the full privilege model.
 

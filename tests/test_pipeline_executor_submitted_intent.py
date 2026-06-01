@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,

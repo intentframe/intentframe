@@ -4,7 +4,7 @@ The packaged Jarvis YAMLs under :mod:`jarvis.policies` carry the
 ``RUN_COMMAND.constraints.deny_capabilities`` list literally — they
 are the source of truth for the gateway's runtime seed.  The same
 set is exposed as a Python ``frozenset`` constant
-(:data:`intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`)
+(:data:`intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`)
 for the deterministic-accuracy and classifier-contract tests that
 compare against named values rather than parsing YAML.
 
@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pytest
 
-from intentframe_native_bundles.actions.terminal.capabilities import (
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities import (
     DEFAULT_TERMINAL_DENY_CAPABILITIES,
     PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
     SENSITIVE_SURFACE_DENY_CAPABILITIES,

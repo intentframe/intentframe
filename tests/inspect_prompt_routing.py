@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_bundle_sdk.loader import ensure_loaded
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.types import ActionPermission, BundleAIContext, BundleContext
@@ -119,7 +119,7 @@ def _legacy_guardian_prompt_id(action: ActionType) -> str:
 
 
 def main() -> None:
-    ensure_loaded(["intentframe_native_bundles"])
+    ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])
 
     print("PROMPT ROUTING MATRIX")
     print(SEPARATOR)

@@ -1,4 +1,4 @@
-"""Unit tests for :class:`intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`.
+"""Unit tests for :class:`intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`.
 
 ``HostFilesActionBundle.enforce_constraints`` is the per-action constraint
 enforcer for the ``HOST_FILE`` category.  Unlike the virtual ``files``
@@ -21,9 +21,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
-from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseDecision
 

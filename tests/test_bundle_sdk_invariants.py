@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.registry import (
     all_action_bundles,
@@ -22,7 +22,7 @@ from intentframe_bundle_sdk.types import (
 )
 from intentframe_components.guardian.deterministic import DeterministicGuardian
 from intentframe_core.types import IntentFrame, UserContext
-from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 from intentframe_bundle_sdk.registry import domain_bundle_for
 from policy_registry.models import ActionPermission as PolicyActionPermission
 from tests._bundle_loader import ensure_test_bundles_loaded
@@ -160,7 +160,7 @@ def test_deterministic_guardian_blocks_allowed_action_without_bundle(
     import intentframe_bundle_sdk.registry as bundle_registry
 
     monkeypatch.delitem(bundle_registry._ACTION_BY_ID, ActionType.READ_FILE.value)
-    dg = DeterministicGuardian(packages=["intentframe_native_bundles"])
+    dg = DeterministicGuardian(packages=["intentframe_native_kit.intentframe_native_bundles"])
     intent = IntentFrame(
         action=ActionType.READ_FILE,
         target="/tmp/x",
@@ -409,7 +409,7 @@ def test_domain_schema_blocks_deletion_when_path_only_in_target() -> None:
 
 
 def test_finance_domain_blocks_missing_amount_for_max_amount_policy() -> None:
-    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 
     bundle = FinanceDomainBundle()
     intent = IntentFrame(
@@ -426,7 +426,7 @@ def test_finance_domain_blocks_missing_amount_for_max_amount_policy() -> None:
 
 
 def test_finance_domain_blocks_missing_recipient_for_allowlist_policy() -> None:
-    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 
     bundle = FinanceDomainBundle()
     intent = IntentFrame(
@@ -446,7 +446,7 @@ def test_finance_domain_blocks_missing_recipient_for_allowlist_policy() -> None:
 
 
 def test_api_bundle_blocks_missing_amount_for_max_amount_policy() -> None:
-    from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
 
     bundle = ApiActionBundle()
     intent = IntentFrame(
@@ -473,7 +473,7 @@ def test_api_bundle_blocks_missing_amount_for_max_amount_policy() -> None:
 
 
 def test_api_bundle_blocks_missing_url_for_allowed_endpoints_policy() -> None:
-    from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
 
     bundle = ApiActionBundle()
     intent = IntentFrame(
@@ -499,7 +499,7 @@ def test_api_bundle_blocks_missing_url_for_allowed_endpoints_policy() -> None:
 
 
 def test_calendar_bundle_blocks_missing_calendar_for_allowed_calendars_policy() -> None:
-    from intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
 
     bundle = CalendarActionBundle()
     intent = IntentFrame(
@@ -526,7 +526,7 @@ def test_calendar_bundle_blocks_missing_calendar_for_allowed_calendars_policy() 
 
 
 def test_terminal_bundle_blocks_missing_command_when_policy_needs_command() -> None:
-    from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
 
     bundle = TerminalActionBundle()
     intent = IntentFrame(
@@ -552,7 +552,7 @@ def test_terminal_bundle_blocks_missing_command_when_policy_needs_command() -> N
 
 
 def test_deletion_domain_blocks_missing_path_for_allowed_paths_policy() -> None:
-    from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
 
     bundle = DeletionDomainBundle()
     intent = IntentFrame(
@@ -569,8 +569,8 @@ def test_deletion_domain_blocks_missing_path_for_allowed_paths_policy() -> None:
 
 
 def test_domain_schemas_ignore_unrelated_fields_for_slice_validation() -> None:
-    from action_registry.domains.deletion import DeletionIntentData
-    from action_registry.domains.finance import FinancialIntentData
+    from intentframe_native_kit.action_registry.domains.deletion import DeletionIntentData
+    from intentframe_native_kit.action_registry.domains.finance import FinancialIntentData
 
     combined = {
         "amount": 250.0,
@@ -592,8 +592,8 @@ def test_domain_schemas_ignore_unrelated_fields_for_slice_validation() -> None:
 
 def test_domain_shape_checks_compose_for_many_to_many_routing() -> None:
     from intentframe_bundle_sdk.domain import check_domain_intent_shape
-    from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
-    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 
     intent = IntentFrame(
         action=ActionType.PAY_INVOICE,
@@ -810,7 +810,7 @@ def test_bundle_phase_outcome_decision_path_passthrough() -> None:
 
 
 def test_terminal_pre_pipeline_ignores_command_only_in_target() -> None:
-    from intentframe_native_bundles.actions.terminal.pre_pipeline import (
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.pre_pipeline import (
         run_terminal_pre_pipeline,
     )
 
@@ -828,7 +828,7 @@ def test_terminal_pre_pipeline_ignores_command_only_in_target() -> None:
 
 
 def test_browser_bundle_blocks_url_only_in_target() -> None:
-    from intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
 
     bundle = BrowserActionBundle()
     intent = IntentFrame(
@@ -853,7 +853,7 @@ def test_browser_bundle_blocks_url_only_in_target() -> None:
 
 
 def test_message_bundle_send_does_not_fall_back_to_target_for_contact_policy() -> None:
-    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
 
     bundle = MessageActionBundle()
     intent = IntentFrame(
@@ -879,7 +879,7 @@ def test_message_bundle_send_does_not_fall_back_to_target_for_contact_policy() -
 
 
 def test_message_bundle_read_uses_contact_field_for_policy() -> None:
-    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
 
     bundle = MessageActionBundle()
     intent = IntentFrame(
@@ -904,7 +904,7 @@ def test_message_bundle_read_uses_contact_field_for_policy() -> None:
 
 
 def test_message_bundle_read_blocks_unfiltered_read_under_contact_policy() -> None:
-    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
 
     bundle = MessageActionBundle()
     intent = IntentFrame(

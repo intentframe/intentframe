@@ -13,7 +13,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_IMPORT_PREFIXES = (
-    "intentframe_native_bundles",
+    "intentframe_native_kit.intentframe_native_bundles",
 )
 
 STRICT_ROOTS = (
@@ -23,9 +23,9 @@ STRICT_ROOTS = (
 
 ALLOWLISTED_IMPORTS: dict[Path, frozenset[str]] = {
     # Known optional decouple — onboarding copy lives in native_bundles.
-    # Every other component import of intentframe_native_bundles must fail CI.
+    # Every other component import of intentframe_native_kit.intentframe_native_bundles must fail CI.
     REPO_ROOT / "intentframe_components" / "onboarding" / "engine.py": frozenset({
-        "intentframe_native_bundles.onboarding",
+        "intentframe_native_kit.intentframe_native_bundles.onboarding",
     }),
 }
 
@@ -69,7 +69,7 @@ def test_bundle_sdk_does_not_import_native_bundles() -> None:
 
 def test_no_cross_bundle_action_imports() -> None:
     """No file under actions/<bundle_a>/ may import from actions/<bundle_b>/."""
-    actions_root = REPO_ROOT / "intentframe_native_bundles" / "actions"
+    actions_root = REPO_ROOT / "intentframe_native_kit" / "intentframe_native_bundles" / "actions"
     violations: list[str] = []
     for path in sorted(actions_root.rglob("*.py")):
         bundle = path.parent.name
@@ -80,11 +80,11 @@ def test_no_cross_bundle_action_imports() -> None:
                 mod = node.module
             elif isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name.startswith("intentframe_native_bundles.actions."):
+                    if alias.name.startswith("intentframe_native_kit.intentframe_native_bundles.actions."):
                         mod = alias.name
             if not mod:
                 continue
-            prefix = "intentframe_native_bundles.actions."
+            prefix = "intentframe_native_kit.intentframe_native_bundles.actions."
             if not mod.startswith(prefix):
                 continue
             parts = mod[len(prefix):].split(".")
@@ -97,8 +97,8 @@ def test_no_cross_bundle_action_imports() -> None:
 
 def test_shared_does_not_import_action_bundles() -> None:
     """No file under shared/<topic>/ may import from actions/<bundle>/."""
-    shared_root = REPO_ROOT / "intentframe_native_bundles" / "shared"
-    prefix = "intentframe_native_bundles.actions."
+    shared_root = REPO_ROOT / "intentframe_native_kit" / "intentframe_native_bundles" / "shared"
+    prefix = "intentframe_native_kit.intentframe_native_bundles.actions."
     violations: list[str] = []
     for path in sorted(shared_root.rglob("*.py")):
         for imported in _collect_imports(path):

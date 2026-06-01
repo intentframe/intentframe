@@ -102,7 +102,7 @@ def load_policy_seed(
 def _validate_loaded_policy(policy: UserPolicy) -> None:
     from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
 
-    ensure_loaded(["intentframe_native_bundles"])
+    ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])
     validate_policy_against_registry(policy)
 
 

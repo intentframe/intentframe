@@ -154,7 +154,7 @@ Together with policy-registry, this is the "configuration plane" — what the us
 | | |
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/executor.sock`. Runs in its own Python virtualenv (`~/.intentframe-venvs/executor/`) so its dependencies are isolated from the rest of the system. |
-| **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_executor_pack_macos/adapters/*.py` |
+| **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_native_kit/intentframe_executor_pack_macos/adapters/*.py` |
 | **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
 | **Storage** | SQLite audit DB; in-memory credential cache (loaded from vault) |
 | **OpenAI calls** | No |
@@ -193,7 +193,7 @@ This is where Guardian and the Analysis Engine actually *run*. When you read "th
 | **Holds credentials?** | OpenAI key only (passed via env from the gateway) |
 | **Lifecycle** | Optional. Started by the gateway in Step 8 if Jarvis is enabled. |
 
-The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-core` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
+The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-core` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`intentframe_native_kit.action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
 
 ### 11. `jarvis-telegram` — Telegram bridge (optional)
 

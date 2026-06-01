@@ -14,7 +14,7 @@ The repo is divided into roughly six layers of concern:
 
 | Layer | Purpose | Modules |
 |---|---|---|
-| **Shared types** | Data model used by everyone | `intentframe_core`, `action_registry` |
+| **Shared types** | Data model used by everyone | `intentframe_core`, `intentframe_native_kit.action_registry` |
 | **Configuration plane** | What the user has authorized | `policy_registry`, `resource_registry` |
 | **Pipeline (decision)** | Validates intents | `intentframe_components` (analysis, guardian, onboarding), `intentframe_server` |
 | **Execution (action)** | Touches the world | `executor`, `executor_client`, `command_shield` |
@@ -32,12 +32,12 @@ The rest of this doc walks each module in turn.
 ```
 intentframe_core          neutral DTOs; IntentFrame.action is str; DomainSchema base only
        ▲
-       │  action_registry depends on core (not the reverse)
-action_registry           ActionType, DomainType, ACTION_DOMAINS, domain intent schemas
+       │  intentframe_native_kit.action_registry depends on core (not the reverse)
+intentframe_native_kit.action_registry           ActionType, DomainType, ACTION_DOMAINS, domain intent schemas
        ▲
        │  optional — agent authors only
-agent tools (e.g. Jarvis) may import action_registry for fail-fast pre-flight
-intentframe_actor         thin transport; no action_registry import
+agent tools (e.g. Jarvis) may import intentframe_native_kit.action_registry for fail-fast pre-flight
+intentframe_actor         thin transport; no intentframe_native_kit.action_registry import
 ```
 
 ### `intentframe_core/`
@@ -45,19 +45,29 @@ intentframe_actor         thin transport; no action_registry import
 | | |
 |---|---|
 | **What** | Shared types and enums (`Decision`, `RiskLevel`, `IntentFrame`, `RuntimeContext`, …) plus `DomainSchema` base in `domains/base.py`. Does **not** export `ActionType` or domain intent schemas. |
-| **Why** | Both the server and the Actor SDK import from here. Without a shared types package, the server-side and agent-side would drift apart. Core must not import `action_registry` — the action taxonomy lives one layer up. |
+| **Why** | Both the server and the Actor SDK import from here. Without a shared types package, the server-side and agent-side would drift apart. Core must not import `intentframe_native_kit.action_registry` — the action taxonomy lives one layer up. |
 | **Where** | `intentframe_core/` |
 | **Process** | None — it's an importable Python package, not a service. |
 | **Public docs** | [architecture.md](architecture.md) (uses these types throughout) |
 | **Module README** | None — purpose is clear from the `__init__.py` docstring. |
 
-### `action_registry/`
+### `intentframe_native_kit/`
 
 | | |
 |---|---|
-| **What** | Static catalog of every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category (FILE, TERMINAL, EMAIL, …), critical-domain tags (`DomainType`, `ACTION_DOMAINS`), and domain intent schemas in `action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`, `DOMAIN_SCHEMAS`). `ActionType` is a `str` enum — members are interchangeable with the plain `str` on `IntentFrame.action`. |
+| **What** | Umbrella for the first-party native action surface: `intentframe_native_kit.action_registry/`, `intentframe_native_kit.intentframe_native_bundles/`, `intentframe_executor_pack_*`, and `extras/` (demo bridge). Import names stay at the repo root via setuptools `package-dir` remapping. |
+| **Why** | Keeps action taxonomy, governance bundles, and executor adapters out of substrate packages (`intentframe_core`, `intentframe_actor`, `executor`, `executor_sdk`). |
+| **Where** | `intentframe_native_kit/` |
+| **Process** | None — importable Python packages. |
+| **Public docs** | [registries.md § Action registry](registries.md#the-action-registry); [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+
+### `intentframe_native_kit.action_registry/`
+
+| | |
+|---|---|
+| **What** | Static catalog of every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category (FILE, TERMINAL, EMAIL, …), critical-domain tags (`DomainType`, `ACTION_DOMAINS`), and domain intent schemas in `intentframe_native_kit.action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`, `DOMAIN_SCHEMAS`). `ActionType` is a `str` enum — members are interchangeable with the plain `str` on `IntentFrame.action`. |
 | **Why** | Shared vocabulary for bundles, executor packs, policy YAML, and optional agent-author validation. Depends on `intentframe_core` for `DomainSchema`; core does not depend back. |
-| **Where** | `action_registry/` |
+| **Where** | `intentframe_native_kit/action_registry/` |
 | **Process** | None — in-process Python module. |
 | **Public docs** | [registries.md § Action registry](registries.md#the-action-registry) |
 | **Module README** | None — purpose is clear from the `__init__.py` docstring. |
@@ -99,18 +109,18 @@ intentframe_actor         thin transport; no action_registry import
 | **What** | Bundle lifecycle contract: `ActionBundle` / `DomainBundle` hooks, `DeterministicRunner` (fixed gate order), registry + domain routes, `ensure_loaded(packages)` loader, opaque `ActionPermission` / `BundleAIContext` types. |
 | **Why** | Substrate orchestrates; plugins own action/domain logic. The SDK is action- and domain-agnostic — no family-specific constraint field names or industry vocabulary. |
 | **Where** | `intentframe_bundle_sdk/` |
-| **Process** | None — imported by `intentframe_components`, `intentframe_native_bundles`, and tests. |
+| **Process** | None — imported by `intentframe_components`, `intentframe_native_kit.intentframe_native_bundles`, and tests. |
 | **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | Module docstrings in `loader.py`, `action.py`, `runner.py`. |
 
-### `intentframe_native_bundles/`
+### `intentframe_native_kit.intentframe_native_bundles/`
 
 | | |
 |---|---|
 | **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `shared/<topic>/` (cross-family libraries — e.g. `shared/files/` for write-payload `FileIntel`, pre-pipeline, AE prompts used by `files` and `host_files`), `domains/<domain>/` (domain overlays), `platform/contacts_client.py` (contact-based recipient resolution at enforce time), `domain_routes.py` (routing manifest), `onboarding/<family>/onboarding_guardrails.py` (per-bundle onboarding copy), `onboarding/manifest.py` (cross-bundle `OnboardingManifest`), `register_bundles(registry)` entry point. |
 | **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Action bundles must not import sibling bundles (`actions/<A>` ↛ `actions/<B>`); shared code lives under `shared/<topic>/`, which must not import `actions/*` (enforced in `tests/test_boundary_imports.py`). Domain bundles do not import action bundles; routing is separate metadata. Onboarding copy is also bundle-owned: each bundle contributes via `onboarding_guardrails()`; cross-cutting rules go in the manifest. |
-| **Where** | `intentframe_native_bundles/` |
-| **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_bundles"])`. |
+| **Where** | `intentframe_native_kit/intentframe_native_bundles/` |
+| **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])`. |
 | **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | None — see `register_bundles` in `__init__.py`. |
 
@@ -122,7 +132,7 @@ intentframe_actor         thin transport; no action_registry import
 
 | | |
 |---|---|
-| **What** | The pipeline building blocks: `analysis/` (Analysis Engine), `guardian/` (deterministic + AI Guardian), `onboarding/` (agent handshake), `executor/` (executor base ABC). Action-family path/vocabulary rules live in `intentframe_native_bundles/`. |
+| **What** | The pipeline building blocks: `analysis/` (Analysis Engine), `guardian/` (deterministic + AI Guardian), `onboarding/` (agent handshake), `executor/` (executor base ABC). Action-family path/vocabulary rules live in `intentframe_native_kit/intentframe_native_bundles/`. |
 | **Why** | Each layer of the pipeline gets its own sub-package with a base class plus a default AI implementation, so you can swap the AI implementation without touching pipeline assembly. |
 | **Where** | `intentframe_components/` |
 | **Process** | None directly — used by `intentframe_server`. The `intentframe-core` process imports from here. |
@@ -159,7 +169,7 @@ intentframe_actor         thin transport; no action_registry import
 
 | | |
 |---|---|
-| **What** | Two implementations of the `Executor` ABC — `ExecutorHTTPClient` (calls the executor service over UDS) and `ExecutorBridge` (in-process, for tests / demo). Plus wire-protocol models. |
+| **What** | `ExecutorHTTPClient` (calls the executor service over UDS) plus wire-protocol models. In-process demo bridge: `intentframe_native_kit.extras.bridge.ExecutorBridge`. |
 | **Why** | The pipeline talks to the executor through the same interface in both production (HTTP) and tests (in-process). Letting tests skip the HTTP layer keeps test runtime fast without diverging from production code paths. |
 | **Where** | `executor_client/` |
 | **Process** | None directly — imported by the pipeline (`intentframe-core`). |
@@ -352,7 +362,7 @@ A direct answer to "does docs/ cover all tracked workspace modules?":
 | Module | Has module README | Has dedicated public doc | Covered in docs |
 |---|---|---|---|
 | `intentframe_core` | — | — | ✅ via [architecture.md](architecture.md) |
-| `action_registry` | — | — | ✅ via [registries.md](registries.md) |
+| `intentframe_native_kit.action_registry` | — | — | ✅ via [registries.md](registries.md) |
 | `policy_registry` | — | — | ✅ via [registries.md](registries.md) |
 | `resource_registry` | — | — | ✅ via [registries.md](registries.md), [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
 | `intentframe_components` | — | — | ✅ via [architecture.md](architecture.md) |

@@ -40,7 +40,7 @@ The IntentFrame Bundle SDK is a **contract**, not a magic discovery mechanism.
 ### The Loading Mechanism
 The SDK does not scan directories for classes marked as SDK components. Instead, it loads **Python packages** via an explicit entry point:
 
-1. The host calls `ensure_loaded(["intentframe_native_bundles", "acme_custom_bundle"])`.
+1. The host calls `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles", "acme_custom_bundle"])`.
 2. The loader imports the package (`importlib.import_module`).
 3. The loader looks for a top-level `register_bundles(registry)` function in the package.
 4. The package's function instantiates its bundles and registers them (`registry.register_action_bundle(...)`).
@@ -56,7 +56,7 @@ If a third-party developer wants to use IntentFrame in their agentic app, the fl
 
 1. **Authoring:** The developer creates a Python package (e.g., `acme_slack_plugin`) containing classes that inherit from `ActionBundle` or `DomainBundle`.
 2. **Registration:** They expose a `register_bundles` function in their package's `__init__.py`.
-3. **Loading:** The host processor boots up and calls `ensure_loaded(["intentframe_native_bundles", "acme_slack_plugin"])`.
+3. **Loading:** The host processor boots up and calls `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles", "acme_slack_plugin"])`.
 4. **Validation:** The SDK validates that no two packages register the same `action_id` or `domain_id`. It then validates the user's policy against the registered constraint schemas.
 5. **Execution:** When the agent submits an intent, the SDK deterministically routes it to the registered bundle for that `action_id`, enforcing the fixed runner order (`prepare_evidence` → `enrich` → `enforce_constraints` → `structural_gates` → `allow_gates` → `build_ai_context`).
 

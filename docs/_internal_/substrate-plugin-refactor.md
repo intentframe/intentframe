@@ -17,7 +17,7 @@ Turn IntentFrame from a **monolithic, action-hardcoded substrate** into a **stri
 
 - **Substrate** (`intentframe_components/`, `intentframe_server/`) orchestrates the pipeline and consumes prepared data. It must not encode action-family field names, re-run enforcement at prompt-build time, or dispatch into per-family checkers.
 - **Bundle SDK** (`intentframe_bundle_sdk/`) owns the lifecycle contract, fixed gate order, registry, loader, and data shapes flowing to AI layers.
-- **Plugins** (`intentframe_native_bundles/`) own action ids, constraint schemas, evidence, validation, enforcement, descriptions, structural/allow gates, and AI context.
+- **Plugins** (`intentframe_native_kit.intentframe_native_bundles/`) own action ids, constraint schemas, evidence, validation, enforcement, descriptions, structural/allow gates, and AI context.
 - **Policy registry** stores **opaque dict** constraints only — no typed constraint unions that couple core modules to plugin schemas.
 
 The refactor was triggered initially by wanting **permission before shield** in the deterministic path, but the actual work became a full **bundle SDK + plugin migration** because the old architecture mixed three roles in one place (SDK hooks, legacy manifest/checker dispatch, and substrate re-enforcement).
@@ -76,14 +76,18 @@ DeterministicRunner (SDK) — fixed gate order:
 ### Package layout
 
 ```
-intentframe_native_bundles/
-  actions/<family>/     # ActionBundle implementations (bundle-local constraints, gates)
-  shared/<topic>/       # Cross-family libraries (not bundles; e.g. shared/files/ write-payload tooling)
-  domains/<domain>/     # DomainBundle implementations (finance, deletion)
-  platform/             # Shared runtime helpers (e.g. contacts_client for policy sources)
-  domain_routes.py      # domain_id → action ids (routing manifest)
-  onboarding/           # first-party onboarding copy
-  __init__.py           # register_bundles(registry) only
+intentframe_native_kit/
+  intentframe_native_kit.action_registry/              # Action taxonomy + domain intent schemas
+  intentframe_native_kit.intentframe_native_bundles/
+    actions/<family>/           # ActionBundle implementations (bundle-local constraints, gates)
+    shared/<topic>/             # Cross-family libraries (e.g. shared/files/)
+    domains/<domain>/           # DomainBundle implementations (finance, deletion)
+    platform/                   # Shared runtime helpers (e.g. contacts_client)
+    domain_routes.py            # domain_id → action ids (routing manifest)
+    onboarding/                 # first-party onboarding copy
+    __init__.py                 # register_bundles(registry) only
+  intentframe_executor_pack_*/  # posix / macos / console
+  extras/                       # demo bridge (ExecutorBridge)
 ```
 
 Import layering (CI-enforced in `tests/test_boundary_imports.py`):
@@ -118,7 +122,7 @@ Implementation followed nine phases in `TODO/new_plan.md`, grouped into four **w
 | `5154eb5` | Prompt refactor — `intentframe_prompt_library`, bundle `build_ai_context` |
 | `5719a35` | Pass 12 — domain SDK, `register_domain_routes`, many-to-many routing |
 | `eb1a4e3` | Passive-read on per-bundle `passive_read_action_ids`; `allow_gates` |
-| `551229e` | Rename → `intentframe_native_bundles` |
+| `551229e` | Rename → `intentframe_native_kit.intentframe_native_bundles` |
 | `e3855aa` | Fix actions/ vs domains/ split |
 | `aeb3130` | Restore pass-12 SDK routing; delete policy_registry constraint copies |
 | `fee09a6` | Loader + invariant tests (pass 15) |
@@ -131,7 +135,7 @@ Implementation followed nine phases in `TODO/new_plan.md`, grouped into four **w
 - `intentframe_components/guardian/checkers/`
 - `intentframe_action_bundle/` (entire package — replaced by native bundles + SDK)
 - `policy_registry/constraints/`, `policy_registry/domains/`, `policy_registry/source_types.py`, `policy_registry/contacts_client.py`
-- Terminal system-floor merge and `DEFAULT_TERMINAL_DENY_CAPABILITIES` ownership moved to `intentframe_native_bundles/actions/terminal/`
+- Terminal system-floor merge and `DEFAULT_TERMINAL_DENY_CAPABILITIES` ownership moved to `intentframe_native_kit.intentframe_native_bundles/actions/terminal/`
 - Manifest, policy_bridge, NullActionBundle, checker shims
 
 ---
@@ -292,7 +296,7 @@ Loader entry point per plugin package:
 def register_bundles(registry) -> None: ...
 ```
 
-Boot: `ensure_loaded(["intentframe_native_bundles"])` then `validate_policy_against_registry(policy)`.
+Boot: `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])` then `validate_policy_against_registry(policy)`.
 
 ---
 
@@ -300,8 +304,8 @@ Boot: `ensure_loaded(["intentframe_native_bundles"])` then `validate_policy_agai
 
 | Item | Notes |
 |------|-------|
-| Orphan copies under `intentframe_native_bundles/{files,terminal,...}/` (top-level, not under `actions/`) | Not imported; safe to delete |
-| `onboarding/engine.py` imports native onboarding | ~~Optional decouple~~ — Done: `engine.py` now imports `build_onboarding_instructions` from `intentframe_components.onboarding.instructions`. Bundle SDK owns the middle section via `render_onboarding_bundle_context`; each bundle contributes via `onboarding_guardrails()`; cross-bundle copy lives in `intentframe_native_bundles/onboarding/manifest.py`. |
+| Orphan copies under `intentframe_native_kit.intentframe_native_bundles/{files,terminal,...}/` (top-level, not under `actions/`) | Not imported; safe to delete |
+| `onboarding/engine.py` imports native onboarding | ~~Optional decouple~~ — Done: `engine.py` now imports `build_onboarding_instructions` from `intentframe_components.onboarding.instructions`. Bundle SDK owns the middle section via `render_onboarding_bundle_context`; each bundle contributes via `onboarding_guardrails()`; cross-bundle copy lives in `intentframe_native_kit.intentframe_native_bundles/onboarding/manifest.py`. |
 | ~~`intentframe_server/enrichers/email.py` imports native enrich~~ | Done — bundle owns `EmailClient` lifecycle via `aclose()` |
 | `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Resolved: loader validates constraint shapes via `validate_policy_against_registry` after opaque `UserPolicy` construction. Registry HTTP writes remain unvalidated until bundle-runtime service lands (see `policy_registry/TODO/bundle_validator.md`). |
 | `intentframe_components/TODO/*.md` | References pre-refactor paths (criticality, strategy.py) |

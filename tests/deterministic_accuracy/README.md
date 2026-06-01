@@ -398,7 +398,7 @@ Two-stage algorithmic failure:
    structural signals include `command-substitution`. Correct behavior —
    the classifier can't know what `$(echo pip)` evaluates to.
 2. DG's gates skip on empty caps: in
-   [`intentframe_native_bundles/actions/terminal/bundle.py`](../../intentframe_native_bundles/actions/terminal/bundle.py),
+   [`intentframe_native_kit.intentframe_native_bundles/actions/terminal/bundle.py`](../../intentframe_native_kit.intentframe_native_bundles/actions/terminal/bundle.py),
    the guard `if constraints.deny_capabilities and capabilities:` makes
    the deny check a no-op when `capabilities` is an empty tuple. Same
    for `allow_capabilities`.

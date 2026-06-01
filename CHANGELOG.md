@@ -8,10 +8,15 @@ This project follows semantic versioning where practical. While IntentFrame is i
 
 ### Changed
 
+- Native action surface packaging: `intentframe_native_kit.action_registry`, `intentframe_native_kit.intentframe_native_bundles`,
+  and `intentframe_executor_pack_*` now live under `intentframe_native_kit/`
+  (import names unchanged; demo `ExecutorBridge` lives in
+  `intentframe_native_kit/extras/bridge.py` only).
+
 - Policy registry decoupling: constraint schemas, system terminal floors, and
   contact-based recipient resolution moved from `policy_registry/` into action
-  bundles (`intentframe_native_bundles/actions/*/constraints.py`) and
-  `intentframe_native_bundles/platform/contacts_client.py`. The registry stores
+  bundles (`intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py`) and
+  `intentframe_native_kit/intentframe_native_bundles/platform/contacts_client.py`. The registry stores
   opaque constraint dicts only; bundles enforce shape and runtime resolution.
 
 ### Added

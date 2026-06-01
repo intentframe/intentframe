@@ -179,7 +179,7 @@ async def main() -> None:
     _dump("STAGE 2: IntentFrame from Actor (pre-enrichment)", intent_from_actor)
 
     from intentframe_components.prompt import format_intent_data
-    import intentframe_native_bundles.actions.email.enrich as email_enrich_module
+    import intentframe_native_kit.intentframe_native_bundles.actions.email.enrich as email_enrich_module
     from intentframe_server.pipeline import IntentFrameRuntime
 
     real_enrich_intent = email_enrich_module.enrich_intent
@@ -238,7 +238,7 @@ async def main() -> None:
             _dump("STAGE 9: Runtime audit log entry", runtime.get_audit_log())
 
             print("\n--- Mail adapter dispatch check ---")
-            from intentframe_executor_pack_macos.adapters.mail import (
+            from intentframe_native_kit.intentframe_executor_pack_macos.adapters.mail import (
                 _ACCOUNT_ACTIONS,
                 _MESSAGE_ACTIONS,
             )

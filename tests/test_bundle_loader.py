@@ -14,7 +14,7 @@ from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     register_action_bundle,
 )
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
 from policy_registry.models import ActionPermission, UserPolicy
 from tests._bundle_loader import DEFAULT_TEST_PACKAGES, ensure_test_bundles_loaded
 
@@ -32,7 +32,7 @@ def test_ensure_loaded_rejects_conflicting_package_set(
 ) -> None:
     import intentframe_bundle_sdk.loader as loader_mod
 
-    monkeypatch.setattr(loader_mod, "_LOADED_PACKAGES", frozenset({"intentframe_native_bundles"}))
+    monkeypatch.setattr(loader_mod, "_LOADED_PACKAGES", frozenset({"intentframe_native_kit.intentframe_native_bundles"}))
     with pytest.raises(RuntimeError, match="already loaded"):
         ensure_loaded(["some.other.package"])
 

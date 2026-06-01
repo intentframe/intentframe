@@ -22,16 +22,16 @@ _project_root = Path(__file__).parent.parent.parent.resolve()
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from action_registry import ActionType
-from action_registry.types import DomainType, ACTION_DOMAINS
+from intentframe_native_kit.action_registry import ActionType
+from intentframe_native_kit.action_registry.types import DomainType, ACTION_DOMAINS
 from intentframe_core.types import IntentFrame
-from action_registry.domains import DOMAIN_SCHEMAS
+from intentframe_native_kit.action_registry.domains import DOMAIN_SCHEMAS
 from policy_registry.models import UserPolicy
-from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
-from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
-from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
-from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
-from intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
+from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+from intentframe_native_kit.intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
+from intentframe_native_kit.intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
+from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+from intentframe_native_kit.intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
 from intentframe_bundle_sdk.types import PhaseDecision
 
 passed_count = 0
@@ -495,8 +495,8 @@ def test_guardian_pipeline():
     from intentframe_components.analysis import AIAnalysisEngine
     from intentframe_components.guardian import AIGuardian
     from policy_registry.models import ActionPermission
-    from intentframe_native_bundles.actions.api.constraints import ApiConstraints
-    from intentframe_native_bundles.actions.files.constraints import FileConstraints
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
+    from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints import FileConstraints
 
     analysis_engine = AIAnalysisEngine(model="gpt-4o-mini", verbose=False)
     guardian = AIGuardian(model="gpt-4o-mini", verbose=True)

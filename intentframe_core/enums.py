@@ -3,7 +3,7 @@ Enums for IntentFrame System
 
 IntentFrame-specific enumerations.
 
-The action taxonomy (``ActionType``) deliberately lives in ``action_registry``,
+The action taxonomy (``ActionType``) deliberately lives in ``intentframe_native_kit.action_registry``,
 not here. ``intentframe_core`` is a neutral, lower-level layer and must not
 depend on the registry; ``IntentFrame.action`` is a plain string.
 """

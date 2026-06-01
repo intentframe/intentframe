@@ -43,7 +43,7 @@ class DeterministicGuardian:
         verbose: bool = False,
     ) -> None:
         self.verbose = verbose
-        self.packages = packages or ["intentframe_native_bundles"]
+        self.packages = packages or ["intentframe_native_kit.intentframe_native_bundles"]
         ensure_loaded(self.packages)
 
     async def decide_async(

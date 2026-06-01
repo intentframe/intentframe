@@ -7,7 +7,7 @@ implementations to route I/O through the IntentFrame security pipeline.
 The Actor parses request dicts into signed :class:`~intentframe_core.types.IntentFrame`
 objects and POSTs them to the runtime. It does **not** validate action
 taxonomy or critical-domain payload shape — that is optional author-side
-work (e.g. Jarvis imports ``action_registry`` before submit). Unknown actions
+work (e.g. Jarvis imports ``intentframe_native_kit.action_registry`` before submit). Unknown actions
 and malformed domain payloads fail closed server-side in the bundle runner
 and executor.
 

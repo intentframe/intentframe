@@ -20,11 +20,11 @@
 # entry-point group (how a third-party org plugs in its own pack).
 #
 # First-party packs available in this repo:
-#   intentframe_executor_pack_posix    portable base (files VFS, sqlite, hmac, uds)
-#   intentframe_executor_pack_console  console_user_io + simulated_user_io (headless)
-#   intentframe_executor_pack_macos    native macOS adapters (+ portable base)
+#   intentframe_native_kit.intentframe_executor_pack_posix    portable base (files VFS, sqlite, hmac, uds)
+#   intentframe_native_kit.intentframe_executor_pack_console  console_user_io + simulated_user_io (headless)
+#   intentframe_native_kit.intentframe_executor_pack_macos    native macOS adapters (+ portable base)
 packs:
-  - intentframe_executor_pack_posix
+  - intentframe_native_kit.intentframe_executor_pack_posix
 
 # ─── Transport: How requests arrive ──────────────────────────────────────────
 # Types: unix_socket (device default), grpc (cloud/device), rest (admin/debug)

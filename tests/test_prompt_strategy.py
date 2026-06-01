@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import asyncio
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
-from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.shared.files.evidence import FileIntel
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
-from intentframe_native_bundles.shared.files.prompts_ae import _CRITICAL_WRITE_FILE
-from intentframe_native_bundles.actions.terminal.evidence import (
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.shared.files.evidence import FileIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_kit.intentframe_native_bundles.shared.files.prompts_ae import _CRITICAL_WRITE_FILE
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
 )
-from intentframe_native_bundles.actions.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
 from intentframe_bundle_sdk.types import ActionPermission, BundleAIContext, BundleContext
 from intentframe_components.analysis.engine import AIAnalysisEngine
 from intentframe_components.guardian.engine import AIGuardian
@@ -154,7 +154,7 @@ class TestHostFilesBundleAIContext:
 
 class TestDefaultBundleAIContext:
     def test_spotlight_bundle_returns_substrate_defaults(self):
-        from intentframe_native_bundles.actions.spotlight.bundle import SpotlightActionBundle
+        from intentframe_native_kit.intentframe_native_bundles.actions.spotlight.bundle import SpotlightActionBundle
 
         bundle = SpotlightActionBundle()
         ctx = _bundle_ctx(_intent(ActionType.SEARCH_SPOTLIGHT, "query"))
@@ -197,7 +197,7 @@ class TestEngineResolution:
 
 class TestPassiveReadDriftGuard:
     def test_terminal_and_passive_read_do_not_overlap(self):
-        from intentframe_native_bundles import passive_read_action_ids
-        from intentframe_native_bundles.actions.terminal import ACTION_IDS as TERMINAL_ACTIONS
+        from intentframe_native_kit.intentframe_native_bundles import passive_read_action_ids
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal import ACTION_IDS as TERMINAL_ACTIONS
 
         assert TERMINAL_ACTIONS.isdisjoint(passive_read_action_ids())

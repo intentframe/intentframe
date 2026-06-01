@@ -26,10 +26,10 @@ from pydantic import ValidationError
 
 from intentframe_gateway import bootstrap
 from jarvis.policies import builtin_policy_path
-from intentframe_native_bundles.actions.email.constraints import EmailConstraints
-from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
-from intentframe_native_bundles.actions.message.constraints import MessageConstraints
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.message.constraints import MessageConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import (
     INTENTFRAME_POLICY_SCHEMA_VERSION,
     UserPolicy,

@@ -6,7 +6,7 @@
 Each I/O tool follows the same pattern:
   1. Build a typed Pydantic action model (tool-schema validation).
   2. Optional registry pre-flight via ``_validate_against_registry`` — Jarvis
-     imports ``action_registry`` as author-side convenience (taxonomy + domain
+     imports ``intentframe_native_kit.action_registry`` as author-side convenience (taxonomy + domain
      payload slices). The Actor itself does not import the registry.
   3. Submit through ``actor.submit()`` — every call hits the IntentFrame
      Guardian pipeline. Server-side bundles re-validate authoritatively.
@@ -28,8 +28,8 @@ from pydantic import BaseModel
 # registry to fail fast before the network round-trip. The actor and core stay
 # decoupled from the registry; the IntentFrame pipeline still re-validates
 # authoritatively server-side.
-from action_registry.domains import DOMAIN_SCHEMAS
-from action_registry.types import ACTION_DOMAINS, ActionType
+from intentframe_native_kit.action_registry.domains import DOMAIN_SCHEMAS
+from intentframe_native_kit.action_registry.types import ACTION_DOMAINS, ActionType
 
 from jarvis.types import AgentContext
 

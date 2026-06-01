@@ -11,7 +11,7 @@
 # Runs locally on a Mac host: the macOS pack supplies the GUI `user_io`
 # (osascript dialogs) plus the portable base (files VFS, sqlite, hmac, uds).
 packs:
-  - intentframe_executor_pack_macos
+  - intentframe_native_kit.intentframe_executor_pack_macos
 
 transport:
   type: unix_socket

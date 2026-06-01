@@ -14,14 +14,14 @@ checker-reorder shows up here with a tight, readable diff.
 
 from __future__ import annotations
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_core.types import IntentFrame, UserContext
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 from ._helpers import build_command_intel, run_dg, run_dg_with_intel

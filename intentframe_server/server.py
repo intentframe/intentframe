@@ -113,7 +113,7 @@ def _create_runtime() -> IntentFrameRuntime:
         execution_context=execution_context,
         onboarding_engine=onboarding,
         deterministic_guardian=DeterministicGuardian(
-            packages=["intentframe_native_bundles"],
+            packages=["intentframe_native_kit.intentframe_native_bundles"],
             verbose=verbose,
         ),
         verbose=verbose,

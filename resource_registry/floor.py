@@ -1,10 +1,10 @@
 """Non-negotiable deny-write floor + shared real-path canonicalization.
 
-Analogue of ``intentframe_executor_pack_macos.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE`` for
+Analogue of ``intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE`` for
 mutating file-tool actions (WRITE_FILE / DELETE_FILE / APPEND_ROW, plus
 WRITE_HOST_FILE / DELETE_HOST_FILE for the host-file family).  The
 sandbox's deny list only protects ``RUN_COMMAND`` (via the Seatbelt
-profile in ``intentframe_executor_pack_macos.sandbox``); file-tool actions
+profile in ``intentframe_native_kit.intentframe_executor_pack_macos.sandbox``); file-tool actions
 go through the VFS / host-file adapters and bypass the kernel-level
 floor entirely.  This module gives both families a symmetric floor so
 writes/deletes to a launchd plist / shell rc file / ``~/.ssh/*`` /
@@ -25,7 +25,7 @@ Design choices:
   here preserves the extraction-as-microservice story of the registry
   and keeps executor code unchanged.
 - **Pre-expanded tuple.**  ``~`` is expanded at module-load time using
-  :func:`intentframe_executor_pack_macos.sandbox.venv.owner_home` so the floor honours
+  :func:`intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv.owner_home` so the floor honours
   ``SUDO_USER`` under root-via-sudo — the same identity-aware HOME the
   executor venv uses.  No per-call expansion.
 - **Canonicalized via realpath.**  Matches the sandbox's
@@ -37,7 +37,7 @@ Design choices:
   for audit logging; callers treat a non-None result as "deny".
 
 The list is a deliberate superset of
-``intentframe_executor_pack_macos.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE`` covering the
+``intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE`` covering the
 root-demo hardening categories named in
 ``TODO/root-demo-policy-driven-sandbox.md``:
 
@@ -61,13 +61,13 @@ import logging
 import os
 from pathlib import Path
 
-# Identity-aware HOME resolution lives in intentframe_executor_pack_macos.sandbox.venv today.
+# Identity-aware HOME resolution lives in intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv today.
 # Importing it does NOT edit sandbox code — it's a read-only dependency
 # that lets us share the "respect SUDO_USER" behaviour without
 # duplicating the pwd.getpwnam logic.  If the resource-registry is ever
 # extracted as a microservice, lift owner_home() to a neutral location
 # (intentframe_core.identity) and update both sides in one go.
-from intentframe_executor_pack_macos.sandbox.venv import owner_home
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import owner_home
 
 logger = logging.getLogger(__name__)
 
@@ -172,9 +172,9 @@ def canonicalize_real_path(raw: str) -> str:
 
     - :class:`intentframe_components.guardian.deterministic.DeterministicGuardian`
       (host-file floor gates)
-    - :class:`intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`
+    - :class:`intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`
       (per-action allowlist match)
-    - :class:`intentframe_executor_pack_macos.adapters.host_files.HostFilesAdapter`
+    - :class:`intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files.HostFilesAdapter`
       (pre-I/O enforcement)
 
     All three must agree on the canonical string form before calling
@@ -182,7 +182,7 @@ def canonicalize_real_path(raw: str) -> str:
     one canonicalization but not another.
 
     Semantics mirror
-    :func:`intentframe_executor_pack_macos.virtual_filesystem._canonical_real_path`
+    :func:`intentframe_native_kit.intentframe_executor_pack_macos.virtual_filesystem._canonical_real_path`
     (re-implemented here rather than imported so ``resource_registry``
     stays free of ``executor`` deps):
 

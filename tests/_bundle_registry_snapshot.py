@@ -53,7 +53,7 @@ def restore_registry_snapshot(snap: _RegistrySnapshot) -> None:
 
 def refresh_email_bundle_in_registry() -> None:
     """Replace the shared email registry singleton with a fresh instance."""
-    from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.email.bundle import EmailActionBundle
 
     fresh = EmailActionBundle()
     registry._ACTION_INSTANCES[:] = [

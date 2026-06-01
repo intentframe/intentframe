@@ -15,13 +15,13 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from action_registry import ActionType
+from intentframe_native_kit.action_registry import ActionType
 from intentframe_core import IntentFrame, UserContext
 from intentframe_components.analysis import AIAnalysisEngine
 from intentframe_components.guardian import AIGuardian
 from policy_registry.models import ActionPermission
-from intentframe_native_bundles.actions.api.constraints import ApiConstraints
-from intentframe_native_bundles.actions.files.constraints import FileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints import FileConstraints
 
 
 async def _run_test():

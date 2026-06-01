@@ -1,7 +1,7 @@
 # Substrate vocabulary hygiene — remaining action literals in `intentframe_components`
 
 > **Context:** [docs/_internal_/substrate-plugin-refactor.md](../../docs/_internal_/substrate-plugin-refactor.md) — completed bundle SDK refactor (May 2026).  
-> Follow-up to path heuristics → files bundle and onboarding → `intentframe_native_bundles.onboarding`.  
+> Follow-up to path heuristics → files bundle and onboarding → `intentframe_native_kit.intentframe_native_bundles.onboarding`.  
 > Pre-refactor baseline: `66e567c` (`pre-refactor` tag).
 
 ---
@@ -83,7 +83,7 @@ Guardian system prompt and closing instruction hardcode user-IO action names:
 
 ### Suggested steps
 
-1. Define `USER_IO_ACTIONS` frozenset in bundle (from `action_registry.types.ActionType`).
+1. Define `USER_IO_ACTIONS` frozenset in bundle (from `intentframe_native_kit.action_registry.types.ActionType`).
 2. Export `guardian_user_io_section() -> str` (and optional closing line fragment).
 3. Concatenate into Guardian `_STANDARD` via `build_guardian_prompts()` (mirror `build_analysis_prompts`).
 4. Remove literal `ASK_USER` strings from `guardian/engine.py` closing; use bundle fragment or generic “user-IO actions” wording.

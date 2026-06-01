@@ -84,8 +84,8 @@ def _register_packs(config) -> None:
         raise ConfigurationError(
             "No executor packs configured. Set `packs:` in executor.yaml, e.g.\n"
             "  packs:\n"
-            "    - intentframe_executor_pack_posix   # portable base\n"
-            "    - intentframe_executor_pack_console # console / simulated user_io\n"
+            "    - intentframe_native_kit.intentframe_executor_pack_posix   # portable base\n"
+            "    - intentframe_native_kit.intentframe_executor_pack_console # console / simulated user_io\n"
             "(or a pack advertised under the "
             f"'{ENTRY_POINT_GROUP}' entry-point group).",
         )
@@ -109,7 +109,7 @@ async def lifespan(app: FastAPI):
 
     if sys.platform == "darwin":
         try:
-            from intentframe_executor_pack_macos.permissions import check_permissions
+            from intentframe_native_kit.intentframe_executor_pack_macos.permissions import check_permissions
             check_permissions(config.adapters.enabled)
         except Exception as exc:
             logger.warning("Platform server permission check failed: %s", exc)

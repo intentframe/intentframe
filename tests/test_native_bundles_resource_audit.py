@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ACTIONS_ROOT = REPO_ROOT / "intentframe_native_bundles" / "actions"
+ACTIONS_ROOT = REPO_ROOT / "intentframe_native_kit" / "intentframe_native_bundles" / "actions"
 
 # Bundles audited for external client ownership; email is the only one with aclose today.
 CLIENT_BUNDLE_IDS = frozenset({"email", "browser", "api", "host_files", "terminal"})

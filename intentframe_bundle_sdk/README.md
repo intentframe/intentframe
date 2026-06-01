@@ -5,7 +5,7 @@ Governed lifecycle contract for **action** and **domain** plugins. The substrate
 this package owns hook shapes, registry, loader, fixed gate order, and the data
 that flows to Analysis Engine / Guardian on the UNDECIDED path.
 
-First-party reference implementation: `intentframe_native_bundles/`.
+First-party reference implementation: `intentframe_native_kit/intentframe_native_bundles/`.
 
 ---
 
@@ -60,7 +60,7 @@ Public API is re-exported from `intentframe_bundle_sdk/__init__.py` (`__all__`).
 ```python
 from intentframe_bundle_sdk import ensure_loaded, validate_policy_against_registry
 
-ensure_loaded(["intentframe_native_bundles"])
+ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])
 validate_policy_against_registry(user_policy)
 ```
 
@@ -166,7 +166,7 @@ class MyActionBundle(ActionBundle):
         return BundlePhaseOutcome.continue_(ctx)
 ```
 
-Reference: `intentframe_native_bundles/actions/email/bundle.py` (enrichment + `aclose`).
+Reference: `intentframe_native_kit/intentframe_native_bundles/actions/email/bundle.py` (enrichment + `aclose`).
 
 ---
 
@@ -230,7 +230,7 @@ def register_bundles(registry) -> None:
     registry.register_onboarding_manifest(MY_ONBOARDING_MANIFEST)  # optional
 ```
 
-See `intentframe_native_bundles/__init__.py` for the first-party pattern.
+See `intentframe_native_kit/intentframe_native_bundles/__init__.py` for the first-party pattern.
 
 ---
 
@@ -273,7 +273,7 @@ second bundle needs multi-resource teardown.
 Typical wiring in `intentframe_server`:
 
 ```python
-DeterministicGuardian(packages=["intentframe_native_bundles"])
+DeterministicGuardian(packages=["intentframe_native_kit.intentframe_native_bundles"])
   → ensure_loaded(packages) on init
   → permission gate
   → DeterministicRunner.run_action_bundle(...)

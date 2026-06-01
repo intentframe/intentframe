@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_bundle_sdk.registry import domain_bundle_for, validate_policy_domain_constraints
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.trace import (

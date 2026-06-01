@@ -10,15 +10,15 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
     DeterministicResult,
 )
 from intentframe_core.types import IntentFrame, UserContext
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 from tests.deterministic_accuracy._helpers import (
     decide_dg_sync,

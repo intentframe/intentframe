@@ -40,11 +40,11 @@ git add \
   executor/config/schema.py \
   executor/config/executor.yaml \
   executor_sdk/packs.py \
-  intentframe_executor_pack_posix/ \
-  intentframe_executor_pack_console/adapters/simulated_user_io.py \
-  intentframe_executor_pack_console/adapters/__init__.py \
-  intentframe_executor_pack_console/adapters/console_user_io.py \
-  intentframe_executor_pack_macos/
+  intentframe_native_kit/intentframe_executor_pack_posix/ \
+  intentframe_native_kit/intentframe_executor_pack_console/adapters/simulated_user_io.py \
+  intentframe_native_kit/intentframe_executor_pack_console/adapters/__init__.py \
+  intentframe_native_kit/intentframe_executor_pack_console/adapters/console_user_io.py \
+  intentframe_native_kit/intentframe_executor_pack_macos/
 
 git commit -m "executor: config-driven packs + POSIX base for Linux container"
 git push origin refactor-substrate

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from tests._bundle_loader import ensure_test_bundles_loaded
-from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
-from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
+from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+from intentframe_native_kit.intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     domain_bundle_for,

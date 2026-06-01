@@ -43,7 +43,7 @@ _project_root = Path(__file__).parent.parent.parent.resolve()
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
 from intentframe_core.enums import RiskLevel, Reversibility, Decision
 from intentframe_components.analysis import AIAnalysisEngine

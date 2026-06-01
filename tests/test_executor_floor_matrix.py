@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from action_registry import ActionType
-from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
-from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
+from intentframe_native_kit.action_registry import ActionType
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 from resource_registry.floor import DENY_WRITE_PREFIXES
 
 

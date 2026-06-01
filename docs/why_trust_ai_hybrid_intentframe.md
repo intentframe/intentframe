@@ -148,7 +148,7 @@ Plus a third hard gate for domain-structural policy — enforced by **domain bun
             )
 ```
 
-Domain intent slices are defined in `action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`). Routing is declared in `intentframe_native_bundles/domain_routes.py` and registered via `register_domain_routes()` — the runner does not import `ACTION_DOMAINS` at runtime.
+Domain intent slices are defined in `intentframe_native_kit/action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`). Routing is declared in `intentframe_native_kit/intentframe_native_bundles/domain_routes.py` and registered via `register_domain_routes()` — the runner does not import `ACTION_DOMAINS` at runtime.
 
 All three gates block before the AI sees anything.
 

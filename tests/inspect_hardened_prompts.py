@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import asyncio
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
-from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
-from intentframe_native_bundles.shared.files.file_intel import build_file_intel
-from intentframe_native_bundles.actions.terminal.evidence import (
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel import build_file_intel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
 )

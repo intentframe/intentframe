@@ -495,7 +495,7 @@ _OBFUSCATION: list[Case] = [
 
 
 # ── python+shell-only deny set ─────────────────────────────────────
-# Pins ``intentframe_native_bundles.actions.terminal.capabilities.PYTHON_SHELL_ONLY_DENY_CAPABILITIES``
+# Pins ``intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.PYTHON_SHELL_ONLY_DENY_CAPABILITIES``
 # end-to-end through DG.  python_shell_only is the load-bearing column;
 # the other profiles are presence checks documenting the cross-profile
 # blast radius of each command:

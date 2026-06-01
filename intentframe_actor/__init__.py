@@ -3,7 +3,7 @@ IntentFrame Actor SDK — thin transport to the IntentFrame runtime.
 
 Wraps tool calls: parse request dicts into :class:`~intentframe_core.types.IntentFrame`
 (no action-registry validation) and POST to the pipeline. Agent authors who
-want fail-fast taxonomy/domain checks import ``action_registry`` in their own
+want fail-fast taxonomy/domain checks import ``intentframe_native_kit.action_registry`` in their own
 tool layer (see ``jarvis.tools``).
 
 Usage::

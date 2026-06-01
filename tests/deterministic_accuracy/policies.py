@@ -7,7 +7,7 @@ internals, so new ones can be added without understanding the gates.
 Shared floor: every profile includes the system-floor blocked_patterns.
 In production the floor is applied inside ``TerminalActionBundle.enforce_constraints``
 by merging ``SYSTEM_TERMINAL_BLOCKED_PATTERNS`` from
-:mod:`intentframe_native_bundles.actions.terminal.constraints` with the
+:mod:`intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints` with the
 user-supplied patterns.  Here we embed a small representative subset so the
 tests do not depend on the bundle internals — bundle-level floor enforcement is
 covered separately in ``tests/test_terminal_blocklist.py``.
@@ -18,11 +18,11 @@ from __future__ import annotations
 from typing import Callable
 
 from intentframe_core.types import UserContext
-from intentframe_native_bundles.actions.terminal.capabilities import (
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities import (
     DEFAULT_TERMINAL_DENY_CAPABILITIES,
     PYTHON_SHELL_ONLY_DENY_CAPABILITIES,
 )
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 
@@ -111,7 +111,7 @@ def python_shell_only() -> UserContext:
     """Python/shell command profile plus the sensitive-surface clamp.
 
     Pulls the canonical deny set from
-    :data:`intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+    :data:`intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
     (union of :data:`PYTHON_SHELL_ONLY_DENY_CAPABILITIES` and
     :data:`SENSITIVE_SURFACE_DENY_CAPABILITIES`) so the accuracy corpus
     automatically tracks future changes to the default deny set.

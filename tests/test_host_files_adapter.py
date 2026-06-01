@@ -1,4 +1,4 @@
-"""Unit tests for :class:`intentframe_executor_pack_macos.adapters.host_files.HostFilesAdapter`.
+"""Unit tests for :class:`intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files.HostFilesAdapter`.
 
 The adapter is the final wall before real-path I/O.  It runs two
 independent checks on every call:
@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from action_registry import ActionType
-from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
-from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
+from intentframe_native_kit.action_registry import ActionType
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
 
 
 def _run(adapter: HostFilesAdapter, action, params):

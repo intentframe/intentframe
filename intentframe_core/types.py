@@ -7,7 +7,7 @@ for automatic JSON serialization over HTTP.
 Key contract — :class:`IntentFrame`:
     ``action`` is an opaque string (e.g. ``"READ_FILE"``), not a registry
     enum. Core does not validate action names or domain payload shape; agent
-    authors may use ``action_registry`` for that locally. The substrate
+    authors may use ``intentframe_native_kit.action_registry`` for that locally. The substrate
     validates authoritatively via bundles and executor dispatch.
 """
 
@@ -47,7 +47,7 @@ class IntentFrame(BaseModel):
 
     ``action`` is an opaque string identifier (e.g. ``"READ_FILE"``). Core does
     not validate it against any taxonomy — that is the agent author's job (they
-    may use ``action_registry`` for convenience). Unknown actions fail closed at
+    may use ``intentframe_native_kit.action_registry`` for convenience). Unknown actions fail closed at
     executor dispatch.
     """
     action: str

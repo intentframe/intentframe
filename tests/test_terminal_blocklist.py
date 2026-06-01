@@ -20,18 +20,18 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from intentframe_native_bundles.actions.terminal.constraints import (
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import (
     SYSTEM_TERMINAL_BLOCKED_PATTERNS,
     TerminalConstraints,
 )
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.registry import PolicyRegistry
-from intentframe_native_bundles.actions.terminal.ae_fast_path import (
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.ae_fast_path import (
     CATASTROPHIC_COMMAND_PATTERNS,
     try_catastrophic_report,
 )
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
 from intentframe_core.enums import RiskLevel, Reversibility
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import (
@@ -39,8 +39,8 @@ from intentframe_bundle_sdk.types import (
     BundleContext,
     PhaseDecision,
 )
-from action_registry.types import ActionType
-from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 from command_shield import quick_check
 from command_shield.patterns import COMPILED_PATTERNS
 
@@ -541,7 +541,7 @@ class TestComponentIndependence:
         assert "sudo" in SYSTEM_TERMINAL_BLOCKED_PATTERNS
 
         # Terminal bundle catastrophic patterns
-        from intentframe_native_bundles.actions.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
         assert "sudo" in CATASTROPHIC_COMMAND_PATTERNS
 
         # Terminal bundle constraint enforcement
@@ -560,7 +560,7 @@ class TestComponentIndependence:
 
     def test_each_layer_covers_original_six_patterns(self):
         """Policy registry, terminal bundle, and command_shield all know the original six."""
-        from intentframe_native_bundles.actions.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.ae_fast_path import CATASTROPHIC_COMMAND_PATTERNS
 
         expected = {"sudo", "rm -rf /", "mkfs", "dd if=", "> /dev/", "chmod 777"}
 
