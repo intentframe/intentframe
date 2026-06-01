@@ -26,6 +26,7 @@ def _intent() -> IntentFrame:
     return IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="echo hi",
+        data={"command": "echo hi"},
         reason="test",
         agent_id="tester",
     )

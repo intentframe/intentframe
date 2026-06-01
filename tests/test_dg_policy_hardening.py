@@ -36,6 +36,7 @@ class TestExceptionFailClosedPolicy:
             IntentFrame(
                 action=ActionType.RUN_COMMAND,
                 target="echo hi",
+                data={"command": "echo hi"},
                 reason="test",
                 agent_id="a",
             ),
@@ -121,6 +122,7 @@ class TestCalendarConstraintEnforcement:
             IntentFrame(
                 action=ActionType.CREATE_EVENT,
                 target="personal",
+                data={"calendar": "personal"},
                 reason="test",
                 agent_id="a",
             ),
@@ -145,6 +147,7 @@ class TestCalendarConstraintEnforcement:
             IntentFrame(
                 action=ActionType.CREATE_EVENT,
                 target="work",
+                data={"calendar": "work"},
                 reason="test",
                 agent_id="a",
             ),

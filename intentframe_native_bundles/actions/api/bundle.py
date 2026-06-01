@@ -46,25 +46,44 @@ class ApiActionBundle(ActionBundle):
         constraints = ApiConstraints.model_validate(action_permission.constraints)
         if constraints.max_amount is not None:
             amount = (intent.data or {}).get("amount")
-            if amount is not None:
-                try:
-                    if float(amount) > constraints.max_amount:
-                        return BundlePhaseOutcome.block(
-                            ctx,
-                            reason=(
-                                f"Constraint violation: Amount ${float(amount):,.2f} "
-                                f"exceeds limit ${constraints.max_amount:,.2f}"
-                            ),
-                            matched_gate="constraint",
-                        )
-                except (TypeError, ValueError):
+            if amount is None:
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Constraint violation: Amount is required to "
+                        "evaluate max_amount policy"
+                    ),
+                    matched_gate="constraint",
+                )
+            try:
+                if float(amount) > constraints.max_amount:
                     return BundlePhaseOutcome.block(
                         ctx,
-                        reason="Constraint violation: Invalid amount value",
+                        reason=(
+                            f"Constraint violation: Amount ${float(amount):,.2f} "
+                            f"exceeds limit ${constraints.max_amount:,.2f}"
+                        ),
                         matched_gate="constraint",
                     )
+            except (TypeError, ValueError):
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason="Constraint violation: Invalid amount value",
+                    matched_gate="constraint",
+                )
         if constraints.allowed_endpoints is not None:
-            endpoint = intent.target or (intent.data or {}).get("url", "")
+            endpoint = (intent.data or {}).get("url")
+            if endpoint is None or (
+                isinstance(endpoint, str) and not endpoint.strip()
+            ):
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Constraint violation: URL is required to evaluate "
+                        "allowed_endpoints policy"
+                    ),
+                    matched_gate="constraint",
+                )
             for pattern in constraints.allowed_endpoints:
                 if fnmatch.fnmatch(endpoint, pattern):
                     return BundlePhaseOutcome.continue_(ctx)

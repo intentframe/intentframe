@@ -175,12 +175,30 @@ class TerminalActionBundle(ActionBundle):
         return constraints.deny_capabilities
 
     @staticmethod
+    def _terminal_policy_needs_command(constraints: TerminalConstraints) -> bool:
+        return bool(
+            constraints.allowed_commands
+            or constraints.blocked_patterns
+            or constraints.deny_capabilities
+            or constraints.allow_capabilities
+        )
+
+    @staticmethod
     def _check_constraints(
         intent: IntentFrame,
         constraints: TerminalConstraints,
         ctx: BundleContext,
     ) -> tuple[bool, str]:
-        command = intent.target or (intent.data or {}).get("command", "")
+        # ``data["command"]`` is the executed resource; ``intent.target`` is display.
+        command = (intent.data or {}).get("command", "")
+        if TerminalActionBundle._terminal_policy_needs_command(constraints):
+            if not command or (
+                isinstance(command, str) and not command.strip()
+            ):
+                return (
+                    False,
+                    "Command is required to evaluate terminal policy",
+                )
 
         # System floor is always enforced, independent of user policy.
         effective_blocked = list(

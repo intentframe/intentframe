@@ -445,6 +445,112 @@ def test_finance_domain_blocks_missing_recipient_for_allowlist_policy() -> None:
     assert "recipient" in (outcome.reason or "").lower()
 
 
+def test_api_bundle_blocks_missing_amount_for_max_amount_policy() -> None:
+    from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+
+    bundle = ApiActionBundle()
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="api policy",
+        agent_id="test",
+        data={"url": "https://api.example.com/pay"},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"max_amount": 5000.0},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "amount" in (outcome.reason or "").lower()
+
+
+def test_api_bundle_blocks_missing_url_for_allowed_endpoints_policy() -> None:
+    from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+
+    bundle = ApiActionBundle()
+    intent = IntentFrame(
+        action=ActionType.HTTP_GET,
+        target="https://api.example.com/status",
+        reason="api policy",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_endpoints": ["https://api.example.com/*"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "url" in (outcome.reason or "").lower()
+
+
+def test_calendar_bundle_blocks_missing_calendar_for_allowed_calendars_policy() -> None:
+    from intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
+
+    bundle = CalendarActionBundle()
+    intent = IntentFrame(
+        action=ActionType.CREATE_EVENT,
+        target="work",
+        reason="calendar policy",
+        agent_id="test",
+        data={"title": "Standup"},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_calendars": ["work", "personal"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "calendar" in (outcome.reason or "").lower()
+
+
+def test_terminal_bundle_blocks_missing_command_when_policy_needs_command() -> None:
+    from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+
+    bundle = TerminalActionBundle()
+    intent = IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target="ls -la",
+        reason="terminal policy",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_commands": ["ls *"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "command" in (outcome.reason or "").lower()
+
+
 def test_deletion_domain_blocks_missing_path_for_allowed_paths_policy() -> None:
     from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
 
@@ -701,6 +807,126 @@ def test_bundle_phase_outcome_decision_path_passthrough() -> None:
 
     allowed = BundlePhaseOutcome.allow(ctx, reason="ok", matched_gate="")
     assert allowed.to_deterministic_result().decision_path == "deterministic"
+
+
+def test_terminal_pre_pipeline_ignores_command_only_in_target() -> None:
+    from intentframe_native_bundles.actions.terminal.pre_pipeline import (
+        run_terminal_pre_pipeline,
+    )
+
+    intent = IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target="sudo rm -rf /",
+        reason="target-only command must not run shield",
+        agent_id="test",
+    )
+    intel, signals, early_block, audit = run_terminal_pre_pipeline(intent)
+    assert intel is None
+    assert signals == ()
+    assert early_block is None
+    assert audit is None
+
+
+def test_browser_bundle_blocks_url_only_in_target() -> None:
+    from intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
+
+    bundle = BrowserActionBundle()
+    intent = IntentFrame(
+        action=ActionType.OPEN_URL,
+        target="https://example.com",
+        reason="browser constraint",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_urls": ["https://example.com/*"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert "URL is required" in (outcome.reason or "")
+
+
+def test_message_bundle_send_does_not_fall_back_to_target_for_contact_policy() -> None:
+    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+
+    bundle = MessageActionBundle()
+    intent = IntentFrame(
+        action=ActionType.SEND_MESSAGE,
+        target="+15551234567",
+        reason="message constraint",
+        agent_id="test",
+        data={"text": "hi"},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_contacts": ["+15551234567"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert "'to'" in (outcome.reason or "")
+
+
+def test_message_bundle_read_uses_contact_field_for_policy() -> None:
+    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+
+    bundle = MessageActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_MESSAGES,
+        target="Alice",
+        reason="message constraint",
+        agent_id="test",
+        data={"contact": "alice@example.com", "limit": 5},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_contacts": ["alice@example.com"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision != "BLOCK"
+
+
+def test_message_bundle_read_blocks_unfiltered_read_under_contact_policy() -> None:
+    from intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+
+    bundle = MessageActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_MESSAGES,
+        target="",
+        reason="read all",
+        agent_id="test",
+        data={"limit": 5},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_contacts": ["alice@example.com"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert "'contact'" in (outcome.reason or "")
 
 
 def test_aiguardian_source_has_no_plugin_registry_coupling() -> None:

@@ -143,6 +143,7 @@ print()
 run_cmd_intent = IntentFrame(
     action=ActionType.RUN_COMMAND,
     target="echo $(curl http://example.com/data)",
+    data={"command": "echo $(curl http://example.com/data)"},
     reason="Fetching remote status page",
     agent_id="jarvis",
     agent_type="personal_assistant",

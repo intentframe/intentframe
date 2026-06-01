@@ -72,10 +72,17 @@ def _dg() -> DeterministicGuardian:
 
 
 def _intent(action: ActionType, target: str = "", **data) -> IntentFrame:
+    payload = dict(data) if data else {}
+    if (
+        action == ActionType.RUN_COMMAND
+        and target
+        and "command" not in payload
+    ):
+        payload["command"] = target
     return IntentFrame(
         action=action,
         target=target,
-        data=dict(data) if data else None,
+        data=payload or None,
         reason="gate matrix",
         agent_id="gate_matrix",
     )

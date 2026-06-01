@@ -47,17 +47,36 @@ class MessageActionBundle(ActionBundle):
         if action_permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
         constraints = MessageConstraints.model_validate(action_permission.constraints)
+        action = intent.action.value
+        data = intent.data or {}
+
+        if action == ActionType.SEND_MESSAGE.value:
+            field = "to"
+            contact = data.get("to")
+        elif action == ActionType.READ_MESSAGES.value:
+            field = "contact"
+            contact = data.get("contact")
+        else:
+            return BundlePhaseOutcome.continue_(ctx)
 
         # Resolve dynamic contact sources — constraint check, not enrichment.
         allowed = list(constraints.allowed_contacts)
-        if (
-            intent.action.value == ActionType.SEND_MESSAGE.value
-            and constraints.contact_sources
-        ):
+        if constraints.contact_sources:
             resolved = await self._contacts.resolve_sources(constraints.contact_sources)
             allowed = list(set(allowed) | set(resolved))
 
-        contact = (intent.data or {}).get("to", intent.target)
+        if contact is None or (
+            isinstance(contact, str) and not contact.strip()
+        ):
+            return BundlePhaseOutcome.block(
+                ctx,
+                reason=(
+                    f"Constraint violation: {field!r} is required to "
+                    "evaluate allowed_contacts policy"
+                ),
+                matched_gate="constraint",
+            )
+
         for pattern in allowed:
             if fnmatch.fnmatch(str(contact), pattern):
                 return BundlePhaseOutcome.continue_(ctx)

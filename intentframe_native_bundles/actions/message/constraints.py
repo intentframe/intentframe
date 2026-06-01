@@ -1,4 +1,4 @@
-"""Constraints for MESSAGES category actions (SEND_MESSAGE)."""
+"""Constraints for MESSAGES category actions (SEND_MESSAGE, READ_MESSAGES)."""
 
 from __future__ import annotations
 

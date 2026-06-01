@@ -48,7 +48,17 @@ class CalendarActionBundle(ActionBundle):
             return BundlePhaseOutcome.continue_(ctx)
         constraints = CalendarConstraints.model_validate(action_permission.constraints)
         if constraints.allowed_calendars is not None:
-            calendar = (intent.data or {}).get("calendar") or intent.target
+            data = intent.data or {}
+            if "calendar" not in data:
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Constraint violation: Calendar is required to "
+                        "evaluate allowed_calendars policy"
+                    ),
+                    matched_gate="constraint",
+                )
+            calendar = data["calendar"]
             if calendar not in constraints.allowed_calendars:
                 return BundlePhaseOutcome.block(
                     ctx,

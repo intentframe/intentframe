@@ -23,9 +23,13 @@ from intentframe_core.types import IntentFrame
 
 
 def _intent(action: ActionType = ActionType.RUN_COMMAND, target: str = "echo hi") -> IntentFrame:
+    data = None
+    if action == ActionType.RUN_COMMAND:
+        data = {"command": target}
     return IntentFrame(
         action=action,
         target=target,
+        data=data,
         reason="audit test",
         agent_id="audit_tester",
     )

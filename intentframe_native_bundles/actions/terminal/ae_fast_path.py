@@ -21,8 +21,8 @@ def try_catastrophic_report(intent: IntentFrame) -> AnalysisReport | None:
     if intent.action.value != ActionType.RUN_COMMAND.value:
         return None
 
-    command = intent.target or (intent.data or {}).get("command", "")
-    if not command:
+    command = (intent.data or {}).get("command", "")
+    if not command or (isinstance(command, str) and not command.strip()):
         return None
 
     for pattern, description in CATASTROPHIC_COMMAND_PATTERNS.items():

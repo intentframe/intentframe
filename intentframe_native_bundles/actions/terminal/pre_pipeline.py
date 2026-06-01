@@ -20,8 +20,10 @@ def run_terminal_pre_pipeline(
     dict[str, Any] | None,
 ]:
     """Run command_shield for RUN_COMMAND. Returns intel, signals, early_block, audit."""
-    command = intent.target or (intent.data or {}).get("command", "")
-    if not command:
+    # ``data["command"]`` is the executed resource (adapter params). ``target`` is
+    # display/audit only.
+    command = (intent.data or {}).get("command", "")
+    if not command or (isinstance(command, str) and not command.strip()):
         return None, (), None, None
 
     report = shield_inspect(command)

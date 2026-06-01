@@ -123,7 +123,7 @@ def test_allow_capabilities_no_op_on_empty_caps() -> None:
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="mkdir some_directory",
-        data=None,
+        data={"command": "mkdir some_directory"},
         reason="precedence test",
         agent_id="precedence",
     )
@@ -146,7 +146,7 @@ def test_missing_intel_cannot_allow() -> None:
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="",
-        data=None,
+        data={"command": ""},
         reason="precedence test",
         agent_id="precedence",
     )

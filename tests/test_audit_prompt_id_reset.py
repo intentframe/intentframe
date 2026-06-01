@@ -48,6 +48,7 @@ def _run_command_intent() -> IntentFrame:
     return IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="curl https://example.com",
+        data={"command": "curl https://example.com"},
         reason="probe",
         agent_id="test_agent",
     )

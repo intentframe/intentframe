@@ -76,6 +76,7 @@ def _intent(command: str) -> IntentFrame:
     return IntentFrame(
         action=ActionType.RUN_COMMAND,
         target=command,
+        data={"command": command},
         reason="test",
         agent_id="test_agent",
     )

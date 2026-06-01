@@ -30,9 +30,13 @@ _NO_CONSTRAINTS = ActionPermission(safe=True, constraints=None)
 
 
 def _intent(action: ActionType, target: str = "/tmp/x") -> IntentFrame:
+    data = None
+    if action == ActionType.RUN_COMMAND:
+        data = {"command": target}
     return IntentFrame(
         action=action,
         target=target,
+        data=data,
         reason="test",
         agent_id="strategy_tester",
     )

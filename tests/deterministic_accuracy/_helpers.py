@@ -99,7 +99,7 @@ def run_dg(
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target=command,
-        data=None,
+        data={"command": command},
         reason="accuracy test",
         agent_id="dg_accuracy",
     )

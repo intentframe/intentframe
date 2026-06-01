@@ -40,7 +40,16 @@ class BrowserActionBundle(ActionBundle):
         if action_permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
         constraints = BrowserConstraints.model_validate(action_permission.constraints)
-        url = intent.target or (intent.data or {}).get("url", "")
+        url = (intent.data or {}).get("url")
+        if url is None or (isinstance(url, str) and not url.strip()):
+            return BundlePhaseOutcome.block(
+                ctx,
+                reason=(
+                    "Constraint violation: URL is required to evaluate "
+                    "allowed_urls policy"
+                ),
+                matched_gate="constraint",
+            )
         for pattern in constraints.allowed_urls:
             if fnmatch.fnmatch(url, pattern):
                 return BundlePhaseOutcome.continue_(ctx)
