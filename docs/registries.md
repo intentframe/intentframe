@@ -75,11 +75,15 @@ The "Why isn't this a single big config?" question. Three reasons:
 
 ```
 ActionCategory ─── enum (FILE, HOST_FILE, TERMINAL, EMAIL, CALENDAR, …)
-ActionType ─────── enum (READ_FILE, WRITE_FILE, RUN_COMMAND, PAY_INVOICE, …)
+ActionType ─────── str enum (READ_FILE, WRITE_FILE, RUN_COMMAND, PAY_INVOICE, …)
 ActionMeta ─────── per-action metadata (category, domain, description)
-DomainType ─────── enum (FINANCE, COMMUNICATION, FILESYSTEM, …)
-ActionCatalog ──── lookup: ActionType → ActionMeta
+DomainType ─────── enum (FINANCE, DELETION)
+ACTION_DOMAINS ─── map ActionType → DomainType (critical-domain tag)
+ActionCatalog ──── lookup: action id string → ActionMeta
+domains/ ───────── domain intent schemas (FinancialIntentData, DeletionIntentData, DOMAIN_SCHEMAS)
 ```
+
+`IntentFrame.action` in core is a plain `str`. `ActionType` members are drop-in strings (`ActionType(str, Enum)`). Platform-only catalog actions (e.g. `RUN_SHORTCUT`, `WATCH_FILESYSTEM`) may exist in `ActionCatalog` without being enum members — they still flow as strings through the pipeline.
 
 Each `ActionType` belongs to exactly one `ActionCategory`. Categories determine which constraint schema applies when a user writes a policy. For example:
 
@@ -90,12 +94,14 @@ Each `ActionType` belongs to exactly one `ActionCategory`. Categories determine 
 
 ### Why it's a separate module
 
-So the policy registry can validate that a user's rule references a real action type, and so the pipeline can dispatch typed intents to the right adapter — both without depending on each other. Both `policy_registry` and the IntentFrame pipeline import from `action_registry`; nothing else points the other way.
+So bundles, executor packs, policy YAML, and optional agent-author tooling share one vocabulary without coupling that vocabulary into `intentframe_core`. **`action_registry` depends on `intentframe_core`** (for `DomainSchema`); core does not import the registry. The deterministic runner routes domains via `domain_routes.py` and the bundle SDK registry — not via `ACTION_DOMAINS` at runtime.
 
 ### Where to look
 
-- `action_registry/types.py` — enums and metadata models
+- `action_registry/types.py` — enums, `ACTION_CATEGORIES`, `ACTION_DOMAINS`
 - `action_registry/catalog.py` — `ActionCatalog` registration
+- `action_registry/domains/` — `DOMAIN_SCHEMAS`, `FinancialIntentData`, `DeletionIntentData`
+- `action_registry/platforms/<os>/actions.py` — platform-only catalog entries
 
 ---
 
@@ -112,7 +118,7 @@ Runs as a uvicorn FastAPI service on `~/.intentframe/run/policy-registry.sock`. 
 ```
 UserPolicy
 ├── user_id
-├── allowed_actions: dict[ActionType → ActionPermission]
+├── allowed_actions: dict[str → ActionPermission]   # keys are action id strings (e.g. "READ_FILE")
 │        ActionPermission:
 │          • safe: bool                ← critical for fast-path routing
 │          • constraints: dict | None  ← opaque JSON; schema owned by action bundles

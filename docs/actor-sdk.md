@@ -158,8 +158,8 @@ your tool function
         │   actor.submit({"action": "READ_FILE", ...})
         ▼
 Actor SDK (your process)
-  • parse + validate the request shape
-  • build a signed IntentFrame (adds agent_id, session_id, timestamps, signature)
+  • parse request dict → IntentFrame (action as plain string; no taxonomy check)
+  • add metadata + signature
   • POST to the IntentFrame runtime over UDS
         │
         ▼
@@ -181,6 +181,8 @@ ExecutionResult back to your tool
 
 Your code never touches any of those layers. They run in a separate process, they have credentials your agent does not, and they apply the user's policy without consulting your agent. Your agent gets back a typed `ExecutionResult` and decides what to do next.
 
+**Optional author-side validation.** The Actor itself does not import `action_registry`. Agent authors *may* opt in before calling `actor.submit()` — for example Jarvis runs `_validate_against_registry()` in `jarvis_pa/jarvis/tools.py` to fail fast on unknown actions or malformed critical-domain payloads. That is convenience, not security: the bundle runner re-validates authoritatively server-side regardless.
+
 For the full pipeline reference, see [architecture.md](architecture.md). For what each layer protects against, see [threat-model.md](threat-model.md). For why the executor is where credentials live, see [executor.md](executor.md).
 
 ---
@@ -200,6 +202,8 @@ Both follow the same shape:
 2. In the body of every tool, call `actor.submit(...)` with a structured intent.
 3. Build a system prompt that includes the `runtime_ctx` returned from `handshake()` so the LLM knows its policy envelope.
 4. Run the agent loop in your framework of choice.
+
+**Jarvis** additionally imports `action_registry` in its tool layer for optional pre-flight validation (taxonomy + domain payload slices) before `actor.submit()`. The invoice bot does not — it relies on per-tool Pydantic models and server-side enforcement only. Both patterns are valid; the Actor stays registry-agnostic either way.
 
 You can paste either agent into a new project and replace the framework with LangChain, AutoGen, or a raw OpenAI tool-call loop, and the integration with IntentFrame would not change. The Actor SDK is the only seam.
 

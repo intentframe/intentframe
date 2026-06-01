@@ -187,7 +187,7 @@ The shipped `IntentFrame` Pydantic model has the following fields:
 
 | Field | Type | Purpose |
 |---|---|---|
-| `action` | `ActionType` enum | The typed operation (e.g., `READ_FILE`, `APPEND_ROW`, `RUN_COMMAND`, `PAY_INVOICE`) |
+| `action` | `str` | Opaque action identifier (e.g. `"READ_FILE"`, `"PAY_INVOICE"`). Core does not validate against any taxonomy — agent authors may use `action_registry` locally for convenience. Unknown actions fail closed at executor dispatch. |
 | `target` | `str` | Who or what the action affects (path, recipient, command, URL) |
 | `data` | `Optional[Dict[str, Any]]` | Action-specific structured payload (amount, recipient, content) |
 | `reason` | `str` | The agent's stated justification — used by AE for reason-vs-data cross-checks |

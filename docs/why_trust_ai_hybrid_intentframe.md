@@ -130,25 +130,25 @@ Each stage gates the next. The agent does not touch the executor directly; it su
             )
 ```
 
-Plus a third hard gate for domain-structural policy:
+Plus a third hard gate for domain-structural policy — enforced by **domain bundles** in the deterministic runner, not inline in the AI Guardian:
 
-```317:333:intentframe_components/guardian/engine.py
-        # ── Step 2.5: Domain module enforcement (structural hard gate) ──
-        domain = ACTION_DOMAINS.get(intent.action)
-        if domain and domain in DOMAIN_MODULES:
-            domain_constraints = self._get_domain_constraints(user_context, domain)
-            if domain_constraints is not None:
-                module = DOMAIN_MODULES[domain]
-                passed, reason = module.check(intent, domain_constraints)
-                if not passed:
-                    ...
-                    return ValidationResult(
-                        decision=Decision.BLOCK,
-                        ...
-                        message=f"Domain violation ({domain.value}): {reason}",
-                        decision_path="ai_path",
-                    )
+```204:234:intentframe_bundle_sdk/runner.py
+        domain_ids = domains_for_action(action_id)
+        for domain_id in domain_ids:
+            domain_bundle = domain_bundle_for(domain_id)
+            ...
+            outcome = traced_call(
+                check_domain_intent_shape, domain_bundle, intent,
+                ...
+            )
+            ...
+            outcome = traced_call(
+                domain_bundle.enforce, intent, slice_,
+                ...
+            )
 ```
+
+Domain intent slices are defined in `action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`). Routing is declared in `intentframe_native_bundles/domain_routes.py` and registered via `register_domain_routes()` — the runner does not import `ACTION_DOMAINS` at runtime.
 
 All three gates block before the AI sees anything.
 

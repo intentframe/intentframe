@@ -38,7 +38,7 @@ Runtime routing authority is **plugin-owned SDK registry**, not `action_registry
 - `registered_domain_ids()`, `routed_domain_ids()` for introspection.
 - Runner loops `for domain_id in domains_for_action(action_id)`; **does not import `action_registry`**.
 
-`ACTION_DOMAINS` in `action_registry/types.py` remains for actor, demo, and docs only — not the deterministic runner path.
+`ACTION_DOMAINS` in `action_registry/types.py` is a taxonomy hint (maps enum members to `DomainType`). Runtime domain routing uses `domain_routes.py` + `domains_for_action()` — not `ACTION_DOMAINS`. Optional agent-author pre-flight (e.g. Jarvis `_validate_against_registry`) may read `ACTION_DOMAINS` + `DOMAIN_SCHEMAS`; the Actor and bundle runner do not.
 
 ### 0.2 Intentional drifts from pass 12 (`5719a35`)
 
@@ -569,7 +569,7 @@ Exit: contributors can read the SDK docstrings and follow the contract without c
 | api/browser/message ids | Real action ids per `action_registry/types.py`; no families dropped. |
 | `api` vs `finance` | `ApiActionBundle` owns `PAY_INVOICE`, `HTTP_GET`, `HTTP_POST`, …; finance is domain-only (`domains/finance/`). No `FinanceActionBundle`. |
 | Domain routing | `domain_routes.py` + `register_domain_routes()`; runner uses `domains_for_action()`; not `ACTION_DOMAINS`. |
-| `ACTION_DOMAINS` | Kept in `action_registry/types.py` for actor/demo/docs only; not imported by SDK runner. |
+| `ACTION_DOMAINS` | Taxonomy hint in `action_registry/types.py`; optional agent-author pre-flight (Jarvis); not imported by SDK runner. |
 | `_capability_match.py` | `intentframe_native_bundles/actions/terminal/_capability_match.py`. |
 | `_to_result` / `decision_path` | `BundlePhaseOutcome.to_deterministic_result()`; `matched_gate` passthrough, else `"deterministic"`. |
 | Dashboard `DOMAIN_CONSTRAINT_TYPES` | Raw dict pass-through. |

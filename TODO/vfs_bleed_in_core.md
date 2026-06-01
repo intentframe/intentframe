@@ -61,11 +61,11 @@ The docstring flags it as debt:
 
 So a registry that claims *"independent of… the executor package"* (its own module docstring) imports from a macOS executor pack for path/HOME math. That's path-vocabulary bleeding **across three layers at once** (registry → executor pack → OS identity).
 
-## Bleed point 5 — into the *domain* layer
+## Bleed point 5 — into the *domain* layer (partially addressed)
 
-You saw this in the first question. The deletion domain is path-shaped, so non-file destructive actions don't fit the abstraction:
+The deletion domain schema is still path-shaped, so non-file destructive actions don't fit the abstraction. Schemas now live in **`action_registry/domains/`** (not `intentframe_core`) — core only keeps the `DomainSchema` base:
 
-```9:15:intentframe_core/domains/deletion.py
+```9:15:action_registry/domains/deletion.py
 Current limitation:
     This schema is still path-oriented. It works well for file deletions, but
     non-file destructive actions such as ``DELETE_EVENT`` and
@@ -74,7 +74,7 @@ Current limitation:
     schema validation rejects them before policy enforcement runs.
 ```
 
-And `action_registry/types.py` has `DELETE_EVENT`/`DELETE_REMINDER` **commented out** of `ACTION_DOMAINS` precisely because the path-shaped deletion schema can't represent them. The file vocabulary constrains the taxonomy.
+And `action_registry/types.py` has `DELETE_EVENT`/`DELETE_REMINDER` **commented out** of `ACTION_DOMAINS` precisely because the path-shaped deletion schema can't represent them. The file vocabulary still constrains the taxonomy even though the schema no longer bleeds into core.
 
 ## Bleed point 6 — into the universal `IntentFrame` and handshake
 
@@ -89,7 +89,7 @@ flowchart TD
   SDK["executor_sdk/services/virtual_filesystem.py"]
   RR["resource_registry (ResourceMount = paths)"]
   Floor["resource_registry/floor.py → macos pack"]
-  Domain["intentframe_core/domains/deletion.py (path-only)"]
+  Domain["action_registry/domains/deletion.py (path-only)"]
   IF["IntentFrame.target: str + handshake virtual_paths"]
   FileFamily -.bleeds into.-> Core
   FileFamily -.bleeds into.-> SDK
@@ -106,4 +106,4 @@ Two forces:
 1. **The pipeline and the executor must agree on canonical path form** *before* execution, so the primitive can't live only in the executor — it has to sit somewhere both import. The "shared" spot they chose was `intentframe_core`, which is why a file concept landed in the universal layer.
 2. **VFS predates the bundle/substrate refactor.** Path virtualization was foundational (it's "7 of 10 safety properties" in `docs/executor/why-foundation.md`) and was built before the "families own their specifics" discipline existed. So it's grandfathered into the substrate rather than pushed down into the files bundle.
 
-The cleaner end-state the code itself gestures at: move identity/path canonicalization to a neutral `intentframe_core.identity`, treat VFS as a files-bundle-owned capability the executor resolves, and generalize the deletion domain off `path`. Until then, **VFS is a file-family concern that the substrate carries on its behalf** — which is precisely the bleed you're sensing.
+The cleaner end-state the code itself gestures at: move identity/path canonicalization to a neutral `intentframe_core.identity`, treat VFS as a files-bundle-owned capability the executor resolves, and generalize the deletion domain off `path`. Domain intent schemas have already moved from `intentframe_core` to `action_registry/domains/` (core keeps only `DomainSchema` base). Until VFS and path canonicalization follow, **VFS is a file-family concern that the substrate carries on its behalf** — which is precisely the bleed you're sensing.

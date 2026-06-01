@@ -27,12 +27,25 @@ The rest of this doc walks each module in turn.
 
 ## Shared types
 
+### Layering (core vs registry vs actor)
+
+```
+intentframe_core          neutral DTOs; IntentFrame.action is str; DomainSchema base only
+       ▲
+       │  action_registry depends on core (not the reverse)
+action_registry           ActionType, DomainType, ACTION_DOMAINS, domain intent schemas
+       ▲
+       │  optional — agent authors only
+agent tools (e.g. Jarvis) may import action_registry for fail-fast pre-flight
+intentframe_actor         thin transport; no action_registry import
+```
+
 ### `intentframe_core/`
 
 | | |
 |---|---|
-| **What** | Shared types and enums (`ActionType`, `Decision`, `RiskLevel`, `IntentFrame`, `RuntimeContext`, …). Zero dependencies on the rest of IntentFrame. |
-| **Why** | Both the server and the Actor SDK import from here. Without a shared types package, the server-side and agent-side would drift apart, and a common dataclass change would require edits in two unrelated trees. |
+| **What** | Shared types and enums (`Decision`, `RiskLevel`, `IntentFrame`, `RuntimeContext`, …) plus `DomainSchema` base in `domains/base.py`. Does **not** export `ActionType` or domain intent schemas. |
+| **Why** | Both the server and the Actor SDK import from here. Without a shared types package, the server-side and agent-side would drift apart. Core must not import `action_registry` — the action taxonomy lives one layer up. |
 | **Where** | `intentframe_core/` |
 | **Process** | None — it's an importable Python package, not a service. |
 | **Public docs** | [architecture.md](architecture.md) (uses these types throughout) |
@@ -42,8 +55,8 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | Static catalog of every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …) and its category (FILE, TERMINAL, EMAIL, …). |
-| **Why** | The vocabulary the policy registry validates against and the pipeline dispatches on. Splitting it from `policy_registry` and from the pipeline lets both depend on a small, dependency-free taxonomy. |
+| **What** | Static catalog of every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category (FILE, TERMINAL, EMAIL, …), critical-domain tags (`DomainType`, `ACTION_DOMAINS`), and domain intent schemas in `action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`, `DOMAIN_SCHEMAS`). `ActionType` is a `str` enum — members are interchangeable with the plain `str` on `IntentFrame.action`. |
+| **Why** | Shared vocabulary for bundles, executor packs, policy YAML, and optional agent-author validation. Depends on `intentframe_core` for `DomainSchema`; core does not depend back. |
 | **Where** | `action_registry/` |
 | **Process** | None — in-process Python module. |
 | **Public docs** | [registries.md § Action registry](registries.md#the-action-registry) |

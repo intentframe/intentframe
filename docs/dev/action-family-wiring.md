@@ -10,7 +10,15 @@ Read this before adding a new action family. Read it again when you are debuggin
 
 ## Mental model in one paragraph
 
-An agent submits an intent. It travels through several gates. Each gate is independent, each has its own opinion, and any of them can block. If the intent survives, the executor adapter performs the real I/O. Onboarding, handshake, and tool descriptions are the things the LLM sees; everything else is runtime enforcement the LLM never sees directly. The trick is that the LLM's picture of the world is built from **declarations** (tool docstrings, `AgentCapabilities.action_types`, onboarding guardrails), while enforcement is built from **different declarations** (`ActionType` enum, `SAFE_ACTIONS`/`UNSAFE_ACTIONS` policy seed, checker registry, critical-action sets). When those two sets of declarations drift, the agent sees capabilities the runtime blocks (or vice versa).
+An agent submits an intent. It travels through several gates. Each gate is independent, each has its own opinion, and any of them can block. If the intent survives, the executor adapter performs the real I/O. Onboarding, handshake, and tool descriptions are the things the LLM sees; everything else is runtime enforcement the LLM never sees directly. The trick is that the LLM's picture of the world is built from **declarations** (tool docstrings, `AgentCapabilities.action_types`, onboarding guardrails), while enforcement is built from **different declarations** (`ActionType` enum in bundles/packs, policy YAML allowed actions, bundle constraint schemas, domain routes). When those two sets of declarations drift, the agent sees capabilities the runtime blocks (or vice versa).
+
+**Three declaration layers for actions:**
+
+| Layer | Who | What |
+|---|---|---|
+| Core / Actor | Platform | `IntentFrame.action` is a plain `str`; Actor does not import `action_registry` |
+| Agent author (optional) | Jarvis, third-party agents | May import `action_registry` + per-tool Pydantic models for fail-fast pre-flight |
+| Substrate | Bundles, executor, policy | `ActionType` constants, `domain_routes.py`, bundle constraints — authoritative at runtime |
 
 ---
 

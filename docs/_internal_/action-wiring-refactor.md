@@ -164,7 +164,7 @@ Given:
 
 Adopt MCP as the partner contract. Their action implementations ship as MCP servers (which they may already have written for ChatGPT/Claude Desktop/Cursor). IntentFrame's executor gains an MCP client that:
 - Reads MCP server's `tools` list at startup or via runtime registration endpoint
-- Maps each tool to an IntentFrame `ActionType` (with `Partner_X_SubmitNote`-style namespacing)
+- Maps each tool to an IntentFrame action id string (with `Partner_X_SubmitNote`-style namespacing)
 - Uses the tool's declared JSON Schema as the Guardian constraint
 - Routes `actor.submit()` calls for those actions through MCP `tools/call`
 
