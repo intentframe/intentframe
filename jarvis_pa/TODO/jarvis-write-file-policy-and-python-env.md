@@ -263,7 +263,7 @@ AE / DG tracks shipped in a deliberately narrower shape than the original
 5-point plan — the security-sensitive rewrites below happened mid-flight
 and are the final stance.
 
-- **Floor parity for `WRITE_FILE` / `DELETE_FILE`** via `resource_registry/floor.py` (`DENY_WRITE_PREFIXES`, identity-aware `~` expansion, canonical `realpath` check) enforced by `LocalVirtualFileSystem.write_file` and the new `LocalVirtualFileSystem.delete_file`.  `DELETE_FILE` in the files adapter now delegates to the VFS instead of calling `unlink` directly, so both ops share the floor.  Covered by `tests/test_vfs_floor.py` including a subset-symmetry test against `NON_NEGOTIABLE_DENY_WRITE`.
+- **Floor parity for `WRITE_FILE` / `DELETE_FILE`** via `intentframe_native_kit/resource_registry/floor.py` (`DENY_WRITE_PREFIXES`, identity-aware `~` expansion, canonical `realpath` check) enforced by `LocalVirtualFileSystem.write_file` and the new `LocalVirtualFileSystem.delete_file`.  `DELETE_FILE` in the files adapter now delegates to the VFS instead of calling `unlink` directly, so both ops share the floor.  Covered by `tests/test_vfs_floor.py` including a subset-symmetry test against `NON_NEGOTIABLE_DENY_WRITE`.
 
 - **`FileIntel` as AI context, not as a routing input.**  `FileIntel` is a real core type in `intentframe_core/types.py`, computed once in `intentframe_server/file_intel.py` by `build_file_intel` on every `WRITE_FILE` / `WRITE_HOST_FILE` with a string payload.  It is forwarded to `AIAnalysisEngine.analyze` (where it renders the `WRITE_FILE — PAYLOAD SIGNALS`, `WRITE_FILE — DESTINATION SIGNALS`, and `WRITE_FILE — PATH SEMANTICS` blocks inside the AE trusted context) and to `AIGuardian.validate` (where it is passed to deterministic checkers only — not to the Guardian LLM prompt, by design: Guardian reads the `AnalysisReport`, not raw deterministic intel).  `DefaultPromptStrategy` also accepts `file_intel` on its Protocol but **does not consult it for prompt-id selection** — see next bullet.
 
@@ -385,7 +385,7 @@ Why this is worth doing:
 Historical plan; current state is tracked in "Phase 7a — Revised Scope" above.
 
 1. Sandbox-floor parity for WRITE_FILE + DELETE_FILE (`intentframe_native_kit/intentframe_executor_pack_macos/virtual_filesystem.py` + tests). ✅ shipped.
-2. Expand the floor list to the root-demo hardening set; share it between sandbox templates and VFS. ✅ shipped (`resource_registry/floor.py`).
+2. Expand the floor list to the root-demo hardening set; share it between sandbox templates and VFS. ✅ shipped (`intentframe_native_kit/resource_registry/floor.py`).
 3. Retract / restate the `TODO/root-demo-policy-driven-sandbox.md:261` checklist entry. ✅ done.
 4. ~~Passive-write fast-path in `DeterministicGuardian`~~ — **reverted** before shipping, see the "Optional — passive-file fast-path for WRITE_FILE" block for rationale.  Replaced with the hard-BLOCK `write_file_sensitive_path` gate.
 5. `critical_write_file` AE lane + strategy branch — ✅ shipped (flat routing, full-body fork `_CRITICAL_WRITE_FILE`).  The payload-aware sub-lane split (`critical_write_file_code`) is deferred; tracked as xfailed tests in `tests/test_prompt_strategy.py`.
@@ -398,7 +398,7 @@ Historical plan; current state is tracked in "Phase 7a — Revised Scope" above.
 ### Near-term
 
 - ~~ship sandbox-floor parity for WRITE_FILE / DELETE_FILE~~ ✅ shipped.
-- ~~share the deny list between `intentframe_native_kit/intentframe_executor_pack_macos/sandbox/templates.py` and the VFS~~ ✅ shipped via `resource_registry/floor.py`.
+- ~~share the deny list between `intentframe_native_kit/intentframe_executor_pack_macos/sandbox/templates.py` and the VFS~~ ✅ shipped via `intentframe_native_kit/resource_registry/floor.py`.
 - ~~passive-write fast-path in `DeterministicGuardian`~~ reverted by design — see "Optional — passive-file fast-path for WRITE_FILE".
 - `critical_write_file` full-body fork (`_CRITICAL_WRITE_FILE`) is shipped.  Content covers destination-payload cross-check, payload-signals consumption, and consumer-awareness.
 - fix `SandboxConfig.working_directory` to use the same identity-aware expansion as the executor venv (currently `os.path.expanduser` in `terminal.py` resolves against whatever HOME the executor process has — wrong under bare root).

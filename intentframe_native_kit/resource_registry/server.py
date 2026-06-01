@@ -5,7 +5,7 @@ Wraps the in-memory ResourceRegistry with HTTP endpoints.
 All business logic stays in registry.py; this is pure HTTP plumbing.
 
 Startup:
-    uvicorn resource_registry.server:app --uds ~/.intentframe/run/resource-registry.sock
+    uvicorn intentframe_native_kit.resource_registry.server:app --uds ~/.intentframe/run/resource-registry.sock
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from resource_registry.models import (
+from intentframe_native_kit.resource_registry.models import (
     ClientView,
     ExecutorView,
     ResourceMount,
     Workspace,
 )
-from resource_registry.registry import ResourceRegistry
+from intentframe_native_kit.resource_registry.registry import ResourceRegistry
 
 logger = logging.getLogger(__name__)
 

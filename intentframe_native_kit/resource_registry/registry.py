@@ -12,7 +12,7 @@ In the demo this runs in-process with an in-memory store.
 In production it becomes its own microservice backed by a database.
 
 Usage (demo):
-    from resource_registry import ResourceRegistry, ResourceMount
+    from intentframe_native_kit.resource_registry import ResourceRegistry, ResourceMount
 
     registry = ResourceRegistry()
 
@@ -35,7 +35,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from resource_registry.models import (
+from intentframe_native_kit.resource_registry.models import (
     ClientView,
     ExecutorView,
     ResourceMount,

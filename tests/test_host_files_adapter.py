@@ -3,7 +3,7 @@
 The adapter is the final wall before real-path I/O.  It runs two
 independent checks on every call:
 
-1. ``resource_registry.floor.match_deny_prefix`` on writes/deletes
+1. ``intentframe_native_kit.resource_registry.floor.match_deny_prefix`` on writes/deletes
    (non-negotiable floor — ``/etc/sudoers``, shell rc files, ``~/.ssh``,
    launchd plists, etc.).
 2. ``HostFilesConfig.allowed_{read,write}_paths`` (the executor YAML

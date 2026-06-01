@@ -25,7 +25,7 @@ class HostFileConstraints(BaseModel):
     Unlike :class:`FileConstraints` (virtual vocabulary), these patterns
     are matched against canonicalized real filesystem paths (after
     ``~`` expansion and symlink resolution via
-    :func:`resource_registry.floor.canonicalize_real_path`).  The
+    :func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path`).  The
     host-files bundle does **not** apply ``normalize_virtual_path``.
 
     Attributes:

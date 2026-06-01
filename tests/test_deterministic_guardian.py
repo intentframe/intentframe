@@ -305,7 +305,7 @@ class TestReadOnlyFastPath:
 # virtual target is a sensitive system location (shell startup files,
 # credential stores, privilege config, persistence daemons, Python
 # runtime hooks).  Mirrors the VFS floor at
-# resource_registry.floor.DENY_WRITE_PREFIXES which catches the same
+# intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES which catches the same
 # families on the canonicalized real path at I/O time — DG fires on
 # the virtual path, pre-AE, so agents don't spend an LLM round-trip
 # on a write we will refuse at I/O anyway.
@@ -396,11 +396,11 @@ class TestWriteFileSensitivePathBlock:
 # ═══════════════════════════════════════════════════════════════════════
 # STEP 3b — HOST_FILE mutation floor (real-path deny prefixes)
 # ═══════════════════════════════════════════════════════════════════════
-# DG enforces ``resource_registry.floor.DENY_WRITE_PREFIXES`` on
+# DG enforces ``intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES`` on
 # ``WRITE_HOST_FILE`` / ``DELETE_HOST_FILE`` before the LLM round-trip.
 # Unlike the virtual-path ``write_file_sensitive_path`` gate (which works
 # on the raw virtual target), the host-file gates canonicalize via
-# :func:`resource_registry.floor.canonicalize_real_path` first, then call
+# :func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path` first, then call
 # :func:`match_deny_prefix`.  Inputs are therefore picked from the actual
 # expanded floor tuple so the test follows the loader, not a static
 # whitelist.
@@ -420,7 +420,7 @@ class TestHostFileFloorBlock:
     def test_write_host_file_deny_floor_blocks(self):
         # Document the end-to-end flow in one test:
         #   1. ``/etc/sudoers`` is a raw (agent-supplied) real path.
-        #   2. ``resource_registry.floor`` canonicalizes every entry in
+        #   2. ``intentframe_native_kit.resource_registry.floor`` canonicalizes every entry in
         #      ``DENY_WRITE_PREFIXES`` at module-load time via
         #      ``os.path.realpath``.  On macOS ``/etc`` is a symlink to
         #      ``/private/etc``, so the stored tuple holds
@@ -434,7 +434,7 @@ class TestHostFileFloorBlock:
         # canonicalization drifts, the precondition assertion fails
         # loudly with a clear diff instead of a generic "expected BLOCK
         # got UNDECIDED".
-        from resource_registry.floor import (
+        from intentframe_native_kit.resource_registry.floor import (
             DENY_WRITE_PREFIXES,
             canonicalize_real_path,
         )

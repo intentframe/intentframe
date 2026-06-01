@@ -17,7 +17,7 @@
 #
 # Important: broadening the allow-lists here does NOT disable the
 # non-negotiable deny base enforced by the sandbox templates and
-# ``resource_registry/floor.py`` (LaunchAgents, /etc, sshd_config,
+# ``intentframe_native_kit/resource_registry/floor.py`` (LaunchAgents, /etc, sshd_config,
 # sudoers, PAM, kexts, Keychains, Messages, Mail, ~/.ssh, ~/.gnupg,
 # shell rc files, etc.) — those gates still apply under every template,
 # including ``unrestricted``.
@@ -88,7 +88,7 @@ pack_options:
         writable: true
   # Real-path allowlist for host-file tools. Broadened to ``/`` so the
   # root-profile agent can operate on system paths. The non-negotiable
-  # deny base in ``resource_registry/floor.py`` still protects LaunchAgents,
+  # deny base in ``intentframe_native_kit/resource_registry/floor.py`` still protects LaunchAgents,
   # /etc sensitive files, sudoers, sshd_config, PAM, kexts, Keychains,
   # Messages, Mail, ~/.ssh, ~/.gnupg, and shell rc files regardless of what
   # this allow-list says.

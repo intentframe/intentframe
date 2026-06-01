@@ -3,7 +3,7 @@
 ``HostFilesActionBundle.enforce_constraints`` is the per-action constraint
 enforcer for the ``HOST_FILE`` category.  Unlike the virtual ``files``
 family, it operates on real host paths — ``~`` expansion + symlink
-resolution via :func:`resource_registry.floor.canonicalize_real_path`, then
+resolution via :func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path`, then
 fnmatch matching against ``HostFileConstraints.allowed_host_paths``.
 
 The floor (``match_deny_prefix``) is a separate wall enforced by DG

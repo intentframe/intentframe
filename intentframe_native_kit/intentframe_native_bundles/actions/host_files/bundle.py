@@ -6,7 +6,7 @@ import fnmatch
 
 from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
-from resource_registry.floor import canonicalize_real_path
+from intentframe_native_kit.resource_registry.floor import canonicalize_real_path
 
 from intentframe_native_kit.intentframe_native_bundles.shared.files.ai_context import (
     render_file_external_context,

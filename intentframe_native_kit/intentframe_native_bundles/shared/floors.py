@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from intentframe_native_kit.action_registry.types import ActionType
-from resource_registry.floor import match_deny_prefix
+from intentframe_native_kit.resource_registry.floor import match_deny_prefix
 
 HOST_MUTATING_ACTIONS = frozenset({
     ActionType.WRITE_HOST_FILE.value,

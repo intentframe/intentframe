@@ -59,7 +59,7 @@ for p in (_project_root, _tests_dir, _root_demo_dir):
 from typing import Any, Dict, List, Tuple
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 from intentframe_server.client import IntentFrameClient
 
 from root_intent_pipeline import (

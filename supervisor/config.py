@@ -58,7 +58,7 @@ class SupervisorConfig(BaseModel):
         ),
         ServiceConfig(
             name="resource-registry",
-            module="resource_registry.server:app",
+            module="intentframe_native_kit.resource_registry.server:app",
             socket_name="resource-registry.sock",
         ),
         ServiceConfig(

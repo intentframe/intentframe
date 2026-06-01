@@ -183,7 +183,7 @@ class LocalVirtualFileSystem(VirtualFileSystem):
 
         1. Mount writability — the VFS mount must be declared ``writable``.
         2. Non-negotiable deny-write floor — the resolved real path must not
-           fall under :data:`resource_registry.floor.DENY_WRITE_PREFIXES`.
+           fall under :data:`intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES`.
            This is symmetric with the Seatbelt ``NON_NEGOTIABLE_DENY_WRITE``
            list enforced for ``RUN_COMMAND`` in the macOS sandbox; without
            this check the VFS would let WRITE_FILE bypass the floor the

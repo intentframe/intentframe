@@ -80,7 +80,6 @@ include = [
     "executor*",
     "executor_client*",
     "executor_sdk*",
-    "resource_registry*",
     "policy_registry*",
     "command_shield*",
     "supervisor*",

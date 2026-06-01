@@ -15,7 +15,7 @@ The repo is divided into roughly six layers of concern:
 | Layer | Purpose | Modules |
 |---|---|---|
 | **Shared types** | Data model used by everyone | `intentframe_core`, `intentframe_native_kit.action_registry` |
-| **Configuration plane** | What the user has authorized | `policy_registry`, `resource_registry` |
+| **Configuration plane** | What the user has authorized | `policy_registry`, `intentframe_native_kit.resource_registry` |
 | **Pipeline (decision)** | Validates intents | `intentframe_components` (analysis, guardian, onboarding), `intentframe_server` |
 | **Execution (action)** | Touches the world | `executor`, `executor_client`, `command_shield` |
 | **Platform services** | OS / data-source bridges | `intentframe_credentials`, `external_data_ingestion`, `macos-appkit-server` |
@@ -87,13 +87,13 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Public docs** | [registries.md § Policy registry](registries.md#the-policy-registry) |
 | **Module README** | None — design is described in `__init__.py` and `registry.py` docstrings. |
 
-### `resource_registry/`
+### `intentframe_native_kit/resource_registry/`
 
 | | |
 |---|---|
 | **What** | Workspaces and resource mounts. Serves separate read views to the agent (virtual paths only) and the executor (real paths). |
 | **Why** | Implements the virtual filesystem. The agent can never name a path outside its mounts; path traversal becomes structurally impossible. |
-| **Where** | `resource_registry/` |
+| **Where** | `intentframe_native_kit/resource_registry/` |
 | **Process** | `resource-registry` (uvicorn) on `~/.intentframe/run/resource-registry.sock`, started by the supervisor. |
 | **Public docs** | [registries.md § Resource registry](registries.md#the-resource-registry); [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
 | **Module README** | None. |
@@ -364,7 +364,7 @@ A direct answer to "does docs/ cover all tracked workspace modules?":
 | `intentframe_core` | — | — | ✅ via [architecture.md](architecture.md) |
 | `intentframe_native_kit.action_registry` | — | — | ✅ via [registries.md](registries.md) |
 | `policy_registry` | — | — | ✅ via [registries.md](registries.md) |
-| `resource_registry` | — | — | ✅ via [registries.md](registries.md), [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
+| `intentframe_native_kit.resource_registry` | — | — | ✅ via [registries.md](registries.md), [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
 | `intentframe_components` | — | — | ✅ via [architecture.md](architecture.md) |
 | `intentframe_server` | — | — | ✅ via [architecture.md](architecture.md), [processes.md](processes.md) |
 | `executor` | ✅ (sub-folder of refs) | ✅ [executor.md](executor.md) | ✅ |

@@ -73,7 +73,7 @@ When adding one, expect edits in roughly these places. Missing any of them produ
 - `intentframe_native_kit/intentframe_native_bundles/domain_routes.py` — routing manifest (`domain_id` → action ids); registered via `register_domain_routes`.
 - `intentframe_components/guardian/deterministic.py` — permission gate + `DeterministicRunner`; blocks `no_bundle` / `no_enforcement`.
 - `intentframe_components/guardian/engine.py` — AI Guardian reads `bundle_ai_context.constraint_context` only (no checker dispatch).
-- `resource_registry/floor.py` — if this family writes to the host filesystem, extend `DENY_WRITE_PREFIXES` with any non-negotiable deny roots.
+- `intentframe_native_kit/resource_registry/floor.py` — if this family writes to the host filesystem, extend `DENY_WRITE_PREFIXES` with any non-negotiable deny roots.
 
 ### 5. Bundle lifecycle hooks (evidence, AI context, gates)
 
@@ -204,7 +204,7 @@ When you see one of these, jump straight to the file named.
 | Read action ran full AE when policy marks it safe | Missing from `passive_read_action_ids` | Same bundle class |
 | RUN_COMMAND catastrophic not blocked pre-AE | `prepare_evidence()` not running shield | `actions/terminal/pre_pipeline.py` |
 | WRITE_FILE sensitive path not blocked | `structural_gates()` not wired | `actions/files/deterministic.py` |
-| `/etc/foo` blocked but `/private/etc/foo` allowed (macOS) | Canonicalizer / DENY list asymmetry | `resource_registry/floor.py` + relevant checker |
+| `/etc/foo` blocked but `/private/etc/foo` allowed (macOS) | Canonicalizer / DENY list asymmetry | `intentframe_native_kit/resource_registry/floor.py` + relevant checker |
 | Mirror test green but runtime broken | Test pinning the wrong file | `tests/test_jarvis_host_scope_mirror.py` |
 | LLM keeps picking `RUN_COMMAND` over the structured tool | Tool docstring not discouraging shell alternatives | `jarvis_pa/jarvis/tools.py` |
 

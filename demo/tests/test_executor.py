@@ -40,7 +40,7 @@ PROJECT_ROOT = DEMO_ROOT.parent
 sys.path.insert(0, str(DEMO_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from resource_registry import ResourceRegistry, ResourceMount
+from intentframe_native_kit.resource_registry import ResourceRegistry, ResourceMount
 
 from intentframe_native_kit.action_registry import ActionType
 from intentframe_core import IntentFrame

@@ -82,7 +82,7 @@ from rich.text import Text
 
 from intentframe_server.client import IntentFrameClient
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 
 from root_intent_pipeline import (
     DEFAULT_INTENTFRAME_SOCKET,

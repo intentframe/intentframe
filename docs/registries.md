@@ -14,7 +14,7 @@ This doc covers all three registries together because they share the same shape 
 |---|---|---|---|---|
 | **Action registry** | `intentframe_native_kit/action_registry/` | The universal *taxonomy* — every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category, its metadata | IntentFrame developers (it's a static catalog) | Policy registry (to validate user policies); pipeline (to dispatch to adapters) |
 | **Policy registry** | `policy_registry/` | The user's *rules* — which actions are allowed, opaque constraint dicts, intent limits | The user (via dashboard / CLI / SDK at registration time) | Guardian (every validation), Analysis Engine (to adjust depth) |
-| **Resource registry** | `resource_registry/` | The user's *workspaces* and resource mounts — virtual paths, real paths, writability, file filters, plus the registered adapter inventory | The user (when defining workspaces) and platform (when adapters register) | Agent client (sees `ClientView` — virtual paths only); executor (sees `ExecutorView` — full mount table with real paths) |
+| **Resource registry** | `intentframe_native_kit/resource_registry/` | The user's *workspaces* and resource mounts — virtual paths, real paths, writability, file filters, plus the registered adapter inventory | The user (when defining workspaces) and platform (when adapters register) | Agent client (sees `ClientView` — virtual paths only); executor (sees `ExecutorView` — full mount table with real paths) |
 
 Capability-tagging (the tag taxonomy used inside `TerminalConstraints`) is owned by `command_shield`, not by a registry of its own.
 
@@ -163,11 +163,11 @@ Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jar
 
 ## The resource registry
 
-`resource_registry/` is what holds the user's workspaces and the platform's adapter inventory.
+`intentframe_native_kit/resource_registry/` is what holds the user's workspaces and the platform's adapter inventory.
 
 ### Process and storage
 
-Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `resource_registry/server.py`. Backed by local SQLite. Started by the supervisor as one of its four core services.
+Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `intentframe_native_kit/resource_registry/server.py`. Backed by local SQLite. Started by the supervisor as one of its four core services.
 
 ### What it stores
 
@@ -204,12 +204,12 @@ The resource registry doesn't enforce path access — that's the executor's `Fil
 
 ### Where to look
 
-- `resource_registry/__init__.py` — public API
-- `resource_registry/registry.py` — `ResourceRegistry` class, view derivation
-- `resource_registry/models.py` — `ClientView`, `ExecutorView`, `ResourceMount`, `Workspace`
-- `resource_registry/server.py` — FastAPI service
-- `resource_registry/client.py` — async client
-- `resource_registry/floor.py` — defaults / floor mounts
+- `intentframe_native_kit/resource_registry/__init__.py` — public API
+- `intentframe_native_kit/resource_registry/registry.py` — `ResourceRegistry` class, view derivation
+- `intentframe_native_kit/resource_registry/models.py` — `ClientView`, `ExecutorView`, `ResourceMount`, `Workspace`
+- `intentframe_native_kit/resource_registry/server.py` — FastAPI service
+- `intentframe_native_kit/resource_registry/client.py` — async client
+- `intentframe_native_kit/resource_registry/floor.py` — defaults / floor mounts
 
 ---
 
@@ -234,7 +234,7 @@ When an `IntentFrame` arrives at the pipeline:
    - any fast-path ALLOW?                            (passive-read or allow_gates)
 
 4. If executor reached:
-   executor calls resource_registry.executor_view(workspace_id)
+   executor calls intentframe_native_kit.resource_registry.executor_view(workspace_id)
    → resolves virtual path to real path
    → FilesAdapter reads/writes that real path
 ```

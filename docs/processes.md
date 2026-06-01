@@ -140,7 +140,7 @@ The policies are the *authority* the Guardian enforces against. They're declared
 | | |
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/resource-registry.sock` |
-| **Source** | `resource_registry/server.py` |
+| **Source** | `intentframe_native_kit/resource_registry/server.py` |
 | **Job** | Tracks VFS mounts (which real paths map to which virtual paths) and the registered adapter inventory. |
 | **Storage** | Local SQLite at `~/.intentframe/resource/` |
 | **OpenAI calls** | No |

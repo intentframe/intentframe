@@ -309,7 +309,7 @@ Two independent sandboxing layers enforce boundaries at execution time:
 
 ### Workspace VFS (Resource Registry)
 
-`resource_registry/` provides virtual-filesystem isolation per user/agent. Agents only see virtual paths mapped by the dashboard (via `ResourceMount` entries). The executor resolves virtual paths to real paths through the registry. An agent requesting `/invoices/report.pdf` hits a virtual mount point — the real path on disk is never exposed.
+`intentframe_native_kit/resource_registry/` provides virtual-filesystem isolation per user/agent. Agents only see virtual paths mapped by the dashboard (via `ResourceMount` entries). The executor resolves virtual paths to real paths through the registry. An agent requesting `/invoices/report.pdf` hits a virtual mount point — the real path on disk is never exposed.
 
 ### macOS Seatbelt SBPL Kernel Sandbox
 

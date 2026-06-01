@@ -127,7 +127,7 @@ def _expand_prefix(raw: str) -> str | None:
         home = owner_home()
         if home is None:
             logger.warning(
-                "resource_registry.floor: dropping %r — running as bare root "
+                "intentframe_native_kit.resource_registry.floor: dropping %r — running as bare root "
                 "with no SUDO_USER, cannot expand ~",
                 raw,
             )
@@ -177,7 +177,7 @@ def canonicalize_real_path(raw: str) -> str:
 
     Semantics mirror
     :func:`intentframe_native_kit.intentframe_executor_pack_macos.virtual_filesystem._canonical_real_path`
-    (re-implemented here rather than imported so ``resource_registry``
+    (re-implemented here rather than imported so ``intentframe_native_kit.resource_registry``
     stays free of ``executor`` deps):
 
     - ``~`` is expanded via :func:`os.path.expanduser`.

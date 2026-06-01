@@ -33,8 +33,8 @@ from typing import Any, Dict, List
 
 from policy_registry.client import PolicyRegistryClient
 from policy_registry.models import ActionPermission, SemanticIntentLimit, UserPolicy
-from resource_registry.client import ResourceRegistryClient
-from resource_registry.models import ResourceMount
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.models import ResourceMount
 
 from intentframe_server.client import IntentFrameClient
 

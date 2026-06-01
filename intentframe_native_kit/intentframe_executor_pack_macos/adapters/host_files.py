@@ -10,7 +10,7 @@ LIST_HOST_DIRECTORY.
 
 Enforcement walls (run in order before any I/O):
 
-1. ``resource_registry.floor.match_deny_prefix`` — non-negotiable
+1. ``intentframe_native_kit.resource_registry.floor.match_deny_prefix`` — non-negotiable
    deny-write floor.  Rejects writes/deletes into launchd plists, shell
    rc files, ``~/.ssh``, ``/etc/sudoers``, etc.  Peer of the floor check
    inside :class:`LocalVirtualFileSystem`.
@@ -37,7 +37,7 @@ from intentframe_native_kit.action_registry import ActionType
 from executor_sdk.adapters.base import CapabilityAdapter
 from executor_sdk.models import AdapterManifest, ExecutionResult
 from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
-from resource_registry.floor import canonicalize_real_path
+from intentframe_native_kit.resource_registry.floor import canonicalize_real_path
 
 # MIME types we refuse up-front rather than surfacing cryptic decode
 # errors.  Mirrors LocalVirtualFileSystem._BINARY_UNSUPPORTED so the

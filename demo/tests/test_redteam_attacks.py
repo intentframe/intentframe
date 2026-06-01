@@ -33,8 +33,8 @@ for p in (_project_root, _tests_dir):
         sys.path.insert(0, str(p))
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
-from resource_registry.models import ResourceMount
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.models import ResourceMount
 
 from intentframe_server.client import IntentFrameClient
 

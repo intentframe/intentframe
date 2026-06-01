@@ -17,7 +17,7 @@ Deterministic enforcement is **not one layer**. It is the same conceptual job sp
   intentframe_server/          Pre-AE forks: RUN_COMMAND, WRITE_*, email enrich
   command_shield/              Structural command/code analysis (package)
   intentframe_components/      DG, AE fast-paths, checkers, prompt routing
-  executor/ + resource_registry/  I/O-time floors (post-approval)
+  executor/ + intentframe_native_kit/resource_registry/  I/O-time floors (post-approval)
 ```
 
 **Core tension you observed is correct:**

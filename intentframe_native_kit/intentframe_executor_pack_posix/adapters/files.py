@@ -64,7 +64,7 @@ class FilesAdapter(CapabilityAdapter):
         """Build mount list from registry (if workspace_id set) or static config."""
         if cfg.workspace_id:
             try:
-                from resource_registry.client import ResourceRegistryClient
+                from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 
                 rr = ResourceRegistryClient()
                 view = rr.executor_view(cfg.workspace_id)
@@ -168,7 +168,7 @@ class FilesAdapter(CapabilityAdapter):
             if action == "DELETE_FILE":
                 # Delegated to the VFS so the deny-write floor applies symmetrically
                 # with WRITE_FILE (see virtual_filesystem.py and
-                # resource_registry/floor.py).  The adapter never reaches into the
+                # intentframe_native_kit/resource_registry/floor.py).  The adapter never reaches into the
                 # resolver directly, which would bypass the floor entirely.
                 self._vfs.delete_file(path)
                 return ExecutionResult(success=True, data={"path": path, "deleted": True})

@@ -29,9 +29,9 @@ The SDK services folder mixes genuinely action-agnostic infrastructure with one 
 
 ## Bleed point 3 — the "resource" registry is really a *file* registry
 
-`resource_registry` is named as if it abstracts any resource, but its entire model is virtual→real **path** mapping:
+`intentframe_native_kit.resource_registry` is named as if it abstracts any resource, but its entire model is virtual→real **path** mapping:
 
-```24:38:resource_registry/models.py
+```24:38:intentframe_native_kit/resource_registry/models.py
 class ResourceMount(BaseModel):
     ...
     virtual_path: str
@@ -42,24 +42,18 @@ class ResourceMount(BaseModel):
 
 `ClientView` is literally `virtual_paths: list[str]`. There's no `EmailResourceMount` or `CalendarResource`. The "third registry" in `docs/registries.md` is, in practice, the file-mount table.
 
-## Bleed point 4 — the most concrete code-level bleed: `floor.py` reaching into a macOS pack
+## Bleed point 4 — resolved: identity-aware HOME moved to core
 
-This is the cross-layer leak that's actually acknowledged in a comment. `resource_registry/floor.py` imports *up* into a platform executor pack:
+This concrete code-level bleed has been removed. The resource-registry floor
+now imports the shared identity helper from core:
 
-```70:70:resource_registry/floor.py
-from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import owner_home  # import name; sources under intentframe_native_kit/
+```64:64:intentframe_native_kit/resource_registry/floor.py
+from intentframe_core.identity import owner_home
 ```
 
-The docstring flags it as debt:
-
-```64:69:resource_registry/floor.py
-# Identity-aware HOME resolution lives in intentframe_native_kit/intentframe_executor_pack_macos/sandbox/venv.py today.
-# ...  If the resource-registry is ever
-# extracted as a microservice, lift owner_home() to a neutral location
-# (intentframe_core.identity) and update both sides in one go.
-```
-
-So a registry that claims *"independent of… the executor package"* (its own module docstring) imports from a macOS executor pack for path/HOME math. That's path-vocabulary bleeding **across three layers at once** (registry → executor pack → OS identity).
+The macOS sandbox venv resolver imports the same helper, so the floor and
+executor still agree on `SUDO_USER`/root behavior without the registry reaching
+into a platform executor pack.
 
 ## Bleed point 5 — into the *domain* layer (partially addressed)
 
@@ -88,7 +82,7 @@ flowchart TD
   Core["intentframe_core/paths.py<br/>(zero-dep layer)"]
   SDK["executor_sdk/services/virtual_filesystem.py"]
   RR["resource_registry (ResourceMount = paths)"]
-  Floor["resource_registry/floor.py → macos pack"]
+  Floor["intentframe_native_kit/resource_registry/floor.py → intentframe_core.identity"]
   Domain["intentframe_native_kit/action_registry/domains/deletion.py (path-only)"]
   IF["IntentFrame.target: str + handshake virtual_paths"]
   FileFamily -.bleeds into.-> Core

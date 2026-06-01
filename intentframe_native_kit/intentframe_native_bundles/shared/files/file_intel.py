@@ -15,7 +15,7 @@ from intentframe_native_kit.intentframe_native_bundles.shared.files.evidence imp
     FILE_PARENT_KIND,
     FileIntel,
 )
-from resource_registry.floor import canonicalize_real_path, match_deny_prefix
+from intentframe_native_kit.resource_registry.floor import canonicalize_real_path, match_deny_prefix
 
 logger = logging.getLogger(__name__)
 

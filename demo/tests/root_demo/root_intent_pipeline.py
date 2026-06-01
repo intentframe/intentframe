@@ -21,8 +21,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
-from resource_registry.models import ResourceMount
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.models import ResourceMount
 
 from root_policy_loader import load_root_demo_policy
 

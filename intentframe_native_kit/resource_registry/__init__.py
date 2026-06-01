@@ -11,7 +11,7 @@ In the demo this runs in-process.  In production it becomes its own
 microservice backed by a database.
 
 Usage:
-    from resource_registry import ResourceRegistry, ResourceMount
+    from intentframe_native_kit.resource_registry import ResourceRegistry, ResourceMount
 
     registry = ResourceRegistry()
     registry.create_workspace(
@@ -23,13 +23,13 @@ Usage:
     executor_view = registry.executor_view("my_workspace")
 """
 
-from resource_registry.models import (
+from intentframe_native_kit.resource_registry.models import (
     ClientView,
     ExecutorView,
     ResourceMount,
     Workspace,
 )
-from resource_registry.registry import ResourceRegistry
+from intentframe_native_kit.resource_registry.registry import ResourceRegistry
 
 __all__ = [
     "ClientView",

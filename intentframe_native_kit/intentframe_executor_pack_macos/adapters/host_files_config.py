@@ -39,6 +39,6 @@ class HostFilesConfig(BaseModel):
     @classmethod
     def _canonicalize(cls, paths: list[str]) -> list[str]:
         """Expand ``~`` + resolve symlinks on each path once at load time."""
-        from resource_registry.floor import canonicalize_real_path
+        from intentframe_native_kit.resource_registry.floor import canonicalize_real_path
 
         return [canonicalize_real_path(p) for p in paths]

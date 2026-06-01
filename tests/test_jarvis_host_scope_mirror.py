@@ -15,7 +15,7 @@ earlier in the pipeline.  If the two drift apart:
   paths the operator intentionally opened.
 
 This test canonicalizes both allowlists through the shared
-:func:`resource_registry.floor.canonicalize_real_path` and asserts
+:func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path` and asserts
 strict set equality (reads and writes both).  The invariant is relaxed
 only if the policy later grows finer-grained sub-allowlists (out of
 scope for this plan).
@@ -36,7 +36,7 @@ import pytest
 import yaml
 
 from intentframe_gateway import bootstrap
-from resource_registry.floor import canonicalize_real_path
+from intentframe_native_kit.resource_registry.floor import canonicalize_real_path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

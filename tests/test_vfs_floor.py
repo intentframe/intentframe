@@ -1,7 +1,7 @@
 """Tests for the non-negotiable deny-write floor on the VFS.
 
 Covers:
-    - ``resource_registry.floor.match_deny_prefix``:
+    - ``intentframe_native_kit.resource_registry.floor.match_deny_prefix``:
         * exact match, prefix match, unrelated path miss;
         * canonicalization (trailing separator handling).
     - ``LocalVirtualFileSystem.write_file`` / ``delete_file`` reject
@@ -10,7 +10,7 @@ Covers:
     - ``APPEND_ROW`` path (which goes through ``write_file``) inherits
       the floor check for free.
     - Symmetry: every entry in ``intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates.NON_NEGOTIABLE_DENY_WRITE``
-      is covered by ``resource_registry.floor.DENY_WRITE_PREFIXES`` so
+      is covered by ``intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES`` so
       the sandbox and the file-tool floor cannot drift.
 
 These tests use a temporary mount that shadows a real sensitive path by
@@ -32,7 +32,7 @@ from intentframe_native_kit.intentframe_executor_pack_macos.virtual_filesystem i
 from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_WRITE
 from intentframe_core.identity import owner_home
 from executor_sdk.services.virtual_filesystem import MountPointConfig
-from resource_registry.floor import DENY_WRITE_PREFIXES, match_deny_prefix
+from intentframe_native_kit.resource_registry.floor import DENY_WRITE_PREFIXES, match_deny_prefix
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -196,8 +196,8 @@ class TestSandboxFloorSymmetry:
         missing = [p for p in expanded_sandbox if match_deny_prefix(p) is None]
         assert not missing, (
             f"Sandbox deny-write entries not covered by "
-            f"resource_registry.floor.DENY_WRITE_PREFIXES: {missing}. "
-            f"Add them to _RAW_DENY_WRITE_PREFIXES in resource_registry/floor.py."
+            f"intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES: {missing}. "
+            f"Add them to _RAW_DENY_WRITE_PREFIXES in intentframe_native_kit/resource_registry/floor.py."
         )
 
     def test_registry_floor_is_nonempty(self):

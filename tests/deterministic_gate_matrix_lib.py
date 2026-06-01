@@ -146,7 +146,7 @@ def gate_cases() -> tuple[GateCase, ...]:
         )
 
     def write_host_file_floor_block(dg: DeterministicGuardian) -> DeterministicResult:
-        from resource_registry.floor import (
+        from intentframe_native_kit.resource_registry.floor import (
             DENY_WRITE_PREFIXES,
             canonicalize_real_path,
         )
@@ -163,7 +163,7 @@ def gate_cases() -> tuple[GateCase, ...]:
         )
 
     def delete_host_file_floor_block(dg: DeterministicGuardian) -> DeterministicResult:
-        from resource_registry.floor import (
+        from intentframe_native_kit.resource_registry.floor import (
             DENY_WRITE_PREFIXES,
             canonicalize_real_path,
         )

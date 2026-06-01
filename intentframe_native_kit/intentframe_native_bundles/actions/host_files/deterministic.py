@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.types import IntentFrame
-from resource_registry.floor import canonicalize_real_path, match_deny_prefix
+from intentframe_native_kit.resource_registry.floor import canonicalize_real_path, match_deny_prefix
 
 from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
 

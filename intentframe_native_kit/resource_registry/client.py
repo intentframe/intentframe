@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from resource_registry.models import (
+from intentframe_native_kit.resource_registry.models import (
     ClientView,
     ExecutorView,
     ResourceMount,
