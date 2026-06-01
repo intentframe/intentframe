@@ -145,7 +145,12 @@ def main() -> None:
 
     if not policy_sock.exists():
         print(f"Error: Policy registry socket not found at {policy_sock}")
-        print("Start the supervisor first: python -m supervisor.main start")
+        print(
+            "Start the supervisor first: python -m supervisor.main start "
+            "--config intentframe_native_kit/supervisor_profile.yaml "
+            "(the kit profile also starts resource-registry, which this "
+            "seeder needs for workspaces)."
+        )
         sys.exit(1)
 
     variant = _resolve_variant()

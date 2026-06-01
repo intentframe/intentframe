@@ -7,7 +7,9 @@ for secrets, so we resolve every ``runtime_env`` credential into a
 the supervisor.
 
 The supervisor inherits this process's environment and forwards it to every
-supervised service, so the OpenAI key reaches intentframe-core.
+supervised service, so the OpenAI key reaches intentframe-core. The supervisor
+also reads INTENTFRAME_SUPERVISOR_CONFIG from this inherited env to pick its
+service-graph profile (minimal default unless the kit profile is exported).
 
 We deliberately drop any inherited ``OPENAI_API_KEY`` first, so the value the
 supervisor sees provably comes from the vault fetch — not the container env.

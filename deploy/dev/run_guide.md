@@ -65,6 +65,17 @@ export OPENAI_API_KEY=sk-...               # your actual key
 `VAULT_ADDR` defaults to `http://vault:8200` and `VAULT_TOKEN` to
 `dev-root-token` — override them only if you want to use an external Vault.
 
+**If your tests use workspaces** (anything that calls `ResourceRegistryClient()`
+/ sets `INTENTFRAME_RESOURCE_URL`), also enable the first-party kit profiles so
+the supervisor starts `resource-registry` and the edge exposes `/workspaces`:
+
+```bash
+export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+```
+
+Leave both unset for the minimal substrate (policy-registry + executor + core).
+
 ---
 
 ## Step 4 — build and start the containers
@@ -88,7 +99,10 @@ runtime. Watch the runtime logs — the expected sequence is:
 [bootstrap] injected 1 runtime_env var(s) from vault: ['OPENAI_API_KEY']
 ```
 
-Then the supervisor brings up all 4 services, and once `intentframe-core` is healthy, the edge container starts. The edge health probe takes up to ~90s from cold start.
+Then the supervisor brings up the services in its active profile (minimal
+default: policy-registry, executor, intentframe-core — plus resource-registry if
+you exported the kit profile), and once `intentframe-core` is healthy, the edge
+container starts. The edge health probe takes up to ~90s from cold start.
 
 ---
 
@@ -98,11 +112,14 @@ Then the supervisor brings up all 4 services, and once `intentframe-core` is hea
 curl -fsS http://localhost:8443/health
 ```
 
-Expected response:
+Expected response (minimal default):
 
 ```json
-{"status":"ok","backends":{"policy-registry":true,"resource-registry":true,"intentframe-core":true}}
+{"status":"ok","backends":{"policy-registry":true,"intentframe-core":true}}
 ```
+
+With the kit profiles enabled (Step 3) the summary also includes
+`"resource-registry":true`.
 
 Also confirm the key actually came from HashiCorp (not container env):
 
@@ -131,6 +148,9 @@ python -m demo.tests.test_redteam_attacks
 
 Your `PolicyRegistryClient()`, `ResourceRegistryClient()`, `IntentFrameClient()`, and `Actor(...)` all pick up these env vars automatically — no test code changes needed.
 
+> `ResourceRegistryClient()` / `INTENTFRAME_RESOURCE_URL` only work when the
+> kit profiles were enabled at Step 3; otherwise `/workspaces` returns 404/502.
+
 > **Defense validation works over HTTP; executor side effects are partial.**
 > Most attacks block before the executor runs — audit `BLOCK` / `blocked_count`
 > is enough. Filesystem sync only matters for ALLOW paths (e.g. redteam attack 16)
@@ -150,4 +170,5 @@ Your `PolicyRegistryClient()`, `ResourceRegistryClient()`, `IntentFrameClient()`
 | `vault authentication failed` | `VAULT_TOKEN` doesn't match the bundled Vault's root token (default `dev-root-token`) |
 | edge health check times out | Edge depends on runtime being healthy first; runtime has 90s start window — wait longer or check supervisor logs |
 | tests get 401/404 | Edge isn't up yet — wait for the health check to pass |
+| `/workspaces` 404 / `resource-registry` missing from `/health` | Kit profiles not enabled — export `INTENTFRAME_SUPERVISOR_CONFIG` + `INTENTFRAME_EDGE_CONFIG` (Step 3) and `up` again |
 | `No module named 'supervisor'` | Clone didn't succeed (private repo?) — add `IF_GIT_REPO=https://<TOKEN>@github.com/...` build-arg |

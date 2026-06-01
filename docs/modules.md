@@ -94,7 +94,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **What** | Workspaces and resource mounts. Serves separate read views to the agent (virtual paths only) and the executor (real paths). |
 | **Why** | Implements the virtual filesystem. The agent can never name a path outside its mounts; path traversal becomes structurally impossible. |
 | **Where** | `intentframe_native_kit/resource_registry/` |
-| **Process** | `resource-registry` (uvicorn) on `~/.intentframe/run/resource-registry.sock`, started by the supervisor. |
+| **Process** | `resource-registry` (uvicorn) on `~/.intentframe/run/resource-registry.sock`, started by the supervisor only under the first-party kit profile (opt-in, not in the minimal default). |
 | **Public docs** | [registries.md § Resource registry](registries.md#the-resource-registry); [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
 | **Module README** | None. |
 
@@ -243,7 +243,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 
 | | |
 |---|---|
-| **What** | A small process manager that spawns and monitors the four core services (`policy-registry`, `resource-registry`, `executor`, `intentframe-core`) in dependency order, waits for health, and shuts them down gracefully. |
+| **What** | A small process manager that spawns and monitors the services in an admin-owned, config-driven graph, in dependency order, waits for health, and shuts them down gracefully. The packaged minimal default starts `policy-registry`, `executor`, and `intentframe-core`; the first-party kit profile (`intentframe_native_kit/supervisor_profile.yaml`, what the gateway passes) adds `resource-registry`. Selected via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG`. |
 | **Why** | Splitting startup orchestration out of the gateway keeps the gateway focused on the user-facing API. The supervisor also injects `runtime_env` credentials into spawned children, so the children never call the vault themselves. |
 | **Where** | `supervisor/` |
 | **Process** | `supervisor`, started by the gateway in Step 6. |

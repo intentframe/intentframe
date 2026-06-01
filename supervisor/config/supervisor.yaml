@@ -1,0 +1,36 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# IntentFrame Supervisor — default service graph
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This is the supervisor's built-in, dependency-free default. It starts only the
+# substrate services and deliberately EXCLUDES the resource-registry: the
+# executor's files adapter works off the static `pack_options.files.mounts` table
+# unless a workspace_id is configured, so a registry is not required to run.
+#
+# Deployments that want dynamic workspace management (virtual→real mount
+# resolution via the resource registry) should start the supervisor against a
+# profile that includes it, e.g. the first-party kit profile:
+#
+#   python -m supervisor.main start \
+#     --config intentframe_native_kit/supervisor_profile.yaml
+#
+# The supervisor reads `--config <path>` from its CLI args; when omitted it
+# falls back to this file. Mechanism (spawn/health/monitor) lives in
+# supervisor/main.py — this file is the admin-owned service graph it executes.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  - name: policy-registry
+    module: policy_registry.server:app
+    socket_name: policy-registry.sock
+
+  - name: executor
+    module: executor.server:app
+    socket_name: executor.sock
+
+  - name: intentframe-core
+    module: intentframe_server.server:app
+    socket_name: intentframe.sock
+    depends_on:
+      - policy-registry
+      - executor

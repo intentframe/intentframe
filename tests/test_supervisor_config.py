@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from supervisor.config import ServiceConfig, SupervisorConfig, load_supervisor_config
-from supervisor.config import _apply_executor_mode, _executor_mode_from_env
+from supervisor.config import (
+    _apply_executor_mode,
+    _executor_mode_from_env,
+    _load_config_file,
+    _packaged_default_config,
+)
+
+_KIT_PROFILE = (
+    Path(__file__).resolve().parents[1]
+    / "intentframe_native_kit"
+    / "supervisor_profile.yaml"
+)
 
 
 def _service(config, name: str):
@@ -21,6 +34,30 @@ def test_supervisor_config_real_mode_starts_executor(monkeypatch: pytest.MonkeyP
     assert "executor" in core.depends_on
 
 
+def test_supervisor_config_default_excludes_resource_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The supervisor's packaged default graph is dependency-free."""
+    monkeypatch.delenv("INTENTFRAME_EXECUTOR_MODE", raising=False)
+
+    config = load_supervisor_config()
+
+    assert _service(config, "resource-registry") is None
+    core = _service(config, "intentframe-core")
+    assert core is not None
+    assert "resource-registry" not in core.depends_on
+
+
+def test_kit_profile_includes_resource_registry() -> None:
+    """The first-party kit profile opts the resource-registry back in."""
+    config = _load_config_file(_KIT_PROFILE)
+
+    assert _service(config, "resource-registry") is not None
+    core = _service(config, "intentframe-core")
+    assert core is not None
+    assert {"policy-registry", "resource-registry", "executor"} <= set(core.depends_on)
+
+
 def test_supervisor_config_dry_run_omits_executor(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INTENTFRAME_EXECUTOR_MODE", "dry_run")
 
@@ -30,7 +67,16 @@ def test_supervisor_config_dry_run_omits_executor(monkeypatch: pytest.MonkeyPatc
     core = _service(config, "intentframe-core")
     assert core is not None
     assert "executor" not in core.depends_on
-    assert {"policy-registry", "resource-registry"} <= set(core.depends_on)
+    assert {"policy-registry"} <= set(core.depends_on)
+
+
+def test_explicit_missing_config_path_raises(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        load_supervisor_config(tmp_path / "does-not-exist.yaml")
+
+
+def test_packaged_default_config_exists() -> None:
+    assert _packaged_default_config().exists()
 
 
 def test_supervisor_config_rejects_unknown_executor_mode(

@@ -4,12 +4,14 @@
 #
 #   1. start credential-vault   (HashiCorp backend via IF_VAULT_BACKEND/VAULT_*)
 #   2. wait for vault /health
-#   3. exec supervisor          (policy-registry, resource-registry,
-#                                executor, intentframe-core — all UDS)
+#   3. exec supervisor          (services per the active profile — minimal by
+#                                default: policy-registry, executor,
+#                                intentframe-core; all UDS)
 #
 # The supervisor inherits this process's environment, so OPENAI_API_KEY
-# (and anything else the services read) must be present here. Vault is the
-# bootstrap dependency: first up, last down.
+# (and anything else the services read) must be present here, as must
+# INTENTFRAME_SUPERVISOR_CONFIG when a non-default service graph is wanted.
+# Vault is the bootstrap dependency: first up, last down.
 #
 set -euo pipefail
 
@@ -47,7 +49,7 @@ shutdown() {
 }
 trap shutdown SIGTERM SIGINT
 
-echo "[entrypoint] [3/3] starting supervisor (4 services)"
+echo "[entrypoint] [3/3] starting supervisor (graph: ${INTENTFRAME_SUPERVISOR_CONFIG:-default minimal})"
 python -m supervisor.main start &
 SUP_PID=$!
 wait "${SUP_PID}"

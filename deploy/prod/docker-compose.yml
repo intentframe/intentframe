@@ -1,11 +1,18 @@
 # IntentFrame B2B deployment — one runtime + one network edge.
 #
-#   intentframe-runtime : vault + supervisor (4 UDS services). One writer.
+#   intentframe-runtime : vault + supervisor (UDS services). One writer.
 #   intentframe-edge     : HTTP(S) front door, forwards to the UDS sockets.
 #
 # The two services share the `if-run` volume so the edge can reach the
 # runtime's sockets. DevOps discipline: never scale the runtime, and never
 # point a second runtime at the same volume (single-writer per environment).
+#
+# Supervisor and edge are generic, config-driven substrate. By default they run
+# the MINIMAL graph (policy-registry + executor + intentframe-core; edge exposes
+# /policies + /handshake|/process|/audit) with NO resource-registry / /workspaces.
+# A deployment that needs dynamic workspaces opts in by setting BOTH:
+#   INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+#   INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
 #
 # Quick start:
 #   export OPENAI_API_KEY=sk-...
@@ -31,6 +38,11 @@ services:
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:?set VAULT_SECRET_ID}"
       # real executor (set to dry_run to exercise the pipeline only)
       INTENTFRAME_EXECUTOR_MODE: "${INTENTFRAME_EXECUTOR_MODE:-real}"
+      # Supervisor service-graph profile. Empty = minimal default (no
+      # resource-registry). Set to the kit profile only if this deployment
+      # needs workspaces (pair with INTENTFRAME_EDGE_CONFIG on the edge):
+      #   /app/intentframe_native_kit/supervisor_profile.yaml
+      INTENTFRAME_SUPERVISOR_CONFIG: "${INTENTFRAME_SUPERVISOR_CONFIG:-}"
     volumes:
       - if-run:/home/intentframe/.intentframe/run     # UDS sockets
       - if-data:/home/intentframe/.intentframe         # policy/resource/audit state
@@ -57,6 +69,11 @@ services:
     environment:
       INTENTFRAME_EDGE_HOST: "0.0.0.0"
       INTENTFRAME_EDGE_PORT: "8443"
+      # Edge backend profile. Empty = minimal default (/policies + core routes,
+      # no /workspaces). Set the kit profile to expose /workspaces (pair with
+      # INTENTFRAME_SUPERVISOR_CONFIG on the runtime):
+      #   /app/intentframe_native_kit/edge_profile.yaml
+      INTENTFRAME_EDGE_CONFIG: "${INTENTFRAME_EDGE_CONFIG:-}"
       # Optional coarse auth on top of TLS:
       # INTENTFRAME_EDGE_TOKEN: "${INTENTFRAME_EDGE_TOKEN:-}"
       # Optional TLS / mTLS (mount certs and point at them):

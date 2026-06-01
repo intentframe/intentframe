@@ -2,6 +2,15 @@
 
 Everything is env-overridable so the edge can be configured entirely
 from a container environment (docker-compose, k8s) with no code change.
+
+The backend list is admin-owned data, not edge logic. It is read from a YAML
+profile (``INTENTFRAME_EDGE_CONFIG`` / ``--config``) when provided, falling back
+to the in-code minimal default. The minimal default deliberately exposes only
+the substrate services that every deployment runs (``policy-registry`` and
+``intentframe-core``); the ``resource-registry`` ``/workspaces`` route is
+optional and lives in the first-party kit profile
+(``intentframe_native_kit/edge_profile.yaml``), mirroring the supervisor's
+registry-less default + opt-in kit profile split.
 """
 
 from __future__ import annotations
@@ -10,6 +19,7 @@ import logging
 import os
 from pathlib import Path
 
+import yaml
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("intentframe.edge")
@@ -38,21 +48,17 @@ class Backend(BaseModel):
     prefixes: tuple[str, ...]
 
 
-# The three services a remote test/agent client legitimately needs.
-# Executor and credential-vault are intentionally absent — they stay
-# UDS-only inside the environment.
+# Minimal default: only the substrate services every deployment runs.
+# ``resource-registry`` (/workspaces) is optional and added by the first-party
+# kit profile (intentframe_native_kit/edge_profile.yaml). Executor and
+# credential-vault are intentionally never exposed — they stay UDS-only inside
+# the environment.
 DEFAULT_BACKENDS: list[Backend] = [
     Backend(
         name="policy-registry",
         socket_name="policy-registry.sock",
         upstream_host="policy-registry",
         prefixes=("/policies",),
-    ),
-    Backend(
-        name="resource-registry",
-        socket_name="resource-registry.sock",
-        upstream_host="resource-registry",
-        prefixes=("/workspaces",),
     ),
     Backend(
         name="intentframe-core",
@@ -95,9 +101,35 @@ class EdgeConfig(BaseModel):
         return self.tls_enabled and bool(self.tls_ca)
 
 
+def _load_config_file(path: Path) -> EdgeConfig:
+    """Validate an edge profile YAML into an :class:`EdgeConfig`.
+
+    The YAML typically carries only a ``backends:`` list (the routable upstream
+    set); network fields (host/port/TLS/auth) keep their defaults and are
+    overlaid from env afterwards, so one profile works across deployments.
+    """
+    with open(path) as fh:
+        data = yaml.safe_load(fh)
+    if not isinstance(data, dict):
+        raise ValueError(f"Edge config must be a YAML mapping: {path}")
+    return EdgeConfig.model_validate(data)
+
+
 def load_edge_config() -> EdgeConfig:
-    """Build config from defaults overlaid with ``INTENTFRAME_EDGE_*`` env."""
-    config = EdgeConfig()
+    """Build config from a profile file (if any) overlaid with env.
+
+    The backend graph comes from ``INTENTFRAME_EDGE_CONFIG`` (a YAML profile)
+    when set, else the in-code minimal default. ``INTENTFRAME_EDGE_*`` env vars
+    always override the network-facing fields on top.
+    """
+    config_path = os.environ.get("INTENTFRAME_EDGE_CONFIG")
+    if config_path:
+        path = Path(config_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Edge config not found: {path}")
+        config = _load_config_file(path)
+    else:
+        config = EdgeConfig()
 
     if run_dir := os.environ.get("INTENTFRAME_RUN_DIR"):
         config.run_dir = Path(run_dir)

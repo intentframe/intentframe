@@ -111,7 +111,7 @@ So bundles, executor packs, policy YAML, and optional agent-author tooling share
 
 ### Process and storage
 
-Runs as a uvicorn FastAPI service on `~/.intentframe/run/policy-registry.sock`. Source: `policy_registry/server.py`. Backed by local SQLite. Started by the supervisor as one of its four core services.
+Runs as a uvicorn FastAPI service on `~/.intentframe/run/policy-registry.sock`. Source: `policy_registry/server.py`. Backed by local SQLite. Started by the supervisor in every profile, including the packaged minimal default.
 
 ### What it stores
 
@@ -167,7 +167,7 @@ Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jar
 
 ### Process and storage
 
-Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `intentframe_native_kit/resource_registry/server.py`. Backed by local SQLite. Started by the supervisor as one of its four core services.
+Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `intentframe_native_kit/resource_registry/server.py`. Backed by local SQLite. **Opt-in**: the supervisor only starts it under the first-party kit profile (`intentframe_native_kit/supervisor_profile.yaml`), not the packaged minimal default. Deployments that only use static executor mounts can omit it entirely.
 
 ### What it stores
 

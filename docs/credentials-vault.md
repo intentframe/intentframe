@@ -216,8 +216,9 @@ GATEWAY STARTS
               to gate further startup. If missing → partial-startup mode.
     └─ Step 4: supervisor builds runtime_env from
               vault.list_runtime_env() + vault.get(...) for each
-    └─ Step 6: supervisor spawns 4 services with that env
-              (each child reads what it needs from os.environ)
+    └─ Step 6: supervisor spawns its profile's services with that env
+              (gateway passes the kit profile → 4 services;
+               each child reads what it needs from os.environ)
 
 EXECUTOR STARTS (under supervisor)
     └─ executor.yaml: credentials.backend = service

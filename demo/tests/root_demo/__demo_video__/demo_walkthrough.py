@@ -38,7 +38,8 @@ Usage
 Or for safe rehearsal (no host I/O):
   INTENTFRAME_EXECUTOR_MODE=dry_run \\
   INTENTFRAME_DRY_RUN_CONTEXT=root \\
-  python -m supervisor.main start
+  python -m supervisor.main start \\
+    --config intentframe_native_kit/supervisor_profile.yaml
   python demo/tests/root_demo/__demo_video__/demo_walkthrough.py
 
 Override policy:

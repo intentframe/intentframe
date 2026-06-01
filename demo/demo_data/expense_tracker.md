@@ -10,3 +10,8 @@
 | GlobalConsult Partners | 4000.0 | 2024-11-20 | Consulting Phase 3 | Approved |
 | GlobalConsult Partners | 4000.0 | 2024-11-21 | Consulting Phase 4 | Approved |
 | GlobalConsult Partners | 4000.0 | 2024-11-22 | Consulting Phase 5 | Approved |
+| GlobalConsult Partners | 4000.0 | 2024-11-18 | Consulting Phase 1 | Approved |
+| GlobalConsult Partners | 4000.0 | 2024-11-19 | Consulting Phase 2 | Approved |
+| GlobalConsult Partners | 4000.0 | 2024-11-20 | Consulting Phase 3 | Approved |
+| GlobalConsult Partners | 4000.0 | 2024-11-21 | Consulting Phase 4 | Approved |
+| GlobalConsult Partners | 4000.0 | 2024-11-22 | Consulting Phase 5 | Approved |

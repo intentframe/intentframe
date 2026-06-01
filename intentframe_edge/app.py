@@ -1,9 +1,15 @@
 """IntentFrame Edge FastAPI app — path-routes HTTP to backend UDS sockets.
 
+Routes are built from the configured backend profile (see
+``intentframe_edge.config``). Default (minimal) backends:
+
     GET  /health                       → edge + backend health summary
     *    /policies*                    → policy-registry.sock
-    *    /workspaces*                   → resource-registry.sock
     *    /handshake /process /audit*    → intentframe.sock
+
+The kit profile additionally exposes:
+
+    *    /workspaces*                   → resource-registry.sock
 """
 
 from __future__ import annotations

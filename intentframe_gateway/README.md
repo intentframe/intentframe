@@ -59,7 +59,7 @@ The gateway is the **root process**.  It starts everything in dependency order:
 | 3 | Start EDI (fire-and-forget) | Email sync daemon, only if email accounts configured |
 | 4 | Build combined env | Merge non-sensitive config YAML + vault secrets; see [Env injection](#env-injection-three-layers-one-dict) |
 | 5 | Detect root-demo escalation | Read `~/.intentframe/state/root-demo.json` + check `/etc/sudoers.d/intentframe-run`; inject `INTENTFRAME_ESCALATION_ARMED=0\|1` into supervisor env |
-| 6 | Start supervisor | Spawns 4 infra services (policy-registry, resource-registry, executor, intentframe-core); inherits `INTENTFRAME_ESCALATION_ARMED` |
+| 6 | Start supervisor | Passes the first-party kit profile (`intentframe_native_kit/supervisor_profile.yaml`, override with `INTENTFRAME_SUPERVISOR_CONFIG`), so it spawns 4 infra services (policy-registry, resource-registry, executor, intentframe-core); inherits `INTENTFRAME_ESCALATION_ARMED` |
 | 7 | Start platform server (macOS) | Via `open .app` for TCC permissions; non-fatal if unavailable |
 | 8 | Bootstrap | Seed policies and workspace (idempotent) |
 | 9 | Start Jarvis | AI agent, needs runtime env (OpenAI key) |
@@ -113,7 +113,7 @@ combined_env = {**config_env, **runtime_env}
 
 This combined dict is passed to every process that accepts an env overlay:
 
-- The **supervisor** (and thus its four infra children)
+- The **supervisor** (and thus its infra children — 4 under the gateway's kit profile)
 - **Jarvis** (`start_jarvis(env=combined_env)`)
 - **Telegram** (`start_telegram(env=combined_env)`)
 
@@ -134,7 +134,7 @@ POST /system/shutdown  →  gateway SIGTERM  →  lifespan teardown
 The lifespan teardown runs in order:
 1. `POST /shutdown` on platform server (macOS only)
 2. Stop managed processes (telegram, edi, jarvis, vault) via `SIGTERM`
-3. Stop supervisor (which stops its 4 infra services)
+3. Stop supervisor (which stops its infra services)
 4. Close proxies
 5. Remove `gateway.pid`
 
