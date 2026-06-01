@@ -30,7 +30,7 @@ import pytest
 from executor_sdk.exceptions import VirtualFileSystemError
 from intentframe_native_kit.intentframe_executor_pack_macos.virtual_filesystem import LocalVirtualFileSystem
 from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_WRITE
-from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import owner_home
+from intentframe_core.identity import owner_home
 from executor_sdk.services.virtual_filesystem import MountPointConfig
 from resource_registry.floor import DENY_WRITE_PREFIXES, match_deny_prefix
 

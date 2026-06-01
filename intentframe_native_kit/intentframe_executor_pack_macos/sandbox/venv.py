@@ -42,43 +42,15 @@ from __future__ import annotations
 
 import logging
 import os
-import pwd
 from pathlib import Path
+
+from intentframe_core.identity import owner_home
 
 from .config import SandboxConfig
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_VENV_RELATIVE = ".intentframe-venvs/executor"
-
-
-def owner_home() -> str | None:
-    """Return the HOME of the intended runtime identity, or ``None``.
-
-    ``None`` means the executor is running as bare root with no
-    ``SUDO_USER`` hint, i.e. there is no well-defined owning user for
-    ``~`` expansion. Callers must treat this as an error when a
-    user-scoped path is required.
-    """
-    sudo_user = os.environ.get("SUDO_USER")
-    if sudo_user:
-        try:
-            return pwd.getpwnam(sudo_user).pw_dir
-        except KeyError:
-            logger.warning(
-                "SUDO_USER=%r set but no such user; falling back to uid-based "
-                "HOME resolution",
-                sudo_user,
-            )
-
-    uid = os.getuid()
-    if uid == 0:
-        return None
-
-    try:
-        return pwd.getpwuid(uid).pw_dir
-    except KeyError:
-        return None
 
 
 def resolve_executor_venv_path(config: SandboxConfig) -> str | None:

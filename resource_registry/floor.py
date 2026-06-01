@@ -25,7 +25,7 @@ Design choices:
   here preserves the extraction-as-microservice story of the registry
   and keeps executor code unchanged.
 - **Pre-expanded tuple.**  ``~`` is expanded at module-load time using
-  :func:`intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv.owner_home` so the floor honours
+  :func:`intentframe_core.identity.owner_home` so the floor honours
   ``SUDO_USER`` under root-via-sudo — the same identity-aware HOME the
   executor venv uses.  No per-call expansion.
 - **Canonicalized via realpath.**  Matches the sandbox's
@@ -61,13 +61,7 @@ import logging
 import os
 from pathlib import Path
 
-# Identity-aware HOME resolution lives in intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv today.
-# Importing it does NOT edit sandbox code — it's a read-only dependency
-# that lets us share the "respect SUDO_USER" behaviour without
-# duplicating the pwd.getpwnam logic.  If the resource-registry is ever
-# extracted as a microservice, lift owner_home() to a neutral location
-# (intentframe_core.identity) and update both sides in one go.
-from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import owner_home
+from intentframe_core.identity import owner_home
 
 logger = logging.getLogger(__name__)
 
