@@ -54,7 +54,7 @@ def run_terminal_pre_pipeline(
             print("")
 
         audit_entry = {
-            "action": intent.action.value,
+            "action": intent.action,
             "target": intent.target,
             "data": intent.data,
             "reason": intent.reason,

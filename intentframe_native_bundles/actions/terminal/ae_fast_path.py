@@ -18,7 +18,7 @@ CATASTROPHIC_COMMAND_PATTERNS: dict[str, str] = {
 
 def try_catastrophic_report(intent: IntentFrame) -> AnalysisReport | None:
     """Return a deterministic CRITICAL report if the command is catastrophic."""
-    if intent.action.value != ActionType.RUN_COMMAND.value:
+    if intent.action != ActionType.RUN_COMMAND.value:
         return None
 
     command = (intent.data or {}).get("command", "")

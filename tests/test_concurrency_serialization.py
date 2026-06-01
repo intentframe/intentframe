@@ -79,7 +79,7 @@ class _YieldingGuardian:
 
 class _CompletedExecutor:
     def execute(self, validated_intent: IntentFrame) -> ExecutionResult:
-        return ExecutionResult(success=True, data={"action": validated_intent.action.value})
+        return ExecutionResult(success=True, data={"action": validated_intent.action})
 
 
 class _AwaitableResult:

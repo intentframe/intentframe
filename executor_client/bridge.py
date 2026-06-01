@@ -98,7 +98,7 @@ class ExecutorBridge:
             Demo ExecutionResult (dataclass) with data shaped to match
             what the demo agent expects.
         """
-        action = intent.action.value  # e.g. ActionType.READ_FILE -> "READ_FILE"
+        action = intent.action  # opaque action string, e.g. "READ_FILE"
 
         # 1. Build production request with translated params
         request = self._to_execution_request(intent, action)

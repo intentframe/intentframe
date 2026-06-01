@@ -25,7 +25,7 @@ if str(_project_root) not in sys.path:
 from action_registry import ActionType
 from action_registry.types import DomainType, ACTION_DOMAINS
 from intentframe_core.types import IntentFrame
-from intentframe_core.domains import DOMAIN_SCHEMAS
+from action_registry.domains import DOMAIN_SCHEMAS
 from policy_registry.models import UserPolicy
 from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
 from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
@@ -308,15 +308,20 @@ def test_deletion_module_host_file():
 # 2. Actor Schema Validation (no server)
 # ═══════════════════════════════════════════════════════════════════
 
-def test_actor_schema_validation():
+def test_actor_is_thin_transport():
     print("\n" + "=" * 60)
-    print("  2. Actor Schema Validation — _build_intent")
+    print("  2. Actor is a thin transport — _build_intent")
     print("=" * 60)
 
+    # Contract: the actor does NOT validate action taxonomy or domain intent
+    # shape. ``IntentFrame.action`` is an opaque string and the actor passes
+    # ``data`` through untouched. Domain shape is enforced server-side by the
+    # bundle runner (``check_domain_intent_shape``) and domain bundles; unknown
+    # actions fail closed at executor dispatch.
     from intentframe_actor import Actor
     actor = Actor(agent_id="test", user_id="test")
 
-    # PAY_INVOICE with valid data → should succeed
+    # PAY_INVOICE with valid data → builds OK, action is the plain string.
     intent = actor._build_intent({
         "action": "PAY_INVOICE",
         "target": "vendor_invoice",
@@ -324,25 +329,22 @@ def test_actor_schema_validation():
         "data": {"amount": 5000.0, "currency": "USD"},
     })
     check("PAY_INVOICE with amount+currency → builds OK", intent is not None)
-    check("  action is PAY_INVOICE", intent.action == ActionType.PAY_INVOICE)
+    check("  action is the plain string 'PAY_INVOICE'", intent.action == "PAY_INVOICE")
+    check("  action equals ActionType.PAY_INVOICE.value", intent.action == ActionType.PAY_INVOICE.value)
 
-    # PAY_INVOICE missing amount → should raise ValueError
-    raised = False
-    msg = ""
-    try:
-        actor._build_intent({
-            "action": "PAY_INVOICE",
-            "target": "vendor",
-            "reason": "test",
-            "data": {"description": "no amount field"},
-        })
-    except ValueError as e:
-        raised = True
-        msg = str(e)
-    check("PAY_INVOICE without amount → ValueError", raised)
-    check("  error mentions FinancialIntentData", "FinancialIntentData" in msg)
+    # PAY_INVOICE missing amount → actor no longer validates; still builds.
+    intent_bad_finance = actor._build_intent({
+        "action": "PAY_INVOICE",
+        "target": "vendor",
+        "reason": "test",
+        "data": {"description": "no amount field"},
+    })
+    check(
+        "PAY_INVOICE without amount → builds OK (validated server-side)",
+        intent_bad_finance is not None,
+    )
 
-    # DELETE_FILE with valid data → should succeed
+    # DELETE_FILE with valid data → builds OK.
     intent2 = actor._build_intent({
         "action": "DELETE_FILE",
         "target": "/tmp/file.txt",
@@ -351,53 +353,36 @@ def test_actor_schema_validation():
     })
     check("DELETE_FILE with path → builds OK", intent2 is not None)
 
-    # DELETE_FILE missing path → should raise ValueError
-    raised2 = False
-    try:
-        actor._build_intent({
-            "action": "DELETE_FILE",
-            "target": "/tmp/file.txt",
-            "reason": "cleanup",
-            "data": {"filename": "file.txt"},
-        })
-    except ValueError as e:
-        raised2 = True
-    check("DELETE_FILE without path → ValueError", raised2)
-
-    # DELETE_HOST_FILE (real-path parallel) — same DeletionIntentData schema.
-    intent_host = actor._build_intent({
-        "action": "DELETE_HOST_FILE",
-        "target": "~/Documents/file.txt",
+    # DELETE_FILE missing path → actor no longer validates; still builds.
+    intent_bad_deletion = actor._build_intent({
+        "action": "DELETE_FILE",
+        "target": "/tmp/file.txt",
         "reason": "cleanup",
-        "data": {"path": "~/Documents/file.txt"},
+        "data": {"filename": "file.txt"},
     })
     check(
-        "DELETE_HOST_FILE with path → builds OK",
-        intent_host is not None,
+        "DELETE_FILE without path → builds OK (validated server-side)",
+        intent_bad_deletion is not None,
     )
 
-    raised_host = False
-    try:
-        actor._build_intent({
-            "action": "DELETE_HOST_FILE",
-            "target": "~/Documents/file.txt",
-            "reason": "cleanup",
-            "data": {"filename": "file.txt"},
-        })
-    except ValueError:
-        raised_host = True
+    # Unknown action string → actor does not police the taxonomy.
+    intent_unknown = actor._build_intent({
+        "action": "NOT_A_REAL_ACTION",
+        "target": "x",
+        "reason": "author's responsibility",
+    })
     check(
-        "DELETE_HOST_FILE without path → ValueError",
-        raised_host,
+        "Unknown action string → builds OK (fails closed at dispatch)",
+        intent_unknown is not None and intent_unknown.action == "NOT_A_REAL_ACTION",
     )
 
-    # Non-critical-domain action → no schema validation
+    # Non-critical-domain action → builds OK.
     intent3 = actor._build_intent({
         "action": "READ_FILE",
         "target": "/invoices/test.md",
         "reason": "reading",
     })
-    check("READ_FILE (no domain) → builds OK without schema", intent3 is not None)
+    check("READ_FILE → builds OK", intent3 is not None)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -653,7 +638,7 @@ def main():
     test_finance_module()
     test_deletion_module()
     test_deletion_module_host_file()
-    test_actor_schema_validation()
+    test_actor_is_thin_transport()
     test_serialization_roundtrip()
     test_taxonomy()
 

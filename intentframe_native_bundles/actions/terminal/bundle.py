@@ -126,7 +126,7 @@ class TerminalActionBundle(ActionBundle):
         action_permission: ActionPermission,
         ctx: BundleContext,
     ) -> BundlePhaseOutcome:
-        if intent.action.value not in self.action_ids:
+        if intent.action not in self.action_ids:
             return BundlePhaseOutcome.continue_(ctx)
         command_intel = ctx.evidence.get(COMMAND_INTEL_KEY)
         if command_intel is None:

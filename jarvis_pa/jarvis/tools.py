@@ -21,6 +21,13 @@ from agents import RunContextWrapper, WebSearchTool, function_tool
 from loguru import logger
 from pydantic import BaseModel
 
+# Author-side convenience: jarvis (the agent author) opts into the action
+# registry to fail fast before the network round-trip. The actor and core stay
+# decoupled from the registry; the IntentFrame pipeline still re-validates
+# authoritatively server-side.
+from action_registry.domains import DOMAIN_SCHEMAS
+from action_registry.types import ACTION_DOMAINS, ActionType
+
 from jarvis.types import AgentContext
 
 # ---------------------------------------------------------------------------
@@ -328,6 +335,38 @@ def _render_result(result: Any) -> str:
 # Shared submit helper
 # ---------------------------------------------------------------------------
 
+def _validate_against_registry(payload: dict[str, Any]) -> str | None:
+    """Author-side pre-flight validation using the action registry.
+
+    Returns an error string if the action is unknown to the taxonomy or its
+    critical-domain payload slice is malformed; otherwise ``None``. This is a
+    fail-fast convenience that runs before the network round-trip — the
+    IntentFrame pipeline re-validates authoritatively server-side regardless,
+    so this never weakens enforcement.
+    """
+    action_str = payload.get("action", "")
+    try:
+        action = ActionType(action_str)
+    except ValueError:
+        return (
+            f"Error: unknown action '{action_str}' — not part of the action "
+            f"registry taxonomy."
+        )
+
+    domain = ACTION_DOMAINS.get(action)
+    if domain is not None:
+        schema_cls = DOMAIN_SCHEMAS.get(domain)
+        if schema_cls is not None:
+            try:
+                schema_cls.validate_slice(payload)
+            except Exception as exc:
+                return (
+                    f"Error: {action.value} is in the {domain.value} domain and "
+                    f"requires valid {schema_cls.__name__} data: {exc}"
+                )
+    return None
+
+
 async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> str:
     """Submit an action through the actor and return a string result."""
     payload = action.model_dump()
@@ -340,6 +379,14 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
         or payload.get("url")
         or ""
     )
+
+    pre_flight_error = _validate_against_registry(payload)
+    if pre_flight_error is not None:
+        logger.warning(
+            f"actor.submit pre-flight rejected {action_type}: {pre_flight_error}"
+        )
+        return pre_flight_error
+
     logger.debug(
         f"actor.submit: {action_type} — {str(payload['display_subject'])[:60]}"
     )

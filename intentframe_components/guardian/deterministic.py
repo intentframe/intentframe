@@ -81,7 +81,7 @@ class DeterministicGuardian:
         *,
         verbose: bool,
     ) -> DeterministicResult:
-        action = intent.action.value
+        action = intent.action
 
         if action not in user_context.allowed_actions:
             return DeterministicResult(

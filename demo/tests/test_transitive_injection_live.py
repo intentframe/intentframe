@@ -149,7 +149,7 @@ def _run_xfail_test(test_fn) -> None:
 
 def _print_intent(intent: IntentFrame):
     print(f"\n  {_BOLD}IntentFrame:{_RESET}")
-    print(f"    action:   {_CYAN}{intent.action.value}{_RESET}")
+    print(f"    action:   {_CYAN}{intent.action}{_RESET}")
     print(f"    target:   {intent.target}")
     if intent.data:
         for k, v in intent.data.items():

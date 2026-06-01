@@ -262,7 +262,7 @@ write_file_intent = IntentFrame(
 write_file_intel = build_file_intel(
     write_file_intent.data["content"],
     write_file_intent.target,
-    write_file_intent.action.value,
+    write_file_intent.action,
 )
 write_file_analysis = AnalysisReport(
     stated_intent="Write a Python expense-sync helper to the user's scripts directory",

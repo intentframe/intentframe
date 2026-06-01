@@ -90,7 +90,7 @@ async def _run_test():
 
     for i, intent in enumerate(test_intents, 1):
         print(f"\n{'─' * 70}")
-        print(f"  Test {i}: {intent.action.value}")
+        print(f"  Test {i}: {intent.action}")
         print(f"  Target: {intent.target}")
         print(f"  Reason: {intent.reason}")
         print(f"{'─' * 70}")

@@ -81,7 +81,7 @@ class EmailActionBundle(ActionBundle):
         verbose: bool = False,
     ) -> BundlePhaseOutcome:
         del action_permission, verbose
-        if intent.action.value in EMAIL_MESSAGE_ACTIONS:
+        if intent.action in EMAIL_MESSAGE_ACTIONS:
             client = await self._get_client()
             ctx.enriched_intent = await enrich_intent(intent, client=client)
         return BundlePhaseOutcome.continue_(ctx)
@@ -113,7 +113,7 @@ class EmailActionBundle(ActionBundle):
         # Resolve dynamic recipient sources here — the natural place since
         # "is this recipient allowed?" is a constraint check, not enrichment.
         allowed = list(constraints.allowed_recipients)
-        if intent.action.value in _SEND_LIKE_ACTIONS and constraints.recipient_sources:
+        if intent.action in _SEND_LIKE_ACTIONS and constraints.recipient_sources:
             resolved = await self._contacts.resolve_sources(constraints.recipient_sources)
             allowed = list(set(allowed) | set(resolved))
 
@@ -149,7 +149,7 @@ class EmailActionBundle(ActionBundle):
         allowed_recipients: list[str],
     ) -> tuple[bool, str]:
         data = intent.data or {}
-        action = intent.action.value
+        action = intent.action
         raw_to = str(data.get("to", "")).strip()
         recipients = self._extract_emails(raw_to) if raw_to else []
         if not recipients:

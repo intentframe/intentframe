@@ -47,7 +47,7 @@ class MessageActionBundle(ActionBundle):
         if action_permission.constraints is None:
             return BundlePhaseOutcome.continue_(ctx)
         constraints = MessageConstraints.model_validate(action_permission.constraints)
-        action = intent.action.value
+        action = intent.action
         data = intent.data or {}
 
         if action == ActionType.SEND_MESSAGE.value:

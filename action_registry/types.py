@@ -41,11 +41,16 @@ class ActionCategory(Enum):
     SYSTEM = "SYSTEM"
 
 
-class ActionType(Enum):
+class ActionType(str, Enum):
     """Canonical action types available on the device.
 
     Universal actions exist on every platform.
     Platform-specific actions are registered via platform modules.
+
+    Subclasses ``str`` so members are drop-in string identifiers: an
+    ``ActionType`` member equals its ``.value`` and can populate the plain
+    ``str`` ``IntentFrame.action`` field directly. ``intentframe_core`` stays
+    decoupled from this taxonomy.
     """
 
     # ── FILE ──────────────────────────────────────────────────────

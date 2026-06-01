@@ -176,7 +176,7 @@ class IntentFrameRuntime:
 
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "action": intent.action.value,
+            "action": intent.action,
             "success": result.success,
             "target": intent.target or "",
             "error": result.error,
@@ -307,9 +307,9 @@ class IntentFrameRuntime:
         from intentframe_core.enums import Reversibility, RiskLevel
 
         return AnalysisReport(
-            stated_intent=f"{intent.action.value} on {intent.target}",
+            stated_intent=f"{intent.action} on {intent.target}",
             actual_behaviors=[{
-                "action": intent.action.value,
+                "action": intent.action,
                 "actual_behavior": det_result.reason,
                 "matches_intent": True,
             }],
@@ -499,7 +499,7 @@ class IntentFrameRuntime:
             print(f"    ║  {intent_header:<58} ║")
             print(f"    ╠══════════════════════════════════════════════════════════╣")
             print(f"    ║  Agent: {intent.agent_id:<50} ║")
-            print(f"    ║  Action: {intent.action.value:<49} ║")
+            print(f"    ║  Action: {intent.action:<49} ║")
             print(f"    ║  Target: {subject[:49]:<49} ║")
             if reason:
                 print(f"    ╟──────────────────────────────────────────────────────────╢")
@@ -552,7 +552,7 @@ class IntentFrameRuntime:
         if det_result.decision is DeterministicDecision.BLOCK:
             decision_path = det_result.decision_path or "deterministic"
             audit_entry = {
-                "action": intent.action.value,
+                "action": intent.action,
                 "target": intent.target,
                 "data": intent.data,
                 "reason": intent.reason,
@@ -625,7 +625,7 @@ class IntentFrameRuntime:
             )
 
             if self.verbose:
-                print(f"    │  AI analyzing: {intent.action.value}...")
+                print(f"    │  AI analyzing: {intent.action}...")
                 print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
                 print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
                 if analysis.hidden_behaviors:
@@ -679,7 +679,7 @@ class IntentFrameRuntime:
 
         # Build audit entry
         audit_entry = {
-            "action": intent.action.value,
+            "action": intent.action,
             "target": intent.target,
             "data": intent.data,
             "reason": intent.reason,

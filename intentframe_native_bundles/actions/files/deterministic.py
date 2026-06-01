@@ -13,7 +13,7 @@ def decide_write_file_sensitive_path(
     intent: IntentFrame,
     ctx: BundleContext,
 ) -> BundlePhaseOutcome | None:
-    if intent.action.value != ActionType.WRITE_FILE.value:
+    if intent.action != ActionType.WRITE_FILE.value:
         return None
     # ``data["path"]`` is the executed resource (same field the adapter acts
     # on). ``intent.target`` is display/audit only.

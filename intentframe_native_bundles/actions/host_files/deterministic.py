@@ -20,7 +20,7 @@ def decide_host_file_floor(
     intent: IntentFrame,
     ctx: BundleContext,
 ) -> BundlePhaseOutcome | None:
-    action = intent.action.value
+    action = intent.action
     # ``data["path"]`` is the executed resource (same field the adapter acts
     # on). ``intent.target`` is display/audit only.
     path = (intent.data or {}).get("path", "")

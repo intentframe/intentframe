@@ -14,7 +14,7 @@ def run_files_pre_pipeline(
     *,
     verbose: bool = False,
 ) -> FileIntel | None:
-    if intent.action.value not in WRITE_FILE_ACTIONS:
+    if intent.action not in WRITE_FILE_ACTIONS:
         return None
 
     data = intent.data or {}
@@ -24,7 +24,7 @@ def run_files_pre_pipeline(
 
     # ``data["path"]`` is the executed resource; ``intent.target`` is display.
     path = data.get("path", "")
-    file_intel = build_file_intel(content, path, intent.action.value)
+    file_intel = build_file_intel(content, path, intent.action)
 
     if verbose and file_intel is not None:
         print("    ┌──────────────────────────────────────────────────────────┐")

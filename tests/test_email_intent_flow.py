@@ -105,7 +105,7 @@ class CaptureExecutor:
         _dump("STAGE 6: Executor received validated intent", validated_intent)
 
         self.adapter_params = ExecutorHTTPClient._translate_params(
-            validated_intent.action.value,
+            validated_intent.action,
             validated_intent,
         )
         _dump(
@@ -116,7 +116,7 @@ class CaptureExecutor:
         return ExecutionResult(
             success=True,
             data={
-                "captured_action": validated_intent.action.value,
+                "captured_action": validated_intent.action,
                 "captured_target": validated_intent.target,
                 "captured_params": self.adapter_params,
             },
@@ -245,7 +245,7 @@ async def main() -> None:
             if executor.received_intent is None or executor.adapter_params is None:
                 raise RuntimeError("Executor did not capture the final validated intent")
 
-            action_value = executor.received_intent.action.value
+            action_value = executor.received_intent.action
             executor_params = executor.adapter_params
             if action_value in _MESSAGE_ACTIONS:
                 mid = executor_params.get("rfc_message_id") or executor_params.get("message_id")

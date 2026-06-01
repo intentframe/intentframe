@@ -154,7 +154,7 @@ async def _run_test():
 
     for i, intent in enumerate(test_intents, 1):
         print(f"\n{'═' * 70}")
-        print(f"  TEST {i}: {intent.action.value}")
+        print(f"  TEST {i}: {intent.action}")
         print(f"  Target: {intent.target}")
         if intent.data and "amount" in intent.data:
             print(f"  Amount: ${intent.data['amount']:,}")
@@ -189,7 +189,7 @@ async def _run_test():
         print(f"  ├─ Decision: {icon} {result.decision.value}")
         print(f"  └─ Reason: {result.message}")
 
-        results.append((i, intent.action.value, result.decision.value))
+        results.append((i, intent.action, result.decision.value))
 
     # Summary
     print(f"\n{'═' * 70}")

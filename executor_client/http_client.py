@@ -107,7 +107,7 @@ class ExecutorHTTPClient(Executor):
         ``validated_intent`` is the actor-submitted frame (post-guardian ALLOW),
         not an enriched copy — pipeline enrichment must not alter adapter params.
         """
-        action = validated_intent.action.value
+        action = validated_intent.action
 
         request = self._to_execution_request(validated_intent, action)
         resp = self._client.post("/execute", json=request.model_dump(mode="json"))

@@ -229,7 +229,7 @@ class AIAnalysisEngine(AnalysisEngine):
 
         if self.verbose:
             print(
-                f"    │  AI analyzing: {intent.action.value} "
+                f"    │  AI analyzing: {intent.action} "
                 f"(prompt={prompt_source}:{prompt_label})..."
             )
 
@@ -296,7 +296,7 @@ class AIAnalysisEngine(AnalysisEngine):
     ) -> str:
         """Build hardened per-request prompt; bundle supplies external Context text."""
         context_lines = [
-            f"Action: {intent.action.value}",
+            f"Action: {intent.action}",
             f"Agent: {intent.agent_type or intent.agent_id}",
             f"Task: {intent.task_description or 'Not specified'}",
         ]
@@ -382,7 +382,7 @@ class AIAnalysisEngine(AnalysisEngine):
         return AnalysisReport(
             stated_intent=ai_output.stated_intent,
             actual_behaviors=[{
-                "action": intent.action.value,
+                "action": intent.action,
                 "actual_behavior": ai_output.actual_behavior,
                 "matches_intent": not ai_output.scope_mismatch,
             }],

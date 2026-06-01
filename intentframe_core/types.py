@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 
@@ -39,8 +38,13 @@ class IntentFrame(BaseModel):
 
     Created by Actor from unstructured agent request.
     This is the structured, signed representation of intent.
+
+    ``action`` is an opaque string identifier (e.g. ``"READ_FILE"``). Core does
+    not validate it against any taxonomy — that is the agent author's job (they
+    may use ``action_registry`` for convenience). Unknown actions fail closed at
+    executor dispatch.
     """
-    action: ActionType
+    action: str
     target: str
     data: Optional[Dict[str, Any]] = None
     reason: str = ""

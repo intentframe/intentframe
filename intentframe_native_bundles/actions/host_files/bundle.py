@@ -47,7 +47,7 @@ class HostFilesActionBundle(ActionBundle):
         *,
         verbose: bool = False,
     ) -> BundlePhaseOutcome:
-        if intent.action.value == ActionType.WRITE_HOST_FILE.value:
+        if intent.action == ActionType.WRITE_HOST_FILE.value:
             ctx.evidence[FILE_INTEL_KEY] = run_files_pre_pipeline(intent, verbose=verbose)
         return BundlePhaseOutcome.continue_(ctx)
 
@@ -107,7 +107,7 @@ class HostFilesActionBundle(ActionBundle):
         ctx: BundleContext,
     ) -> BundleAIContext:
         del action_permission
-        if intent.action.value != ActionType.WRITE_HOST_FILE.value:
+        if intent.action != ActionType.WRITE_HOST_FILE.value:
             return BundleAIContext()
         file_intel = ctx.evidence.get(FILE_INTEL_KEY)
         if file_intel is not None and not isinstance(file_intel, FileIntel):

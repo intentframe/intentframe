@@ -202,7 +202,7 @@ class DeterministicRunner:
             )
 
         # ── domain enforce ─────────────────────────────────────────────
-        action_id = intent.action.value
+        action_id = intent.action
         domain_ids = domains_for_action(action_id)
         for domain_id in domain_ids:
             domain_bundle = domain_bundle_for(domain_id)
@@ -353,7 +353,7 @@ class DeterministicRunner:
         action_permission: ActionPermission,
         ctx: BundleContext,
     ) -> BundlePhaseOutcome | None:
-        action = intent.action.value
+        action = intent.action
         if action not in bundle.passive_read_action_ids:
             return None
         if not action_permission.safe:

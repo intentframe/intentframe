@@ -49,7 +49,7 @@ async def _resolve_email_context(
 
 def _build_email_target(intent: IntentFrame, meta: dict[str, Any]) -> str:
     data = intent.data or {}
-    action = intent.action.value
+    action = intent.action
     message_id = data.get("rfc_message_id") or data.get("message_id", "")
     subject = meta.get("email_subject") or data.get("email_subject") or message_id
     sender = meta.get("email_from") or data.get("email_from") or "unknown"
@@ -77,7 +77,7 @@ def _build_email_target(intent: IntentFrame, meta: dict[str, Any]) -> str:
 
 
 async def enrich_intent(intent: IntentFrame, *, client: EmailLookupClient) -> IntentFrame:
-    if intent.action.value not in EMAIL_MESSAGE_ACTIONS:
+    if intent.action not in EMAIL_MESSAGE_ACTIONS:
         return intent
 
     data = dict(intent.data or {})
@@ -91,7 +91,7 @@ async def enrich_intent(intent: IntentFrame, *, client: EmailLookupClient) -> In
         if not data.get(key):
             data[key] = value
 
-    if intent.action.value == ActionType.REPLY_EMAIL.value and not data.get("to"):
+    if intent.action == ActionType.REPLY_EMAIL.value and not data.get("to"):
         reply_to = meta.get("email_from_address") or ""
         if reply_to:
             data["to"] = reply_to
