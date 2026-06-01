@@ -40,7 +40,8 @@ class CalendarAdapter(CapabilityAdapter):
     """macOS Calendar adapter — RPC client to the native platform server."""
 
     def __init__(self, **_kwargs) -> None:
-        pass
+        from ..permissions import check_adapter_permission
+        check_adapter_permission("calendar")
 
     def supported_actions(self) -> list[str]:
         return [

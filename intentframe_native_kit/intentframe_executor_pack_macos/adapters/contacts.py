@@ -39,7 +39,8 @@ class ContactsAdapter(CapabilityAdapter):
     """macOS Contacts adapter — RPC client to the native platform server."""
 
     def __init__(self, **_kwargs) -> None:
-        pass
+        from ..permissions import check_adapter_permission
+        check_adapter_permission("contacts")
 
     def supported_actions(self) -> list[str]:
         return [

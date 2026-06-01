@@ -14,7 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "intentframe_native_adapters",
-    "intentframe_native_kit.intentframe_native_bundles",
+    # Core executor must not import the native kit at all: packs (incl. the
+    # macOS pack's TCC permission check) are loaded purely via config-driven
+    # register_all() / entry points, never by direct import from executor/.
+    "intentframe_native_kit",
 )
 
 STRICT_ROOTS = (

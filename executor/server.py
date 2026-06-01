@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -107,13 +106,9 @@ async def lifespan(app: FastAPI):
     config = load_config(config_path=os.environ.get("EXECUTOR_CONFIG"))
     _register_packs(config)
 
-    if sys.platform == "darwin":
-        try:
-            from intentframe_native_kit.intentframe_executor_pack_macos.permissions import check_permissions
-            check_permissions(config.adapters.enabled)
-        except Exception as exc:
-            logger.warning("Platform server permission check failed: %s", exc)
-
+    # Platform-specific startup checks (e.g. macOS TCC permissions) are owned by
+    # the relevant executor pack and run when its adapters are constructed in
+    # build_gateway() -- core executor stays deployment-agnostic.
     _gateway, _transport, _worker_pool = build_gateway(config)
     logger.info("Executor gateway ready")
     yield
