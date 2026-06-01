@@ -1,4 +1,4 @@
-"""Typed intent data schema for the deletion domain.
+"""Deletion-domain intent slice for ``IntentFrame.data``.
 
 Contract:
     The deletion domain is path-oriented. The destructive resource is carried
@@ -15,6 +15,9 @@ Current limitation:
 
     Follow-up work should generalize deletion-domain intent data so it can
     represent both path-based and non-path-based destructive actions.
+
+Used by ``DeletionDomainBundle`` and optionally by agent authors via
+``DOMAIN_SCHEMAS`` for local pre-flight validation.
 """
 
 from __future__ import annotations

@@ -1,14 +1,21 @@
 """
-Typed intent data schemas for critical domains.
+Critical-domain intent data schemas.
 
-Each schema is a **slice** of ``IntentFrame.data`` for one domain's risk
-surface. Schemas ignore unrelated fields (``extra="ignore"``), so an action
-routed to multiple domains can carry a combined payload and each domain
-validates only its own fields.
+Each schema validates a **slice** of :attr:`~intentframe_core.types.IntentFrame.data`
+for one risk domain (finance, deletion, …). Unrelated payload keys are ignored
+(``extra="ignore"`` on :class:`~intentframe_core.domains.base.DomainSchema`),
+so multiple domains can apply to the same action without one exhaustive model.
 
-Agent authors may validate slices locally via ``DOMAIN_SCHEMAS`` (optional).
-The Bundle SDK runner validates every routed domain slice before
-``DomainBundle.enforce()``.
+``DOMAIN_SCHEMAS`` maps :class:`~action_registry.types.DomainType` to schema
+classes. It pairs with ``ACTION_DOMAINS`` in ``action_registry.types``.
+
+Who validates:
+    - **Optional (author-side):** agent tools (e.g. Jarvis ``_validate_against_registry``).
+    - **Authoritative (server-side):** ``check_domain_intent_shape`` in the bundle
+      SDK runner, then each :class:`~intentframe_bundle_sdk.domain.DomainBundle`.
+
+Import from ``action_registry.domains`` — not from ``action_registry`` top-level
+(see ``action_registry.__init__``).
 """
 
 from __future__ import annotations

@@ -1,8 +1,14 @@
 """
 IntentFrame Core — shared types and enums used across the entire system.
 
-Both the server (intentframe/) and the Actor SDK (intentframe_actor/)
-import from here.  This package has zero dependencies on either.
+Both the server (``intentframe_server/``) and the Actor SDK
+(``intentframe_actor/``) import from here. This package is the neutral
+foundation layer: it must not import ``action_registry`` (the action
+taxonomy lives there; ``IntentFrame.action`` is a plain string).
+
+Concrete domain intent schemas (finance, deletion, …) also live in
+``action_registry.domains``; ``intentframe_core.domains`` only exposes
+the shared :class:`~intentframe_core.domains.base.DomainSchema` base.
 """
 
 from intentframe_core.enums import Decision, Reversibility, RiskLevel

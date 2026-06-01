@@ -1,4 +1,11 @@
-"""Base class for typed intent data schemas."""
+"""Base type for typed domain intent slices.
+
+:class:`DomainSchema` is the only domain-related export from
+``intentframe_core``. Concrete schemas (``FinancialIntentData``,
+``DeletionIntentData``, …) and the ``DOMAIN_SCHEMAS`` map live in
+``action_registry.domains`` so the registry can depend on core without
+core depending on the registry.
+"""
 
 from __future__ import annotations
 

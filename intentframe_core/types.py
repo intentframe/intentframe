@@ -1,8 +1,14 @@
 """
-Data Structures for IntentFrame System
+Data structures for the IntentFrame pipeline.
 
-All models used to pass information between layers.
-Pydantic BaseModel for automatic JSON serialization over HTTP.
+All models used to pass information between layers. Pydantic ``BaseModel``
+for automatic JSON serialization over HTTP.
+
+Key contract — :class:`IntentFrame`:
+    ``action`` is an opaque string (e.g. ``"READ_FILE"``), not a registry
+    enum. Core does not validate action names or domain payload shape; agent
+    authors may use ``action_registry`` for that locally. The substrate
+    validates authoritatively via bundles and executor dispatch.
 """
 
 from dataclasses import dataclass

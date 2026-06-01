@@ -1,4 +1,8 @@
-"""Deletion domain bundle."""
+"""Deletion domain bundle — deterministic structural enforcement.
+
+Uses :class:`~action_registry.domains.deletion.DeletionIntentData` for the
+intent slice validated by the bundle SDK before ``enforce()`` runs.
+"""
 
 from __future__ import annotations
 

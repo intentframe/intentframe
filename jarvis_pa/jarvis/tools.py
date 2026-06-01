@@ -1,12 +1,15 @@
 """Tool definitions for Jarvis PA.
 
-Actor.submit wrappers + memory_search + memory_get + spawn_agent.
+``Actor.submit`` wrappers plus agent-only tools (``memory_search``,
+``memory_get``, ``spawn_agent``).
 
-Each actor.submit tool follows the same pattern:
-  1. Build a typed Pydantic action model (validates before network call).
-  2. Submit through actor.submit() — every call goes through the IntentFrame
-     Guardian pipeline regardless of how the LLM was instructed.
-  3. Return success data or a clear error string to the LLM.
+Each I/O tool follows the same pattern:
+  1. Build a typed Pydantic action model (tool-schema validation).
+  2. Optional registry pre-flight via ``_validate_against_registry`` — Jarvis
+     imports ``action_registry`` as author-side convenience (taxonomy + domain
+     payload slices). The Actor itself does not import the registry.
+  3. Submit through ``actor.submit()`` — every call hits the IntentFrame
+     Guardian pipeline. Server-side bundles re-validate authoritatively.
 
 The LLM sees these as plain callable functions.
 """

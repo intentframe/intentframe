@@ -1,11 +1,14 @@
 """
-Action Registry — Core Types
+Action Registry — core types.
 
-Defines the universal action taxonomy: categories, types, and metadata.
-This module is the vocabulary that every system on the device shares.
-No logic, no constraints, no policies — just definitions.
+Defines the universal action taxonomy: categories, types, domain tags, and
+metadata mappings (``ACTION_CATEGORIES``, ``ACTION_DOMAINS``). No enforcement
+logic — bundles and the Guardian consume these definitions at runtime.
 
-Both the Policy Registry and IntentFrame import from here.
+``ActionType`` subclasses ``str`` so enum members are interchangeable with
+the plain ``str`` on :attr:`~intentframe_core.types.IntentFrame.action`.
+Platform-only actions (``RUN_SHORTCUT``, …) may exist in :class:`ActionCatalog`
+without being enum members; they still flow as strings through the pipeline.
 """
 
 from __future__ import annotations

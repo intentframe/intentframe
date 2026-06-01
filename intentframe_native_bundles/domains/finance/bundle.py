@@ -1,4 +1,8 @@
-"""Finance domain bundle — structural enforcement for financial intents."""
+"""Finance domain bundle — deterministic structural enforcement.
+
+Uses :class:`~action_registry.domains.finance.FinancialIntentData` for the
+intent slice validated by the bundle SDK before ``enforce()`` runs.
+"""
 
 from __future__ import annotations
 
