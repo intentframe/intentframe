@@ -408,6 +408,158 @@ def test_domain_schema_blocks_deletion_when_path_only_in_target() -> None:
     assert result.bundle_ai_context is None
 
 
+def test_finance_domain_blocks_missing_amount_for_max_amount_policy() -> None:
+    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+
+    bundle = FinanceDomainBundle()
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="finance policy",
+        agent_id="test",
+        data={"currency": "USD", "recipient": "ACME Corp"},
+    )
+    outcome = bundle.enforce(intent, {"max_amount": 5000.0})
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "domain"
+    assert "amount" in (outcome.reason or "").lower()
+
+
+def test_finance_domain_blocks_missing_recipient_for_allowlist_policy() -> None:
+    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+
+    bundle = FinanceDomainBundle()
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="finance policy",
+        agent_id="test",
+        data={"amount": 100.0, "currency": "USD"},
+    )
+    outcome = bundle.enforce(
+        intent,
+        {"allowed_recipients": ["ACME Corp", "Office Depot"]},
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "domain"
+    assert "recipient" in (outcome.reason or "").lower()
+
+
+def test_deletion_domain_blocks_missing_path_for_allowed_paths_policy() -> None:
+    from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+
+    bundle = DeletionDomainBundle()
+    intent = IntentFrame(
+        action=ActionType.DELETE_FILE,
+        target="/tmp/x",
+        reason="deletion policy",
+        agent_id="test",
+        data={"irreversible": False},
+    )
+    outcome = bundle.enforce(intent, {"allowed_paths": ["/tmp/*"]})
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "domain"
+    assert "path" in (outcome.reason or "").lower()
+
+
+def test_domain_schemas_ignore_unrelated_fields_for_slice_validation() -> None:
+    from intentframe_core.domains.deletion import DeletionIntentData
+    from intentframe_core.domains.finance import FinancialIntentData
+
+    combined = {
+        "amount": 250.0,
+        "currency": "USD",
+        "recipient": "ACME Corp",
+        "path": "/tmp/invoice.pdf",
+        "irreversible": False,
+        "rfc_message_id": "<extra@example.com>",
+    }
+
+    finance = FinancialIntentData.validate_slice(combined)
+    deletion = DeletionIntentData.validate_slice(combined)
+
+    assert finance.amount == 250.0
+    assert finance.recipient == "ACME Corp"
+    assert deletion.path == "/tmp/invoice.pdf"
+    assert deletion.irreversible is False
+
+
+def test_domain_shape_checks_compose_for_many_to_many_routing() -> None:
+    from intentframe_bundle_sdk.domain import check_domain_intent_shape
+    from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+    from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="multi-domain slice",
+        agent_id="test",
+        data={
+            "amount": 250.0,
+            "currency": "USD",
+            "recipient": "ACME Corp",
+            "path": "/tmp/invoice.pdf",
+            "irreversible": False,
+        },
+    )
+
+    finance_shape = check_domain_intent_shape(FinanceDomainBundle(), intent)
+    deletion_shape = check_domain_intent_shape(DeletionDomainBundle(), intent)
+
+    assert finance_shape.terminal is False
+    assert deletion_shape.terminal is False
+
+
+def test_runner_applies_all_routed_domain_slices() -> None:
+    import intentframe_bundle_sdk.registry as bundle_registry
+
+    bundle = FilesActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_FILE,
+        target="/tmp/invoice.pdf",
+        reason="many-to-many domains",
+        agent_id="test",
+        data={
+            "path": "/tmp/invoice.pdf",
+            "amount": 250.0,
+            "currency": "USD",
+            "recipient": "ACME Corp",
+            "irreversible": False,
+        },
+    )
+    permission = PolicyActionPermission(safe=True)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"READ_FILE": permission},
+        domain_constraints={
+            "finance": {"max_amount": 5000.0},
+            "deletion": {"allowed_paths": ["/tmp/*"]},
+        },
+    )
+
+    previous = bundle_registry._ACTION_TO_DOMAINS.get(ActionType.READ_FILE.value)
+    bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = (
+        "deletion",
+        "finance",
+    )
+    try:
+        result = asyncio.run(
+            DeterministicRunner.run_action_bundle(
+                bundle,
+                intent,
+                permission,
+                user_context,
+            )
+        )
+    finally:
+        if previous is None:
+            bundle_registry._ACTION_TO_DOMAINS.pop(ActionType.READ_FILE.value, None)
+        else:
+            bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = previous
+
+    assert result.decision != "BLOCK"
+
+
 def test_missing_describe_falls_back_to_str_constraints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

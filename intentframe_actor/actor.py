@@ -235,7 +235,7 @@ class Actor:
             if schema_cls is not None:
                 raw = data or {}
                 try:
-                    schema_cls(**raw)
+                    schema_cls.validate_slice(raw)
                 except Exception as exc:
                     raise ValueError(
                         f"{action.name} is in the {domain.value} domain and "

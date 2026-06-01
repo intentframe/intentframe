@@ -1,13 +1,14 @@
 """
 Typed intent data schemas for critical domains.
 
-These are protocol contracts: they define what goes inside
-``IntentFrame.data`` when the action belongs to a critical domain.
+Each schema is a **slice** of ``IntentFrame.data`` for one domain's risk
+surface. Schemas ignore unrelated fields (``extra="ignore"``), so an action
+routed to multiple domains can carry a combined payload and each domain
+validates only its own fields.
 
-Both the Actor (producer) and Guardian (consumer) import from here.
-Schemas are validated at the Actor boundary — if a critical-domain
-action arrives with malformed data, it is rejected before entering
-the pipeline.
+The Actor validates the slice for the action's primary domain (see
+``ACTION_DOMAINS``). The Bundle SDK runner validates every routed domain slice
+before ``DomainBundle.enforce()``.
 """
 
 from __future__ import annotations

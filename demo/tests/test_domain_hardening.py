@@ -130,14 +130,25 @@ def test_finance_module():
     ok4, reason4 = _check_finance(intent4, constraints)
     check("Recipient 'Unknown LLC' not in allowlist → BLOCK", not ok4)
 
-    # No recipient specified → pass (optional field)
+    # No recipient specified → BLOCK when allowed_recipients policy is configured
     intent5 = IntentFrame(
         action=ActionType.PAY_INVOICE,
         target="vendor",
         data={"amount": 100.0, "currency": "USD"},
     )
-    ok5, _ = _check_finance(intent5, constraints)
-    check("No recipient (optional) → pass", ok5)
+    ok5, reason5 = _check_finance(intent5, constraints)
+    check("No recipient with allowed_recipients policy → BLOCK", not ok5)
+    check("  reason mentions recipient", "recipient" in reason5.lower())
+
+    # Missing amount with max_amount policy → BLOCK
+    intent5b = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="vendor",
+        data={"currency": "USD", "recipient": "ACME Corp"},
+    )
+    ok5b, reason5b = _check_finance(intent5b, constraints)
+    check("Missing amount with max_amount policy → BLOCK", not ok5b)
+    check("  reason mentions amount", "amount" in reason5b.lower())
 
     # No domain constraints → pass (nothing to enforce)
     ok6, _ = _check_finance(intent, None)
@@ -192,6 +203,16 @@ def test_deletion_module():
     )
     ok4, _ = _check_deletion(intent4, constraints)
     check("Path /cache/old_data.bin prefix matches /cache/ → pass", ok4)
+
+    # Missing path with allowed_paths policy → BLOCK
+    intent4b = IntentFrame(
+        action=ActionType.DELETE_FILE,
+        target="/tmp/scratch.log",
+        data={"irreversible": False},
+    )
+    ok4b, reason4b = _check_deletion(intent4b, constraints)
+    check("Missing path with allowed_paths policy → BLOCK", not ok4b)
+    check("  reason mentions path", "path" in reason4b.lower())
 
     # No allowed_paths constraint → only check irreversible
     constraints2 = DeletionConstraints(block_irreversible=False)

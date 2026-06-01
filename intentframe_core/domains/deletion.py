@@ -23,15 +23,11 @@ from intentframe_core.domains.base import DomainSchema
 
 
 class DeletionIntentData(DomainSchema):
-    """Required fields for any deletion/destructive action.
+    """Deletion-domain slice of ``IntentFrame.data``.
 
-    When an action belongs to the deletion domain (e.g. DELETE_FILE),
-    ``IntentFrame.data`` must conform to this schema.
-
-    ``path`` is the executable resource the executor deletes; it is the same
-    field validated by deletion policy. It currently reflects the file-deletion
-    use case and is not a natural fit for calendar, reminders, contacts, or
-    other record-oriented deletions.
+    Validates ``path`` and ``irreversible`` only. Other payload fields (e.g.
+    finance ``amount``) are ignored so deletion can compose with other routed
+    domains on the same action.
     """
 
     path: str

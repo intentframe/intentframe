@@ -57,11 +57,11 @@ def check_domain_intent_shape(
     bundle: DomainBundle,
     intent: IntentFrame,
 ) -> BundlePhaseOutcome:
-    """Framework-owned domain intent schema check before author enforcement.
+    """Framework-owned domain intent slice check before author enforcement.
 
-    This intentionally mirrors Actor validation: domain schemas validate the
-    raw ``IntentFrame.data`` payload, not a bundle-normalized projection from
-    other IntentFrame fields such as ``target``.
+    Validates only the fields declared on ``bundle.intent_schema``. Unrelated
+    keys in ``IntentFrame.data`` are ignored so multiple domains can route to
+    the same action without a shared exhaustive payload model.
     """
     ctx = BundleContext(intent=intent.model_copy(deep=True))
     schema = getattr(bundle, "intent_schema", None)
@@ -72,7 +72,7 @@ def check_domain_intent_shape(
             matched_gate="domain_schema",
         )
     try:
-        schema.model_validate(intent.data or {})
+        schema.validate_slice(intent.data)
     except Exception as exc:
         return BundlePhaseOutcome.block(
             ctx,

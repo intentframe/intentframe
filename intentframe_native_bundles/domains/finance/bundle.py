@@ -32,27 +32,45 @@ class FinanceDomainBundle(DomainBundle):
 
         if constraints.max_amount is not None:
             amount = data.get("amount")
-            if amount is not None:
-                try:
-                    if float(amount) > constraints.max_amount:
-                        return BundlePhaseOutcome.block(
-                            ctx,
-                            reason=(
-                                f"Domain violation (finance): Amount "
-                                f"${float(amount):,.2f} exceeds domain limit "
-                                f"${constraints.max_amount:,.2f}"
-                            ),
-                            matched_gate="domain",
-                        )
-                except (TypeError, ValueError):
+            if amount is None:
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Domain violation (finance): Amount is required to "
+                        "evaluate max_amount policy"
+                    ),
+                    matched_gate="domain",
+                )
+            try:
+                if float(amount) > constraints.max_amount:
                     return BundlePhaseOutcome.block(
                         ctx,
-                        reason="Domain violation (finance): Invalid amount value",
+                        reason=(
+                            f"Domain violation (finance): Amount "
+                            f"${float(amount):,.2f} exceeds domain limit "
+                            f"${constraints.max_amount:,.2f}"
+                        ),
                         matched_gate="domain",
                     )
+            except (TypeError, ValueError):
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason="Domain violation (finance): Invalid amount value",
+                    matched_gate="domain",
+                )
 
         if constraints.allowed_currencies is not None:
-            currency = data.get("currency", "USD")
+            try:
+                currency = FinancialIntentData.model_validate(data).currency
+            except Exception:
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Domain violation (finance): Invalid intent data for "
+                        "currency policy evaluation"
+                    ),
+                    matched_gate="domain",
+                )
             if currency not in constraints.allowed_currencies:
                 return BundlePhaseOutcome.block(
                     ctx,
@@ -65,7 +83,18 @@ class FinanceDomainBundle(DomainBundle):
 
         if constraints.allowed_recipients is not None:
             recipient = data.get("recipient")
-            if recipient is not None and recipient not in constraints.allowed_recipients:
+            if recipient is None or (
+                isinstance(recipient, str) and not recipient.strip()
+            ):
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Domain violation (finance): Recipient is required to "
+                        "evaluate allowed_recipients policy"
+                    ),
+                    matched_gate="domain",
+                )
+            if recipient not in constraints.allowed_recipients:
                 return BundlePhaseOutcome.block(
                     ctx,
                     reason=(

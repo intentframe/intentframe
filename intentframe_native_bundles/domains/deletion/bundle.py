@@ -35,7 +35,16 @@ class DeletionDomainBundle(DomainBundle):
         if constraints.allowed_paths is not None:
             # ``data["path"]`` is the executed resource (same field the adapter
             # acts on). No fallback to ``intent.target`` — target is display-only.
-            path = data.get("path", "")
+            path = data.get("path")
+            if path is None or (isinstance(path, str) and not path.strip()):
+                return BundlePhaseOutcome.block(
+                    ctx,
+                    reason=(
+                        "Domain violation (deletion): Path is required to "
+                        "evaluate allowed_paths policy"
+                    ),
+                    matched_gate="domain",
+                )
             if not self._path_matches(path, constraints.allowed_paths):
                 return BundlePhaseOutcome.block(
                     ctx,

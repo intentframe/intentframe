@@ -8,11 +8,11 @@ from intentframe_core.domains.base import DomainSchema
 
 
 class FinancialIntentData(DomainSchema):
-    """Required fields for any financial action.
+    """Finance-domain slice of ``IntentFrame.data``.
 
-    When an action belongs to the finance domain (e.g. PAY_INVOICE),
-    the Actor validates that ``IntentFrame.data`` conforms to this
-    schema before entering the pipeline.
+    Validates ``amount``, ``currency``, and ``recipient`` only. Other payload
+    fields (e.g. deletion ``path``) are ignored so finance can compose with
+    other routed domains on the same action.
     """
 
     amount: float

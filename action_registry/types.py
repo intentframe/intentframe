@@ -275,10 +275,11 @@ ACTION_DOMAINS: dict[ActionType, DomainType] = {
     ActionType.PAY_INVOICE: DomainType.FINANCE,
     ActionType.DELETE_FILE: DomainType.DELETION,
     ActionType.DELETE_HOST_FILE: DomainType.DELETION,
-    ActionType.DELETE_EVENT: DomainType.DELETION,
-    ActionType.DELETE_REMINDER: DomainType.DELETION,
-    ActionType.DELETE_CONTACT: DomainType.DELETION,
-    ActionType.DELETE_NOTE: DomainType.DELETION,
+    # Path-oriented ``DeletionIntentData`` only — see ``domain_routes.py``.
+    # ActionType.DELETE_EVENT: DomainType.DELETION,
+    # ActionType.DELETE_REMINDER: DomainType.DELETION,
+    # ActionType.DELETE_CONTACT: DomainType.DELETION,
+    # ActionType.DELETE_NOTE: DomainType.DELETION,
 }
 
 
