@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 
-from intentframe_core.domains.deletion import DeletionIntentData
+from action_registry.domains.deletion import DeletionIntentData
 from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints

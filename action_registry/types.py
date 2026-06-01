@@ -268,7 +268,7 @@ class DomainType(str, Enum):
     """Critical domains that require typed intent data and structural enforcement.
 
     Actions in a critical domain must provide data conforming to the domain's
-    schema (defined in intentframe_core.domains).  Guardian domain modules
+    schema (defined in action_registry.domains).  Guardian domain modules
     enforce structural constraints deterministically before AI evaluation.
     """
 

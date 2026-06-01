@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from intentframe_core.domains.finance import FinancialIntentData
+from action_registry.domains.finance import FinancialIntentData
 from intentframe_core.types import IntentFrame
 
 from intentframe_native_bundles.domains.finance.constraints import FinanceConstraints

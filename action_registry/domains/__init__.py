@@ -6,9 +6,9 @@ surface. Schemas ignore unrelated fields (``extra="ignore"``), so an action
 routed to multiple domains can carry a combined payload and each domain
 validates only its own fields.
 
-The Actor validates the slice for the action's primary domain (see
-``ACTION_DOMAINS``). The Bundle SDK runner validates every routed domain slice
-before ``DomainBundle.enforce()``.
+Agent authors may validate slices locally via ``DOMAIN_SCHEMAS`` (optional).
+The Bundle SDK runner validates every routed domain slice before
+``DomainBundle.enforce()``.
 """
 
 from __future__ import annotations

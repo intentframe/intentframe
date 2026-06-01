@@ -569,8 +569,8 @@ def test_deletion_domain_blocks_missing_path_for_allowed_paths_policy() -> None:
 
 
 def test_domain_schemas_ignore_unrelated_fields_for_slice_validation() -> None:
-    from intentframe_core.domains.deletion import DeletionIntentData
-    from intentframe_core.domains.finance import FinancialIntentData
+    from action_registry.domains.deletion import DeletionIntentData
+    from action_registry.domains.finance import FinancialIntentData
 
     combined = {
         "amount": 250.0,
