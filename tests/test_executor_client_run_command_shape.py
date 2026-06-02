@@ -1,9 +1,11 @@
-"""Pin the RUN_COMMAND result shape both executor-client paths emit.
+"""Pin the RUN_COMMAND result shape the in-process bridge emits.
 
 The terminal adapter returns ``{stdout, stderr, return_code, command}``.
-We deliberately collapse that to the historical ``{"content": stdout}``
+``ExecutorBridge`` collapses that to the historical ``{"content": stdout}``
 shape (unchanged — the LLM and demo harnesses were already reading it)
 plus ``stderr`` added alongside — success or failure.
+
+The HTTP client forwards wire results unchanged and is not covered here.
 
 Why not also forward ``return_code`` and ``command``?  An earlier
 revision did exactly that, and the LLM started summarising tool output
@@ -27,8 +29,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from intentframe_native_kit.extras.bridge import ExecutorBridge
-from executor_client.http_client import _RESULT_MAP
+from tests._bridge import ExecutorBridge
 
 
 def _adapter_run_command_data() -> dict:
@@ -44,18 +45,6 @@ def _adapter_run_command_data() -> dict:
 def _expected_keys() -> set[str]:
     """Exactly what RUN_COMMAND translators must emit — no more, no less."""
     return {"content", "stderr"}
-
-
-def test_http_client_run_command_shape_is_content_plus_stderr() -> None:
-    translator = _RESULT_MAP["RUN_COMMAND"]
-    out = translator(_adapter_run_command_data())
-
-    assert set(out.keys()) == _expected_keys(), (
-        f"unexpected RUN_COMMAND keys: {sorted(out.keys())} "
-        "(expected exactly content + stderr)"
-    )
-    assert out["content"] == ""
-    assert out["stderr"].startswith("ps: illegal option")
 
 
 def test_bridge_run_command_shape_is_content_plus_stderr() -> None:
@@ -82,12 +71,10 @@ def test_success_with_stdout_also_carries_empty_stderr() -> None:
         "command": "echo hi",
     }
 
-    http_out = _RESULT_MAP["RUN_COMMAND"](data)
     bridge_out = ExecutorBridge._RESULT_MAP["RUN_COMMAND"](data)
 
-    for out in (http_out, bridge_out):
-        assert out["content"] == "line1\nline2\n"
-        assert out["stderr"] == ""
+    assert bridge_out["content"] == "line1\nline2\n"
+    assert bridge_out["stderr"] == ""
 
 
 def test_return_code_and_command_are_not_forwarded() -> None:
@@ -98,11 +85,10 @@ def test_return_code_and_command_are_not_forwarded() -> None:
     """
     data = _adapter_run_command_data()
 
-    for translator in (_RESULT_MAP["RUN_COMMAND"], ExecutorBridge._RESULT_MAP["RUN_COMMAND"]):
-        out = translator(data)
-        assert "return_code" not in out
-        assert "command" not in out
-        assert "stdout" not in out
+    out = ExecutorBridge._RESULT_MAP["RUN_COMMAND"](data)
+    assert "return_code" not in out
+    assert "command" not in out
+    assert "stdout" not in out
 
 
 def test_llm_tool_rendering_surfaces_stderr_and_content() -> None:
@@ -113,7 +99,7 @@ def test_llm_tool_rendering_surfaces_stderr_and_content() -> None:
     """
     from jarvis.tools import _render_result
 
-    translated = _RESULT_MAP["RUN_COMMAND"](_adapter_run_command_data())
+    translated = ExecutorBridge._RESULT_MAP["RUN_COMMAND"](_adapter_run_command_data())
     result = SimpleNamespace(success=True, data=translated, error=None)
 
     rendered = json.loads(_render_result(result))

@@ -37,7 +37,7 @@ Modules group into layers by responsibility: author-facing contracts, plugin cod
 ┌───────────────────────────────▼─────────────────────────────────┐
 │  Plugin author code (first-party example: intentframe_native_kit)│
 │  action_registry, intentframe_native_bundles, executor packs,    │
-│  resource_registry, kit YAML profiles, extras/                   │
+│  resource_registry, kit YAML profiles                            │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │ intentframe_bundle_sdk, executor_sdk
 ┌───────────────────────────────▼─────────────────────────────────┐
@@ -191,10 +191,9 @@ Generic orchestration — replaceable with Docker Compose, systemd, etc. No doma
 | `intentframe_native_kit/intentframe_executor_pack_macos/` | macOS adapters + terminal sandbox. |
 | `intentframe_native_kit/intentframe_executor_pack_console/` | Console `user_io`. |
 | `intentframe_native_kit/resource_registry/` | Optional workspace/mount service (kit supervisor profile). |
-| `intentframe_native_kit/extras/` | Demo `ExecutorBridge` — not production substrate. |
 | `intentframe_native_kit/*.yaml` | First-party profiles: `core.yaml`, `supervisor_profile.yaml`, `edge_profile.yaml`. |
 
-**Kit imports from workspace today:** `intentframe_bundle_sdk`, `executor_sdk`, `command_shield`, `external_data_ingestion` (lazy in email/mail), and kit-internal modules. Demo `extras/bridge.py` also imports `executor` and `executor_client`. Kit does **not** import `intentframe_core`, `intentframe_server`, or `policy_registry`.
+**Kit imports from workspace today:** `intentframe_bundle_sdk`, `executor_sdk`, `command_shield`, `external_data_ingestion` (lazy in email/mail), and kit-internal modules. Kit does **not** import `intentframe_core`, `intentframe_server`, or `policy_registry`. In-process demo glue (`ExecutorBridge`) lives in `tests/_bridge.py` — test-only, not kit substrate.
 
 ### 8. Agents and frontends
 
@@ -438,7 +437,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 | Directory | Purpose |
 |-----------|---------|
 | `demo/` | End-to-end demos and attack/benign intent suites |
-| `tests/` | Cross-cutting integration and boundary import tests |
+| `tests/` | Cross-cutting integration and boundary import tests; in-process executor bridge (`tests/_bridge.py`) and pipeline coverage (`tests/test_executor.py`) |
 | `deploy/` | Docker Compose for dev/prod |
 | `scripts/`, `git-hooks/` | Developer tooling |
 | `roadmap/`, `TODO/` | Planning artifacts |

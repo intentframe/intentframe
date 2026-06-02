@@ -20,33 +20,25 @@ Tests:
    10. Hash chain      -- verify tamper-evident integrity
 
 Usage:
-    cd demo && python tests/test_executor.py
+    uv run pytest tests/test_executor.py
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-import os
 import shutil
 import sqlite3
 import sys
 import tempfile
 from pathlib import Path
 
-# ── Path setup ────────────────────────────────────────────────────────────────
-DEMO_ROOT = Path(__file__).parent.parent.resolve()
-PROJECT_ROOT = DEMO_ROOT.parent
-sys.path.insert(0, str(DEMO_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT))
-
-from intentframe_native_kit.resource_registry import ResourceRegistry, ResourceMount
-
 from intentframe_native_kit.action_registry import ActionType
+from intentframe_native_kit.resource_registry import ResourceMount, ResourceRegistry
 from intentframe_core import IntentFrame
-from intentframe_native_kit.extras.bridge import ExecutorBridge
+from tests._bridge import ExecutorBridge
 
 # ── Config ────────────────────────────────────────────────────────────────────
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEMO_ROOT = REPO_ROOT / "demo"
 DEMO_DATA = DEMO_ROOT / "demo_data"
 DB_DIR = Path(tempfile.mkdtemp(prefix="intentframe_test_executor_"))
 DB_PATH = str(DB_DIR / "test_executor.db")
@@ -126,7 +118,7 @@ def result_block(label: str, result) -> None:
 # Main
 # ═════════════════════════════════════════════════════════════════════════════
 
-def main():
+def main() -> int:
     # Reset expense tracker so APPEND_ROW has a clean slate
     original = DEMO_DATA / "expense_tracker_original_locked.md"
     target = DEMO_DATA / "expense_tracker.md"
@@ -348,7 +340,7 @@ def main():
 
     if failed > 0:
         print("\n  ⚠️  Some tests failed -- investigate above output")
-        sys.exit(1)
+        return failed
     else:
         print("\n  All executor pipeline tests passed.")
 
@@ -356,6 +348,12 @@ def main():
     if original.exists():
         shutil.copy(original, target)
 
+    return 0
+
+
+def test_executor_pipeline() -> None:
+    assert main() == 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -14,7 +14,9 @@ Pipeline and component tests:
 - test_ai_pipeline:        Full pipeline (Analysis + Guardian + Executor)
 - test_adapters:           Executor adapter tests
 - test_domain_hardening:   Domain constraint tests
-- test_executor:           Executor service tests
+
+Executor pipeline (in-process bridge): tests/test_executor.py
+  (bridge helper: tests/_bridge.py)
 
 Test infrastructure:
 - stub_pipeline_agent:     Agent-agnostic test harness (not an LLM)

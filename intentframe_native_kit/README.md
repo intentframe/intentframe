@@ -23,7 +23,7 @@ Kit Python code must **not** import `intentframe_core` directly. Wire types come
 
 | Kit area | Import wire types from |
 |----------|-------------------------|
-| `intentframe_native_bundles/`, `action_registry/` (domain schemas), `resource_registry/`, `extras/` | `intentframe_bundle_sdk` — e.g. `IntentFrame`, `DomainSchema`, `owner_home`, `normalize_virtual_path` |
+| `intentframe_native_bundles/`, `action_registry/` (domain schemas), `resource_registry/` | `intentframe_bundle_sdk` — e.g. `IntentFrame`, `DomainSchema`, `owner_home`, `normalize_virtual_path` |
 | `intentframe_executor_pack_*` | `executor_sdk` for pack-only helpers (e.g. `owner_home`); submodules under `executor_sdk.*` for adapters/models |
 
 ```python
@@ -51,7 +51,6 @@ intentframe_native_kit/
   intentframe_executor_pack_posix/   Base pack: transport, auth, storage, files
   intentframe_executor_pack_macos/   macOS adapters + Seatbelt sandbox
   intentframe_executor_pack_console/ Console user_io (headless / CI)
-  extras/                       Demo glue (ExecutorBridge) — not production substrate
   core.yaml                     First-party core profile (bundles list)
   supervisor_profile.yaml       Opt-in graph (+ resource-registry)
   edge_profile.yaml             Opt-in edge (+ /workspaces)
@@ -84,10 +83,6 @@ Loaded by `executor` from `executor.yaml` `packs:` (transport, auth, storage, ad
 | `intentframe_executor_pack_console` | Console `user_io` |
 
 Entry points: `intentframe.executor_packs` (`posix`, `macos`, `console`). Sandbox: [`intentframe_executor_pack_macos/sandbox.md`](intentframe_executor_pack_macos/sandbox.md).
-
-### `extras/`
-
-Demo bridge between IntentFrame types and the production executor. Not part of the governed substrate boundary.
 
 ### Profiles (YAML)
 

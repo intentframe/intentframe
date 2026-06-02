@@ -149,8 +149,8 @@ export OPENAI_API_KEY=your-key-here
 # Adapter contract tests (standalone script, from repo root)
 .venv/bin/python demo/tests/test_adapters.py
 
-# Executor pipeline tests (standalone script, must run from demo/)
-cd demo && ../.venv/bin/python tests/test_executor.py
+# Executor pipeline tests (pytest, from repo root)
+uv run pytest tests/test_executor.py
 ```
 
 ---
@@ -311,8 +311,10 @@ demo/tests/
 ├── test_ai_pipeline.py                # Full pipeline integration tests
 ├── test_adapters.py                   # Executor adapter tests
 ├── test_domain_hardening.py           # Domain constraint tests
-├── test_executor.py                   # Executor service tests
 └── ai_naive_invoice_agent.py          # Naive agent (no IntentFrame) for comparison
+
+Executor pipeline coverage moved to repo root: ``tests/test_executor.py``
+(uses in-process bridge helper ``tests/_bridge.py``).
 ```
 
 Attack intent files live in `demo/demo_data/attack_intents/` (1-14) and `demo/demo_data/attack_intents/redteam/` (15-24).
