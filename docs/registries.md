@@ -131,7 +131,7 @@ UserPolicy
 └── (per-policy metadata)
 ```
 
-The registry stores constraint dicts **opaquely**. It does not validate shapes, resolve dynamic sources (e.g. `contacts_all` → email addresses), or merge system safety floors. Those responsibilities live in the **action bundles** that own each constraint schema (see `intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py` and `intentframe_bundle_sdk/runner.py`).
+The registry stores constraint dicts **opaquely**. It does not validate shapes, resolve dynamic sources (e.g. `contacts_all` → email addresses), or merge system safety floors. Those responsibilities live in the **action bundles** that own each constraint schema (see `intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py` and `intentframe_bundle_sdk/runner.py`). Which bundles are loaded is declared in `core.yaml` (`bundles:`) — see [plugin-profiles.md](plugin-profiles.md). Gateway policy seeding validates against that same bundle set when `INTENTFRAME_CORE_CONFIG` is set.
 
 ### Two important properties
 

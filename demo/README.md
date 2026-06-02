@@ -30,6 +30,8 @@ invoice_bot → Actor SDK → Analysis Engine → Guardian → Executor → real
 
 **Terminal 1 — start the supervisor with demo config (from repo root):**
 
+`INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` point at the demo's `core.yaml` and `executor.yaml` profiles (which bundles and packs load). See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
+
 ```bash
 INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=demo/config/executor.yaml \

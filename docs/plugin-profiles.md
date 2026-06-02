@@ -227,6 +227,26 @@ For adapter-level detail, see [executor.md](executor.md) § extending the execut
 
 ---
 
+## Repository touchpoints (implementation map)
+
+| Area | Role |
+|------|------|
+| [`intentframe_server/config.py`](../intentframe_server/config.py) | `load_core_config()`, fail-closed validation |
+| [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml) | Annotated template + legacy env mapping |
+| [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml) | First-party default profile |
+| [`intentframe_bundle_sdk/loader.py`](../intentframe_bundle_sdk/loader.py) | `intentframe.bundles` entry-point + module resolution |
+| [`executor/server.py`](../executor/server.py) | `intentframe.executor_packs` pack loading |
+| [`intentframe_gateway/profiles.py`](../intentframe_gateway/profiles.py) | `resolve_core_config_path()` (gateway-only empty/missing → kit default) |
+| [`intentframe_gateway/bootstrap.py`](../intentframe_gateway/bootstrap.py) | Policy seed `bundle_packages` from same resolver |
+| [`intentframe_gateway/server.py`](../intentframe_gateway/server.py) | Forwards `INTENTFRAME_CORE_CONFIG` to supervisor child |
+| [`jarvis_pa/seed_policies.py`](../jarvis_pa/seed_policies.py) | Dev seeding; uses `INTENTFRAME_CORE_CONFIG` only (no bundle env shortcut) |
+| [`tests/conftest.py`](../tests/conftest.py) | Autouse temp `core.yaml` for unit tests |
+| [`tests/test_gateway_profiles.py`](../tests/test_gateway_profiles.py) | Gateway resolver regression (override / unset / empty env) |
+| [`tests/test_core_config.py`](../tests/test_core_config.py) | Core profile load and fail-closed behavior |
+| Root [`pyproject.toml`](../pyproject.toml) | `[project.entry-points."intentframe.bundles"]` and `"intentframe.executor_packs"` |
+
+---
+
 ## Related docs
 
 | Doc | Topic |
@@ -236,3 +256,15 @@ For adapter-level detail, see [executor.md](executor.md) § extending the execut
 | [dev/action-family-wiring.md](dev/action-family-wiring.md) | Wiring a new action family end-to-end |
 | [executor.md](executor.md) | Executor adapters and pack registration |
 | [registries.md](registries.md) | Policy registry vs in-process bundle registry |
+| [quickstart.md](quickstart.md), [demo/README.md](../demo/README.md) | Supervisor launch examples with profile env vars |
+| [deploy/dev/README.md](../deploy/dev/README.md), [deploy/prod/README.md](../deploy/prod/README.md) | Container profile defaults |
+| [intentframe_gateway/README.md](../intentframe_gateway/README.md) | Gateway env table (`INTENTFRAME_CORE_CONFIG`, `EXECUTOR_CONFIG`) |
+
+Example YAML shipped with the repo:
+
+| File | Role |
+|------|------|
+| [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml) | Annotated core profile template |
+| [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml) | First-party default `bundles:` |
+| [`executor/config/executor.yaml`](../executor/config/executor.yaml) | Reference `packs:` and adapter wiring |
+| [`jarvis_pa/executor.yaml`](../jarvis_pa/executor.yaml) | Jarvis user-mode executor profile |

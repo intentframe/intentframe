@@ -296,7 +296,7 @@ Loader entry point per plugin package:
 def register_bundles(registry) -> None: ...
 ```
 
-Boot: `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])` then `validate_policy_against_registry(policy)`.
+Boot: `load_core_config()` from `INTENTFRAME_CORE_CONFIG` → `ensure_loaded(core_config.bundles)` then `validate_policy_against_registry(policy, bundle_packages=...)`. Public doc: [plugin-profiles.md](../plugin-profiles.md).
 
 ---
 

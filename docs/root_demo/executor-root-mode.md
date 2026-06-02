@@ -93,6 +93,8 @@ INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 python -m supervisor.main start
 ```
 
+Profile env vars (`INTENTFRAME_CORE_CONFIG`, `EXECUTOR_CONFIG`, entry points): [plugin-profiles.md](../plugin-profiles.md).
+
 This does **not** require `sudo bash intentframe_setup_root_demo.sh`, does not
 load `jarvis_pa/executor_root.yaml`, and does not require
 `INTENTFRAME_ESCALATION_ARMED`. The supervisor omits the real executor service

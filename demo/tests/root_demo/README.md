@@ -93,6 +93,8 @@ python -m supervisor.main start \
   --config intentframe_native_kit/supervisor_profile.yaml
 ```
 
+(`INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG` — what loads at startup: [docs/plugin-profiles.md](../../../docs/plugin-profiles.md).)
+
 The kit profile starts `resource-registry` so workspace seeding works. The
 packaged supervisor default omits it; use this profile for every root-demo run
 (local or container).

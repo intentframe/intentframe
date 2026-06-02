@@ -24,9 +24,13 @@ The important pieces are:
 - `policy_registry/seeds/resolver.py`: resolves user override files under
   `~/.intentframe/policies/`.
 - `intentframe_gateway/bootstrap.py`: seeds Jarvis policy and workspace on
-  gateway startup.
+  gateway startup; validates seeded actions against bundles from
+  `resolve_core_config_path()` → `core.yaml` (same list `intentframe-core` loads).
+- `intentframe_gateway/profiles.py`: shared gateway resolver for that core profile path.
 - `jarvis_pa/seed_policies.py`: development convenience script using the same
-  loader as the gateway.
+  loader as the gateway (requires `INTENTFRAME_CORE_CONFIG` when validating bundles).
+
+Which bundles are active in a deployment: [plugin-profiles.md](../plugin-profiles.md).
 
 The gateway auto-seeds only Jarvis today. External agents are mentioned in the
 loader API, but policy install and review flows are still TODOs.

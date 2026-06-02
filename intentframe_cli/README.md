@@ -20,7 +20,7 @@ The CLI also supports a demo-only root profile:
 intentframe-gateway-cli --profile root
 ```
 
-This does **not** run the whole stack with `sudo`. Instead, it asks the gateway to use the Jarvis root profile and `jarvis_pa/executor_root.yaml`, whose sandbox config opts `RUN_COMMAND` into per-command `sudo -n sandbox-exec` wrapping.
+This does **not** run the whole stack with `sudo`. Instead, it asks the gateway to use the Jarvis root profile and `jarvis_pa/executor_root.yaml`, whose sandbox config opts `RUN_COMMAND` into per-command `sudo -n sandbox-exec` wrapping. The gateway still resolves `INTENTFRAME_CORE_CONFIG` (action bundles) and `EXECUTOR_CONFIG` (executor packs) for the supervised stack — see [docs/plugin-profiles.md](../docs/plugin-profiles.md).
 
 That root capability only becomes active after a one-time machine setup:
 

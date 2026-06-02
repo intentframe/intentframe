@@ -55,7 +55,7 @@ All inter-process communication uses **Unix domain sockets** under `~/.intentfra
 |---|---|
 | **What it is** | The single program you launch. A FastAPI app served on a Unix socket (`~/.intentframe/run/gateway.sock`). |
 | **Source** | `intentframe_gateway/server.py` |
-| **Job** | Starts the credential vault, gates on mandatory credentials (OpenAI key), starts EDI / platform-server / supervisor / Jarvis / Telegram in order, exposes a unified API for frontends. |
+| **Job** | Starts the credential vault, gates on mandatory credentials (OpenAI key), starts EDI / platform-server / supervisor / Jarvis / Telegram in order, exposes a unified API for frontends. Resolves and forwards `INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG` (`intentframe_gateway/profiles.py`); seeds policies against the same bundle list core will load. |
 | **OpenAI calls** | No |
 | **Outbound network** | No |
 | **Holds credentials?** | No — passes runtime env to children, never inspects secrets |
@@ -157,7 +157,7 @@ Together with policy-registry, this is the "configuration plane" — what the us
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/executor.sock`. Runs in its own Python virtualenv (`~/.intentframe-venvs/executor/`) so its dependencies are isolated from the rest of the system. |
 | **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_native_kit/intentframe_executor_pack_macos/adapters/*.py` |
-| **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
+| **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Loads executor packs from `EXECUTOR_CONFIG` → `executor.yaml` `packs:` (see [plugin-profiles.md](plugin-profiles.md)). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
 | **Storage** | SQLite audit DB; in-memory credential cache (loaded from vault) |
 | **OpenAI calls** | No |
 | **Outbound network** | **Yes — but only via approved adapters acting on agent intents.** HTTP adapter calls the URLs the agent named; mail adapter goes through EDI; etc. None of this is background traffic. |
@@ -370,7 +370,7 @@ The process model above is the macOS / Jarvis deployment. Other deployments adju
 | **Linux core** | No platform-server (Swift binary is macOS-only); native adapters become "unavailable"; everything else identical |
 | **Cloud (planned)** | Transport changes from UDS to gRPC; platform-server replaced by cloud-equivalent adapters; credential vault may delegate to KMS / Vault |
 
-The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile. `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
+The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile (see [plugin-profiles.md](plugin-profiles.md)). `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
 
 ---
 

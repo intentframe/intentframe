@@ -60,12 +60,15 @@ Public API is re-exported from `intentframe_bundle_sdk/__init__.py` (`__all__`).
 ```python
 from intentframe_bundle_sdk import ensure_loaded, validate_policy_against_registry
 
+# In production, package list comes from core.yaml (INTENTFRAME_CORE_CONFIG).
+# Short entry-point names work when the distribution is installed, e.g. ["native"].
 ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])
 validate_policy_against_registry(user_policy)
 ```
 
 `ensure_loaded()`:
 
+- Resolves each ref via the `intentframe.bundles` entry-point group (short name) or as a dotted module path — see [docs/plugin-profiles.md](../docs/plugin-profiles.md).
 - Imports each plugin package and calls `register_bundles(registry)`.
 - Is **idempotent** for the same package set.
 - Raises if called again with a **different** package set (process-wide registry).
@@ -283,7 +286,9 @@ DeterministicGuardian(packages=core_config.bundles)
 
 Each bundle ref is either a short name advertised under the
 `intentframe.bundles` entry-point group or a dotted module path exposing
-`register_bundles(registry)`.
+`register_bundles(registry)`. The host selects refs in `core.yaml` (`bundles:`)
+via `INTENTFRAME_CORE_CONFIG` — entry points alone do not load anything.
+See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
 
 `IntentFrameRuntime.startup()` / `aclose()` fan out to `startup_bundles()` /
 `shutdown_bundles()` and close the executor (`aclose` or `close`, awaited if async).

@@ -154,9 +154,10 @@ Your `PolicyRegistryClient()`, `ResourceRegistryClient()`, `IntentFrameClient()`
 > **Defense validation works over HTTP; executor side effects are partial.**
 > Most attacks block before the executor runs — audit `BLOCK` / `blocked_count`
 > is enough. Filesystem sync only matters for ALLOW paths (e.g. redteam attack 16)
-> or allowed prelude reads on `/invoices/`. Changing `EXECUTOR_CONFIG` or
-> `INTENTFRAME_EXECUTOR_MODE` requires restarting the container — see
-> [README.md §2d](README.md#2d-when-to-restart-the-container) and
+> or allowed prelude reads on `/invoices/`. Changing `EXECUTOR_CONFIG`,
+> `INTENTFRAME_CORE_CONFIG`, or `INTENTFRAME_EXECUTOR_MODE` requires restarting the container — see
+> [README.md §2d](README.md#2d-when-to-restart-the-container),
+> [docs/plugin-profiles.md](../../docs/plugin-profiles.md), and
 > [§2c](README.md#2c-limitations-when-running-tests-over-http).
 
 ---

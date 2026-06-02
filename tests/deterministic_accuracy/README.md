@@ -525,6 +525,8 @@ end-to-end security claim, pair this folder with an AE accuracy harness.
 
 ## Running the tests
 
+These tests use `tests/_bundle_loader.make_deterministic_guardian()` (explicit bundle packages). The repo-wide `tests/conftest.py` autouse fixture sets `INTENTFRAME_CORE_CONFIG` for tests that call `load_core_config()` directly. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
+
 ```sh
 # Everything
 python -m pytest tests/deterministic_accuracy/ -v

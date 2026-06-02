@@ -1,3 +1,9 @@
+# Captured attack-suite output (reference)
+
+Supervisor profile env for these runs: `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`, `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md) and [README.md](README.md).
+
+---
+
 > python demo/tests/test_attacks.py && python demo/tests/test_advanced_attacks.py && python demo/tests/test_redteam_attacks.py
 
 ===============================================================================

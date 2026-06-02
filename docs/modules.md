@@ -59,7 +59,8 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | Keeps action taxonomy, governance bundles, and executor adapters out of substrate packages (`intentframe_core`, `intentframe_actor`, `executor`, `executor_sdk`). |
 | **Where** | `intentframe_native_kit/` |
 | **Process** | None — importable Python packages. |
-| **Public docs** | [registries.md § Action registry](registries.md#the-action-registry); [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [registries.md § Action registry](registries.md#the-action-registry); [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Profiles** | `intentframe_native_kit/core.yaml` (bundles); executor packs via `jarvis_pa/executor.yaml` and siblings — see [plugin-profiles.md](plugin-profiles.md) |
 
 ### `intentframe_native_kit.action_registry/`
 
@@ -147,7 +148,8 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | The pipeline needs a service surface so the Actor SDK can submit intents from a different process. This is that service. |
 | **Where** | `intentframe_server/` |
 | **Process** | `intentframe-core` (uvicorn) on `~/.intentframe/run/intentframe.sock`, started by the supervisor. This is the process that calls OpenAI for AE + Guardian. |
-| **Public docs** | [architecture.md](architecture.md), [processes.md § intentframe-core](processes.md) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [architecture.md](architecture.md), [processes.md § intentframe-core](processes.md) |
+| **Profiles** | `intentframe_server/config.py` + [`config/core.example.yaml`](../intentframe_server/config/core.example.yaml) — loaded via `INTENTFRAME_CORE_CONFIG` |
 | **Module README** | None. |
 
 ---
@@ -162,7 +164,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | Concentrating every IO and every credential in one process is what makes credential isolation, audit, and rollback structurally enforceable. The executor is "the engine, not the workbench." |
 | **Where** | `executor/` |
 | **Process** | `executor` (uvicorn) on `~/.intentframe/run/executor.sock`, started by the supervisor. |
-| **Public docs** | [executor.md](executor.md), [executor/architecture.md](executor/architecture.md), [executor/security-model.md](executor/security-model.md), [executor/why-foundation.md](executor/why-foundation.md), [executor/standalone-product.md](executor/standalone-product.md) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md) (`packs:` / `EXECUTOR_CONFIG`); [executor.md](executor.md), [executor/architecture.md](executor/architecture.md), [executor/security-model.md](executor/security-model.md), [executor/why-foundation.md](executor/why-foundation.md), [executor/standalone-product.md](executor/standalone-product.md) |
 | **Module README** | `executor/README.md` (sub-references: `executor/sandbox.md`, `executor/plan.md`) |
 
 ### `executor_client/`
@@ -236,7 +238,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | Frontends shouldn't have to know which sockets exist or how to start each subsystem. They talk to one socket; the gateway hides everything else. |
 | **Where** | `intentframe_gateway/` |
 | **Process** | `intentframe-gateway-cli` (uvicorn) on `~/.intentframe/run/gateway.sock`. The user-facing entry point — the one process the user actually starts. |
-| **Public docs** | [processes.md § Process tree](processes.md), [architecture.md § Runtime model and privacy](architecture.md#runtime-model-and-privacy) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md) (forwards `INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG`); [processes.md § Process tree](processes.md), [architecture.md § Runtime model and privacy](architecture.md#runtime-model-and-privacy) |
 | **Module README** | `intentframe_gateway/README.md` |
 
 ### `supervisor/`
@@ -247,7 +249,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | Splitting startup orchestration out of the gateway keeps the gateway focused on the user-facing API. The supervisor also injects `runtime_env` credentials into spawned children, so the children never call the vault themselves. |
 | **Where** | `supervisor/` |
 | **Process** | `supervisor`, started by the gateway in Step 6. |
-| **Public docs** | [processes.md § supervisor](processes.md), [credentials-vault.md § Lifecycle](credentials-vault.md#lifecycle) |
+| **Public docs** | [processes.md § supervisor](processes.md), [plugin-profiles.md](plugin-profiles.md) (forwards profile env to children); [credentials-vault.md § Lifecycle](credentials-vault.md#lifecycle) |
 | **Module README** | None. |
 
 ### `intentframe_cli/`

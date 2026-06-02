@@ -49,6 +49,7 @@ If you're new to IntentFrame, read in this order:
 - [architecture.md](architecture.md) — the logical pipeline
 - [processes.md](processes.md) — the physical process model (what runs where)
 - [modules.md](modules.md) — every workspace module, what it is, what it does, where its docs are
+- [plugin-profiles.md](plugin-profiles.md) — how core and executor load bundles/packs (YAML + entry points)
 - [executor.md](executor.md) — the executor, the only component that touches the real world
 - [executor/](executor/) — long-form material on the executor (architecture, security model, foundation argument, standalone-product positioning)
 
@@ -112,12 +113,13 @@ If you're new to IntentFrame, read in this order:
 | [principles.md](principles.md) | The invariants that implement the thesis |
 | [threat-model.md](threat-model.md) | What's protected, what isn't, the trust boundaries |
 | [evidence.md](evidence.md) | Test results and proof artifacts |
-| [faq.md](faq.md) | Common questions and objections |
+| [faq.md](faq.md) | Common questions and objections (incl. custom action bundles — Q12b) |
 
 ### Runtime, processes, and data
 
 | Doc | What it covers |
 |---|---|
+| [plugin-profiles.md](plugin-profiles.md) | `core.yaml` / `executor.yaml`, env selectors, entry-point discovery, gateway profile forwarding |
 | [processes.md](processes.md) | Every long-lived process, what it does, what socket it listens on, what it depends on |
 | [privacy.md](privacy.md) | What's on disk, what leaves the machine, what never happens |
 | [modules.md](modules.md) | Every workspace module, with WH (what / why / where / who / how) for each |

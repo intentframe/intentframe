@@ -202,6 +202,7 @@ All extensible components use the same registration mechanism:
 │                                                              │
 │  Deployments list packs explicitly in executor.yaml `packs:`;│
 │  there are no built-in or platform-default packs.            │
+│  See plugin-profiles.md for entry-point short names vs paths.│
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -242,7 +243,9 @@ def register_all_adapters() -> None:
 ```
 
 External orgs ship a pack module with `register_all()` and optionally advertise
-it under the `intentframe.executor_packs` entry-point group.
+it under the `intentframe.executor_packs` entry-point group. Profile selection,
+env vars, and the parallel core bundle model are documented in
+[plugin-profiles.md](../plugin-profiles.md).
 
 ### Step 3: list the pack in config
 

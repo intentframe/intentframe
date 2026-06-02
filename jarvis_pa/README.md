@@ -21,6 +21,8 @@ You type a message
 
 IntentFrame is a dependency, not an identity. Jarvis stores nothing in IntentFrame paths. It follows IntentFrame's security principles (every AI-decided action goes through the pipeline), but architecturally it is decoupled — the same way a Django app follows HTTP semantics without being "an HTTP project".
 
+When the gateway starts Jarvis, it also selects which **action bundles** (`INTENTFRAME_CORE_CONFIG` → `core.yaml`) and **executor packs** (`EXECUTOR_CONFIG` → `jarvis_pa/executor.yaml` or `executor_root.yaml`) load in the supervised stack. See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
+
 ## Architecture
 
 ```

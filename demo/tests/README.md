@@ -76,6 +76,8 @@ intent_limits:
 
 Each suite expects a specific supervisor executor config. Start the supervisor **from repo root** with the matching config before running the suite. All harnesses that register or resolve workspaces need the **kit supervisor profile** (`resource-registry` is not in the packaged default graph).
 
+`INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` select the action-bundle and executor-pack profiles for that run. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
+
 | Test file(s) | Required supervisor command |
 |---|---|
 | `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml` |

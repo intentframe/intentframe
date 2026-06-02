@@ -264,6 +264,7 @@ See [`../../tests/README.md`](../../tests/README.md) for the full test guide.
 
 ```bash
 # Start supervisor with attack executor profile + kit profile (workspaces)
+# Profile selection: docs/plugin-profiles.md
 INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
 python -m supervisor.main start \

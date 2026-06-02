@@ -39,6 +39,7 @@ UDS-only inside the environment.
 `core.yaml` profile declaring the action bundles to load. The compose default is
 the first-party kit profile (`/app/intentframe_native_kit/core.yaml`); third
 parties ship their own profile just like they ship their own executor config.
+Entry-point short names vs module paths: [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
 ## 1. Start the runtime + edge
 

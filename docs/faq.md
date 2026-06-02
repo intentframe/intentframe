@@ -204,9 +204,25 @@ What we ship to make the trade-off honest:
 - **AGPL-3.0** — anyone can fork and maintain the runtime independently of the original maintainer.
 - **Small executor surface** — adapters are ~50–100 lines each; the executor core is small enough to fork and audit.
 - **Config-driven action registry** — extending capabilities does not require modifying the executor core.
+- **Config-driven plugin profiles** — action bundles (`core.yaml` / `INTENTFRAME_CORE_CONFIG`) and executor packs (`executor.yaml` / `EXECUTOR_CONFIG`) are explicit allowlists; optional `pyproject.toml` entry points supply short names. See [plugin-profiles.md](plugin-profiles.md).
 - **No agent-layer lock-in** — the seam is one method (`actor.submit({...dict...})`); re-pointing your agent at a different IntentFrame fork is a config change, not a rewrite.
 
 What singletonness *gives* in return is the property no per-agent model gives: credentials, audit, and policy are unified at the device, not replicated across n agents that each have to be vetted independently. See [single-runtime.md](single-runtime.md) for the full development of this trade-off, including the migration friction sizing for retrofitting existing OSS agents.
+
+---
+
+## Q12b. How do I load my own action bundles (not just the first-party kit)?
+
+Declare them in a **`core.yaml`** profile and point **`INTENTFRAME_CORE_CONFIG`** at that file before starting `intentframe-core` (or let the gateway set it when you use `intentframe-gateway-cli`). Each `bundles:` entry is either:
+
+- a short name from the `intentframe.bundles` entry-point group in your wheel's `pyproject.toml`, or
+- a dotted module path exposing `register_bundles(registry)`.
+
+There is **no** `INTENTFRAME_BUNDLES` comma-separated env shortcut — same rule as executor packs. The substrate does not fall back to native-kit bundles if the profile is missing; deployments must be explicit.
+
+Gateway policy seeding validates against the same bundle list when a core profile is configured, so seeded policies cannot reference actions your bundles do not register.
+
+Full checklist: [plugin-profiles.md](plugin-profiles.md).
 
 ---
 

@@ -484,7 +484,7 @@ Scope:
     - For each domain in `domain_constraints`, resolve domain bundle, verify route exists, and call `domain_bundle.validate(slice)` (via `validate_policy_domain_constraints`).
   - Any failure → raise → substrate refuses to start.
 - `intentframe_components/guardian/deterministic.py`: add `packages: list[str]` constructor arg; call `ensure_loaded(packages)`.
-- `intentframe_server/server.py`: `_create_runtime()` constructs `DeterministicGuardian(packages=["intentframe_native_kit.intentframe_native_bundles"], verbose=verbose)`.
+- `intentframe_server/server.py`: `_create_runtime()` loads `load_core_config()` and constructs `DeterministicGuardian(packages=core_config.bundles, verbose=verbose)`.
 - Delete the `_ensure_first_party_bundles_loaded()` shim from `intentframe_native_kit/intentframe_native_bundles/__init__.py` (keep `register_bundles(registry)`).
 - Update `tests/_bundle_loader.py` to call `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])`.
 
@@ -555,7 +555,7 @@ Exit: contributors can read the SDK docstrings and follow the contract without c
 - External Jarvis YAML schema stays unchanged (`intentframe_schema_version: 1`); only bump if dict migration breaks a seeded YAML in practice.
 - Action-id namespacing is intentionally out of scope; the strict-duplicate `ValueError` is the only collision defense.
 - Policy hot reload: bundles parse on each call; absence of cache state on bundle classes is enforced by convention and reviewed in PR (no automated lint added for this).
-- `pyproject.toml` entry points are deliberately not added; loader is constructor-arg driven.
+- `pyproject.toml` entry points added (`intentframe.bundles`, `intentframe.executor_packs`); loader resolves short names or module paths; allowlist remains `core.yaml` / `executor.yaml`.
 - Pass-10 already wired `passive_read_action_ids` and the SDK gate, and pass-11 already removed the critical/taxonomy aggregator. Phase 3 must reconcile these against the final layout — do not recreate `passive_read/` as a final family.
 
 ## 12. What Is Locked (Single-Decision Summary)
@@ -575,7 +575,7 @@ Exit: contributors can read the SDK docstrings and follow the contract without c
 | Dashboard `DOMAIN_CONSTRAINT_TYPES` | Raw dict pass-through. |
 | Dashboard manifest flags | No replacement; vanish with `manifest.py`. |
 | `policy_bridge.py` | Delete (zero external consumers). |
-| `pyproject.toml` entry points | Not added. |
+| `pyproject.toml` entry points | Added for bundles and executor packs; YAML profiles still required. |
 | Mutation safety | Runner deep-copies constraints; bundles parse fresh each call. |
 | Test drift guards | Aggregate `CRITICAL_ACTIONS ∩ PASSIVE_READ_ACTIONS == ∅` removed; strict registry covers uniqueness. |
 | Passive-read gate | SDK runner owns it; runs between `structural_gates` and `allow_gates`; uses `bundle.passive_read_action_ids` + `action_permission.safe`. |

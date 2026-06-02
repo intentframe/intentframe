@@ -32,6 +32,8 @@ uv run pytest tests/                    # command shield + core tests
 uv run pytest demo/tests/               # security demo tests (needs OpenAI key)
 ```
 
+`tests/conftest.py` sets a temporary `INTENTFRAME_CORE_CONFIG` (autouse) so unit tests that construct core runtime pieces have a valid `bundles:` profile. Supervisor-backed demos must set `INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` explicitly — see [docs/plugin-profiles.md](docs/plugin-profiles.md).
+
 ## Project Structure
 
 IntentFrame is a `uv` workspace. The root `pyproject.toml` defines the main

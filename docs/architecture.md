@@ -521,6 +521,7 @@ For the concrete runtime picture — what processes exist, what each one does, w
 - [docs/evidence.md](evidence.md) — test results and failure reports
 - [docs/credentials-vault.md](credentials-vault.md) — secret storage and the vault service
 - [docs/registries.md](registries.md) — policy / resource / action registries (the configuration plane)
+- [docs/plugin-profiles.md](plugin-profiles.md) — `core.yaml` / `executor.yaml`, entry points, and startup loading for bundles and packs
 - [docs/email-sync.md](email-sync.md) — IMAP / SMTP daemon (EDI)
 - [docs/macos-platform-server.md](macos-platform-server.md) — Swift native bridge (Calendar, Contacts, iMessage, …)
 - [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) — why the AI hybrid model works

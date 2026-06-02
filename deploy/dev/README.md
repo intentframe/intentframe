@@ -110,7 +110,8 @@ The registry/runtime clients accept a `base_url` and also read it from the
 environment, so existing harnesses run unmodified — just point them at the edge.
 The executor config to use depends on which test suite you're running:
 The core config declares which action bundles `intentframe-core` loads; the
-compose default is `/app/intentframe_native_kit/core.yaml`.
+compose default is `/app/intentframe_native_kit/core.yaml`. Executor packs are
+selected separately via `EXECUTOR_CONFIG`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
 ### 2a. Dashboard + basic pipeline tests
 
@@ -650,7 +651,7 @@ Only use when you intentionally want to wipe Docker state machine-wide.
 | `seed_vault.py` | store `OPENAI_API_KEY` in Vault as `runtime_env` |
 | `inject_and_exec.py` | fetch `runtime_env` from Vault, `exec` the supervisor |
 | `docker-compose.dev.yml` | runtime + edge, wired to host Vault |
-| `../../intentframe_native_kit/core.yaml` | kit core profile (loads first-party action bundles) — selected by `INTENTFRAME_CORE_CONFIG` |
+| `../../intentframe_native_kit/core.yaml` | kit core profile (loads first-party action bundles) — selected by `INTENTFRAME_CORE_CONFIG` ([docs/plugin-profiles.md](../../docs/plugin-profiles.md)) |
 | `../../demo/config/executor_hashicorp.yaml` | default executor config (dashboard + basic pipeline tests) |
 | `../../demo/config/executor_attacks_hashicorp.yaml` | executor config for invoice attack suites |
 | `../../intentframe_native_kit/supervisor_profile.yaml` | kit supervisor profile (adds `resource-registry`) — export as `INTENTFRAME_SUPERVISOR_CONFIG` |
