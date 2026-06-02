@@ -74,6 +74,7 @@ native = "intentframe_native_kit.intentframe_native_bundles:register_bundles"
 # profile so `--config` resolution works from an installed wheel, not just a
 # repo checkout.
 supervisor = ["config/*.yaml"]
+intentframe_server = ["config/*.yaml"]
 intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml", "core.yaml"]
 
 [tool.setuptools.packages.find]

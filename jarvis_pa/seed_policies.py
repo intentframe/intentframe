@@ -120,10 +120,7 @@ def _build_policy_payload(variant: JarvisVariant, user_id: str) -> dict:
 
 def _configured_bundle_packages() -> list[str] | None:
     """Use the active core profile for seed validation when one is declared."""
-    if not (
-        os.environ.get("INTENTFRAME_CORE_CONFIG")
-        or os.environ.get("INTENTFRAME_BUNDLES")
-    ):
+    if not os.environ.get("INTENTFRAME_CORE_CONFIG"):
         return None
     try:
         return load_core_config().bundles

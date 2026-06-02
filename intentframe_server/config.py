@@ -82,7 +82,6 @@ def load_core_config(
         1. Explicit ``config_dict`` (tests).
         2. Explicit ``config_path``.
         3. ``INTENTFRAME_CORE_CONFIG``.
-        4. ``INTENTFRAME_BUNDLES`` comma-separated shortcut.
 
     There is deliberately no native-kit fallback. A deployment must declare
     which bundles intentframe-core loads.
@@ -95,7 +94,10 @@ def load_core_config(
         if path is not None:
             raw = _load_yaml(path)
         else:
-            raw = _config_from_bundle_env()
+            raise CoreConfigurationError(
+                "No intentframe-core profile configured. Set "
+                "INTENTFRAME_CORE_CONFIG to a core.yaml containing `bundles:`."
+            )
 
     try:
         config = CoreConfig.model_validate(raw)
@@ -112,18 +114,6 @@ def load_core_config(
 def _env_core_config_path() -> Path | None:
     value = os.environ.get("INTENTFRAME_CORE_CONFIG")
     return Path(value) if value else None
-
-
-def _config_from_bundle_env() -> dict[str, Any]:
-    raw = os.environ.get("INTENTFRAME_BUNDLES")
-    if raw is None:
-        raise CoreConfigurationError(
-            "No intentframe-core bundle profile configured. Set "
-            "INTENTFRAME_CORE_CONFIG to a core.yaml containing `bundles:`, "
-            "or set INTENTFRAME_BUNDLES for local development."
-        )
-    bundles = [part.strip() for part in raw.split(",") if part.strip()]
-    return {"bundles": bundles}
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:

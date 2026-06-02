@@ -28,20 +28,10 @@ def test_core_config_loads_bundles_from_yaml(tmp_path: Path) -> None:
     assert config.runtime.verbose is False
 
 
-def test_core_config_env_bundle_shortcut(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_core_config_fails_without_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("INTENTFRAME_CORE_CONFIG", raising=False)
-    monkeypatch.setenv("INTENTFRAME_BUNDLES", "acme, other.module")
 
-    config = load_core_config()
-
-    assert config.bundles == ["acme", "other.module"]
-
-
-def test_core_config_fails_without_bundles(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("INTENTFRAME_CORE_CONFIG", raising=False)
-    monkeypatch.delenv("INTENTFRAME_BUNDLES", raising=False)
-
-    with pytest.raises(CoreConfigurationError, match="No intentframe-core bundle profile"):
+    with pytest.raises(CoreConfigurationError, match="No intentframe-core profile"):
         load_core_config()
 
 
