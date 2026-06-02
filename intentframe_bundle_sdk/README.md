@@ -55,6 +55,17 @@ Public API is re-exported from `intentframe_bundle_sdk/__init__.py` (`__all__`).
 
 ---
 
+## Plugin import surface
+
+Bundle and domain plugin code should import neutral wire types from this package
+only (e.g. ``IntentFrame``, ``DomainSchema``, ``normalize_virtual_path``,
+``owner_home``)—not ``intentframe_core`` directly. Those names are re-exported
+from ``intentframe_bundle_sdk`` so the SDK is the sole author-facing contract.
+
+Executor packs use ``executor_sdk`` the same way (see ``executor_sdk/__init__.py``).
+
+---
+
 ## Boot
 
 ```python

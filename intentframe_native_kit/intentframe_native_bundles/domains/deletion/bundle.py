@@ -9,7 +9,7 @@ from __future__ import annotations
 import fnmatch
 
 from intentframe_native_kit.action_registry.domains.deletion import DeletionIntentData
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame
 
 from intentframe_native_kit.intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
 from intentframe_bundle_sdk.domain import DomainBundle

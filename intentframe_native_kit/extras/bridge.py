@@ -37,7 +37,7 @@ from typing import Any
 
 # ── IntentFrame types ─────────────────────────────────────────────────────────
 from intentframe_native_kit.action_registry import ActionType  # noqa: F401 -- canonical source of truth
-from intentframe_core.types import (
+from intentframe_bundle_sdk import (
     ExecutionResult as DemoExecutionResult,
     IntentFrame,
 )

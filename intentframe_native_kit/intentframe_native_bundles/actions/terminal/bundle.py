@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame
 
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal import ACTION_IDS
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal._capability_match import (

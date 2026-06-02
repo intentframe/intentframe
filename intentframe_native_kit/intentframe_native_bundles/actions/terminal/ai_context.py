@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from intentframe_core.types import IntentSignal, INTENT_SIGNALS_MAX_ITEMS, INTENT_SIGNAL_VALUE_MAX_LEN
+from intentframe_bundle_sdk import (
+    INTENT_SIGNALS_MAX_ITEMS,
+    INTENT_SIGNAL_VALUE_MAX_LEN,
+    IntentSignal,
+)
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal.prompts_ae import _CRITICAL_RUN_COMMAND
 

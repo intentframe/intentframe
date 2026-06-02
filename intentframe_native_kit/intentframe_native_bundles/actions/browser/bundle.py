@@ -5,7 +5,7 @@ from __future__ import annotations
 import fnmatch
 
 from intentframe_native_kit.action_registry.types import ActionType
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame
 
 from intentframe_native_kit.intentframe_native_bundles.actions.browser.constraints import BrowserConstraints
 from intentframe_bundle_sdk.action import ActionBundle

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from intentframe_core.domains.base import DomainSchema
+from intentframe_bundle_sdk import DomainSchema
 
 
 class FinancialIntentData(DomainSchema):

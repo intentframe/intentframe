@@ -77,7 +77,20 @@ from intentframe_bundle_sdk.types import (
     enrichment_audit_fields,
     record_enrichment,
 )
-from intentframe_core.types import IntentSignal
+# Neutral wire types — re-exported so plugin authors import only this SDK.
+from intentframe_core.domains.base import DomainSchema
+from intentframe_core.enums import Decision, Reversibility, RiskLevel
+from intentframe_core.identity import owner_home
+from intentframe_core.paths import normalize_virtual_path
+from intentframe_core.types import (
+    INTENT_SIGNALS_MAX_ITEMS,
+    INTENT_SIGNAL_VALUE_MAX_LEN,
+    AnalysisReport,
+    ExecutionResult,
+    IntentFrame,
+    IntentSignal,
+    ValidationResult,
+)
 
 __all__ = [
     "ActionBundle",
@@ -129,4 +142,18 @@ __all__ = [
     "routed_domain_ids",
     "validate_policy_domain_constraints",
     "validate_policy_against_registry",
+    # Re-exported from intentframe_core (plugin public surface)
+    "AnalysisReport",
+    "Decision",
+    "DomainSchema",
+    "ExecutionResult",
+    "INTENT_SIGNALS_MAX_ITEMS",
+    "INTENT_SIGNAL_VALUE_MAX_LEN",
+    "IntentFrame",
+    "IntentSignal",
+    "Reversibility",
+    "RiskLevel",
+    "ValidationResult",
+    "normalize_virtual_path",
+    "owner_home",
 ]

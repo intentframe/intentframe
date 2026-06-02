@@ -25,7 +25,7 @@ Design choices:
   here preserves the extraction-as-microservice story of the registry
   and keeps executor code unchanged.
 - **Pre-expanded tuple.**  ``~`` is expanded at module-load time using
-  :func:`intentframe_core.identity.owner_home` so the floor honours
+  :func:`intentframe_bundle_sdk.owner_home` so the floor honours
   ``SUDO_USER`` under root-via-sudo — the same identity-aware HOME the
   executor venv uses.  No per-call expansion.
 - **Canonicalized via realpath.**  Matches the sandbox's
@@ -61,7 +61,7 @@ import logging
 import os
 from pathlib import Path
 
-from intentframe_core.identity import owner_home
+from intentframe_bundle_sdk import owner_home
 
 logger = logging.getLogger(__name__)
 

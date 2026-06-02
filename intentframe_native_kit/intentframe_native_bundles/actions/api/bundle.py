@@ -5,7 +5,7 @@ from __future__ import annotations
 import fnmatch
 
 from intentframe_native_kit.action_registry.types import ActionType
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame
 
 from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
 from intentframe_native_kit.intentframe_native_bundles.actions.api.onboarding_guardrails import api_onboarding_guardrails
