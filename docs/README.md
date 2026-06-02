@@ -92,6 +92,7 @@ If you're new to IntentFrame, read in this order:
 
 ### "I want to extend IntentFrame"
 
+- [plugin-profiles.md](plugin-profiles.md) — `core.yaml` / `executor.yaml`, env selectors, and `pyproject.toml` entry points for bundles and packs
 - [executor/architecture.md](executor/architecture.md) — adapter pattern, how to add a new capability
 - [executor/standalone-product.md](executor/standalone-product.md) — how the executor stands alone as infrastructure
 - [dev/action-family-wiring.md](dev/action-family-wiring.md) — wiring new action families end-to-end
@@ -177,6 +178,7 @@ If you're new to IntentFrame, read in this order:
 
 | Doc | What it covers |
 |---|---|
+| [plugin-profiles.md](plugin-profiles.md) | Plugin hosts: `bundles:` / `packs:`, profile env vars, entry-point discovery |
 | [dev/action-family-wiring.md](dev/action-family-wiring.md) | How to wire a new action family end-to-end |
 
 ---

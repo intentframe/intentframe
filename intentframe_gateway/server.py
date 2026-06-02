@@ -31,6 +31,7 @@ from intentframe_gateway.bootstrap import Bootstrapper
 from intentframe_gateway.config import GatewayConfig, load_gateway_config
 from intentframe_gateway.credential_gate import CredentialGate
 from intentframe_gateway.escalation import detect_escalation_state
+from intentframe_gateway.profiles import resolve_core_config_path
 from intentframe_gateway.process_manager import ProcessManager
 from intentframe_proxy.proxy import UDSProxy
 
@@ -64,16 +65,6 @@ def _supervisor_config_path() -> str:
     return str(Path(intentframe_native_kit.__file__).parent / "supervisor_profile.yaml")
 
 
-def _core_config_path() -> str:
-    """Resolve the intentframe-core profile for first-party products."""
-    override = os.environ.get("INTENTFRAME_CORE_CONFIG")
-    if override:
-        return override
-    import intentframe_native_kit
-
-    return str(Path(intentframe_native_kit.__file__).parent / "core.yaml")
-
-
 async def _start_supervisor(
     config: GatewayConfig,
     runtime_env: dict[str, str],
@@ -82,7 +73,7 @@ async def _start_supervisor(
     """Spawn the supervisor as a child process."""
     child_env = {**os.environ, "PYTHONUNBUFFERED": "1", **runtime_env}
     child_env["EXECUTOR_CONFIG"] = os.environ.get("EXECUTOR_CONFIG") or "jarvis_pa/executor.yaml"
-    child_env["INTENTFRAME_CORE_CONFIG"] = _core_config_path()
+    child_env["INTENTFRAME_CORE_CONFIG"] = resolve_core_config_path()
 
     # Detect root-demo escalation capability and stamp it into the
     # supervisor/executor env.  Both sides use this single env var as

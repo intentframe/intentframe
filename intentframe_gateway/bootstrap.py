@@ -55,7 +55,6 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 from typing import Any, Literal
 
 from jarvis.policies import (
@@ -65,6 +64,7 @@ from jarvis.policies import (
 )
 
 from intentframe_gateway.config import GatewayConfig
+from intentframe_gateway.profiles import resolve_core_config_path
 from intentframe_server.config import load_core_config
 from intentframe_proxy.proxy import UDSProxy
 from policy_registry.seeds import load_policy_seed, resolve_seed_path
@@ -74,12 +74,7 @@ logger = logging.getLogger(__name__)
 
 def _core_bundle_packages() -> list[str]:
     """Bundle refs used for seed-time validation in the gateway deployment."""
-    config_path = os.environ.get("INTENTFRAME_CORE_CONFIG")
-    if config_path is None:
-        import intentframe_native_kit
-
-        config_path = str(Path(intentframe_native_kit.__file__).parent / "core.yaml")
-    return load_core_config(config_path).bundles
+    return load_core_config(resolve_core_config_path()).bundles
 
 __all__ = [
     "Bootstrapper",

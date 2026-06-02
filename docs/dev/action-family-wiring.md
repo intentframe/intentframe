@@ -6,6 +6,8 @@ This document exists because the IntentFrame pipeline legitimately has many laye
 
 Read this before adding a new action family. Read it again when you are debugging "why isn't X being enforced / mentioned / routed the way I expect?".
 
+For **which bundles/packs load at startup** (`core.yaml`, `executor.yaml`, entry points, env selectors), see [plugin-profiles.md](../plugin-profiles.md).
+
 ---
 
 ## Mental model in one paragraph

@@ -66,6 +66,8 @@ The demo runs an AI invoice-processing agent through a constrained IntentFrame s
 
 **Terminal 1 — start the supervisor with demo config:**
 
+(`INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` select which action bundles and executor packs load; see [plugin-profiles.md](plugin-profiles.md).)
+
 ```bash
 INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=demo/config/executor.yaml \

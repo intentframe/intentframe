@@ -227,7 +227,8 @@ def register_all_adapters() -> None:
 
 Third-party packs can advertise themselves under the
 `intentframe.executor_packs` entry-point group in `pyproject.toml` so
-deployments reference them by short name.
+deployments reference them by short name. See [plugin-profiles.md](plugin-profiles.md)
+for the shared core/executor profile model, env selectors, and resolution order.
 
 **Step 3: list the pack in config**
 

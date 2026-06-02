@@ -183,9 +183,11 @@ This is the process the entire IntentFrame security model rests on. See [executo
 This is where Guardian and the Analysis Engine actually *run*. When you read "the Guardian decides," the decision is happening in this process. It's also the only IntentFrame-internal process that talks to OpenAI.
 Like the executor, this process is a plugin host: `core.yaml` declares `bundles:`
 (action/domain bundles), while `executor.yaml` declares `packs:` (transport,
-auth, storage, adapters). See `intentframe_server/config/core.example.yaml` for
-the core profile shape and env mapping. The supervisor forwards the selected
-config paths; it does not know what bundles or packs mean.
+auth, storage, adapters). See [plugin-profiles.md](plugin-profiles.md) for the
+full model (entry points, resolution order, third-party checklist) and
+`intentframe_server/config/core.example.yaml` for the core profile shape and env
+mapping. The supervisor forwards the selected config paths; it does not know
+what bundles or packs mean.
 
 ### 10. `jarvis` — the agent application (optional)
 

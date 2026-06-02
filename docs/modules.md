@@ -110,7 +110,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | Substrate orchestrates; plugins own action/domain logic. The SDK is action- and domain-agnostic — no family-specific constraint field names or industry vocabulary. |
 | **Where** | `intentframe_bundle_sdk/` |
 | **Process** | None — imported by `intentframe_components`, `intentframe_native_kit.intentframe_native_bundles`, and tests. |
-| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | Module docstrings in `loader.py`, `action.py`, `runner.py`. |
 
 ### `intentframe_native_kit.intentframe_native_bundles/`
@@ -121,7 +121,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Action bundles must not import sibling bundles (`actions/<A>` ↛ `actions/<B>`); shared code lives under `shared/<topic>/`, which must not import `actions/*` (enforced in `tests/test_boundary_imports.py`). Domain bundles do not import action bundles; routing is separate metadata. Onboarding copy is also bundle-owned: each bundle contributes via `onboarding_guardrails()`; cross-cutting rules go in the manifest. |
 | **Where** | `intentframe_native_kit/intentframe_native_bundles/` |
 | **Process** | Loaded by `intentframe-core` from the active `INTENTFRAME_CORE_CONFIG` profile (`bundles:` list). |
-| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | None — see `register_bundles` in `__init__.py`. |
 
 ---
