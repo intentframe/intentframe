@@ -122,7 +122,7 @@ For Jarvis, `intentframe_gateway/bootstrap.py` resolves:
 2. User id: gateway identity config, with environment fallback.
 3. Agent id: `jarvis` for user mode or `jarvis_root` for root mode.
 4. YAML path: user override first, packaged policy second.
-5. Validated policy: `policy_registry.seeds.load_policy_seed(...)` (registry fields + bundle constraint schemas).
+5. Validated policy: `policy_registry.seeds.load_policy_seed(..., bundle_packages=...)` (registry fields + host-supplied bundle constraint schemas).
 
 The bootstrapper then posts the policy into the policy registry.
 
@@ -321,7 +321,10 @@ python - <<'PY'
 from pathlib import Path
 from policy_registry.seeds import load_policy_seed
 
-policy = load_policy_seed(Path("~/.intentframe/policies/jarvis.yaml").expanduser())
+policy = load_policy_seed(
+    Path("~/.intentframe/policies/jarvis.yaml").expanduser(),
+    bundle_packages=["my_org.intentframe_bundles"],
+)
 print(policy.model_dump(mode="json", exclude={"created_at"}))
 PY
 ```

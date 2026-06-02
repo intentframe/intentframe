@@ -86,6 +86,7 @@ real policy / Guardian path but replaces only the final executor with
 service, so there is no `executor.sock` that can accidentally run commands.
 
 ```bash
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
 python -m supervisor.main start \
@@ -135,8 +136,9 @@ The CLI starts the gateway, which:
 
 1. Runs `detect_escalation_state()` and decides whether root-demo is armed.
 2. Injects `INTENTFRAME_ESCALATION_ARMED=1` (or `0`) into the supervisor env.
-3. Spawns the supervisor with `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` and
-   the first-party kit service graph (`intentframe_native_kit/supervisor_profile.yaml`,
+3. Spawns the supervisor with `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml`,
+   `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`, and the
+   first-party kit service graph (`intentframe_native_kit/supervisor_profile.yaml`,
    including `resource-registry`).
 
 You should see the banner:
@@ -161,6 +163,7 @@ fail at runtime with a cryptic "password required" error:
 
 ```bash
 JARVIS_VARIANT=root \
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
 python -m supervisor.main start \

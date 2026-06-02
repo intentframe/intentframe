@@ -39,11 +39,13 @@ class DeterministicGuardian:
     def __init__(
         self,
         *,
-        packages: list[str] | None = None,
+        packages: list[str],
         verbose: bool = False,
     ) -> None:
         self.verbose = verbose
-        self.packages = packages or ["intentframe_native_kit.intentframe_native_bundles"]
+        if not packages:
+            raise ValueError("DeterministicGuardian requires at least one bundle package")
+        self.packages = packages
         ensure_loaded(self.packages)
 
     async def decide_async(

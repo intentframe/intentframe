@@ -273,12 +273,17 @@ second bundle needs multi-resource teardown.
 Typical wiring in `intentframe_server`:
 
 ```python
-DeterministicGuardian(packages=["intentframe_native_kit.intentframe_native_bundles"])
+core_config = load_core_config()  # INTENTFRAME_CORE_CONFIG -> core.yaml
+DeterministicGuardian(packages=core_config.bundles)
   → ensure_loaded(packages) on init
   → permission gate
   → DeterministicRunner.run_action_bundle(...)
   → BundleDeterministicResult → AE / Guardian / Executor
 ```
+
+Each bundle ref is either a short name advertised under the
+`intentframe.bundles` entry-point group or a dotted module path exposing
+`register_bundles(registry)`.
 
 `IntentFrameRuntime.startup()` / `aclose()` fan out to `startup_bundles()` /
 `shutdown_bundles()` and close the executor (`aclose` or `close`, awaited if async).

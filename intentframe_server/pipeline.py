@@ -125,9 +125,14 @@ class IntentFrameRuntime:
         )
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
-        self.deterministic_guardian = deterministic_guardian or DeterministicGuardian(
-            verbose=verbose,
-        )
+        if deterministic_guardian is None:
+            from intentframe_server.config import load_core_config
+
+            deterministic_guardian = DeterministicGuardian(
+                packages=load_core_config().bundles,
+                verbose=verbose,
+            )
+        self.deterministic_guardian = deterministic_guardian
         self.verbose = verbose
         self.audit_log: list = []
         self._request_counter = 0

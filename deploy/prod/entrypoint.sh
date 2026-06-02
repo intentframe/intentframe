@@ -10,7 +10,8 @@
 #
 # The supervisor inherits this process's environment, so OPENAI_API_KEY
 # (and anything else the services read) must be present here, as must
-# INTENTFRAME_SUPERVISOR_CONFIG when a non-default service graph is wanted.
+# INTENTFRAME_SUPERVISOR_CONFIG when a non-default service graph is wanted, and
+# INTENTFRAME_CORE_CONFIG so intentframe-core knows which action bundles to load.
 # Vault is the bootstrap dependency: first up, last down.
 #
 set -euo pipefail

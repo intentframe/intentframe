@@ -307,7 +307,7 @@ Boot: `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])` the
 | Orphan copies under `intentframe_native_kit.intentframe_native_bundles/{files,terminal,...}/` (top-level, not under `actions/`) | Not imported; safe to delete |
 | `onboarding/engine.py` imports native onboarding | ~~Optional decouple~~ — Done: `engine.py` now imports `build_onboarding_instructions` from `intentframe_components.onboarding.instructions`. Bundle SDK owns the middle section via `render_onboarding_bundle_context`; each bundle contributes via `onboarding_guardrails()`; cross-bundle copy lives in `intentframe_native_kit.intentframe_native_bundles/onboarding/manifest.py`. |
 | ~~`intentframe_server/enrichers/email.py` imports native enrich~~ | Done — bundle owns `EmailClient` lifecycle via `aclose()` |
-| `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Resolved: loader validates constraint shapes via `validate_policy_against_registry` after opaque `UserPolicy` construction. Registry HTTP writes remain unvalidated until bundle-runtime service lands (see `policy_registry/TODO/bundle_validator.md`). |
+| `policy_registry/seeds/loader.py` calls `ensure_loaded()` | Resolved: callers pass the deployment's bundle package list into `load_policy_seed(..., bundle_packages=...)`; the loader no longer names native-kit. Registry HTTP writes remain unvalidated until bundle-runtime service lands (see `policy_registry/TODO/bundle_validator.md`). |
 | `intentframe_components/TODO/*.md` | References pre-refactor paths (criticality, strategy.py) |
 | Commit `TODO/new_plan.md` | Plan doc still untracked in some snapshots |
 

@@ -25,6 +25,7 @@ from tests.deterministic_accuracy._helpers import (
     run_dg,
     run_dg_with_intel,
 )
+from tests._bundle_loader import make_deterministic_guardian
 
 LEGACY_COMMIT = "66e567c"
 
@@ -68,7 +69,7 @@ class GateCase:
 
 
 def _dg() -> DeterministicGuardian:
-    return DeterministicGuardian()
+    return make_deterministic_guardian()
 
 
 def _intent(action: ActionType, target: str = "", **data) -> IntentFrame:

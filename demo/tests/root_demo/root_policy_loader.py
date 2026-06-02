@@ -24,6 +24,7 @@ DEFAULT_ROOT_POLICY_PATH = (
 # ``demo/tests/stub_pipeline_agent.py::STUB_PIPELINE_AGENT_ID``;
 # ``tests/test_demo_loader_agent_id_in_sync.py`` pins them together.
 ROOT_DEMO_AGENT_ID = "stub_pipeline_agent"
+_BUNDLE_PACKAGES = ["intentframe_native_kit.intentframe_native_bundles"]
 
 
 def load_root_demo_policy(
@@ -37,4 +38,5 @@ def load_root_demo_policy(
         user_id=user_id,
         agent_id=agent_id,
         metadata={"profile": "root-demo-test"},
+        bundle_packages=_BUNDLE_PACKAGES,
     )

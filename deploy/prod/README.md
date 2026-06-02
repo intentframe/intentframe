@@ -35,6 +35,11 @@ first-party kit profiles (see [§4](#4-enable-workspaces-resource-registry)). Th
 **executor** and **credential-vault** are never exposed by the edge — they stay
 UDS-only inside the environment.
 
+`intentframe-core` is also config-driven: `INTENTFRAME_CORE_CONFIG` points at a
+`core.yaml` profile declaring the action bundles to load. The compose default is
+the first-party kit profile (`/app/intentframe_native_kit/core.yaml`); third
+parties ship their own profile just like they ship their own executor config.
+
 ## 1. Start the runtime + edge
 
 ```bash
@@ -42,6 +47,8 @@ export OPENAI_API_KEY=sk-...
 export VAULT_ADDR=https://vault.acme.com:8200
 export VAULT_ROLE_ID=...
 export VAULT_SECRET_ID=...
+# optional override; defaults to /app/intentframe_native_kit/core.yaml
+# export INTENTFRAME_CORE_CONFIG=/app/acme/core.yaml
 
 docker compose -f deploy/prod/docker-compose.yml up --build
 ```
@@ -134,10 +141,11 @@ curl -fsS http://localhost:8443/health
 # → {"status":"ok","backends":{"policy-registry":true,"resource-registry":true,"intentframe-core":true}}
 ```
 
-This is exactly how a third party would run the supervisor/edge for their own
-requirements: the substrate ships generic, and you point it at the service graph
-and route set you need. The executor still works without a registry by using the
-static `pack_options.files.mounts` table in its `EXECUTOR_CONFIG`.
+This is exactly how a third party runs IntentFrame for their own requirements:
+the substrate ships generic, and you point it at the service graph, core bundle
+profile, executor pack profile, and route set you need. The executor still works
+without a registry by using the static `pack_options.files.mounts` table in its
+`EXECUTOR_CONFIG`.
 
 ## Single-writer invariant
 

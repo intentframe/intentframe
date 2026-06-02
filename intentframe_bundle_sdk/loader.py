@@ -14,7 +14,8 @@ Conventions enforced here and in bundle hooks:
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from importlib.metadata import entry_points
+from typing import TYPE_CHECKING, Callable
 
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
@@ -29,13 +30,15 @@ if TYPE_CHECKING:
     from policy_registry.models import UserPolicy
 
 _LOADED_PACKAGES: frozenset[str] | None = None
+ENTRY_POINT_GROUP = "intentframe.bundles"
 
 
 def ensure_loaded(packages: list[str]) -> list[ActionBundle]:
     """Load plugin packages into the global SDK registry (idempotent).
 
-    For each package: ``importlib.import_module``; require ``register_bundles``;
-    call ``module.register_bundles(registry)`` with the SDK registry module.
+    For each package ref, first look for a distribution entry point under
+    ``intentframe.bundles`` with that name. If none exists, treat the ref as an
+    importable module path exposing ``register_bundles(registry)``.
 
     Raises:
         ImportError: Package missing or lacks ``register_bundles``.
@@ -58,21 +61,33 @@ def ensure_loaded(packages: list[str]) -> list[ActionBundle]:
     import intentframe_bundle_sdk.registry as registry
 
     for package in sorted(normalized):
-        try:
-            module = importlib.import_module(package)
-        except ImportError as exc:
-            raise ImportError(
-                f"failed to import bundle package {package!r}"
-            ) from exc
-        register = getattr(module, "register_bundles", None)
-        if register is None:
-            raise ImportError(
-                f"bundle package {package!r} has no register_bundles(registry) entry point"
-            )
+        register = _load_register_bundles(package)
         register(registry)
 
     _LOADED_PACKAGES = normalized
     return list(all_action_bundles())
+
+
+def _load_register_bundles(package: str) -> Callable:
+    """Resolve one bundle package ref to its register callable."""
+
+    by_name = {ep.name: ep for ep in entry_points(group=ENTRY_POINT_GROUP)}
+    if package in by_name:
+        return by_name[package].load()
+
+    try:
+        module = importlib.import_module(package)
+    except ImportError as exc:
+        raise ImportError(
+            f"failed to import bundle package {package!r}"
+        ) from exc
+    register = getattr(module, "register_bundles", None)
+    if register is None:
+        raise ImportError(
+            f"bundle package {package!r} has no register_bundles(registry) entry point "
+            f"and is not advertised under the {ENTRY_POINT_GROUP!r} entry-point group"
+        )
+    return register
 
 
 def validate_policy_against_registry(policy: UserPolicy) -> None:

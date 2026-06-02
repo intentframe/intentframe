@@ -60,6 +60,33 @@ def test_ensure_loaded_import_error_propagates(monkeypatch: pytest.MonkeyPatch) 
         ensure_loaded(["nonexistent.package.xyz"])
 
 
+def test_ensure_loaded_resolves_entry_point_short_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    import intentframe_bundle_sdk.loader as loader_mod
+
+    monkeypatch.setattr(loader_mod, "_LOADED_PACKAGES", None)
+    called = False
+
+    class FakeEntryPoint:
+        name = "fake"
+
+        def load(self):
+            def register(_registry):
+                nonlocal called
+                called = True
+
+            return register
+
+    monkeypatch.setattr(
+        loader_mod,
+        "entry_points",
+        lambda group: [FakeEntryPoint()] if group == loader_mod.ENTRY_POINT_GROUP else [],
+    )
+
+    ensure_loaded(["fake"])
+
+    assert called is True
+
+
 def test_validate_policy_rejects_bad_terminal_constraint_shape() -> None:
     ensure_test_bundles_loaded()
     policy = UserPolicy(

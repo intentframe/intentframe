@@ -53,6 +53,7 @@ from jarvis.policies import (
     JarvisVariant,
     builtin_policy_path,
 )
+from intentframe_server.config import CoreConfigurationError, load_core_config
 from policy_registry.seeds import (
     load_policy_seed,
     resolve_seed_path,
@@ -112,8 +113,22 @@ def _build_policy_payload(variant: JarvisVariant, user_id: str) -> dict:
         user_id=user_id,
         agent_id=agent_id,
         metadata={"note": "Auto-seeded by seed_policies.py"},
+        bundle_packages=_configured_bundle_packages(),
     )
     return policy.model_dump(mode="json", exclude={"created_at"})
+
+
+def _configured_bundle_packages() -> list[str] | None:
+    """Use the active core profile for seed validation when one is declared."""
+    if not (
+        os.environ.get("INTENTFRAME_CORE_CONFIG")
+        or os.environ.get("INTENTFRAME_BUNDLES")
+    ):
+        return None
+    try:
+        return load_core_config().bundles
+    except CoreConfigurationError as exc:
+        raise SystemExit(f"Invalid core bundle configuration: {exc}") from exc
 
 
 def _seed_workspace(socket_path: str, variant: JarvisVariant, user_id: str) -> None:

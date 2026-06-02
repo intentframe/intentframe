@@ -317,7 +317,10 @@ def test_deterministic_gate_blocks_over_limit_despite_poisoned_ae():
     print(f"{'═' * 70}{_RESET}")
 
 
-    guardian = DeterministicGuardian(verbose=True)
+    guardian = DeterministicGuardian(
+        packages=["intentframe_native_kit.intentframe_native_bundles"],
+        verbose=True,
+    )
     user_context = _make_user_context(max_amount=5000.0)
 
     poisoned = AnalysisReport(

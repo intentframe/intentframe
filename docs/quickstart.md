@@ -67,7 +67,9 @@ The demo runs an AI invoice-processing agent through a constrained IntentFrame s
 **Terminal 1 — start the supervisor with demo config:**
 
 ```bash
-EXECUTOR_CONFIG=demo/config/executor.yaml python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+EXECUTOR_CONFIG=demo/config/executor.yaml \
+python -m supervisor.main start
 ```
 
 **Terminal 2 — run the demo dashboard:**
@@ -90,6 +92,7 @@ The root demo exercises 100 adversarial attack intents through the IntentFrame p
 ```bash
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 python -m supervisor.main start
 ```
 

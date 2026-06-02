@@ -552,7 +552,9 @@ The demo uses its own isolated executor config.
 **Terminal 1 — start the supervisor with demo config:**
 
 ```bash
-EXECUTOR_CONFIG=demo/config/executor.yaml python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+EXECUTOR_CONFIG=demo/config/executor.yaml \
+python -m supervisor.main start
 ```
 
 **Terminal 2 — run the demo dashboard:**

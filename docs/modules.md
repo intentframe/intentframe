@@ -120,7 +120,7 @@ intentframe_actor         thin transport; no intentframe_native_kit.action_regis
 | **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `shared/<topic>/` (cross-family libraries — e.g. `shared/files/` for write-payload `FileIntel`, pre-pipeline, AE prompts used by `files` and `host_files`), `domains/<domain>/` (domain overlays), `platform/contacts_client.py` (contact-based recipient resolution at enforce time), `domain_routes.py` (routing manifest), `onboarding/<family>/onboarding_guardrails.py` (per-bundle onboarding copy), `onboarding/manifest.py` (cross-bundle `OnboardingManifest`), `register_bundles(registry)` entry point. |
 | **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Action bundles must not import sibling bundles (`actions/<A>` ↛ `actions/<B>`); shared code lives under `shared/<topic>/`, which must not import `actions/*` (enforced in `tests/test_boundary_imports.py`). Domain bundles do not import action bundles; routing is separate metadata. Onboarding copy is also bundle-owned: each bundle contributes via `onboarding_guardrails()`; cross-cutting rules go in the manifest. |
 | **Where** | `intentframe_native_kit/intentframe_native_bundles/` |
-| **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])`. |
+| **Process** | Loaded by `intentframe-core` from the active `INTENTFRAME_CORE_CONFIG` profile (`bundles:` list). |
 | **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | None — see `register_bundles` in `__init__.py`. |
 

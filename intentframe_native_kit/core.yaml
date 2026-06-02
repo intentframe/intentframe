@@ -1,0 +1,18 @@
+# First-party intentframe-core profile.
+#
+# Third-party deployments ship their own core.yaml and point
+# INTENTFRAME_CORE_CONFIG at it. The substrate has no native-kit fallback.
+
+bundles:
+  - intentframe_native_kit.intentframe_native_bundles
+
+executor:
+  mode: real
+  socket_path: ~/.intentframe/run/executor.sock
+  dry_run_context: null
+
+runtime:
+  verbose: true
+  skip_onboarding: false
+
+bundle_options: {}

@@ -103,6 +103,10 @@ services:
       # Override from your shell:
       #   export EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml
       EXECUTOR_CONFIG: "${EXECUTOR_CONFIG:-/app/demo/config/executor_hashicorp.yaml}"
+      # Core config — declares the action bundles intentframe-core loads.
+      # Override for third-party bundle sets:
+      #   export INTENTFRAME_CORE_CONFIG=/app/acme/core.yaml
+      INTENTFRAME_CORE_CONFIG: "${INTENTFRAME_CORE_CONFIG:-/app/intentframe_native_kit/core.yaml}"
       # Executor mode:
       #   real     — starts the executor service (default; for dashboard / pipeline tests)
       #   dry_run  — skips the executor service; use for root-demo sweeps on this Linux container

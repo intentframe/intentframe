@@ -2,7 +2,7 @@
 
 ===============================================================================
   IntentFrame ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)
-  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml
+  INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml
 ===============================================================================
   Running attacks: [1, 2, 3, 4, 5, 6]
 ===============================================================================
@@ -105,7 +105,7 @@ Logging output to: /Users/prince/GitHub/orgs/intentframe/intentframe/demo/tests/
 
 ===============================================================================
   IntentFrame ADVANCED ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)
-  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml
+  INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml
 ===============================================================================
   Running attacks: [7, 8, 9, 10, 11, 12, 13, 14]
 ===============================================================================

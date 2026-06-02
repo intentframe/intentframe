@@ -36,6 +36,7 @@ _DEFAULT_POLICY_PATH = (
 # ``demo/tests/stub_pipeline_agent.py::STUB_PIPELINE_AGENT_ID``;
 # ``tests/test_demo_loader_agent_id_in_sync.py`` pins them together.
 _STUB_PIPELINE_AGENT_ID = "stub_pipeline_agent"
+_BUNDLE_PACKAGES = ["intentframe_native_kit.intentframe_native_bundles"]
 
 
 def load_test_policy(
@@ -63,6 +64,7 @@ def load_test_policy(
         user_id=user_id,
         agent_id=agent_id,
         metadata=metadata,
+        bundle_packages=_BUNDLE_PACKAGES,
     )
 
 

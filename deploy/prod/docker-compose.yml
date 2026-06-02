@@ -36,6 +36,8 @@ services:
       VAULT_ADDR: "${VAULT_ADDR:?set VAULT_ADDR}"
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:?set VAULT_ROLE_ID}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:?set VAULT_SECRET_ID}"
+      # core profile — declares the action bundles intentframe-core loads
+      INTENTFRAME_CORE_CONFIG: "${INTENTFRAME_CORE_CONFIG:-/app/intentframe_native_kit/core.yaml}"
       # real executor (set to dry_run to exercise the pipeline only)
       INTENTFRAME_EXECUTOR_MODE: "${INTENTFRAME_EXECUTOR_MODE:-real}"
       # Supervisor service-graph profile. Empty = minimal default (no

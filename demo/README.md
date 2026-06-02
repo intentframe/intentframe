@@ -31,6 +31,7 @@ invoice_bot → Actor SDK → Analysis Engine → Guardian → Executor → real
 **Terminal 1 — start the supervisor with demo config (from repo root):**
 
 ```bash
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=demo/config/executor.yaml \
 python -m supervisor.main start \
   --config intentframe_native_kit/supervisor_profile.yaml
@@ -68,6 +69,7 @@ Quick start (from **repo root**, with the attack supervisor running):
 
 ```bash
 # Start the supervisor with the attack executor profile + kit profile (workspaces)
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
 python -m supervisor.main start \
   --config intentframe_native_kit/supervisor_profile.yaml

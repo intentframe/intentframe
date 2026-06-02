@@ -41,6 +41,7 @@ from intentframe_core.types import IntentFrame, UserContext
 from tests.deterministic_accuracy._helpers import decide_dg_sync, run_dg_with_intel
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
+from tests._bundle_loader import make_deterministic_guardian
 
 
 # ───────────────────────────── helpers ─────────────────────────────
@@ -91,7 +92,7 @@ def _intel(
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestPermissionGate:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_action_not_in_allowed_actions_blocks(self):
         result = decide_dg_sync(self.dg,
@@ -117,7 +118,7 @@ class TestPermissionGate:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestConstraintGate:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_deny_capability_blocks_before_ae(self):
         """deny_capabilities is enforced by TerminalChecker via
@@ -163,7 +164,7 @@ class TestConstraintGate:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestPassiveReadFastPath:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_passive_read_safe_allows(self):
         result = decide_dg_sync(self.dg,
@@ -201,7 +202,7 @@ class TestPassiveReadFastPath:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestReadOnlyFastPath:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     perm = ActionPermission(safe=False)
 
@@ -315,7 +316,7 @@ class TestReadOnlyFastPath:
 # pays the LLM round-trip unless the destination trips the block above.
 
 class TestWriteFileSensitivePathBlock:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     perm_safe = ActionPermission(safe=True)
 
@@ -406,7 +407,7 @@ class TestWriteFileSensitivePathBlock:
 # whitelist.
 
 class TestHostFileFloorBlock:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def _run(self, action: ActionType, target: str):
         # ``path`` in data is the executable contract; target is display-only.
@@ -512,7 +513,7 @@ class TestHostFileFloorBlock:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestUndecidedDefault:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_send_email_with_constraints_falls_through(self):
         from intentframe_native_kit.intentframe_native_bundles.actions.email.constraints import EmailConstraints
@@ -550,7 +551,7 @@ class TestFailClosedExceptionHandling:
         matched_gate=hook_crash and dg_exception set — not fall through
         to the AI path.
         """
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
 
         from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
         from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints

@@ -172,7 +172,7 @@ This is the process the entire IntentFrame security model rests on. See [executo
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/intentframe.sock` |
 | **Source** | `intentframe_server/server.py`, `intentframe_server/pipeline.py`, `intentframe_components/{analysis,guardian,prompt}/...` |
-| **Job** | The validation pipeline. Receives `IntentFrame` requests from agents (via the Actor SDK), runs Command Shield → Deterministic Guardian → Analysis Engine → AI Guardian, and on ALLOW forwards the validated intent to the executor over its UDS. |
+| **Job** | The validation pipeline. Receives `IntentFrame` requests from agents (via the Actor SDK), loads action bundles from `INTENTFRAME_CORE_CONFIG`, runs Command Shield → Deterministic Guardian → Analysis Engine → AI Guardian, and on ALLOW forwards the validated intent to the executor over its UDS. |
 | **Storage** | None directly (reads policies via policy-registry socket) |
 | **OpenAI calls** | **Yes** — the Analysis Engine (`intentframe_components/analysis/engine.py`) and AI Guardian (`intentframe_components/guardian/engine.py`) both call OpenAI. AE uses `gpt-4o-mini` at temperature 0; Guardian uses a reasoning model. |
 | **Outbound network** | **Only OpenAI API**, only on the UNDECIDED path (deterministic gates handle most traffic without an LLM) |
@@ -181,6 +181,10 @@ This is the process the entire IntentFrame security model rests on. See [executo
 | **Depends on** | policy-registry, executor (+ resource-registry when the kit profile is active) |
 
 This is where Guardian and the Analysis Engine actually *run*. When you read "the Guardian decides," the decision is happening in this process. It's also the only IntentFrame-internal process that talks to OpenAI.
+Like the executor, this process is a plugin host: `core.yaml` declares `bundles:`
+(action/domain bundles), while `executor.yaml` declares `packs:` (transport,
+auth, storage, adapters). The supervisor forwards the selected config paths; it
+does not know what bundles or packs mean.
 
 ### 10. `jarvis` — the agent application (optional)
 
@@ -363,7 +367,7 @@ The process model above is the macOS / Jarvis deployment. Other deployments adju
 | **Linux core** | No platform-server (Swift binary is macOS-only); native adapters become "unavailable"; everything else identical |
 | **Cloud (planned)** | Transport changes from UDS to gRPC; platform-server replaced by cloud-equivalent adapters; credential vault may delegate to KMS / Vault |
 
-The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile.
+The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile. `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
 
 ---
 

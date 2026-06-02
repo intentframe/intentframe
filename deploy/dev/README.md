@@ -109,6 +109,8 @@ Confirm the key really came from Vault — the runtime logs show:
 The registry/runtime clients accept a `base_url` and also read it from the
 environment, so existing harnesses run unmodified — just point them at the edge.
 The executor config to use depends on which test suite you're running:
+The core config declares which action bundles `intentframe-core` loads; the
+compose default is `/app/intentframe_native_kit/core.yaml`.
 
 ### 2a. Dashboard + basic pipeline tests
 
@@ -291,6 +293,7 @@ is fixed at **`docker compose up`** time — change it, then recreate the stack.
 |---|---|---|
 | Run a different test against same stack (same `EXECUTOR_CONFIG`, `real` mode) | No | Export `INTENTFRAME_*_URL` on Mac only |
 | Dashboard ↔ invoice attacks (`EXECUTOR_CONFIG`) | **Yes** | `down`, set `EXECUTOR_CONFIG`, `up --build` |
+| Core action bundle set (`INTENTFRAME_CORE_CONFIG`) | **Yes** | `down`, set profile path, `up --build` |
 | Enable/disable workspaces (`INTENTFRAME_SUPERVISOR_CONFIG` + `INTENTFRAME_EDGE_CONFIG`) | **Yes** | `down`, export/unset both kit profiles, `up` |
 | Real executor ↔ root dry-run (`INTENTFRAME_EXECUTOR_MODE`) | **Yes** | `down`, set `dry_run` + `INTENTFRAME_DRY_RUN_CONTEXT=root`, `up` |
 | Code changes after git push (stale cached `git clone` layer) | **Yes** | See [Clean slate](#clean-slate-remove-everything) |
@@ -647,6 +650,7 @@ Only use when you intentionally want to wipe Docker state machine-wide.
 | `seed_vault.py` | store `OPENAI_API_KEY` in Vault as `runtime_env` |
 | `inject_and_exec.py` | fetch `runtime_env` from Vault, `exec` the supervisor |
 | `docker-compose.dev.yml` | runtime + edge, wired to host Vault |
+| `../../intentframe_native_kit/core.yaml` | kit core profile (loads first-party action bundles) — selected by `INTENTFRAME_CORE_CONFIG` |
 | `../../demo/config/executor_hashicorp.yaml` | default executor config (dashboard + basic pipeline tests) |
 | `../../demo/config/executor_attacks_hashicorp.yaml` | executor config for invoice attack suites |
 | `../../intentframe_native_kit/supervisor_profile.yaml` | kit supervisor profile (adds `resource-registry`) — export as `INTENTFRAME_SUPERVISOR_CONFIG` |

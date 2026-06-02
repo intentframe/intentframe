@@ -95,7 +95,10 @@ def run_dg(
 ) -> tuple[DeterministicResult, ShieldView]:
     """Drive full DG lifecycle for RUN_COMMAND with real command_shield."""
     view = build_shield_view(command)
-    dg = dg or DeterministicGuardian()
+    if dg is None:
+        from tests._bundle_loader import make_deterministic_guardian
+
+        dg = make_deterministic_guardian()
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target=command,
@@ -122,7 +125,10 @@ def run_dg_with_intel(
         ctx.evidence[COMMAND_INTEL_KEY] = command_intel
         return BundlePhaseOutcome.continue_(ctx)
 
-    dg = dg or DeterministicGuardian()
+    if dg is None:
+        from tests._bundle_loader import make_deterministic_guardian
+
+        dg = make_deterministic_guardian()
     with patch.object(TerminalActionBundle, "prepare_evidence", seed_prepare):
         result, _ = run_dg(command, user_context, dg)
     return result

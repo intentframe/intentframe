@@ -66,12 +66,15 @@ console = "intentframe_native_kit.intentframe_executor_pack_console:register_all
 posix = "intentframe_native_kit.intentframe_executor_pack_posix:register_all"
 macos = "intentframe_native_kit.intentframe_executor_pack_macos:register_all"
 
+[project.entry-points."intentframe.bundles"]
+native = "intentframe_native_kit.intentframe_native_bundles:register_bundles"
+
 [tool.setuptools.package-data]
 # Ship the supervisor's default service graph and the kit's first-party
 # profile so `--config` resolution works from an installed wheel, not just a
 # repo checkout.
 supervisor = ["config/*.yaml"]
-intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml"]
+intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml", "core.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["."]
