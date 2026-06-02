@@ -119,10 +119,10 @@ What you implement against when writing bundles, packs, or agents.
 | Module | Role | Process |
 |--------|------|---------|
 | [`intentframe_bundle_sdk/`](../intentframe_bundle_sdk/) | Action/domain bundle contract: hooks, `DeterministicRunner`, loader, registry. Re-exports wire types (`IntentFrame`, `DomainSchema`, `normalize_virtual_path`, …) so plugins need not import `intentframe_core`. | Library |
-| [`executor_sdk/`](../executor_sdk/) | Executor pack contract: `register_all()`, adapter/transport/auth/storage registries. Also provides the executor-facing credential vault facade backed by `intentframe_credentials`. | Library |
+| [`executor_sdk/`](../executor_sdk/) | Executor pack contract: ABCs + `register_*` registries for adapters and (optionally) platform backends; wire models; credential vault facade. **`executor/` is also a consumer** — factories and gateway helpers live in the SDK today. See [executor_sdk/README.md](../executor_sdk/README.md). | Library |
 | [`intentframe_actor/`](../intentframe_actor/) | Agent SDK — `Actor` submits intents to the pipeline over UDS/HTTP. | Runs in agent process |
 
-Docs: [`intentframe_bundle_sdk/README.md`](../intentframe_bundle_sdk/README.md), [plugin-profiles.md](plugin-profiles.md), [actor-sdk.md](actor-sdk.md).
+Docs: [`intentframe_bundle_sdk/README.md`](../intentframe_bundle_sdk/README.md), [`executor_sdk/README.md`](../executor_sdk/README.md), [plugin-profiles.md](plugin-profiles.md), [actor-sdk.md](actor-sdk.md).
 
 ### 2. Internal shared libraries (substrate + SDK deps)
 
@@ -226,13 +226,23 @@ Direction matters: **substrate must not look down into plugins**; **plugins impo
 # Bundle / domain plugin
 from intentframe_bundle_sdk import ActionBundle, IntentFrame, DomainSchema
 
-# Executor pack
+# Executor pack — adapter author (typical third-party)
+from executor_sdk.adapters.base import CapabilityAdapter
 from executor_sdk.adapters import register_adapter
+from executor_sdk.models import AdapterManifest, ExecutionResult
+
+# Executor pack — platform base (transport/auth/storage; e.g. posix pack)
+from executor_sdk.transport import register_transport
+from executor_sdk.auth import register_auth_verifier
+from executor_sdk.services.audit_logger import register_audit_logger
+from executor_sdk.services.state_store import register_state_store
 from executor_sdk import owner_home
 
 # Agent
 from intentframe_actor import Actor
 ```
+
+Packs must **not** import `executor/` or `intentframe_core`. Platform packs call `register_*`; the host calls `create_*` at startup.
 
 ---
 
@@ -254,6 +264,32 @@ agent tools (Jarvis, …)       may import action_registry; Actor SDK does not r
 ```
 
 Substrate (`intentframe_server`, `intentframe_components`) orchestrates the pipeline and consumes `BundleAIContext` from the SDK runner — it does not dispatch into per-family checkers or import bundle modules.
+
+### Executor: host, SDK, and packs
+
+The executor has **no built-in packs**. `executor.yaml` must list at least one pack (typically `intentframe_executor_pack_posix` for transport/auth/storage, plus adapter packs). Empty `packs:` fails closed at startup.
+
+Three roles — do not collapse them:
+
+| Role | Implements | Typical importer |
+|------|------------|------------------|
+| **Adapter author** | `CapabilityAdapter` + `register_adapter` | Third-party capability packs |
+| **Platform author** | `TransportServer`, `AuthVerifier`, `AuditLogger`, `StateStore`, … + matching `register_*` | Base pack (posix) or custom deployment |
+| **Executor host** | Gateway, dispatch, worker pool, `create_*` wiring | `executor/` only |
+
+```
+executor/                     host: gateway, load packs, create_* from registries
+       ▲
+       │  imports contracts + factories
+executor_sdk/                 ABCs, wire models, register_* + create_* (today)
+       ▲
+       │  register_all() at startup
+intentframe_executor_pack_*   adapters (+ optional platform backends)
+```
+
+**Trust model (today):** packs run in-process with full Python access. `register_*` is a wiring contract, not a sandbox. Org-trusted / first-party packs are the expected case; see [`TODO/executor_sdk_layering.md`](../TODO/executor_sdk_layering.md) for a future split (neutral contracts package + trimmed author SDK + host-owned registries).
+
+**Minimum runnable stack:** posix platform pack + at least one adapter in `adapters.enabled`. Packs loaded with zero adapters boot but reject every action.
 
 ---
 
@@ -280,10 +316,17 @@ Substrate (`intentframe_server`, `intentframe_components`) orchestrates the pipe
 
 | | |
 |---|---|
-| **What** | Pack registration contract; adapter, transport, auth, storage abstractions; executor-facing credential vault facade. |
-| **Credential coupling** | `executor_sdk.services.credential_vault` imports `intentframe_credentials` backend modules and re-exports `CredentialVault`, `ServiceVault`, `KeyringVault`, `HashiCorpVault`, `EnvVault`, and `register_credential_vault`. |
-| **Who imports** | `executor/`, native executor packs, third-party packs. Packs should use this SDK facade instead of importing `intentframe_credentials` directly. |
+| **What** | Shared contract layer for the executor **host** and **packs**: wire models, ABCs, plugin registries (`register_*` / `create_*`), and the credential vault facade. Not the orchestration brain — that stays in `executor/gateway.py`. |
+| **Nature** | Monolithic today: adapter contract, platform backend contract, and host startup helpers coexist in one package. That is acceptable while packs are org-trusted; most third-party work is **adapters only**, with posix supplying platform backends. |
+| **Adapter author surface** | `CapabilityAdapter`, `register_adapter`, `AdapterManifest`, `ExecutionResult`; optional VFS helpers (`MountPointConfig`, `expand_path`) for file adapters. Adapters receive `(action, params, credentials)` — not `ExecutionRequest`. |
+| **Platform author surface** | `TransportServer`, `AuthVerifier`, `AuditLogger`, `StateStore`, `VirtualFileSystem`, `CredentialVault` + matching `register_*`. Wire types: `ExecutionRequest`, `AuthorizationProof`, `AuditEntry`, … |
+| **Host-only today (also in SDK)** | `create_*` factories, `CredentialScrubber`, `HashChain`, dispatch/gateway exceptions, config defaults. Consumed by `executor/`; pack authors should not need these for normal adapter work. |
+| **Pack contract** | Module-level `register_all()` (idempotent; no registration on import). Discovery: `executor_sdk.packs.ENTRY_POINT_GROUP` → `"intentframe.executor_packs"`. |
+| **Credential coupling** | `executor_sdk.services.credential_vault` imports `intentframe_credentials` backends and re-exports `CredentialVault`, `ServiceVault`, `KeyringVault`, `HashiCorpVault`, `EnvVault`, `register_credential_vault`, `create_credential_vault`. Backends self-register on import; normal runtime selects `service` via `executor.yaml`. |
+| **Who imports** | `executor/` (host), native executor packs, third-party packs. Packs use this facade instead of `intentframe_credentials` or `executor/` directly. Re-exports `owner_home` from `intentframe_core.identity`. |
 | **Process** | None (library). |
+| **README** | [`executor_sdk/README.md`](../executor_sdk/README.md) |
+| **Future** | [`TODO/executor_sdk_layering.md`](../TODO/executor_sdk_layering.md) — split neutral wire types, trimmed author SDK, host-owned registries/factories. |
 
 ### `intentframe_prompt_library/`
 
@@ -408,7 +451,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 |--------|---------------|----------------------|-------|
 | `intentframe_core` | — | [architecture.md](architecture.md) | Internal; plugins use SDK re-exports |
 | `intentframe_bundle_sdk` | ✅ | [plugin-profiles.md](plugin-profiles.md) | Plugin author surface |
-| `executor_sdk` | — | [plugin-profiles.md](plugin-profiles.md), [executor.md](executor.md), [credential-vault-faq.md](credential-vault-faq.md) | Pack author surface + executor credential facade |
+| `executor_sdk` | ✅ | [plugin-profiles.md](plugin-profiles.md), [executor.md](executor.md), [credential-vault-faq.md](credential-vault-faq.md) | Adapter + platform pack contract; host also imports factories today |
 | `intentframe_prompt_library` | — | [architecture.md](architecture.md) | |
 | `policy_registry` | — | [registries.md](registries.md) | |
 | `intentframe_server` / `intentframe_components` | — | [architecture.md](architecture.md), [processes.md](processes.md) | = `intentframe-core` service |
@@ -442,4 +485,6 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 - [credentials-vault.md](credentials-vault.md) — Vault service lifecycle and delivery modes
 - [credential-vault-faq.md](credential-vault-faq.md) — Executor `CredentialVault`, backend registry, `service` backend, and `IF_VAULT_BACKEND`
 - [intentframe_native_kit/README.md](../intentframe_native_kit/README.md) — Kit layout and import rules
+- [executor_sdk/README.md](../executor_sdk/README.md) — Executor pack roles, registration, import surface
+- [TODO/executor_sdk_layering.md](../TODO/executor_sdk_layering.md) — Accepted monolith today; future contracts / host split
 - [intentframe_bundle_sdk/README.md](../intentframe_bundle_sdk/README.md) — Bundle contract and plugin import surface
