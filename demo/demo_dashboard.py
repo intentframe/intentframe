@@ -1,8 +1,11 @@
 """
 Invoice processing demo via IntentFrame Dashboard.
 
-Prerequisites:
-    EXECUTOR_CONFIG=demo/config/executor.yaml python -m supervisor.main start
+Prerequisites (the kit profile starts resource-registry, which the dashboard
+needs to register its workspace; it is not in the supervisor's minimal default):
+    EXECUTOR_CONFIG=demo/config/executor.yaml \
+    python -m supervisor.main start \
+      --config intentframe_native_kit/supervisor_profile.yaml
 
 Usage:
     python demo/demo_dashboard.py

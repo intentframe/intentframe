@@ -74,19 +74,27 @@ intent_limits:
 
 ### Prerequisites
 
-Each suite expects a specific supervisor executor config. Start the supervisor **from repo root** with the matching config before running the suite:
+Each suite expects a specific supervisor executor config. Start the supervisor **from repo root** with the matching config before running the suite. All harnesses that register or resolve workspaces need the **kit supervisor profile** (`resource-registry` is not in the packaged default graph).
+
+`INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` select the action-bundle and executor-pack profiles for that run. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
 | Test file(s) | Required supervisor command |
 |---|---|
-| `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start` |
-| `root_demo/test_normal.py` and other `root_demo/*` suites | `INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root python -m supervisor.main start` for safe dry-run; `intentframe-gateway-cli --profile root` only for real root-capable executor validation — see [`root_demo/README.md`](root_demo/README.md) |
+| `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml` |
+| `root_demo/test_normal.py` and other `root_demo/*` suites | `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml` for safe dry-run; `intentframe-gateway-cli --profile root` only for real root-capable executor validation (gateway passes the kit profile automatically) — see [`root_demo/README.md`](root_demo/README.md) |
 
 ```bash
 # For the 24 attack suites:
-EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
+python -m supervisor.main start \
+  --config intentframe_native_kit/supervisor_profile.yaml
 
 # For the root-demo suite, safe default (no host command execution):
-INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root \
+python -m supervisor.main start \
+  --config intentframe_native_kit/supervisor_profile.yaml
 
 # For real root-demo executor validation only
 # (after one-time `sudo bash intentframe_setup_root_demo.sh`):
@@ -314,10 +322,19 @@ Attack intent files live in `demo/demo_data/attack_intents/` (1-14) and `demo/de
 ## Running against the dev container (HTTP)
 
 The invoice attack suites (`test_attacks.py`, `test_advanced_attacks.py`,
-`test_redteam_attacks.py`) can validate **defense** (audit `BLOCK` /
-`blocked_count`) against the Linux container in `deploy/dev/` without code
-changes — set `INTENTFRAME_*_URL=http://localhost:8443` on your Mac and run the
-harness as usual.
+`test_redteam_attacks.py`) and root-demo dry-run sweeps can run against the
+Linux stack in `deploy/dev/` without code changes. Before `docker compose up`,
+export the kit profiles so the runtime starts `resource-registry` and the edge
+exposes `/workspaces` (the compose default is the minimal graph without them):
+
+```bash
+export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+```
+
+On your Mac, set `INTENTFRAME_*_URL=http://localhost:8443` and run the harness as
+usual. Invoice suites can validate **defense** (audit `BLOCK` / `blocked_count`)
+without shared filesystem mounts.
 
 - **`populate_attack_sandbox()`** — only used by `test_attacks.py` and
   `test_advanced_attacks.py`; most attacks ignore it because fixtures submit

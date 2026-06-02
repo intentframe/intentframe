@@ -21,8 +21,10 @@ Test infrastructure:
 - invoice_attack_pipeline: Orchestration (policy, workspace, sandbox setup)
 - policy_loader:           Loads shared test_policy.yaml into UserPolicy
 
-Run from repo root:
-  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+Run from repo root (--config starts resource-registry for the attack workspace):
+  EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
+    python -m supervisor.main start \
+      --config intentframe_native_kit/supervisor_profile.yaml
   python demo/tests/test_attacks.py
   python demo/tests/test_redteam_attacks.py 15 17
 """

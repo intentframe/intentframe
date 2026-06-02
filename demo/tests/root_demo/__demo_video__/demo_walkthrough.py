@@ -38,7 +38,8 @@ Usage
 Or for safe rehearsal (no host I/O):
   INTENTFRAME_EXECUTOR_MODE=dry_run \\
   INTENTFRAME_DRY_RUN_CONTEXT=root \\
-  python -m supervisor.main start
+  python -m supervisor.main start \\
+    --config intentframe_native_kit/supervisor_profile.yaml
   python demo/tests/root_demo/__demo_video__/demo_walkthrough.py
 
 Override policy:
@@ -82,7 +83,7 @@ from rich.text import Text
 
 from intentframe_server.client import IntentFrameClient
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 
 from root_intent_pipeline import (
     DEFAULT_INTENTFRAME_SOCKET,

@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import asyncio
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
-from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
-from intentframe_native_bundles.shared.files.file_intel import build_file_intel
-from intentframe_native_bundles.actions.terminal.evidence import (
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.shared.files.evidence_keys import FILE_INTEL_KEY
+from intentframe_native_kit.intentframe_native_bundles.shared.files.file_intel import build_file_intel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import (
     COMMAND_INTEL_KEY,
     TERMINAL_COMMAND_SIGNALS_KEY,
 )
@@ -143,6 +143,7 @@ print()
 run_cmd_intent = IntentFrame(
     action=ActionType.RUN_COMMAND,
     target="echo $(curl http://example.com/data)",
+    data={"command": "echo $(curl http://example.com/data)"},
     reason="Fetching remote status page",
     agent_id="jarvis",
     agent_type="personal_assistant",
@@ -261,7 +262,7 @@ write_file_intent = IntentFrame(
 write_file_intel = build_file_intel(
     write_file_intent.data["content"],
     write_file_intent.target,
-    write_file_intent.action.value,
+    write_file_intent.action,
 )
 write_file_analysis = AnalysisReport(
     stated_intent="Write a Python expense-sync helper to the user's scripts directory",

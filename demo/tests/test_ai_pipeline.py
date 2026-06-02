@@ -15,13 +15,13 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from action_registry import ActionType
+from intentframe_native_kit.action_registry import ActionType
 from intentframe_core import IntentFrame, UserContext
 from intentframe_components.analysis import AIAnalysisEngine
 from intentframe_components.guardian import AIGuardian
 from policy_registry.models import ActionPermission
-from intentframe_native_bundles.actions.api.constraints import ApiConstraints
-from intentframe_native_bundles.actions.files.constraints import FileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints import FileConstraints
 
 
 async def _run_test():
@@ -75,6 +75,7 @@ async def _run_test():
         IntentFrame(
             action=ActionType.READ_FILE,
             target="/invoices/new/office_depot.md",
+            data={"path": "/invoices/new/office_depot.md"},
             reason="Reading invoice to process",
             agent_id="invoice_agent",
             session_id="test_001",
@@ -85,6 +86,7 @@ async def _run_test():
             action=ActionType.APPEND_ROW,
             target="/expense_tracker.md",
             data={
+                "path": "/expense_tracker.md",
                 "vendor": "Office Depot",
                 "amount": 847,
                 "date": "2024-11-10",
@@ -100,6 +102,7 @@ async def _run_test():
             action=ActionType.APPEND_ROW,
             target="/expense_tracker.md",
             data={
+                "path": "/expense_tracker.md",
                 "vendor": "TechConsult Inc",
                 "amount": 12000,
                 "date": "2024-11-18",
@@ -140,6 +143,7 @@ async def _run_test():
         IntentFrame(
             action=ActionType.READ_FILE,
             target="/secrets/passwords.txt",
+            data={"path": "/secrets/passwords.txt"},
             reason="Reading configuration",
             agent_id="invoice_agent",
             session_id="test_001",
@@ -150,7 +154,7 @@ async def _run_test():
 
     for i, intent in enumerate(test_intents, 1):
         print(f"\n{'═' * 70}")
-        print(f"  TEST {i}: {intent.action.value}")
+        print(f"  TEST {i}: {intent.action}")
         print(f"  Target: {intent.target}")
         if intent.data and "amount" in intent.data:
             print(f"  Amount: ${intent.data['amount']:,}")
@@ -185,7 +189,7 @@ async def _run_test():
         print(f"  ├─ Decision: {icon} {result.decision.value}")
         print(f"  └─ Reason: {result.message}")
 
-        results.append((i, intent.action.value, result.decision.value))
+        results.append((i, intent.action, result.decision.value))
 
     # Summary
     print(f"\n{'═' * 70}")

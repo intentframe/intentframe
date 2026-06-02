@@ -27,13 +27,13 @@ import asyncio
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from command_shield import inspect_command
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY, CommandIntel
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseDecision
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
 _TERMINAL_BUNDLE = TerminalActionBundle()
 

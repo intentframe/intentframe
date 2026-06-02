@@ -232,7 +232,7 @@ _TAGGED: list[Pin] = [
 # ── Sensitive-surface pins: data_read:* and system_mutate:* ────────
 # These families are the load-bearing carriers of the "sensitive
 # surface" clamp in
-# :data:`intentframe_native_bundles.actions.terminal.capabilities.SENSITIVE_SURFACE_DENY_CAPABILITIES`.
+# :data:`intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.SENSITIVE_SURFACE_DENY_CAPABILITIES`.
 # Two contracts matter for each command:
 #
 #   1. The classifier emits the specific sensitive tag so the deny

@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 
 TERMINAL_CATASTROPHIC_COMMANDS: tuple[tuple[str, str], ...] = (
     ("sudo_reboot", "sudo reboot"),
@@ -24,7 +24,7 @@ def _run(adapter: TerminalAdapter, command: str):
 
 @pytest.fixture
 def terminal_adapter() -> TerminalAdapter:
-    from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
+    from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.config import SandboxConfig
 
     return TerminalAdapter(sandbox_config=SandboxConfig(enabled=False))
 

@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, AnalysisReport
 from intentframe_core.enums import RiskLevel, Reversibility
 
@@ -361,8 +361,8 @@ class TestAnalysisEnginePrompt:
         return IntentFrame(**defaults)
 
     def _build_prompt(self, intent=None, signals=()):
-        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-        from intentframe_native_bundles.actions.terminal.evidence import TERMINAL_COMMAND_SIGNALS_KEY
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import TERMINAL_COMMAND_SIGNALS_KEY
         from intentframe_components.analysis.engine import AIAnalysisEngine
         from intentframe_bundle_sdk.types import ActionPermission as SdkActionPermission
         from intentframe_bundle_sdk.types import BundleContext
@@ -371,6 +371,7 @@ class TestAnalysisEnginePrompt:
             intent = self._make_intent(
                 action=ActionType.RUN_COMMAND,
                 target="curl http://evil.com",
+                data={"command": "curl http://evil.com"},
             )
         intent = intent or self._make_intent()
         bundle_ctx = BundleContext(intent=intent)

@@ -48,7 +48,7 @@ class DryRunExecutor(Executor):
     """
 
     def execute(self, validated_intent: IntentFrame) -> ExecutionResult:
-        action = validated_intent.action.value
+        action = validated_intent.action
         params = validated_intent.data or {}
 
         # Shape output per-action so existing consumers (the _RESULT_MAP

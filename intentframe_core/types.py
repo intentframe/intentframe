@@ -1,8 +1,14 @@
 """
-Data Structures for IntentFrame System
+Data structures for the IntentFrame pipeline.
 
-All models used to pass information between layers.
-Pydantic BaseModel for automatic JSON serialization over HTTP.
+All models used to pass information between layers. Pydantic ``BaseModel``
+for automatic JSON serialization over HTTP.
+
+Key contract — :class:`IntentFrame`:
+    ``action`` is an opaque string (e.g. ``"READ_FILE"``), not a registry
+    enum. Core does not validate action names or domain payload shape; agent
+    authors may use ``intentframe_native_kit.action_registry`` for that locally. The substrate
+    validates authoritatively via bundles and executor dispatch.
 """
 
 from dataclasses import dataclass
@@ -10,7 +16,6 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from action_registry import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
 from policy_registry.models import ActionPermission, SemanticIntentLimit
 
@@ -39,8 +44,13 @@ class IntentFrame(BaseModel):
 
     Created by Actor from unstructured agent request.
     This is the structured, signed representation of intent.
+
+    ``action`` is an opaque string identifier (e.g. ``"READ_FILE"``). Core does
+    not validate it against any taxonomy — that is the agent author's job (they
+    may use ``intentframe_native_kit.action_registry`` for convenience). Unknown actions fail closed at
+    executor dispatch.
     """
-    action: ActionType
+    action: str
     target: str
     data: Optional[Dict[str, Any]] = None
     reason: str = ""
@@ -108,8 +118,12 @@ class ValidationResult(BaseModel):
     Guardian's decision after validating an IntentFrame.
 
     Decisions:
-        ALLOW  - Action is authorized, execute as-is (or with modified_intent).
+        ALLOW  - Action is authorized.
         BLOCK  - Hard policy violation, action rejected.
+
+    Execution contract: ``IntentFrameRuntime`` always passes the actor-submitted
+    frame to ``executor.execute()``. ``modified_intent`` is reserved but unused;
+    Guardian validates, it does not rewrite adapter params.
 
     decision_path identifies which internal path produced this result.
     Used for audit logging and metrics; never affects behavior.
@@ -124,7 +138,7 @@ class ValidationResult(BaseModel):
     message: str = ""
     decision_path: Literal["fast_path", "ai_path", "deterministic"] = "ai_path"
 
-    modified_intent: Optional[IntentFrame] = None
+    modified_intent: Optional[IntentFrame] = None  # unused; runtime executes submitted intent only
     prompt_evidence: Optional[PromptEvidence] = None
 
 

@@ -14,7 +14,7 @@ from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     register_action_bundle,
 )
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
 from policy_registry.models import ActionPermission, UserPolicy
 from tests._bundle_loader import DEFAULT_TEST_PACKAGES, ensure_test_bundles_loaded
 
@@ -32,7 +32,7 @@ def test_ensure_loaded_rejects_conflicting_package_set(
 ) -> None:
     import intentframe_bundle_sdk.loader as loader_mod
 
-    monkeypatch.setattr(loader_mod, "_LOADED_PACKAGES", frozenset({"intentframe_native_bundles"}))
+    monkeypatch.setattr(loader_mod, "_LOADED_PACKAGES", frozenset({"intentframe_native_kit.intentframe_native_bundles"}))
     with pytest.raises(RuntimeError, match="already loaded"):
         ensure_loaded(["some.other.package"])
 
@@ -58,6 +58,33 @@ def test_ensure_loaded_import_error_propagates(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(importlib, "import_module", _boom)
     with pytest.raises(ImportError, match="failed to import"):
         ensure_loaded(["nonexistent.package.xyz"])
+
+
+def test_ensure_loaded_resolves_entry_point_short_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    import intentframe_bundle_sdk.loader as loader_mod
+
+    monkeypatch.setattr(loader_mod, "_LOADED_PACKAGES", None)
+    called = False
+
+    class FakeEntryPoint:
+        name = "fake"
+
+        def load(self):
+            def register(_registry):
+                nonlocal called
+                called = True
+
+            return register
+
+    monkeypatch.setattr(
+        loader_mod,
+        "entry_points",
+        lambda group: [FakeEntryPoint()] if group == loader_mod.ENTRY_POINT_GROUP else [],
+    )
+
+    ensure_loaded(["fake"])
+
+    assert called is True
 
 
 def test_validate_policy_rejects_bad_terminal_constraint_shape() -> None:

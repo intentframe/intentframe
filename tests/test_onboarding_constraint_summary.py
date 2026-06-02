@@ -56,8 +56,8 @@ from intentframe_bundle_sdk.constraints import describe_action_constraints
 from intentframe_components.onboarding.instructions import build_onboarding_instructions
 from tests._bundle_loader import ensure_test_bundles_loaded
 from intentframe_components.onboarding.engine import AIOnboardingEngine
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
-from intentframe_native_bundles.actions.terminal.deny_capabilities import (
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.deny_capabilities import (
     summarize_deny_capabilities,
 )
 from policy_registry.models import SemanticIntentLimit

@@ -1,4 +1,4 @@
-"""Tests for intentframe_executor_pack_macos.sandbox -- classifier, planner, engine, and adapter integration.
+"""Tests for intentframe_native_kit.intentframe_executor_pack_macos.sandbox -- classifier, planner, engine, and adapter integration.
 
 Covers:
     - Classifier: capability detection, opaque detection, edge cases
@@ -21,14 +21,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
-from intentframe_executor_pack_macos.sandbox.capabilities import Capability, CapabilityReport
-from intentframe_executor_pack_macos.sandbox.classifier import classify
-from intentframe_executor_pack_macos.sandbox import SandboxedCommand
-from intentframe_executor_pack_macos.sandbox.pathing import canonical_sandbox_path
-from intentframe_executor_pack_macos.sandbox.plan import ExecutionPlan
-from intentframe_executor_pack_macos.sandbox.planner import SandboxPlanner
-from intentframe_executor_pack_macos.sandbox.templates import (
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.config import SandboxConfig
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.capabilities import Capability, CapabilityReport
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.classifier import classify
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import SandboxedCommand
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.pathing import canonical_sandbox_path
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.plan import ExecutionPlan
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner import SandboxPlanner
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import (
     NON_NEGOTIABLE_DENY_ACCESS,
     NON_NEGOTIABLE_DENY_WRITE,
     SandboxTemplate,
@@ -267,7 +267,7 @@ class TestTemplates:
         assert minimum_template(caps) == SandboxTemplate.UNRESTRICTED
 
     def test_template_order_is_monotonic(self) -> None:
-        from intentframe_executor_pack_macos.sandbox.templates import TEMPLATE_ORDER
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import TEMPLATE_ORDER
         for i in range(len(TEMPLATE_ORDER) - 1):
             a = TEMPLATE_CAPABILITIES[TEMPLATE_ORDER[i]]
             b = TEMPLATE_CAPABILITIES[TEMPLATE_ORDER[i + 1]]
@@ -394,7 +394,7 @@ class TestPlanner:
     def test_invalid_template_name_warns(self, caplog) -> None:
         """Unrecognised template names emit a warning, valid ones still work."""
         import logging
-        with caplog.at_level(logging.WARNING, logger="intentframe_executor_pack_macos.sandbox.planner"):
+        with caplog.at_level(logging.WARNING, logger="intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(allowed=["pure_compute", "bogus_template"])
         assert planner.template == SandboxTemplate.PURE_COMPUTE
         assert "bogus_template" in caplog.text
@@ -402,7 +402,7 @@ class TestPlanner:
     def test_all_invalid_templates_logs_error(self, caplog) -> None:
         """If every template name is invalid, an error is logged and fallback is used."""
         import logging
-        with caplog.at_level(logging.WARNING, logger="intentframe_executor_pack_macos.sandbox.planner"):
+        with caplog.at_level(logging.WARNING, logger="intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(allowed=["typo_one", "typo_two"])
         assert planner.template == SandboxTemplate.FILE_READ_ONLY
         assert "No valid templates" in caplog.text
@@ -491,14 +491,14 @@ class TestPlannerConfigShapes:
 
 class TestEngineFactory:
     def test_create_macos_engine(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
-        with patch("intentframe_executor_pack_macos.sandbox._resolve_platform", return_value="macos"):
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import create_sandbox_engine
+        with patch("intentframe_native_kit.intentframe_executor_pack_macos.sandbox._resolve_platform", return_value="macos"):
             engine = create_sandbox_engine("auto")
             assert engine is not None
 
     def test_create_unsupported_returns_none(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
-        with patch("intentframe_executor_pack_macos.sandbox._resolve_platform", return_value="windows"):
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import create_sandbox_engine
+        with patch("intentframe_native_kit.intentframe_executor_pack_macos.sandbox._resolve_platform", return_value="windows"):
             engine = create_sandbox_engine("auto")
             assert engine is None
 
@@ -512,7 +512,7 @@ class TestProfileGeneration:
     """Verify the dynamically generated SBPL profile structure."""
 
     def test_profile_starts_with_version_and_deny(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -524,7 +524,7 @@ class TestProfileGeneration:
         assert lines[1] == "(deny default)"
 
     def test_profile_contains_essential_process_rules(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -538,7 +538,7 @@ class TestProfileGeneration:
 
     def test_pure_compute_has_no_global_process_info(self) -> None:
         """PURE_COMPUTE only gets same-sandbox process-info, not global."""
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -553,7 +553,7 @@ class TestProfileGeneration:
 
     def test_file_read_write_has_no_global_process_info(self) -> None:
         """FILE_READ_WRITE only gets same-sandbox process-info, not global."""
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_WRITE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -568,7 +568,7 @@ class TestProfileGeneration:
 
     def test_network_outbound_has_global_process_info(self) -> None:
         """NETWORK_OUTBOUND gets global process-info* (for ps, top, etc.)."""
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.NETWORK_OUTBOUND,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -585,7 +585,7 @@ class TestProfileGeneration:
 
     def test_network_full_has_global_process_info(self) -> None:
         """NETWORK_FULL gets global process-info*."""
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.NETWORK_FULL,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -600,7 +600,7 @@ class TestProfileGeneration:
 
     def test_global_process_info_comes_after_same_sandbox(self) -> None:
         """Global process-info* must come after same-sandbox (last-match-wins)."""
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.NETWORK_OUTBOUND,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -614,7 +614,7 @@ class TestProfileGeneration:
         )
 
     def test_profile_contains_global_file_read(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -625,7 +625,7 @@ class TestProfileGeneration:
 
     def test_deny_access_overrides_global_read(self) -> None:
         """Deny-access paths override the global (allow file-read*)."""
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -636,7 +636,7 @@ class TestProfileGeneration:
         assert '(deny file-read* file-write* (subpath "/secret"))' in profile
 
     def test_profile_includes_sandbox_tmpdir_write(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile, SANDBOX_TMPDIR
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile, SANDBOX_TMPDIR
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -647,7 +647,7 @@ class TestProfileGeneration:
         assert f'(allow file-write* (subpath "{canon_tmp}"))' in profile
 
     def test_pure_compute_has_no_mount_rules(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.PURE_COMPUTE,
             allowed_read_paths=("/Users/test/project",),
@@ -658,7 +658,7 @@ class TestProfileGeneration:
         assert '"/Users/test/project"' not in profile
 
     def test_file_read_only_has_global_read_no_write_rules(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_ONLY,
             allowed_read_paths=(),
@@ -670,7 +670,7 @@ class TestProfileGeneration:
         assert '(allow file-write* (subpath "/Users/test/project"))' not in profile
 
     def test_file_read_write_has_global_read_and_write_rules(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_WRITE,
             allowed_read_paths=(),
@@ -682,7 +682,7 @@ class TestProfileGeneration:
         assert '(allow file-write* (subpath "/Users/test/project"))' in profile
 
     def test_network_outbound_has_network_rules(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.NETWORK_OUTBOUND,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -693,7 +693,7 @@ class TestProfileGeneration:
         assert "(allow network-bind)" not in profile
 
     def test_network_full_has_bind_and_inbound(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.NETWORK_FULL,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -705,7 +705,7 @@ class TestProfileGeneration:
         assert "(allow network-inbound)" in profile
 
     def test_deny_overrides_are_last(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_WRITE,
             allowed_read_paths=(),
@@ -719,7 +719,7 @@ class TestProfileGeneration:
         assert deny_pos > allow_pos, "deny rules must come after allow rules"
 
     def test_path_with_spaces_is_escaped(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.FILE_READ_WRITE,
             allowed_read_paths=(),
@@ -730,7 +730,7 @@ class TestProfileGeneration:
         assert '(allow file-write* (subpath "/Users/test/My Documents"))' in profile
 
     def test_unrestricted_has_allow_default_with_deny_overrides(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.UNRESTRICTED,
             allowed_read_paths=("/",),
@@ -749,7 +749,7 @@ class TestProfileGeneration:
         assert deny_access_pos > allow_pos, "deny-access must come after allow default"
 
     def test_unrestricted_includes_network_outbound_bind_inbound(self) -> None:
-        from intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import generate_sandbox_profile
         plan = ExecutionPlan(
             template=SandboxTemplate.UNRESTRICTED,
             allowed_read_paths=(), allowed_write_paths=(),
@@ -763,7 +763,7 @@ class TestProfileGeneration:
 
     def test_engine_available_without_file(self) -> None:
         """Engine availability only depends on sandbox-exec binary, not any file."""
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         engine = MacOSSandboxEngine()
         import shutil
         if shutil.which("sandbox-exec"):
@@ -787,7 +787,7 @@ class TestSeatbeltEnforcement:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -916,7 +916,7 @@ class TestNetworkEnforcement:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1025,7 +1025,7 @@ class TestProcessInfoEnforcement:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1240,7 +1240,7 @@ class TestUnrestrictedEnforcement:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1511,7 +1511,7 @@ class TestTerminalAdapterSandbox:
     """Test the actual TerminalAdapter.execute() with sandbox wiring."""
 
     def test_sandbox_disabled_runs_bare(self) -> None:
-        from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 
         cfg = SandboxConfig(enabled=False)
         adapter = TerminalAdapter(sandbox_config=cfg)
@@ -1520,7 +1520,7 @@ class TestTerminalAdapterSandbox:
         assert "bare_run" in result.data["stdout"]
 
     def test_sandbox_enabled_engine_unavailable_rejects(self) -> None:
-        from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 
         cfg = SandboxConfig(enabled=True)
         adapter = TerminalAdapter(
@@ -1533,8 +1533,8 @@ class TestTerminalAdapterSandbox:
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_sandbox_enabled_wraps_and_succeeds(self) -> None:
-        from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
-        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import create_sandbox_engine
 
         cfg = SandboxConfig(
             enabled=True,
@@ -1556,8 +1556,8 @@ class TestTerminalAdapterSandbox:
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_adapter_preserves_original_command_in_data(self) -> None:
-        from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
-        from intentframe_executor_pack_macos.sandbox import create_sandbox_engine
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import create_sandbox_engine
 
         cfg = SandboxConfig(enabled=True)
         planner = SandboxPlanner(cfg)
@@ -1576,7 +1576,7 @@ class TestTerminalAdapterSandbox:
         assert "sandbox-exec" not in result.data["command"]
 
     def test_no_sandbox_config_runs_bare(self) -> None:
-        from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 
         adapter = TerminalAdapter()
         result = _run(adapter.execute("RUN_COMMAND", {"command": "echo compat_ok"}))
@@ -1595,7 +1595,7 @@ class TestEndToEnd:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1662,14 +1662,14 @@ class TestExecutorVenvResolver:
     """SUDO_USER → uid HOME → None fallback chain, plus config override."""
 
     def test_explicit_config_path_is_returned_absolute(self, tmp_path, monkeypatch) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         cfg = SandboxConfig(executor_venv_path=str(tmp_path))
         monkeypatch.delenv("SUDO_USER", raising=False)
         resolved = resolve_executor_venv_path(cfg)
         assert resolved == os.path.realpath(str(tmp_path))
 
     def test_explicit_tilde_path_expands_against_owner_home(self, monkeypatch) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         cfg = SandboxConfig(executor_venv_path="~/custom-venv")
         monkeypatch.delenv("SUDO_USER", raising=False)
         resolved = resolve_executor_venv_path(cfg)
@@ -1678,7 +1678,7 @@ class TestExecutorVenvResolver:
         assert os.path.isabs(resolved)
 
     def test_default_path_when_unconfigured(self, monkeypatch) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         cfg = SandboxConfig()
         monkeypatch.delenv("SUDO_USER", raising=False)
         resolved = resolve_executor_venv_path(cfg)
@@ -1690,7 +1690,7 @@ class TestExecutorVenvResolver:
     def test_sudo_user_overrides_current_home(self, monkeypatch) -> None:
         """When SUDO_USER is set, it's the authoritative owner."""
         import pwd
-        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         me = pwd.getpwuid(os.getuid())
         monkeypatch.setenv("SUDO_USER", me.pw_name)
         monkeypatch.setenv("HOME", "/tmp/nonsense-home")
@@ -1700,7 +1700,7 @@ class TestExecutorVenvResolver:
         assert resolved.startswith(os.path.realpath(me.pw_dir))
 
     def test_bogus_sudo_user_falls_back_to_uid_home(self, monkeypatch) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import resolve_executor_venv_path
         monkeypatch.setenv("SUDO_USER", "definitely-not-a-real-user-xyz-1234")
         cfg = SandboxConfig()
         resolved = resolve_executor_venv_path(cfg)
@@ -1710,16 +1710,16 @@ class TestExecutorVenvResolver:
 
 class TestExecutorVenvValidator:
     def test_missing_dir_rejected(self, tmp_path) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
         assert validate_executor_venv(str(tmp_path / "does-not-exist")) is False
 
     def test_dir_without_python_rejected(self, tmp_path) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
         (tmp_path / "bin").mkdir()
         assert validate_executor_venv(str(tmp_path)) is False
 
     def test_valid_fake_venv_accepted(self, tmp_path) -> None:
-        from intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import validate_executor_venv
         path = _fake_venv(str(tmp_path / "venv"))
         assert validate_executor_venv(path) is True
 
@@ -1746,7 +1746,7 @@ class TestExecutionPlanVenvThreading:
         returns None and main.py is responsible for fail-closed behavior."""
         import logging
         missing = str(tmp_path / "not-a-venv")
-        with caplog.at_level(logging.ERROR, logger="intentframe_executor_pack_macos.sandbox.planner"):
+        with caplog.at_level(logging.ERROR, logger="intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(
                 executor_venv_path=missing,
                 executor_venv_required=True,
@@ -1757,7 +1757,7 @@ class TestExecutionPlanVenvThreading:
     def test_missing_optional_venv_warns(self, tmp_path, caplog) -> None:
         import logging
         missing = str(tmp_path / "not-a-venv")
-        with caplog.at_level(logging.WARNING, logger="intentframe_executor_pack_macos.sandbox.planner"):
+        with caplog.at_level(logging.WARNING, logger="intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(
                 executor_venv_path=missing,
                 executor_venv_required=False,
@@ -1772,7 +1772,7 @@ class TestMacOSEngineVenvOverrides:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1822,7 +1822,7 @@ class TestSeatbeltVenvEnforcement:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -1937,18 +1937,18 @@ class TestPlannerRejectsVenvUnderDenyAccess:
         an unreadable binary. This reproduces the original bug: the path
         was a valid venv, but the sandbox would deny reads on it."""
         import logging
-        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         denied_root = tmp_path / "denied"
         denied_root.mkdir()
         venv = _fake_venv(str(denied_root / "venvs" / "executor"))
 
         monkeypatch.setattr(
-            "intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            "intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
             NON_NEGOTIABLE_DENY_ACCESS + (str(denied_root),),
         )
 
-        with caplog.at_level(logging.ERROR, logger="intentframe_executor_pack_macos.sandbox.planner"):
+        with caplog.at_level(logging.ERROR, logger="intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner"):
             planner = _make_planner(
                 executor_venv_path=venv,
                 executor_venv_required=True,
@@ -1962,14 +1962,14 @@ class TestPlannerRejectsVenvUnderDenyAccess:
         """Sanity check: a venv that doesn't collide with any deny path
         passes the cross-check and surfaces on the plan. Ensures the
         guard isn't rejecting every venv."""
-        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         venv = _fake_venv(str(tmp_path / "clean-venv"))
         elsewhere = tmp_path / "other"
         elsewhere.mkdir()
 
         monkeypatch.setattr(
-            "intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            "intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
             NON_NEGOTIABLE_DENY_ACCESS + (str(elsewhere),),
         )
         planner = _make_planner(
@@ -1983,7 +1983,7 @@ class TestPlannerRejectsVenvUnderDenyAccess:
     ) -> None:
         """``/a/bad`` must not be treated as under ``/a/b``. Pure-prefix
         collision would be a bug (rejects legitimate paths)."""
-        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         deny = tmp_path / "deny"
         deny.mkdir()
@@ -1992,7 +1992,7 @@ class TestPlannerRejectsVenvUnderDenyAccess:
         venv = _fake_venv(str(sibling / "venv"))
 
         monkeypatch.setattr(
-            "intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
+            "intentframe_native_kit.intentframe_executor_pack_macos.sandbox.planner.NON_NEGOTIABLE_DENY_ACCESS",
             NON_NEGOTIABLE_DENY_ACCESS + (str(deny),),
         )
         planner = _make_planner(
@@ -2014,7 +2014,7 @@ class TestSeatbeltProductionDenyBehavior:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")
@@ -2083,8 +2083,8 @@ class TestSeatbeltProductionDenyBehavior:
         picks must not start with any production deny-access entry.
         Protects against someone accidentally changing the default back
         to under ``~/.intentframe/``."""
-        from intentframe_executor_pack_macos.sandbox.venv import _DEFAULT_VENV_RELATIVE
-        from intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.venv import _DEFAULT_VENV_RELATIVE
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.templates import NON_NEGOTIABLE_DENY_ACCESS
 
         for deny in NON_NEGOTIABLE_DENY_ACCESS:
             # Normalize: deny entries use ~ prefix; compare relative parts.
@@ -2110,7 +2110,7 @@ class TestMacOSEngineEscalationWrap:
 
     @pytest.fixture(autouse=True)
     def _engine(self):
-        from intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
+        from intentframe_native_kit.intentframe_executor_pack_macos.sandbox import MacOSSandboxEngine
         self.engine = MacOSSandboxEngine()
         if not self.engine.available():
             pytest.skip("sandbox-exec not available")

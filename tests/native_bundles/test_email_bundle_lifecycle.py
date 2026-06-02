@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_bundle_sdk.types import ActionPermission, BundleContext
 from intentframe_core.types import IntentFrame
-from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.email.bundle import EmailActionBundle
 
 _NO_PERM = ActionPermission(safe=True)
 

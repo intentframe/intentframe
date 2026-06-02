@@ -100,7 +100,7 @@ Another way to say it: the agent is still the brain, but it no longer has the ha
 
 Every agent on the device — whatever LLM, whatever framework, whatever vendor — submits intents through the same runtime. There is one executor that holds credentials. One audit chain. One policy surface. One door. This is the "Operating System for Agency" bet: manage actions, money, data, and authority for AI agents the way an OS manages hardware resources for apps.
 
-For the full thesis, see [`docs/autonomy.md`](docs/autonomy.md). For the technical architecture, see [`docs/architecture.md`](docs/architecture.md), [`docs/executor.md`](docs/executor.md), [`docs/actor-sdk.md`](docs/actor-sdk.md), and [`docs/single-runtime.md`](docs/single-runtime.md).
+For the full thesis, see [`docs/autonomy.md`](docs/autonomy.md). For the technical architecture, see [`docs/architecture.md`](docs/architecture.md), [`docs/executor.md`](docs/executor.md), [`docs/actor-sdk.md`](docs/actor-sdk.md), and [`docs/single-runtime.md`](docs/single-runtime.md). For which action bundles and executor packs load at startup (`core.yaml`, `executor.yaml`, entry points), see [`docs/plugin-profiles.md`](docs/plugin-profiles.md).
 
 ---
 
@@ -455,7 +455,8 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Wondering "what is this really for?" | [`docs/autonomy.md`](docs/autonomy.md) (the delegatable-autonomy thesis) |
 | A skeptic who wants to break it | [`docs/threat-model.md`](docs/threat-model.md) → [`docs/evidence.md`](docs/evidence.md) |
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
-| An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/executor.md`](docs/executor.md) → [`docs/executor/standalone-product.md`](docs/executor/standalone-product.md) |
+| An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/executor.md`](docs/executor.md) → [`docs/executor/standalone-product.md`](docs/executor/standalone-product.md) |
+| Shipping custom action bundles or executor packs | [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/dev/action-family-wiring.md`](docs/dev/action-family-wiring.md) |
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
 | Looking for common objections answered | [`docs/faq.md`](docs/faq.md) |
@@ -551,8 +552,12 @@ The demo uses its own isolated executor config.
 
 **Terminal 1 — start the supervisor with demo config:**
 
+(`INTENTFRAME_CORE_CONFIG` selects action bundles for core; `EXECUTOR_CONFIG` selects executor packs. See [docs/plugin-profiles.md](docs/plugin-profiles.md).)
+
 ```bash
-EXECUTOR_CONFIG=demo/config/executor.yaml python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+EXECUTOR_CONFIG=demo/config/executor.yaml \
+python -m supervisor.main start
 ```
 
 **Terminal 2 — run the demo dashboard:**

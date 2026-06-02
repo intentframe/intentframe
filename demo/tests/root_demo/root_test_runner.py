@@ -59,7 +59,7 @@ for p in (_project_root, _tests_dir, _root_demo_dir):
 from typing import Any, Dict, List, Tuple
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 from intentframe_server.client import IntentFrameClient
 
 from root_intent_pipeline import (
@@ -213,7 +213,11 @@ def _print_executor_alert() -> None:
         print("#  Supervisor must have been started with:")
         print("#    INTENTFRAME_EXECUTOR_MODE=dry_run \\")
         print("#    INTENTFRAME_DRY_RUN_CONTEXT=root \\")
-        print("#    python -m supervisor.main start")
+        print("#    python -m supervisor.main start \\")
+        print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+        print("#")
+        print("#  (--config starts resource-registry so root-demo workspaces seed;")
+        print("#   it is NOT in the supervisor's minimal default graph.)")
         print("#")
         print("#  ALLOW results must carry data['dry_run']=True or the runner will")
         print("#  fail closed — it will NOT let real commands pretend to be dry-run.")
@@ -230,12 +234,17 @@ def _print_executor_alert() -> None:
         print("#    JARVIS_VARIANT=root \\")
         print("#    EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \\")
         print("#    INTENTFRAME_ESCALATION_ARMED=1 \\")
-        print("#    python -m supervisor.main start")
+        print("#    python -m supervisor.main start \\")
+        print("#      --config intentframe_native_kit/supervisor_profile.yaml")
         print("#")
         print("#  SAFER ALTERNATIVE — DRY-RUN (no host I/O):")
         print("#    INTENTFRAME_EXECUTOR_MODE=dry_run \\")
         print("#    INTENTFRAME_DRY_RUN_CONTEXT=root \\")
-        print("#    python -m supervisor.main start")
+        print("#    python -m supervisor.main start \\")
+        print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+        print("#")
+        print("#  (gateway --profile root passes the kit profile automatically;")
+        print("#   the direct launches above need --config for resource-registry.)")
         print("#")
         print("#  WRONG CONFIG -> ROOT-ONLY COMMANDS FAIL WITH \"PERMISSION DENIED\"")
     print("#" * 79)

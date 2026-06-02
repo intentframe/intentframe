@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from tests._bundle_loader import ensure_test_bundles_loaded
-from intentframe_native_bundles.actions.api.bundle import ApiActionBundle
-from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
+from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+from intentframe_native_kit.intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
 from intentframe_bundle_sdk.registry import (
     action_bundle_for,
     domain_bundle_for,
@@ -39,6 +39,12 @@ def test_sdk_domain_routes_cover_finance_and_deletion() -> None:
     assert routed_domain_ids() >= {"finance", "deletion"}
     assert "PAY_INVOICE" in DOMAIN_ROUTES["finance"]
     assert "DELETE_FILE" in DOMAIN_ROUTES["deletion"]
+    assert "DELETE_HOST_FILE" in DOMAIN_ROUTES["deletion"]
+    # Record deletes are not routed until deletion schema is generalized.
+    assert domains_for_action(ActionType.DELETE_EVENT.value) == ()
+    assert domains_for_action(ActionType.DELETE_REMINDER.value) == ()
+    assert domains_for_action(ActionType.DELETE_CONTACT.value) == ()
+    assert domains_for_action(ActionType.DELETE_NOTE.value) == ()
 
 
 def test_validate_policy_domain_constraints_requires_registered_bundle() -> None:

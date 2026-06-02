@@ -1,4 +1,4 @@
-"""Unit tests for :func:`resource_registry.floor.canonicalize_real_path`.
+"""Unit tests for :func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path`.
 
 This is the single canonicalization primitive shared between the
 Deterministic Guardian host-file floor gates, ``HostFileChecker``, and
@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from resource_registry.floor import canonicalize_real_path
+from intentframe_native_kit.resource_registry.floor import canonicalize_real_path
 
 
 class TestEmptyPassthrough:

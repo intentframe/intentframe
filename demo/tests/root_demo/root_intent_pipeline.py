@@ -6,9 +6,14 @@ the Actor session themselves.  The session loop (open → submit each intent →
 close) lives in the test file, not here — keeping this module a thin facade
 over the registry clients.
 
-Supervisor/gateway preconditions are the caller's responsibility.  Either:
-  * ``intentframe-gateway-cli --profile root`` (see intentframe_cli/README.md)
-  * or a direct ``python -m supervisor.main start`` with
+This module calls ResourceRegistryClient.create_workspace, so the supervisor
+must run the first-party kit profile (resource-registry is not in the minimal
+default graph). Supervisor/gateway preconditions are the caller's
+responsibility.  Either:
+  * ``intentframe-gateway-cli --profile root`` (see intentframe_cli/README.md;
+    the gateway passes the kit profile automatically)
+  * or a direct ``python -m supervisor.main start
+    --config intentframe_native_kit/supervisor_profile.yaml`` with
     ``JARVIS_VARIANT=root``, ``EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml``,
     and ``INTENTFRAME_ESCALATION_ARMED=1`` when root-demo is installed
     (see ``docs/executor-root-mode.md``, section 2a).
@@ -21,8 +26,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
-from resource_registry.models import ResourceMount
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.models import ResourceMount
 
 from root_policy_loader import load_root_demo_policy
 

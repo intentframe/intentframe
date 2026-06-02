@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicResult,
@@ -36,7 +36,7 @@ class _InvoiceAnalysis:
     async def analyze(self, intent, **_kwargs) -> AnalysisReport:
         await asyncio.sleep(0)
         return AnalysisReport(
-            stated_intent=f"{intent.action.value} invoice.pdf",
+            stated_intent=f"{intent.action} invoice.pdf",
             risk_factors={"overall": RiskLevel.LOW},
             reversibility=Reversibility.FULLY_REVERSIBLE,
             confidence=1.0,

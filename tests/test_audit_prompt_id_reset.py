@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
 from intentframe_core.types import (
     AnalysisReport,
@@ -48,6 +48,7 @@ def _run_command_intent() -> IntentFrame:
     return IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="curl https://example.com",
+        data={"command": "curl https://example.com"},
         reason="probe",
         agent_id="test_agent",
     )

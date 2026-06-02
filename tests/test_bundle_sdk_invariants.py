@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.registry import (
     all_action_bundles,
@@ -22,7 +22,7 @@ from intentframe_bundle_sdk.types import (
 )
 from intentframe_components.guardian.deterministic import DeterministicGuardian
 from intentframe_core.types import IntentFrame, UserContext
-from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
 from intentframe_bundle_sdk.registry import domain_bundle_for
 from policy_registry.models import ActionPermission as PolicyActionPermission
 from tests._bundle_loader import ensure_test_bundles_loaded
@@ -160,7 +160,7 @@ def test_deterministic_guardian_blocks_allowed_action_without_bundle(
     import intentframe_bundle_sdk.registry as bundle_registry
 
     monkeypatch.delitem(bundle_registry._ACTION_BY_ID, ActionType.READ_FILE.value)
-    dg = DeterministicGuardian(packages=["intentframe_native_bundles"])
+    dg = DeterministicGuardian(packages=["intentframe_native_kit.intentframe_native_bundles"])
     intent = IntentFrame(
         action=ActionType.READ_FILE,
         target="/tmp/x",
@@ -234,7 +234,7 @@ def test_undecided_populates_constraint_context_and_calls_describe_once(
         target="/tmp/out.txt",
         reason="prompt ctx",
         agent_id="test",
-        data={"content": "x"},
+        data={"path": "/tmp/out.txt", "content": "x"},
     )
     permission = PolicyActionPermission(
         safe=False,
@@ -335,6 +335,337 @@ def test_block_has_no_constraint_context(
     assert result.bundle_ai_context is None
 
 
+def test_domain_schema_blocks_missing_finance_data() -> None:
+    bundle = FilesActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_FILE,
+        target="/tmp/x",
+        reason="finance shape",
+        agent_id="test",
+    )
+    permission = PolicyActionPermission(safe=True)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"READ_FILE": permission},
+        domain_constraints={"finance": {"max_amount": 1.0}},
+    )
+
+    import intentframe_bundle_sdk.registry as bundle_registry
+
+    previous = bundle_registry._ACTION_TO_DOMAINS.get(ActionType.READ_FILE.value)
+    bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = ("finance",)
+    try:
+        result = asyncio.run(
+            DeterministicRunner.run_action_bundle(
+                bundle,
+                intent,
+                permission,
+                user_context,
+            )
+        )
+    finally:
+        if previous is None:
+            bundle_registry._ACTION_TO_DOMAINS.pop(ActionType.READ_FILE.value, None)
+        else:
+            bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = previous
+
+    assert result.decision == "BLOCK"
+    assert result.matched_gate == "domain_schema"
+    assert "invalid intent shape" in result.reason
+    assert result.bundle_ai_context is None
+
+
+def test_domain_schema_blocks_deletion_when_path_only_in_target() -> None:
+    # ``path`` must be in IntentFrame.data (the executable contract). A path
+    # carried only in ``target`` (display/audit) does not satisfy the deletion
+    # schema and must BLOCK at the domain_schema gate.
+    bundle = FilesActionBundle()
+    intent = IntentFrame(
+        action=ActionType.DELETE_FILE,
+        target="/tmp/x",
+        reason="deletion shape",
+        agent_id="test",
+    )
+    permission = PolicyActionPermission(safe=False)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"DELETE_FILE": permission},
+        domain_constraints={"deletion": {"allowed_paths": ["/tmp/*"]}},
+    )
+
+    result = asyncio.run(
+        DeterministicRunner.run_action_bundle(
+            bundle,
+            intent,
+            permission,
+            user_context,
+        )
+    )
+
+    assert result.decision == "BLOCK"
+    assert result.matched_gate == "domain_schema"
+    assert "invalid intent shape" in result.reason
+    assert result.bundle_ai_context is None
+
+
+def test_finance_domain_blocks_missing_amount_for_max_amount_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+
+    bundle = FinanceDomainBundle()
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="finance policy",
+        agent_id="test",
+        data={"currency": "USD", "recipient": "ACME Corp"},
+    )
+    outcome = bundle.enforce(intent, {"max_amount": 5000.0})
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "domain"
+    assert "amount" in (outcome.reason or "").lower()
+
+
+def test_finance_domain_blocks_missing_recipient_for_allowlist_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+
+    bundle = FinanceDomainBundle()
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="finance policy",
+        agent_id="test",
+        data={"amount": 100.0, "currency": "USD"},
+    )
+    outcome = bundle.enforce(
+        intent,
+        {"allowed_recipients": ["ACME Corp", "Office Depot"]},
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "domain"
+    assert "recipient" in (outcome.reason or "").lower()
+
+
+def test_api_bundle_blocks_missing_amount_for_max_amount_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+
+    bundle = ApiActionBundle()
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="api policy",
+        agent_id="test",
+        data={"url": "https://api.example.com/pay"},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"max_amount": 5000.0},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "amount" in (outcome.reason or "").lower()
+
+
+def test_api_bundle_blocks_missing_url_for_allowed_endpoints_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.bundle import ApiActionBundle
+
+    bundle = ApiActionBundle()
+    intent = IntentFrame(
+        action=ActionType.HTTP_GET,
+        target="https://api.example.com/status",
+        reason="api policy",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_endpoints": ["https://api.example.com/*"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "url" in (outcome.reason or "").lower()
+
+
+def test_calendar_bundle_blocks_missing_calendar_for_allowed_calendars_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.calendar.bundle import CalendarActionBundle
+
+    bundle = CalendarActionBundle()
+    intent = IntentFrame(
+        action=ActionType.CREATE_EVENT,
+        target="work",
+        reason="calendar policy",
+        agent_id="test",
+        data={"title": "Standup"},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_calendars": ["work", "personal"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "calendar" in (outcome.reason or "").lower()
+
+
+def test_terminal_bundle_blocks_missing_command_when_policy_needs_command() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+
+    bundle = TerminalActionBundle()
+    intent = IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target="ls -la",
+        reason="terminal policy",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_commands": ["ls *"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "constraint"
+    assert "command" in (outcome.reason or "").lower()
+
+
+def test_deletion_domain_blocks_missing_path_for_allowed_paths_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+
+    bundle = DeletionDomainBundle()
+    intent = IntentFrame(
+        action=ActionType.DELETE_FILE,
+        target="/tmp/x",
+        reason="deletion policy",
+        agent_id="test",
+        data={"irreversible": False},
+    )
+    outcome = bundle.enforce(intent, {"allowed_paths": ["/tmp/*"]})
+    assert outcome.decision == "BLOCK"
+    assert outcome.matched_gate == "domain"
+    assert "path" in (outcome.reason or "").lower()
+
+
+def test_domain_schemas_ignore_unrelated_fields_for_slice_validation() -> None:
+    from intentframe_native_kit.action_registry.domains.deletion import DeletionIntentData
+    from intentframe_native_kit.action_registry.domains.finance import FinancialIntentData
+
+    combined = {
+        "amount": 250.0,
+        "currency": "USD",
+        "recipient": "ACME Corp",
+        "path": "/tmp/invoice.pdf",
+        "irreversible": False,
+        "rfc_message_id": "<extra@example.com>",
+    }
+
+    finance = FinancialIntentData.validate_slice(combined)
+    deletion = DeletionIntentData.validate_slice(combined)
+
+    assert finance.amount == 250.0
+    assert finance.recipient == "ACME Corp"
+    assert deletion.path == "/tmp/invoice.pdf"
+    assert deletion.irreversible is False
+
+
+def test_domain_shape_checks_compose_for_many_to_many_routing() -> None:
+    from intentframe_bundle_sdk.domain import check_domain_intent_shape
+    from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+    from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+
+    intent = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="invoice",
+        reason="multi-domain slice",
+        agent_id="test",
+        data={
+            "amount": 250.0,
+            "currency": "USD",
+            "recipient": "ACME Corp",
+            "path": "/tmp/invoice.pdf",
+            "irreversible": False,
+        },
+    )
+
+    finance_shape = check_domain_intent_shape(FinanceDomainBundle(), intent)
+    deletion_shape = check_domain_intent_shape(DeletionDomainBundle(), intent)
+
+    assert finance_shape.terminal is False
+    assert deletion_shape.terminal is False
+
+
+def test_runner_applies_all_routed_domain_slices() -> None:
+    import intentframe_bundle_sdk.registry as bundle_registry
+
+    bundle = FilesActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_FILE,
+        target="/tmp/invoice.pdf",
+        reason="many-to-many domains",
+        agent_id="test",
+        data={
+            "path": "/tmp/invoice.pdf",
+            "amount": 250.0,
+            "currency": "USD",
+            "recipient": "ACME Corp",
+            "irreversible": False,
+        },
+    )
+    permission = PolicyActionPermission(safe=True)
+    user_context = UserContext(
+        user_id="test",
+        allowed_actions={"READ_FILE": permission},
+        domain_constraints={
+            "finance": {"max_amount": 5000.0},
+            "deletion": {"allowed_paths": ["/tmp/*"]},
+        },
+    )
+
+    previous = bundle_registry._ACTION_TO_DOMAINS.get(ActionType.READ_FILE.value)
+    bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = (
+        "deletion",
+        "finance",
+    )
+    try:
+        result = asyncio.run(
+            DeterministicRunner.run_action_bundle(
+                bundle,
+                intent,
+                permission,
+                user_context,
+            )
+        )
+    finally:
+        if previous is None:
+            bundle_registry._ACTION_TO_DOMAINS.pop(ActionType.READ_FILE.value, None)
+        else:
+            bundle_registry._ACTION_TO_DOMAINS[ActionType.READ_FILE.value] = previous
+
+    assert result.decision != "BLOCK"
+
+
 def test_missing_describe_falls_back_to_str_constraints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -350,7 +681,7 @@ def test_missing_describe_falls_back_to_str_constraints(
         target="/tmp/out.txt",
         reason="fallback",
         agent_id="test",
-        data={"content": "x"},
+        data={"path": "/tmp/out.txt", "content": "x"},
     )
     permission = PolicyActionPermission(safe=False, constraints=constraints)
     user_context = UserContext(
@@ -389,7 +720,7 @@ def test_routed_domain_constraints_rendered_on_undecided(
         target="/tmp/out.txt",
         reason="domain prompt",
         agent_id="test",
-        data={"content": "x"},
+        data={"path": "/tmp/out.txt", "amount": 100.0, "content": "x"},
     )
     permission = PolicyActionPermission(
         safe=False,
@@ -476,6 +807,126 @@ def test_bundle_phase_outcome_decision_path_passthrough() -> None:
 
     allowed = BundlePhaseOutcome.allow(ctx, reason="ok", matched_gate="")
     assert allowed.to_deterministic_result().decision_path == "deterministic"
+
+
+def test_terminal_pre_pipeline_ignores_command_only_in_target() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.pre_pipeline import (
+        run_terminal_pre_pipeline,
+    )
+
+    intent = IntentFrame(
+        action=ActionType.RUN_COMMAND,
+        target="sudo rm -rf /",
+        reason="target-only command must not run shield",
+        agent_id="test",
+    )
+    intel, signals, early_block, audit = run_terminal_pre_pipeline(intent)
+    assert intel is None
+    assert signals == ()
+    assert early_block is None
+    assert audit is None
+
+
+def test_browser_bundle_blocks_url_only_in_target() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.browser.bundle import BrowserActionBundle
+
+    bundle = BrowserActionBundle()
+    intent = IntentFrame(
+        action=ActionType.OPEN_URL,
+        target="https://example.com",
+        reason="browser constraint",
+        agent_id="test",
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_urls": ["https://example.com/*"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert "URL is required" in (outcome.reason or "")
+
+
+def test_message_bundle_send_does_not_fall_back_to_target_for_contact_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+
+    bundle = MessageActionBundle()
+    intent = IntentFrame(
+        action=ActionType.SEND_MESSAGE,
+        target="+15551234567",
+        reason="message constraint",
+        agent_id="test",
+        data={"text": "hi"},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_contacts": ["+15551234567"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert "'to'" in (outcome.reason or "")
+
+
+def test_message_bundle_read_uses_contact_field_for_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+
+    bundle = MessageActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_MESSAGES,
+        target="Alice",
+        reason="message constraint",
+        agent_id="test",
+        data={"contact": "alice@example.com", "limit": 5},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_contacts": ["alice@example.com"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision != "BLOCK"
+
+
+def test_message_bundle_read_blocks_unfiltered_read_under_contact_policy() -> None:
+    from intentframe_native_kit.intentframe_native_bundles.actions.message.bundle import MessageActionBundle
+
+    bundle = MessageActionBundle()
+    intent = IntentFrame(
+        action=ActionType.READ_MESSAGES,
+        target="",
+        reason="read all",
+        agent_id="test",
+        data={"limit": 5},
+    )
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    outcome = asyncio.run(
+        bundle.enforce_constraints(
+            intent,
+            PolicyActionPermission(
+                safe=False,
+                constraints={"allowed_contacts": ["alice@example.com"]},
+            ),
+            ctx,
+        )
+    )
+    assert outcome.decision == "BLOCK"
+    assert "'contact'" in (outcome.reason or "")
 
 
 def test_aiguardian_source_has_no_plugin_registry_coupling() -> None:

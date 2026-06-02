@@ -2,14 +2,15 @@
 Enums for IntentFrame System
 
 IntentFrame-specific enumerations.
-ActionType lives in the action_registry module (universal taxonomy).
+
+The action taxonomy (``ActionType``) deliberately lives in ``intentframe_native_kit.action_registry``,
+not here. ``intentframe_core`` is a neutral, lower-level layer and must not
+depend on the registry; ``IntentFrame.action`` is a plain string.
 """
 
 from enum import Enum
 
-from action_registry import ActionType  # re-export for backward compat
-
-__all__ = ["ActionType", "Decision", "Reversibility", "RiskLevel"]
+__all__ = ["Decision", "Reversibility", "RiskLevel"]
 
 
 class Decision(Enum):

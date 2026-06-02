@@ -7,10 +7,10 @@ from dataclasses import replace
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from tests._bundle_loader import ensure_test_bundles_loaded
-from intentframe_native_bundles.actions.files.bundle import FilesActionBundle
-from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.files.bundle import FilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
 from intentframe_bundle_sdk.registry import action_bundle_for, domain_bundle_for
 from intentframe_bundle_sdk.runner import DeterministicRunner
 from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
@@ -61,6 +61,7 @@ def test_domain_runs_before_passive_read_allow(monkeypatch: pytest.MonkeyPatch) 
     intent = IntentFrame(
         action=ActionType.READ_FILE,
         target="/tmp/x",
+        data={"amount": 1.0},
         reason="order test",
         agent_id="test",
     )
@@ -125,7 +126,7 @@ def test_passive_read_runs_before_allow_gates(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_email_bundle_selected_for_reply() -> None:
-    from intentframe_native_bundles.actions.email.bundle import EmailActionBundle
+    from intentframe_native_kit.intentframe_native_bundles.actions.email.bundle import EmailActionBundle
 
     bundle = action_bundle_for(ActionType.REPLY_EMAIL.value)
     assert isinstance(bundle, EmailActionBundle)

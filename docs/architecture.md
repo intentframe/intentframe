@@ -157,11 +157,11 @@ Both come from the same module (`command_shield/`), but they run at different po
 
 | | L0 — `command_shield` (full evaluation) | L4 — adapter `quick_check()` (floor) |
 |---|---|---|
-| Where it runs | Inside `DeterministicGuardian`, before the AI path | Inside the executor's terminal adapter (`intentframe_executor_pack_macos/adapters/terminal.py`), after Guardian approval, immediately before subprocess launch |
+| Where it runs | Inside `DeterministicGuardian`, before the AI path | Inside the executor's terminal adapter (`intentframe_native_kit/intentframe_executor_pack_macos/adapters/terminal.py`), after Guardian approval, immediately before subprocess launch |
 | What it produces | A full `CommandReport` — verdict, capabilities, edges, code_intel — used by every later gate | A binary "is this catastrophic?" answer; if yes, refuse to launch even though Guardian said ALLOW |
 | Why it exists | The deterministic floor that drives capability tagging and read-only fast-path | The non-negotiable last resort if policy is misconfigured, missing, or somehow bypassed upstream |
 
-In code, the adapter re-invokes `command_shield.quick_check(command)` as the very last step before `subprocess.run`; if `report.is_catastrophic`, the command is refused even though it already passed all earlier gates. This is what makes "adapter quick_check" a distinct layer in defense-in-depth: it survives upstream misconfiguration. See `intentframe_executor_pack_macos/adapters/terminal.py` for the call site.
+In code, the adapter re-invokes `command_shield.quick_check(command)` as the very last step before `subprocess.run`; if `report.is_catastrophic`, the command is refused even though it already passed all earlier gates. This is what makes "adapter quick_check" a distinct layer in defense-in-depth: it survives upstream misconfiguration. See `intentframe_native_kit/intentframe_executor_pack_macos/adapters/terminal.py` for the call site.
 
 ---
 
@@ -187,7 +187,7 @@ The shipped `IntentFrame` Pydantic model has the following fields:
 
 | Field | Type | Purpose |
 |---|---|---|
-| `action` | `ActionType` enum | The typed operation (e.g., `READ_FILE`, `APPEND_ROW`, `RUN_COMMAND`, `PAY_INVOICE`) |
+| `action` | `str` | Opaque action identifier (e.g. `"READ_FILE"`, `"PAY_INVOICE"`). Core does not validate against any taxonomy — agent authors may use `intentframe_native_kit.action_registry` locally for convenience. Unknown actions fail closed at executor dispatch. |
 | `target` | `str` | Who or what the action affects (path, recipient, command, URL) |
 | `data` | `Optional[Dict[str, Any]]` | Action-specific structured payload (amount, recipient, content) |
 | `reason` | `str` | The agent's stated justification — used by AE for reason-vs-data cross-checks |
@@ -521,6 +521,7 @@ For the concrete runtime picture — what processes exist, what each one does, w
 - [docs/evidence.md](evidence.md) — test results and failure reports
 - [docs/credentials-vault.md](credentials-vault.md) — secret storage and the vault service
 - [docs/registries.md](registries.md) — policy / resource / action registries (the configuration plane)
+- [docs/plugin-profiles.md](plugin-profiles.md) — `core.yaml` / `executor.yaml`, entry points, and startup loading for bundles and packs
 - [docs/email-sync.md](email-sync.md) — IMAP / SMTP daemon (EDI)
 - [docs/macos-platform-server.md](macos-platform-server.md) — Swift native bridge (Calendar, Contacts, iMessage, …)
 - [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) — why the AI hybrid model works

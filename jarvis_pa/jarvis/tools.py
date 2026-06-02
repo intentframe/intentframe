@@ -1,12 +1,15 @@
 """Tool definitions for Jarvis PA.
 
-Actor.submit wrappers + memory_search + memory_get + spawn_agent.
+``Actor.submit`` wrappers plus agent-only tools (``memory_search``,
+``memory_get``, ``spawn_agent``).
 
-Each actor.submit tool follows the same pattern:
-  1. Build a typed Pydantic action model (validates before network call).
-  2. Submit through actor.submit() — every call goes through the IntentFrame
-     Guardian pipeline regardless of how the LLM was instructed.
-  3. Return success data or a clear error string to the LLM.
+Each I/O tool follows the same pattern:
+  1. Build a typed Pydantic action model (tool-schema validation).
+  2. Optional registry pre-flight via ``_validate_against_registry`` — Jarvis
+     imports ``intentframe_native_kit.action_registry`` as author-side convenience (taxonomy + domain
+     payload slices). The Actor itself does not import the registry.
+  3. Submit through ``actor.submit()`` — every call hits the IntentFrame
+     Guardian pipeline. Server-side bundles re-validate authoritatively.
 
 The LLM sees these as plain callable functions.
 """
@@ -21,6 +24,13 @@ from agents import RunContextWrapper, WebSearchTool, function_tool
 from loguru import logger
 from pydantic import BaseModel
 
+# Author-side convenience: jarvis (the agent author) opts into the action
+# registry to fail fast before the network round-trip. The actor and core stay
+# decoupled from the registry; the IntentFrame pipeline still re-validates
+# authoritatively server-side.
+from intentframe_native_kit.action_registry.domains import DOMAIN_SCHEMAS
+from intentframe_native_kit.action_registry.types import ACTION_DOMAINS, ActionType
+
 from jarvis.types import AgentContext
 
 # ---------------------------------------------------------------------------
@@ -34,9 +44,13 @@ from jarvis.types import AgentContext
 # ── Host-file actions ─────────────────────────────────────────────────
 # ``target`` carries a real host path like ``~/Documents/foo.txt``.
 
+# File tools: ``path`` is the executable field — it lands in IntentFrame.data
+# and is exactly what the executor adapter acts on (params["path"]) and what
+# deterministic/domain checks validate. ``target`` is display/audit only.
 class _ReadHostFileAction(BaseModel):
     action: str = "READ_HOST_FILE"
     target: str
+    path: str
     reason: str
     offset: int | None = None
     limit: int | None = None
@@ -44,24 +58,24 @@ class _ReadHostFileAction(BaseModel):
 class _WriteHostFileAction(BaseModel):
     action: str = "WRITE_HOST_FILE"
     target: str
+    path: str
     content: str
     reason: str
 
 class _ListHostDirectoryAction(BaseModel):
     action: str = "LIST_HOST_DIRECTORY"
     target: str
+    path: str
     reason: str
 
 class _DeleteHostFileAction(BaseModel):
     action: str = "DELETE_HOST_FILE"
     target: str
     reason: str
-    # DELETE_HOST_FILE is registered in ACTION_DOMAINS as DELETION, so the
-    # DeletionIntentData schema must be satisfied exactly like _DeleteAction.
-    # Populating target_path explicitly (rather than falling back to
-    # intent.target) keeps DeletionModule.check's raw-string path match
-    # deterministic — see the docstring on DeletionConstraints.
-    target_path: str
+    # DELETE_HOST_FILE is in the deletion domain; ``path`` satisfies
+    # DeletionIntentData and is the field both the domain policy and the
+    # executor act on. ``target`` is display/audit only.
+    path: str
     irreversible: bool = True
 
 class _CommandAction(BaseModel):
@@ -324,6 +338,38 @@ def _render_result(result: Any) -> str:
 # Shared submit helper
 # ---------------------------------------------------------------------------
 
+def _validate_against_registry(payload: dict[str, Any]) -> str | None:
+    """Author-side pre-flight validation using the action registry.
+
+    Returns an error string if the action is unknown to the taxonomy or its
+    critical-domain payload slice is malformed; otherwise ``None``. This is a
+    fail-fast convenience that runs before the network round-trip — the
+    IntentFrame pipeline re-validates authoritatively server-side regardless,
+    so this never weakens enforcement.
+    """
+    action_str = payload.get("action", "")
+    try:
+        action = ActionType(action_str)
+    except ValueError:
+        return (
+            f"Error: unknown action '{action_str}' — not part of the action "
+            f"registry taxonomy."
+        )
+
+    domain = ACTION_DOMAINS.get(action)
+    if domain is not None:
+        schema_cls = DOMAIN_SCHEMAS.get(domain)
+        if schema_cls is not None:
+            try:
+                schema_cls.validate_slice(payload)
+            except Exception as exc:
+                return (
+                    f"Error: {action.value} is in the {domain.value} domain and "
+                    f"requires valid {schema_cls.__name__} data: {exc}"
+                )
+    return None
+
+
 async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> str:
     """Submit an action through the actor and return a string result."""
     payload = action.model_dump()
@@ -336,6 +382,14 @@ async def _submit(ctx: RunContextWrapper[AgentContext], action: BaseModel) -> st
         or payload.get("url")
         or ""
     )
+
+    pre_flight_error = _validate_against_registry(payload)
+    if pre_flight_error is not None:
+        logger.warning(
+            f"actor.submit pre-flight rejected {action_type}: {pre_flight_error}"
+        )
+        return pre_flight_error
+
     logger.debug(
         f"actor.submit: {action_type} — {str(payload['display_subject'])[:60]}"
     )
@@ -364,7 +418,7 @@ async def read_host_file(
     Response includes total_lines and truncated flag — call again
     with a higher offset to read more."""
     return await _submit(ctx, _ReadHostFileAction(
-        target=path, reason=reason, offset=offset, limit=limit,
+        target=path, path=path, reason=reason, offset=offset, limit=limit,
     ))
 
 
@@ -377,7 +431,7 @@ async def write_host_file(
 ) -> str:
     """Write content to a file (create or overwrite)."""
     return await _submit(ctx, _WriteHostFileAction(
-        target=path, content=content, reason=reason,
+        target=path, path=path, content=content, reason=reason,
     ))
 
 
@@ -389,7 +443,7 @@ async def list_host_directory(
 ) -> str:
     """List files and subdirectories at the given path."""
     return await _submit(ctx, _ListHostDirectoryAction(
-        target=path, reason=reason,
+        target=path, path=path, reason=reason,
     ))
 
 
@@ -401,7 +455,7 @@ async def delete_host_file(
 ) -> str:
     """Delete a file or empty directory."""
     return await _submit(ctx, _DeleteHostFileAction(
-        target=path, reason=reason, target_path=path,
+        target=path, path=path, reason=reason,
     ))
 
 

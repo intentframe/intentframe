@@ -41,7 +41,7 @@ for p in (_project_root, _tests_dir):
         sys.path.insert(0, str(p))
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 from intentframe_server.client import IntentFrameClient
 
 from invoice_attack_pipeline import (
@@ -216,7 +216,11 @@ def _print_executor_alert() -> None:
     print("#")
     print("#  REQUIRED:")
     print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
-    print("#    python -m supervisor.main start")
+    print("#    python -m supervisor.main start \\")
+    print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+    print("#")
+    print("#  (--config starts resource-registry so the attack workspace can be")
+    print("#   created; it is NOT in the supervisor's minimal default graph.)")
     print("#")
     print("#  WRONG CONFIG -> VFS MOUNT MISMATCH -> \"TEMPORARILY UNAVAILABLE\" ON READS")
     print("#  (GUARDIAN DECISIONS STAY CORRECT; ADAPTER-LEVEL READS FAIL)")

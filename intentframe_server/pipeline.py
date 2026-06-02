@@ -125,9 +125,14 @@ class IntentFrameRuntime:
         )
         self.onboarding_engine = onboarding_engine
         self._policy_client = policy_client or PolicyRegistryClient()
-        self.deterministic_guardian = deterministic_guardian or DeterministicGuardian(
-            verbose=verbose,
-        )
+        if deterministic_guardian is None:
+            from intentframe_server.config import load_core_config
+
+            deterministic_guardian = DeterministicGuardian(
+                packages=load_core_config().bundles,
+                verbose=verbose,
+            )
+        self.deterministic_guardian = deterministic_guardian
         self.verbose = verbose
         self.audit_log: list = []
         self._request_counter = 0
@@ -176,7 +181,7 @@ class IntentFrameRuntime:
 
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "action": intent.action.value,
+            "action": intent.action,
             "success": result.success,
             "target": intent.target or "",
             "error": result.error,
@@ -307,9 +312,9 @@ class IntentFrameRuntime:
         from intentframe_core.enums import Reversibility, RiskLevel
 
         return AnalysisReport(
-            stated_intent=f"{intent.action.value} on {intent.target}",
+            stated_intent=f"{intent.action} on {intent.target}",
             actual_behaviors=[{
-                "action": intent.action.value,
+                "action": intent.action,
                 "actual_behavior": det_result.reason,
                 "matches_intent": True,
             }],
@@ -465,6 +470,11 @@ class IntentFrameRuntime:
         Actor (external SDK) has already parsed the raw request into an
         IntentFrame and sent it here over HTTP.  Runtime only does:
         Analysis → Guardian → Executor.
+
+        Intent planes inside this call:
+          submitted_intent — frozen at entry; sole input to ``executor.execute()``.
+          effective_intent — after bundle enrichment; fed to AE, Guardian, audit.
+        Pipeline internals must not rewrite adapter params (see executor call below).
         """
         user_context = self._resolve_user_context(user_context)
         async with self._lock:
@@ -476,6 +486,10 @@ class IntentFrameRuntime:
         user_context: UserContext,
     ) -> ExecutionResult:
         """Internal implementation of intent processing."""
+        # Agent-developer contract: executor params == actor payload.
+        # Enrichment (``ctx.enriched_intent``), evidence, and AI context may
+        # rewrite ``intent`` below for governance; they must not reach adapters.
+        submitted_intent = intent.model_copy(deep=True)
         self._request_counter += 1
         req_num = self._request_counter
 
@@ -490,7 +504,7 @@ class IntentFrameRuntime:
             print(f"    ║  {intent_header:<58} ║")
             print(f"    ╠══════════════════════════════════════════════════════════╣")
             print(f"    ║  Agent: {intent.agent_id:<50} ║")
-            print(f"    ║  Action: {intent.action.value:<49} ║")
+            print(f"    ║  Action: {intent.action:<49} ║")
             print(f"    ║  Target: {subject[:49]:<49} ║")
             if reason:
                 print(f"    ╟──────────────────────────────────────────────────────────╢")
@@ -525,6 +539,7 @@ class IntentFrameRuntime:
             user_context,
             verbose=self.verbose,
         )
+        # Governance plane — enriched target/data for AE, Guardian, audit only.
         intent = (
             det_result.bundle_context.effective_intent
             if det_result.bundle_context is not None
@@ -542,7 +557,7 @@ class IntentFrameRuntime:
         if det_result.decision is DeterministicDecision.BLOCK:
             decision_path = det_result.decision_path or "deterministic"
             audit_entry = {
-                "action": intent.action.value,
+                "action": intent.action,
                 "target": intent.target,
                 "data": intent.data,
                 "reason": intent.reason,
@@ -615,7 +630,7 @@ class IntentFrameRuntime:
             )
 
             if self.verbose:
-                print(f"    │  AI analyzing: {intent.action.value}...")
+                print(f"    │  AI analyzing: {intent.action}...")
                 print(f"    │  Confidence: {analysis.confidence:.0%}                                        │")
                 print(f"    │  Reversibility: {analysis.reversibility.value if analysis.reversibility else 'N/A':<41} │")
                 if analysis.hidden_behaviors:
@@ -669,7 +684,7 @@ class IntentFrameRuntime:
 
         # Build audit entry
         audit_entry = {
-            "action": intent.action.value,
+            "action": intent.action,
             "target": intent.target,
             "data": intent.data,
             "reason": intent.reason,
@@ -702,13 +717,15 @@ class IntentFrameRuntime:
                 print(f"    │  {validation.message:<56} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
             
-            # Layer 5: Executor
+            # Layer 5: Executor — always ``submitted_intent``, never ``intent``
+            # (effective/enriched) and never ``validation.modified_intent``.
+            # Adapters consume exactly what the actor submitted; policy context
+            # belongs in evidence / external_context, not hidden param mutation.
             if self.verbose:
                 print(f"    ┌──────────────────────────────────────────────────────────┐")
                 print(f"    │  EXECUTOR: Performing action                             │")
             
-            intent_to_execute = validation.modified_intent or intent
-            result = self.executor.execute(intent_to_execute)
+            result = self.executor.execute(submitted_intent)
             if inspect.isawaitable(result):
                 raise TypeError(
                     "Executor.execute() returned an awaitable; the runtime "
@@ -737,9 +754,9 @@ class IntentFrameRuntime:
                     print(f"    │  Result Info:   {info:<49} │")
                 print(f"    └──────────────────────────────────────────────────────────┘")
 
-            self._log_executor_result(intent, result)
-            
-            # Outcome: request params stay in audit_entry["data"]; executor payload here.
+            self._log_executor_result(submitted_intent, result)
+
+            # audit_entry reflects enriched intent for observability; executor used submitted_intent.
             audit_entry["executed"] = result.success
             audit_entry["result_data"] = result.data
             self.audit_log.append(audit_entry)

@@ -28,10 +28,10 @@ from __future__ import annotations
 
 import pytest
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles import passive_read_action_ids
-from intentframe_native_bundles.actions.terminal._read_only import READ_ONLY_INCOMPATIBLE
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles import passive_read_action_ids
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal._read_only import READ_ONLY_INCOMPATIBLE
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
@@ -39,17 +39,25 @@ from intentframe_components.guardian.deterministic import (
 )
 from intentframe_core.types import IntentFrame, UserContext
 from tests.deterministic_accuracy._helpers import decide_dg_sync, run_dg_with_intel
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
+from tests._bundle_loader import make_deterministic_guardian
 
 
 # ───────────────────────────── helpers ─────────────────────────────
 
 def _intent(action: ActionType, target: str = "", **data) -> IntentFrame:
+    payload = dict(data) if data else {}
+    if (
+        action == ActionType.RUN_COMMAND
+        and target
+        and "command" not in payload
+    ):
+        payload["command"] = target
     return IntentFrame(
         action=action,
         target=target,
-        data=dict(data) if data else None,
+        data=payload or None,
         reason="test",
         agent_id="test_agent",
     )
@@ -84,7 +92,7 @@ def _intel(
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestPermissionGate:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_action_not_in_allowed_actions_blocks(self):
         result = decide_dg_sync(self.dg,
@@ -110,7 +118,7 @@ class TestPermissionGate:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestConstraintGate:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_deny_capability_blocks_before_ae(self):
         """deny_capabilities is enforced by TerminalChecker via
@@ -156,7 +164,7 @@ class TestConstraintGate:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestPassiveReadFastPath:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_passive_read_safe_allows(self):
         result = decide_dg_sync(self.dg,
@@ -194,7 +202,7 @@ class TestPassiveReadFastPath:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestReadOnlyFastPath:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     perm = ActionPermission(safe=False)
 
@@ -298,7 +306,7 @@ class TestReadOnlyFastPath:
 # virtual target is a sensitive system location (shell startup files,
 # credential stores, privilege config, persistence daemons, Python
 # runtime hooks).  Mirrors the VFS floor at
-# resource_registry.floor.DENY_WRITE_PREFIXES which catches the same
+# intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES which catches the same
 # families on the canonicalized real path at I/O time — DG fires on
 # the virtual path, pre-AE, so agents don't spend an LLM round-trip
 # on a write we will refuse at I/O anyway.
@@ -308,13 +316,14 @@ class TestReadOnlyFastPath:
 # pays the LLM round-trip unless the destination trips the block above.
 
 class TestWriteFileSensitivePathBlock:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     perm_safe = ActionPermission(safe=True)
 
     def _decide(self, target: str, *, safe: bool = True) -> DeterministicResult:
+        # ``path`` in data is the executable contract; target is display-only.
         return decide_dg_sync(self.dg,
-            _intent(ActionType.WRITE_FILE, target),
+            _intent(ActionType.WRITE_FILE, target, path=target),
             _user(WRITE_FILE=self.perm_safe if safe else ActionPermission(safe=False)),
         )
 
@@ -388,28 +397,31 @@ class TestWriteFileSensitivePathBlock:
 # ═══════════════════════════════════════════════════════════════════════
 # STEP 3b — HOST_FILE mutation floor (real-path deny prefixes)
 # ═══════════════════════════════════════════════════════════════════════
-# DG enforces ``resource_registry.floor.DENY_WRITE_PREFIXES`` on
+# DG enforces ``intentframe_native_kit.resource_registry.floor.DENY_WRITE_PREFIXES`` on
 # ``WRITE_HOST_FILE`` / ``DELETE_HOST_FILE`` before the LLM round-trip.
 # Unlike the virtual-path ``write_file_sensitive_path`` gate (which works
 # on the raw virtual target), the host-file gates canonicalize via
-# :func:`resource_registry.floor.canonicalize_real_path` first, then call
+# :func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path` first, then call
 # :func:`match_deny_prefix`.  Inputs are therefore picked from the actual
 # expanded floor tuple so the test follows the loader, not a static
 # whitelist.
 
 class TestHostFileFloorBlock:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def _run(self, action: ActionType, target: str):
+        # ``path`` in data is the executable contract; target is display-only.
+        # DELETE_HOST_FILE is in the deletion domain, so ``path`` also satisfies
+        # the DeletionIntentData schema gate.
         return decide_dg_sync(self.dg,
-            _intent(action, target),
+            _intent(action, target, path=target),
             _user(**{action.value: ActionPermission(safe=False)}),
         )
 
     def test_write_host_file_deny_floor_blocks(self):
         # Document the end-to-end flow in one test:
         #   1. ``/etc/sudoers`` is a raw (agent-supplied) real path.
-        #   2. ``resource_registry.floor`` canonicalizes every entry in
+        #   2. ``intentframe_native_kit.resource_registry.floor`` canonicalizes every entry in
         #      ``DENY_WRITE_PREFIXES`` at module-load time via
         #      ``os.path.realpath``.  On macOS ``/etc`` is a symlink to
         #      ``/private/etc``, so the stored tuple holds
@@ -423,7 +435,7 @@ class TestHostFileFloorBlock:
         # canonicalization drifts, the precondition assertion fails
         # loudly with a clear diff instead of a generic "expected BLOCK
         # got UNDECIDED".
-        from resource_registry.floor import (
+        from intentframe_native_kit.resource_registry.floor import (
             DENY_WRITE_PREFIXES,
             canonicalize_real_path,
         )
@@ -501,10 +513,10 @@ class TestHostFileFloorBlock:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestUndecidedDefault:
-    dg = DeterministicGuardian()
+    dg = make_deterministic_guardian()
 
     def test_send_email_with_constraints_falls_through(self):
-        from intentframe_native_bundles.actions.email.constraints import EmailConstraints
+        from intentframe_native_kit.intentframe_native_bundles.actions.email.constraints import EmailConstraints
         perm = ActionPermission(
             safe=False,
             constraints=EmailConstraints(allowed_recipients=["a@b.com"]).model_dump(
@@ -539,10 +551,10 @@ class TestFailClosedExceptionHandling:
         matched_gate=hook_crash and dg_exception set — not fall through
         to the AI path.
         """
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
 
-        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         async def raise_boom(self, intent, action_permission, ctx, *, verbose=False):
             del self, intent, action_permission, ctx, verbose

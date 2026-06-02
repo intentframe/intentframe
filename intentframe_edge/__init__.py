@@ -2,11 +2,16 @@
 
 The edge is a thin, stateless reverse proxy that terminates the network
 (TCP / TLS / optional bearer auth) and forwards requests to the
-supervisor-managed services over their Unix domain sockets:
+supervisor-managed services over their Unix domain sockets. The default
+backend set is minimal:
 
     /policies*                      → policy-registry.sock
-    /workspaces*                    → resource-registry.sock
     /handshake, /process, /audit*   → intentframe.sock
+
+The optional ``/workspaces* → resource-registry.sock`` route is added by the
+first-party kit profile (``intentframe_native_kit/edge_profile.yaml``), selected
+via ``INTENTFRAME_EDGE_CONFIG`` / ``--config``. This mirrors the supervisor's
+registry-less default + opt-in kit profile.
 
 It deliberately does NOT expose the executor or the credential vault —
 those stay UDS-only inside the environment.  The edge holds no state and

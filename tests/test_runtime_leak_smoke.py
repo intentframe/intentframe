@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, UserContext
 from intentframe_server.dry_run_executor import DryRunExecutor
 from intentframe_server.pipeline import IntentFrameRuntime

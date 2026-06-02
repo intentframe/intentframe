@@ -22,13 +22,14 @@ intentframe-gateway-cli                ← 1 entry-point process you launch
   │
   ├── platform-server (Swift)          ← macOS only (Step 5)
   │
-  ├── supervisor                       ← always (Step 6 — manages 4 children)
-  │     │
-  │     │  Spawned by supervisor in dependency order
-  │     │  (supervisor/config.py, supervisor/main.py):
+  ├── supervisor                       ← always (Step 6 — gateway passes the
+  │     │                                  kit profile, so 4 children here)
+  │     │  Spawned by supervisor in dependency order from its service-graph
+  │     │  profile (supervisor/config.py, supervisor/main.py). The gateway
+  │     │  selects intentframe_native_kit/supervisor_profile.yaml:
   │     │
   │     ├── policy-registry            (uvicorn, UDS)
-  │     ├── resource-registry          (uvicorn, UDS)
+  │     ├── resource-registry          (uvicorn, UDS — kit profile only)
   │     ├── executor                   (uvicorn, UDS — separate venv)
   │     └── intentframe-core           (uvicorn, UDS)
   │           depends_on: [policy-registry,
@@ -40,7 +41,7 @@ intentframe-gateway-cli                ← 1 entry-point process you launch
   └── jarvis-telegram                  ← if Telegram credentials present (Step 9)
 ```
 
-Source of truth: `intentframe_gateway/server.py` (lifespan, steps 1–9) and `supervisor/main.py` + `supervisor/config.py` (the four supervised services).
+Source of truth: `intentframe_gateway/server.py` (lifespan, steps 1–9) and `supervisor/main.py` + `supervisor/config.py` (the supervised service graph). The tree above is the gateway deployment, which selects the first-party kit profile (4 services); the bare supervisor default omits `resource-registry` — see [§ What changes per deployment](#what-changes-per-deployment) below.
 
 All inter-process communication uses **Unix domain sockets** under `~/.intentframe/run/`. Nothing listens on a TCP port by default. There is no network IPC between IntentFrame components.
 
@@ -54,7 +55,7 @@ All inter-process communication uses **Unix domain sockets** under `~/.intentfra
 |---|---|
 | **What it is** | The single program you launch. A FastAPI app served on a Unix socket (`~/.intentframe/run/gateway.sock`). |
 | **Source** | `intentframe_gateway/server.py` |
-| **Job** | Starts the credential vault, gates on mandatory credentials (OpenAI key), starts EDI / platform-server / supervisor / Jarvis / Telegram in order, exposes a unified API for frontends. |
+| **Job** | Starts the credential vault, gates on mandatory credentials (OpenAI key), starts EDI / platform-server / supervisor / Jarvis / Telegram in order, exposes a unified API for frontends. Resolves and forwards `INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG` (`intentframe_gateway/profiles.py`); seeds policies against the same bundle list core will load. |
 | **OpenAI calls** | No |
 | **Outbound network** | No |
 | **Holds credentials?** | No — passes runtime env to children, never inspects secrets |
@@ -135,27 +136,28 @@ Like systemd, but only for IntentFrame's four uvicorn services. Writes its PID t
 
 The policies are the *authority* the Guardian enforces against. They're declared at registration time, not inferred at runtime — this is the property that prevents a compromised agent from talking the Guardian into a policy exception.
 
-### 7. `resource-registry` — VFS and adapter registry
+### 7. `resource-registry` — VFS and adapter registry (opt-in)
 
 | | |
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/resource-registry.sock` |
-| **Source** | `resource_registry/server.py` |
+| **Source** | `intentframe_native_kit/resource_registry/server.py` |
 | **Job** | Tracks VFS mounts (which real paths map to which virtual paths) and the registered adapter inventory. |
 | **Storage** | Local SQLite at `~/.intentframe/resource/` |
 | **OpenAI calls** | No |
 | **Outbound network** | No |
 | **Restart-on-crash** | Yes |
+| **In the default graph?** | **No** — it ships in the first-party kit profile, not the packaged minimal default. |
 
-Together with policy-registry, this is the "configuration plane" — what the user has authorized, what resources exist, what adapters are wired up. The pipeline reads from both at every intent.
+Together with policy-registry, this is the "configuration plane" — what the user has authorized, what resources exist, what adapters are wired up. It is **optional**: the executor resolves mounts from a static `pack_options.files.mounts` table in its config, and only consults this service for *dynamic* workspaces. Deployments that need that (the gateway, the test stacks) select the kit profiles (`supervisor_profile.yaml` + `edge_profile.yaml`); the bare substrate omits it.
 
 ### 8. `executor` — the only process with credentials and IO
 
 | | |
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/executor.sock`. Runs in its own Python virtualenv (`~/.intentframe-venvs/executor/`) so its dependencies are isolated from the rest of the system. |
-| **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_executor_pack_macos/adapters/*.py` |
-| **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
+| **Source** | `executor/server.py`, `executor/gateway.py`, `intentframe_native_kit/intentframe_executor_pack_macos/adapters/*.py` |
+| **Job** | Executes validated intents through 18 typed adapters (Files, Mail, Calendar, Browser, Terminal, …). Loads executor packs from `EXECUTOR_CONFIG` → `executor.yaml` `packs:` (see [plugin-profiles.md](plugin-profiles.md)). Holds all credentials. Wraps every `RUN_COMMAND` subprocess in a Seatbelt sandbox. Writes the hash-chained audit log. |
 | **Storage** | SQLite audit DB; in-memory credential cache (loaded from vault) |
 | **OpenAI calls** | No |
 | **Outbound network** | **Yes — but only via approved adapters acting on agent intents.** HTTP adapter calls the URLs the agent named; mail adapter goes through EDI; etc. None of this is background traffic. |
@@ -170,15 +172,22 @@ This is the process the entire IntentFrame security model rests on. See [executo
 |---|---|
 | **What it is** | uvicorn FastAPI app on `~/.intentframe/run/intentframe.sock` |
 | **Source** | `intentframe_server/server.py`, `intentframe_server/pipeline.py`, `intentframe_components/{analysis,guardian,prompt}/...` |
-| **Job** | The validation pipeline. Receives `IntentFrame` requests from agents (via the Actor SDK), runs Command Shield → Deterministic Guardian → Analysis Engine → AI Guardian, and on ALLOW forwards the validated intent to the executor over its UDS. |
+| **Job** | The validation pipeline. Receives `IntentFrame` requests from agents (via the Actor SDK), loads action bundles from `INTENTFRAME_CORE_CONFIG`, runs Command Shield → Deterministic Guardian → Analysis Engine → AI Guardian, and on ALLOW forwards the validated intent to the executor over its UDS. |
 | **Storage** | None directly (reads policies via policy-registry socket) |
 | **OpenAI calls** | **Yes** — the Analysis Engine (`intentframe_components/analysis/engine.py`) and AI Guardian (`intentframe_components/guardian/engine.py`) both call OpenAI. AE uses `gpt-4o-mini` at temperature 0; Guardian uses a reasoning model. |
 | **Outbound network** | **Only OpenAI API**, only on the UNDECIDED path (deterministic gates handle most traffic without an LLM) |
 | **Holds credentials?** | OpenAI API key only (received via env at startup from the gateway, which fetched it from the vault) |
 | **Restart-on-crash** | Yes |
-| **Depends on** | policy-registry, resource-registry, executor |
+| **Depends on** | policy-registry, executor (+ resource-registry when the kit profile is active) |
 
 This is where Guardian and the Analysis Engine actually *run*. When you read "the Guardian decides," the decision is happening in this process. It's also the only IntentFrame-internal process that talks to OpenAI.
+Like the executor, this process is a plugin host: `core.yaml` declares `bundles:`
+(action/domain bundles), while `executor.yaml` declares `packs:` (transport,
+auth, storage, adapters). See [plugin-profiles.md](plugin-profiles.md) for the
+full model (entry points, resolution order, third-party checklist) and
+`intentframe_server/config/core.example.yaml` for the core profile shape and env
+mapping. The supervisor forwards the selected config paths; it does not know
+what bundles or packs mean.
 
 ### 10. `jarvis` — the agent application (optional)
 
@@ -193,7 +202,7 @@ This is where Guardian and the Analysis Engine actually *run*. When you read "th
 | **Holds credentials?** | OpenAI key only (passed via env from the gateway) |
 | **Lifecycle** | Optional. Started by the gateway in Step 8 if Jarvis is enabled. |
 
-The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-core` for validation, and only then to the executor. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
+The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-core` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`intentframe_native_kit.action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
 
 ### 11. `jarvis-telegram` — Telegram bridge (optional)
 
@@ -251,7 +260,7 @@ All IPC uses Unix domain sockets in `~/.intentframe/run/`. Each socket is owned 
 
 ### Why Unix domain sockets
 
-Unix domain sockets are the only IPC primitive used between IntentFrame components — between the gateway and supervisor, between the supervisor and the four core services, between the executor and the platform server, between EDI's daemon and its clients, between any frontend and the gateway. There is intentionally no TCP, no message queue, no IPC bus. The choice is deliberate, and worth being explicit about because it underwrites several security and operational properties.
+Unix domain sockets are the only IPC primitive used between IntentFrame components — between the gateway and supervisor, between the supervisor and its supervised services, between the executor and the platform server, between EDI's daemon and its clients, between any frontend and the gateway. There is intentionally no TCP, no message queue, no IPC bus. The choice is deliberate, and worth being explicit about because it underwrites several security and operational properties.
 
 **1. No network exposure — even loopback.**
 A TCP listener on `127.0.0.1` is still a TCP listener. It's reachable from any process on the machine, accessible from container sidecars, traversable over `ssh -L` port-forwarding, and (with misconfiguration) bindable on `0.0.0.0`. Unix sockets have *no network presence at all* — they live in the filesystem namespace. There is no port number, no bind address, no remote-host concept. If you don't have access to the file, you cannot reach the service. This eliminates an entire class of "I accidentally exposed it" mistakes.
@@ -302,9 +311,9 @@ START
        Step 3:  start EDI                       [if configured]
        Step 4:  build env (config + secrets) for children
        Step 5:  start platform-server           [macOS only]
-       Step 6:  spawn supervisor subprocess
+       Step 6:  spawn supervisor subprocess  [gateway passes the kit profile]
                   ├─ supervisor starts policy-registry
-                  ├─ supervisor starts resource-registry
+                  ├─ supervisor starts resource-registry   [kit profile only]
                   ├─ supervisor starts executor
                   └─ supervisor starts intentframe-core   [depends on above]
        Step 7:  bootstrap (seed policies, register workspace)
@@ -361,7 +370,7 @@ The process model above is the macOS / Jarvis deployment. Other deployments adju
 | **Linux core** | No platform-server (Swift binary is macOS-only); native adapters become "unavailable"; everything else identical |
 | **Cloud (planned)** | Transport changes from UDS to gRPC; platform-server replaced by cloud-equivalent adapters; credential vault may delegate to KMS / Vault |
 
-The supervisor's four core services (`policy-registry`, `resource-registry`, `executor`, `intentframe-core`) are present in every deployment.
+The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile (see [plugin-profiles.md](plugin-profiles.md)). `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
 
 ---
 

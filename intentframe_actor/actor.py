@@ -1,19 +1,22 @@
 """
 Actor — the agent-side SDK for IntentFrame.
 
-Actor is a client library that agent developers use in their tool
-calls.  It parses raw request dicts into signed IntentFrames and
-sends them to the IntentFrame Runtime over HTTP.
+A thin transport client: agent developers call ``Actor.submit()`` from tool
+implementations to route I/O through the IntentFrame security pipeline.
 
-Actor is platform-controlled and trusted.  IntentFrame Runtime only
-accepts IntentFrames from certified Actors (verified signatures).
+The Actor parses request dicts into signed :class:`~intentframe_core.types.IntentFrame`
+objects and POSTs them to the runtime. It does **not** validate action
+taxonomy or critical-domain payload shape — that is optional author-side
+work (e.g. Jarvis imports ``intentframe_native_kit.action_registry`` before submit). Unknown actions
+and malformed domain payloads fail closed server-side in the bundle runner
+and executor.
 
     Agent tool call
         │
         ▼
     Actor.submit({"action": "READ_FILE", ...})
-        │  1. Parse & validate
-        │  2. Build IntentFrame (add metadata, signature)
+        │  1. Parse request → IntentFrame (action as plain string)
+        │  2. Add metadata, signature
         │  3. HTTP POST to Runtime
         │
         ▼
@@ -28,9 +31,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from intentframe_server.client import AsyncIntentFrameClient
-from action_registry import ActionType
-from action_registry.types import ACTION_DOMAINS
-from intentframe_core.domains import DOMAIN_SCHEMAS
 from intentframe_core.types import (
     AgentCapabilities,
     ExecutionResult,
@@ -202,21 +202,16 @@ class Actor:
         """Parse a raw agent request dict into a signed IntentFrame.
 
         Fields ``action``, ``target``, ``reason``, and ``display_subject``
-        are extracted into their dedicated IntentFrame fields.  All
-        remaining keys are captured into ``IntentFrame.data`` so they
-        arrive as adapter params without any per-action translation layer.
+        are extracted into dedicated IntentFrame fields. ``action`` is passed
+        through as an opaque string with no taxonomy check. All remaining keys
+        are captured into ``IntentFrame.data`` so they arrive as adapter params
+        without any per-action translation layer.
 
         Backward compatibility: if the caller passes an explicit ``data``
-        dict (legacy style) with no other extra keys, it is used as-is.
+        dict (legacy style) with no other extra keys, it is merged with any
+        flat keys.
         """
-        action_str = agent_request.get("action", "")
-        try:
-            action = ActionType[action_str]
-        except KeyError:
-            raise ValueError(
-                f"Unknown action '{action_str}'. "
-                f"Valid: {[a.name for a in ActionType]}"
-            )
+        action = agent_request.get("action", "")
 
         # Capture every non-reserved key into data.  If the caller used
         # the legacy {"data": {...}} style, merge it with any flat keys.
@@ -227,20 +222,6 @@ class Actor:
             data = {**explicit_data, **extra} or None
         else:
             data = extra or None
-
-        # Validate data against the domain schema for critical domains.
-        domain = ACTION_DOMAINS.get(action)
-        if domain is not None:
-            schema_cls = DOMAIN_SCHEMAS.get(domain)
-            if schema_cls is not None:
-                raw = data or {}
-                try:
-                    schema_cls(**raw)
-                except Exception as exc:
-                    raise ValueError(
-                        f"{action.name} is in the {domain.value} domain and "
-                        f"requires valid {schema_cls.__name__} data: {exc}"
-                    ) from exc
 
         agent_type = ""
         if self.agent_capabilities:

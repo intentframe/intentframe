@@ -12,19 +12,19 @@
 Deterministic enforcement is **not one layer**. It is the same conceptual job split across **six process areas**, with **action-id literals** and **constraint-type registries** wired in Python:
 
 ```
-  action_registry/types.py     ActionType enum, ACTION_CATEGORIES, ACTION_DOMAINS
+  intentframe_native_kit/action_registry/types.py     ActionType enum, ACTION_CATEGORIES, ACTION_DOMAINS
   policy_registry/             YAML → UserPolicy.allowed_actions[action_string]
   intentframe_server/          Pre-AE forks: RUN_COMMAND, WRITE_*, email enrich
   command_shield/              Structural command/code analysis (package)
   intentframe_components/      DG, AE fast-paths, checkers, prompt routing
-  executor/ + resource_registry/  I/O-time floors (post-approval)
+  executor/ + intentframe_native_kit/resource_registry/  I/O-time floors (post-approval)
 ```
 
 **Core tension you observed is correct:**
 
 - Policy is stored as **per-action strings** (`allowed_actions["RUN_COMMAND"]`) with optional **constraint models** (`TerminalConstraints`, `MessageConstraints`, …).
 - Runtime enforcement **does not** discover rules from policy alone. It also consults **hardcoded sets** in components (`_PASSIVE_READ_ACTIONS`, `CRITICAL_ACTIONS`) and **hardcoded `if action == …` gates** in pipeline and DG.
-- Adding a new action to `action_registry` does **not** automatically get correct deterministic behavior — someone must update the right set/checker/fork.
+- Adding a new action to `intentframe_native_kit.action_registry` does **not** automatically get correct deterministic behavior — someone must update the right set/checker/fork.
 
 ---
 
@@ -170,10 +170,10 @@ These sets live in **components source** — policy cannot express them today:
 | `command_shield_catastrophic` | `intentframe_server/pipeline.py` L501–535 | `RUN_COMMAND` + command present | BLOCK, never reaches DG | **Yes — RUN_COMMAND only** |
 | `command_intel_build` | pipeline L543–563 | same | Evidence for downstream | **Yes — RUN_COMMAND** |
 | `file_intel_build` | pipeline + `file_intel.py` | `WRITE_FILE`, `WRITE_HOST_FILE` + string content | Evidence | **Yes — write family** |
-| `email_enrich` | `intentframe_native_bundles/actions/email/bundle.py` | 7 email message actions | Mutates intent target/data via bundle `enrich()` | **Yes — email set** |
+| `email_enrich` | `intentframe_native_kit/intentframe_native_bundles/actions/email/bundle.py` | 7 email message actions | Mutates intent target/data via bundle `enrich()` | **Yes — email set** |
 | `permission` | `deterministic.py` L197–203 | action not in `allowed_actions` | BLOCK | **Generic** (per-action key) |
 | `constraint` | DG L207–220 | `permission.constraints` type | BLOCK | **Generic dispatch**, family checker |
-| `domain` | DG L222–236 | `ACTION_DOMAINS[intent.action]` | BLOCK | **Per-action map** in action_registry |
+| `domain` | DG L222–236 | `ACTION_DOMAINS[intent.action]` | BLOCK | **Per-action map** in intentframe_native_kit.action_registry |
 | `write_file_sensitive_path` | DG L250–259 | `WRITE_FILE` + path heuristic | BLOCK | **Yes — WRITE_FILE** |
 | `write_host_file_floor` | DG L275–286 | `WRITE_HOST_FILE` | BLOCK | **Yes** |
 | `delete_host_file_floor` | DG L288–299 | `DELETE_HOST_FILE` | BLOCK | **Yes** |
@@ -578,7 +578,7 @@ not a gate.
   prompt/strategy.py              |    *    |       ***       |      **
   routing/criticality.py          |    -    |       ***       |      ***
   guardian/checkers/*             |   **    |        *        |       *
-  intentframe_native_bundles/actions/email/bundle.py |    -    |       ***       |      **
+  intentframe_native_kit/intentframe_native_bundles/actions/email/bundle.py |    -    |       ***       |      **
   file_intel.py                   |    -    |       **        |       *
   command_shield                  | family  |     RUN_COMMAND |       -
   executor adapters               |  floor  |     per-action  |       -
@@ -618,7 +618,7 @@ Legend: `*` = some generic machinery; `***` = heavy action-specific coupling.
   4. intentframe_components/analysis/engine.py  (if UNDECIDED)
   5. intentframe_components/prompt/strategy.py + routing/criticality.py
   6. intentframe_components/guardian/engine.py
-  7. action_registry/types.py  (category, domain for action)
+  7. intentframe_native_kit.action_registry/types.py  (category, domain for action)
   8. executor/platforms/.../adapters/<family>.py  (if executed)
 ```
 

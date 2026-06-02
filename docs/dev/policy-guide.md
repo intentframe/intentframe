@@ -24,9 +24,13 @@ The important pieces are:
 - `policy_registry/seeds/resolver.py`: resolves user override files under
   `~/.intentframe/policies/`.
 - `intentframe_gateway/bootstrap.py`: seeds Jarvis policy and workspace on
-  gateway startup.
+  gateway startup; validates seeded actions against bundles from
+  `resolve_core_config_path()` → `core.yaml` (same list `intentframe-core` loads).
+- `intentframe_gateway/profiles.py`: shared gateway resolver for that core profile path.
 - `jarvis_pa/seed_policies.py`: development convenience script using the same
-  loader as the gateway.
+  loader as the gateway (requires `INTENTFRAME_CORE_CONFIG` when validating bundles).
+
+Which bundles are active in a deployment: [plugin-profiles.md](../plugin-profiles.md).
 
 The gateway auto-seeds only Jarvis today. External agents are mentioned in the
 loader API, but policy install and review flows are still TODOs.
@@ -122,7 +126,7 @@ For Jarvis, `intentframe_gateway/bootstrap.py` resolves:
 2. User id: gateway identity config, with environment fallback.
 3. Agent id: `jarvis` for user mode or `jarvis_root` for root mode.
 4. YAML path: user override first, packaged policy second.
-5. Validated policy: `policy_registry.seeds.load_policy_seed(...)` (registry fields + bundle constraint schemas).
+5. Validated policy: `policy_registry.seeds.load_policy_seed(..., bundle_packages=...)` (registry fields + host-supplied bundle constraint schemas).
 
 The bootstrapper then posts the policy into the policy registry.
 
@@ -236,7 +240,7 @@ RUN_COMMAND:
 `blocked_patterns` are direct string-level hard blocks.
 
 `deny_capabilities` are command-shield capability tags. The default list is
-mirrored from `intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
+mirrored from `intentframe_native_kit.intentframe_native_bundles.actions.terminal.capabilities.DEFAULT_TERMINAL_DENY_CAPABILITIES`
 and pinned by tests. If you change the default deny surface in the codebase,
 update the capability constant first and keep the YAML parity test passing.
 
@@ -281,7 +285,7 @@ contacts.
 
 `recipient_sources` and `contact_sources` are stored opaquely in the policy
 registry and resolved at runtime by the email and message bundles during
-`enforce_constraints` (via `intentframe_native_bundles/platform/contacts_client.py`).
+`enforce_constraints` (via `intentframe_native_kit/intentframe_native_bundles/platform/contacts_client.py`).
 The registry does not expand contact lists at write time.
 
 ## Intent Limits
@@ -321,7 +325,10 @@ python - <<'PY'
 from pathlib import Path
 from policy_registry.seeds import load_policy_seed
 
-policy = load_policy_seed(Path("~/.intentframe/policies/jarvis.yaml").expanduser())
+policy = load_policy_seed(
+    Path("~/.intentframe/policies/jarvis.yaml").expanduser(),
+    bundle_packages=["my_org.intentframe_bundles"],
+)
 print(policy.model_dump(mode="json", exclude={"created_at"}))
 PY
 ```

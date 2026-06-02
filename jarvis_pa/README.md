@@ -21,6 +21,8 @@ You type a message
 
 IntentFrame is a dependency, not an identity. Jarvis stores nothing in IntentFrame paths. It follows IntentFrame's security principles (every AI-decided action goes through the pipeline), but architecturally it is decoupled — the same way a Django app follows HTTP semantics without being "an HTTP project".
 
+When the gateway starts Jarvis, it also selects which **action bundles** (`INTENTFRAME_CORE_CONFIG` → `core.yaml`) and **executor packs** (`EXECUTOR_CONFIG` → `jarvis_pa/executor.yaml` or `executor_root.yaml`) load in the supervised stack. See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
+
 ## Architecture
 
 ```
@@ -124,7 +126,7 @@ This installs Jarvis along with all other workspace members. Requires a running 
 
 Email tools in Jarvis (`read_email`, `search_email`, `send_email` in `jarvis/tools.py`) take a required **`account_email`** argument. The model must know that address (from the user, from memory, or from a prior tool result) before it can call those tools successfully.
 
-On the **executor** side, the macOS mail adapter (`intentframe_executor_pack_macos/adapters/mail.py`) uses EDI’s `EmailClient.get_active_accounts()` to validate `account_email`. If an account-scoped action is submitted **without** `account_email`, the adapter returns **failure** and the error string includes the list of **active** accounts. That is account discovery on the **error path only** — not a separate successful action and not exposed as structured JSON the way `list_calendars` is for calendars.
+On the **executor** side, the macOS mail adapter (`intentframe_native_kit/intentframe_executor_pack_macos/adapters/mail.py`) uses EDI’s `EmailClient.get_active_accounts()` to validate `account_email`. If an account-scoped action is submitted **without** `account_email`, the adapter returns **failure** and the error string includes the list of **active** accounts. That is account discovery on the **error path only** — not a separate successful action and not exposed as structured JSON the way `list_calendars` is for calendars.
 
 There is no `LIST_EMAIL_ACCOUNTS` entry in the shared action registry today, and no dedicated Jarvis tool that lists accounts as a normal success response. Until that exists (or `account_email` becomes optional at the Jarvis tool layer with a documented retry flow), assistants may still ask you for an address even though the executor could surface candidates when the field is omitted.
 

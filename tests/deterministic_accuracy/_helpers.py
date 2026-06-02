@@ -6,10 +6,10 @@ import asyncio
 from dataclasses import dataclass
 from unittest.mock import patch
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from command_shield import Verdict, inspect_command
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_bundle_sdk.types import BundlePhaseOutcome
 from intentframe_components.guardian.deterministic import (
     DeterministicGuardian,
@@ -95,11 +95,14 @@ def run_dg(
 ) -> tuple[DeterministicResult, ShieldView]:
     """Drive full DG lifecycle for RUN_COMMAND with real command_shield."""
     view = build_shield_view(command)
-    dg = dg or DeterministicGuardian()
+    if dg is None:
+        from tests._bundle_loader import make_deterministic_guardian
+
+        dg = make_deterministic_guardian()
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target=command,
-        data=None,
+        data={"command": command},
         reason="accuracy test",
         agent_id="dg_accuracy",
     )
@@ -115,14 +118,17 @@ def run_dg_with_intel(
 ) -> DeterministicResult:
     """Pin checker gates with seeded command_intel (skips real shield)."""
 
-    from intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY
+    from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import COMMAND_INTEL_KEY
 
     async def seed_prepare(self, intent, ctx, *, verbose=False):
         del intent, verbose
         ctx.evidence[COMMAND_INTEL_KEY] = command_intel
         return BundlePhaseOutcome.continue_(ctx)
 
-    dg = dg or DeterministicGuardian()
+    if dg is None:
+        from tests._bundle_loader import make_deterministic_guardian
+
+        dg = make_deterministic_guardian()
     with patch.object(TerminalActionBundle, "prepare_evidence", seed_prepare):
         result, _ = run_dg(command, user_context, dg)
     return result

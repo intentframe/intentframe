@@ -27,12 +27,12 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from executor_client.bridge import ExecutorBridge
+from intentframe_native_kit.extras.bridge import ExecutorBridge
 from executor_client.http_client import _RESULT_MAP
 
 
 def _adapter_run_command_data() -> dict:
-    """Shape emitted by intentframe_executor_pack_macos/adapters/terminal.py."""
+    """Shape emitted by intentframe_native_kit.intentframe_executor_pack_macos/adapters/terminal.py."""
     return {
         "stdout": "",
         "stderr": "ps: illegal option -- -\nusage: ps ...\n",

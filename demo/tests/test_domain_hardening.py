@@ -22,16 +22,16 @@ _project_root = Path(__file__).parent.parent.parent.resolve()
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from action_registry import ActionType
-from action_registry.types import DomainType, ACTION_DOMAINS
+from intentframe_native_kit.action_registry import ActionType
+from intentframe_native_kit.action_registry.types import DomainType, ACTION_DOMAINS
 from intentframe_core.types import IntentFrame
-from intentframe_core.domains import DOMAIN_SCHEMAS
+from intentframe_native_kit.action_registry.domains import DOMAIN_SCHEMAS
 from policy_registry.models import UserPolicy
-from intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
-from intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
-from intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
-from intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
-from intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
+from intentframe_native_kit.intentframe_native_bundles.domains.deletion.bundle import DeletionDomainBundle
+from intentframe_native_kit.intentframe_native_bundles.domains.deletion.constraints import DeletionConstraints
+from intentframe_native_kit.intentframe_native_bundles.domain_routes import DOMAIN_ROUTES
+from intentframe_native_kit.intentframe_native_bundles.domains.finance.bundle import FinanceDomainBundle
+from intentframe_native_kit.intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
 from intentframe_bundle_sdk.types import PhaseDecision
 
 passed_count = 0
@@ -130,14 +130,25 @@ def test_finance_module():
     ok4, reason4 = _check_finance(intent4, constraints)
     check("Recipient 'Unknown LLC' not in allowlist → BLOCK", not ok4)
 
-    # No recipient specified → pass (optional field)
+    # No recipient specified → BLOCK when allowed_recipients policy is configured
     intent5 = IntentFrame(
         action=ActionType.PAY_INVOICE,
         target="vendor",
         data={"amount": 100.0, "currency": "USD"},
     )
-    ok5, _ = _check_finance(intent5, constraints)
-    check("No recipient (optional) → pass", ok5)
+    ok5, reason5 = _check_finance(intent5, constraints)
+    check("No recipient with allowed_recipients policy → BLOCK", not ok5)
+    check("  reason mentions recipient", "recipient" in reason5.lower())
+
+    # Missing amount with max_amount policy → BLOCK
+    intent5b = IntentFrame(
+        action=ActionType.PAY_INVOICE,
+        target="vendor",
+        data={"currency": "USD", "recipient": "ACME Corp"},
+    )
+    ok5b, reason5b = _check_finance(intent5b, constraints)
+    check("Missing amount with max_amount policy → BLOCK", not ok5b)
+    check("  reason mentions amount", "amount" in reason5b.lower())
 
     # No domain constraints → pass (nothing to enforce)
     ok6, _ = _check_finance(intent, None)
@@ -159,7 +170,7 @@ def test_deletion_module():
     intent = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/important/database.db",
-        data={"target_path": "/important/database.db", "irreversible": False},
+        data={"path": "/important/database.db", "irreversible": False},
     )
     ok, reason = _check_deletion(intent, constraints)
     check("Path /important/database.db not in [/tmp/*, /cache/] → BLOCK", not ok)
@@ -169,7 +180,7 @@ def test_deletion_module():
     intent2 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/tmp/scratch.log",
-        data={"target_path": "/tmp/scratch.log", "irreversible": True},
+        data={"path": "/tmp/scratch.log", "irreversible": True},
     )
     ok2, reason2 = _check_deletion(intent2, constraints)
     check("Path /tmp/scratch.log matches, but irreversible=True → BLOCK", not ok2)
@@ -179,7 +190,7 @@ def test_deletion_module():
     intent3 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/tmp/scratch.log",
-        data={"target_path": "/tmp/scratch.log", "irreversible": False},
+        data={"path": "/tmp/scratch.log", "irreversible": False},
     )
     ok3, _ = _check_deletion(intent3, constraints)
     check("Path matches, irreversible=False → pass", ok3)
@@ -188,17 +199,27 @@ def test_deletion_module():
     intent4 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/cache/old_data.bin",
-        data={"target_path": "/cache/old_data.bin", "irreversible": False},
+        data={"path": "/cache/old_data.bin", "irreversible": False},
     )
     ok4, _ = _check_deletion(intent4, constraints)
     check("Path /cache/old_data.bin prefix matches /cache/ → pass", ok4)
+
+    # Missing path with allowed_paths policy → BLOCK
+    intent4b = IntentFrame(
+        action=ActionType.DELETE_FILE,
+        target="/tmp/scratch.log",
+        data={"irreversible": False},
+    )
+    ok4b, reason4b = _check_deletion(intent4b, constraints)
+    check("Missing path with allowed_paths policy → BLOCK", not ok4b)
+    check("  reason mentions path", "path" in reason4b.lower())
 
     # No allowed_paths constraint → only check irreversible
     constraints2 = DeletionConstraints(block_irreversible=False)
     intent5 = IntentFrame(
         action=ActionType.DELETE_FILE,
         target="/anywhere/file.txt",
-        data={"target_path": "/anywhere/file.txt", "irreversible": True},
+        data={"path": "/anywhere/file.txt", "irreversible": True},
     )
     ok5, _ = _check_deletion(intent5, constraints2)
     check("No path restriction, block_irreversible=False → pass", ok5)
@@ -210,7 +231,7 @@ def test_deletion_module_host_file():
     ``UserPolicy.domain_constraints`` is keyed by ``DomainType``, so a
     single ``DeletionConstraints`` instance is shared across every
     ``DELETE_*`` action a user is granted.  ``DeletionModule`` matches
-    ``data["target_path"]`` with raw string / fnmatch — it is
+    ``data["path"]`` with raw string / fnmatch — it is
     *vocabulary-blind* (no normalize_virtual_path, no canonicalize_real_path).
     The plan calls out that mixing virtual (``/home/*``) and real
     (``~/Documents/*``) patterns is unsafe unless the namespaces are
@@ -239,7 +260,7 @@ def test_deletion_module_host_file():
     intent = IntentFrame(
         action=ActionType.DELETE_HOST_FILE,
         target="~/Documents/notes.md",
-        data={"target_path": "~/Documents/notes.md", "irreversible": True},
+        data={"path": "~/Documents/notes.md", "irreversible": True},
     )
     ok, _ = _check_deletion(intent, constraints_none)
     check(
@@ -274,7 +295,7 @@ def test_deletion_module_host_file():
     intent_real = IntentFrame(
         action=ActionType.DELETE_HOST_FILE,
         target="~/Documents/notes.md",
-        data={"target_path": "~/Documents/notes.md", "irreversible": False},
+        data={"path": "~/Documents/notes.md", "irreversible": False},
     )
     ok_cross, _ = _check_deletion(intent_real, constraints_virtual)
     check(
@@ -287,15 +308,20 @@ def test_deletion_module_host_file():
 # 2. Actor Schema Validation (no server)
 # ═══════════════════════════════════════════════════════════════════
 
-def test_actor_schema_validation():
+def test_actor_is_thin_transport():
     print("\n" + "=" * 60)
-    print("  2. Actor Schema Validation — _build_intent")
+    print("  2. Actor is a thin transport — _build_intent")
     print("=" * 60)
 
+    # Contract: the actor does NOT validate action taxonomy or domain intent
+    # shape. ``IntentFrame.action`` is an opaque string and the actor passes
+    # ``data`` through untouched. Domain shape is enforced server-side by the
+    # bundle runner (``check_domain_intent_shape``) and domain bundles; unknown
+    # actions fail closed at executor dispatch.
     from intentframe_actor import Actor
     actor = Actor(agent_id="test", user_id="test")
 
-    # PAY_INVOICE with valid data → should succeed
+    # PAY_INVOICE with valid data → builds OK, action is the plain string.
     intent = actor._build_intent({
         "action": "PAY_INVOICE",
         "target": "vendor_invoice",
@@ -303,80 +329,60 @@ def test_actor_schema_validation():
         "data": {"amount": 5000.0, "currency": "USD"},
     })
     check("PAY_INVOICE with amount+currency → builds OK", intent is not None)
-    check("  action is PAY_INVOICE", intent.action == ActionType.PAY_INVOICE)
+    check("  action is the plain string 'PAY_INVOICE'", intent.action == "PAY_INVOICE")
+    check("  action equals ActionType.PAY_INVOICE.value", intent.action == ActionType.PAY_INVOICE.value)
 
-    # PAY_INVOICE missing amount → should raise ValueError
-    raised = False
-    msg = ""
-    try:
-        actor._build_intent({
-            "action": "PAY_INVOICE",
-            "target": "vendor",
-            "reason": "test",
-            "data": {"description": "no amount field"},
-        })
-    except ValueError as e:
-        raised = True
-        msg = str(e)
-    check("PAY_INVOICE without amount → ValueError", raised)
-    check("  error mentions FinancialIntentData", "FinancialIntentData" in msg)
+    # PAY_INVOICE missing amount → actor no longer validates; still builds.
+    intent_bad_finance = actor._build_intent({
+        "action": "PAY_INVOICE",
+        "target": "vendor",
+        "reason": "test",
+        "data": {"description": "no amount field"},
+    })
+    check(
+        "PAY_INVOICE without amount → builds OK (validated server-side)",
+        intent_bad_finance is not None,
+    )
 
-    # DELETE_FILE with valid data → should succeed
+    # DELETE_FILE with valid data → builds OK.
     intent2 = actor._build_intent({
         "action": "DELETE_FILE",
         "target": "/tmp/file.txt",
         "reason": "cleanup",
-        "data": {"target_path": "/tmp/file.txt"},
+        "data": {"path": "/tmp/file.txt"},
     })
-    check("DELETE_FILE with target_path → builds OK", intent2 is not None)
+    check("DELETE_FILE with path → builds OK", intent2 is not None)
 
-    # DELETE_FILE missing target_path → should raise ValueError
-    raised2 = False
-    try:
-        actor._build_intent({
-            "action": "DELETE_FILE",
-            "target": "/tmp/file.txt",
-            "reason": "cleanup",
-            "data": {"filename": "file.txt"},
-        })
-    except ValueError as e:
-        raised2 = True
-    check("DELETE_FILE without target_path → ValueError", raised2)
-
-    # DELETE_HOST_FILE (real-path parallel) — same DeletionIntentData schema.
-    intent_host = actor._build_intent({
-        "action": "DELETE_HOST_FILE",
-        "target": "~/Documents/file.txt",
+    # DELETE_FILE missing path → actor no longer validates; still builds.
+    intent_bad_deletion = actor._build_intent({
+        "action": "DELETE_FILE",
+        "target": "/tmp/file.txt",
         "reason": "cleanup",
-        "data": {"target_path": "~/Documents/file.txt"},
+        "data": {"filename": "file.txt"},
     })
     check(
-        "DELETE_HOST_FILE with target_path → builds OK",
-        intent_host is not None,
+        "DELETE_FILE without path → builds OK (validated server-side)",
+        intent_bad_deletion is not None,
     )
 
-    raised_host = False
-    try:
-        actor._build_intent({
-            "action": "DELETE_HOST_FILE",
-            "target": "~/Documents/file.txt",
-            "reason": "cleanup",
-            "data": {"filename": "file.txt"},
-        })
-    except ValueError:
-        raised_host = True
+    # Unknown action string → actor does not police the taxonomy.
+    intent_unknown = actor._build_intent({
+        "action": "NOT_A_REAL_ACTION",
+        "target": "x",
+        "reason": "author's responsibility",
+    })
     check(
-        "DELETE_HOST_FILE without target_path → ValueError",
-        raised_host,
+        "Unknown action string → builds OK (fails closed at dispatch)",
+        intent_unknown is not None and intent_unknown.action == "NOT_A_REAL_ACTION",
     )
 
-    # Non-critical-domain action → no schema validation
+    # Non-critical-domain action → builds OK.
     intent3 = actor._build_intent({
         "action": "READ_FILE",
         "target": "/invoices/test.md",
         "reason": "reading",
     })
-    check("READ_FILE (no domain) → builds OK without schema", intent3 is not None)
+    check("READ_FILE → builds OK", intent3 is not None)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -489,8 +495,8 @@ def test_guardian_pipeline():
     from intentframe_components.analysis import AIAnalysisEngine
     from intentframe_components.guardian import AIGuardian
     from policy_registry.models import ActionPermission
-    from intentframe_native_bundles.actions.api.constraints import ApiConstraints
-    from intentframe_native_bundles.actions.files.constraints import FileConstraints
+    from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
+    from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints import FileConstraints
 
     analysis_engine = AIAnalysisEngine(model="gpt-4o-mini", verbose=False)
     guardian = AIGuardian(model="gpt-4o-mini", verbose=True)
@@ -572,7 +578,7 @@ def test_guardian_pipeline():
             "intent": IntentFrame(
                 action=ActionType.DELETE_FILE,
                 target="/important/database.db",
-                data={"target_path": "/important/database.db", "irreversible": False},
+                data={"path": "/important/database.db", "irreversible": False},
                 reason="Cleaning up old data",
                 agent_id="test_agent",
             ),
@@ -584,7 +590,7 @@ def test_guardian_pipeline():
             "intent": IntentFrame(
                 action=ActionType.DELETE_FILE,
                 target="/tmp/old_cache.bin",
-                data={"target_path": "/tmp/old_cache.bin", "irreversible": True},
+                data={"path": "/tmp/old_cache.bin", "irreversible": True},
                 reason="Removing stale cache",
                 agent_id="test_agent",
             ),
@@ -632,7 +638,7 @@ def main():
     test_finance_module()
     test_deletion_module()
     test_deletion_module_host_file()
-    test_actor_schema_validation()
+    test_actor_is_thin_transport()
     test_serialization_roundtrip()
     test_taxonomy()
 

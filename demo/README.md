@@ -30,9 +30,17 @@ invoice_bot → Actor SDK → Analysis Engine → Guardian → Executor → real
 
 **Terminal 1 — start the supervisor with demo config (from repo root):**
 
+`INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` point at the demo's `core.yaml` and `executor.yaml` profiles (which bundles and packs load). See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
+
 ```bash
-EXECUTOR_CONFIG=demo/config/executor.yaml python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+EXECUTOR_CONFIG=demo/config/executor.yaml \
+python -m supervisor.main start \
+  --config intentframe_native_kit/supervisor_profile.yaml
 ```
+
+The kit profile starts `resource-registry` so the dashboard can register workspaces.
+The packaged supervisor default omits it; use the profile for all demo/test runs.
 
 **Terminal 2 — run the demo dashboard (from repo root):**
 
@@ -62,8 +70,11 @@ See [`tests/README.md`](tests/README.md) for the full test guide — threat mode
 Quick start (from **repo root**, with the attack supervisor running):
 
 ```bash
-# Start the supervisor with the attack executor profile
-EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+# Start the supervisor with the attack executor profile + kit profile (workspaces)
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
+python -m supervisor.main start \
+  --config intentframe_native_kit/supervisor_profile.yaml
 
 # Foundation attacks (1-6)
 python demo/tests/test_attacks.py

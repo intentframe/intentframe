@@ -21,7 +21,7 @@ import re
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_core.types import IntentFrame, AnalysisReport, UserContext
 from intentframe_core.enums import RiskLevel, Reversibility
 
@@ -29,7 +29,7 @@ from intentframe_components.analysis.engine import AIAnalysisEngine, AIAnalysisO
 from intentframe_components.guardian.engine import AIGuardian
 from intentframe_components.prompt.hardening import PromptHardening
 from policy_registry.models import ActionPermission
-from intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
 
 
 # ═══════════════════════════════════════════════════════════════════════

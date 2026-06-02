@@ -30,15 +30,15 @@ Three things stay separate; do not collapse them:
 2. **Domain bundles** (`domains/<finance|deletion>/`) — own domain logic only; no action ids.
 3. **Domain routes** (`domain_routes.py`) — routing manifest; registered via `register_domain_routes()`.
 
-Runtime routing authority is **plugin-owned SDK registry**, not `action_registry.ACTION_DOMAINS`:
+Runtime routing authority is **plugin-owned SDK registry**, not `intentframe_native_kit.action_registry.ACTION_DOMAINS`:
 
 - `register_domain_routes(DOMAIN_ROUTES)` merges routes after domain bundles register.
 - `domains_for_action(action_id) -> tuple[str, ...]` — supports many-to-many.
 - `_ROUTED_DOMAIN_IDS` + route-aware `validate_policy_domain_constraints()` — fail closed if bundle missing or no route.
 - `registered_domain_ids()`, `routed_domain_ids()` for introspection.
-- Runner loops `for domain_id in domains_for_action(action_id)`; **does not import `action_registry`**.
+- Runner loops `for domain_id in domains_for_action(action_id)`; **does not import `intentframe_native_kit.action_registry`**.
 
-`ACTION_DOMAINS` in `action_registry/types.py` remains for actor, demo, and docs only — not the deterministic runner path.
+`ACTION_DOMAINS` in `intentframe_native_kit/action_registry/types.py` is a taxonomy hint (maps enum members to `DomainType`). Runtime domain routing uses `domain_routes.py` + `domains_for_action()` — not `ACTION_DOMAINS`. Optional agent-author pre-flight (e.g. Jarvis `_validate_against_registry`) may read `ACTION_DOMAINS` + `DOMAIN_SCHEMAS`; the Actor and bundle runner do not.
 
 ### 0.2 Intentional drifts from pass 12 (`5719a35`)
 
@@ -56,7 +56,7 @@ Make IntentFrame a strict plugin platform.
 
 - The substrate (`intentframe_components/`, `intentframe_server/`) orchestrates and consumes data; it never reads constraint field names, never re-runs enforcement, never calls bundle methods at prompt-build time.
 - The SDK (`intentframe_bundle_sdk/`) owns the lifecycle contract, runner, registry, loader, and the data shapes that flow from bundles to the AI layer.
-- Plugins (`intentframe_native_bundles/<family>/`) own action ids, constraint schemas, evidence, validation, enforcement, descriptions, structural and allow gates, and AI context.
+- Plugins (`intentframe_native_kit/intentframe_native_bundles/<family>/`) own action ids, constraint schemas, evidence, validation, enforcement, descriptions, structural and allow gates, and AI context.
 - The `policy_registry` stores opaque dict constraints only — no Pydantic constraint unions, no domain constraint typed union.
 
 ## 2. Boundary Rules (Hard)
@@ -241,7 +241,7 @@ Constraint prompt context fallbacks (all inside the SDK runner, never in Guardia
 ## 8. Final Plugin Layout
 
 ```
-intentframe_native_bundles/
+intentframe_native_kit/intentframe_native_bundles/
   __init__.py                # register_bundles(registry) only (shim removed in Phase 7)
   shared/
     files/                   # FileIntel, pre_pipeline, path_heuristics, AE write prompts (files + host_files)
@@ -293,7 +293,7 @@ Per-family passive-read ids (locked):
 - `spotlight`: SEARCH_SPOTLIGHT.
 - `system`: GET_SYSTEM_INFO, GET_BRIGHTNESS, GET_VOLUME, GET_MUTE, GET_DARK_MODE.
 
-`intentframe_native_bundles/__init__.py` body:
+`intentframe_native_kit/intentframe_native_bundles/__init__.py` body:
 
 ```python
 def register_bundles(registry) -> None:
@@ -335,19 +335,19 @@ def register_bundles(registry) -> None:
 
 ### Already deleted
 
-- `intentframe_native_bundles/manifest.py`
-- `intentframe_native_bundles/policy_bridge.py`
-- `intentframe_native_bundles/taxonomy.py`
-- `intentframe_native_bundles/critical/` (entire folder)
-- `intentframe_native_bundles/pre_pipeline.py` (top-level)
-- `intentframe_native_bundles/types.py` (top-level; `BundleGateDecision` moved to SDK)
-- `intentframe_native_bundles/registry.py` (top-level)
-- `intentframe_native_bundles/evidence.py` (top-level; split into family folders)
-- `intentframe_native_bundles/bundles/` (entire folder)
-- `intentframe_native_bundles/passive_read/` (entire folder)
-- `intentframe_native_bundles/actions/finance/` (finance is domain-only)
+- `intentframe_native_kit/intentframe_native_bundles/manifest.py`
+- `intentframe_native_kit/intentframe_native_bundles/policy_bridge.py`
+- `intentframe_native_kit/intentframe_native_bundles/taxonomy.py`
+- `intentframe_native_kit/intentframe_native_bundles/critical/` (entire folder)
+- `intentframe_native_kit/intentframe_native_bundles/pre_pipeline.py` (top-level)
+- `intentframe_native_kit/intentframe_native_bundles/types.py` (top-level; `BundleGateDecision` moved to SDK)
+- `intentframe_native_kit/intentframe_native_bundles/registry.py` (top-level)
+- `intentframe_native_kit/intentframe_native_bundles/evidence.py` (top-level; split into family folders)
+- `intentframe_native_kit/intentframe_native_bundles/bundles/` (entire folder)
+- `intentframe_native_kit/intentframe_native_bundles/passive_read/` (entire folder)
+- `intentframe_native_kit/intentframe_native_bundles/actions/finance/` (finance is domain-only)
 - `intentframe_bundle_sdk/constraint_checker_skip.py`
-- Aggregator exports `CRITICAL_ACTIONS`, `PASSIVE_READ_ACTIONS`, `is_critical` from `intentframe_native_bundles/__init__.py`
+- Aggregator exports `CRITICAL_ACTIONS`, `PASSIVE_READ_ACTIONS`, `is_critical` from `intentframe_native_kit/intentframe_native_bundles/__init__.py`
 - `NullActionBundle`, `CheckerOnlyActionBundle`, `gates()` shim, `_phase_to_result`, `constraint_type` field from `intentframe_bundle_sdk/action.py`
 - `_CHECKER_BY_TYPE` map, `registered_checker_constraint_types()` from `intentframe_bundle_sdk/registry.py`
 - `BundleContext.constraint_checker_skipped` field
@@ -369,10 +369,10 @@ Scope:
 - Add `ConstraintPromptContext` dataclass.
 - Add `BundleAIContext.constraint_context: ConstraintPromptContext | None`.
 - Add `BundlePhaseOutcome.to_deterministic_result()` with the `matched_gate` passthrough.
-- Move `BundleGateDecision` from `intentframe_native_bundles/types.py` into SDK types.
+- Move `BundleGateDecision` from `intentframe_native_kit/intentframe_native_bundles/types.py` into SDK types.
 - Remove `BundleContext.constraint_checker_skipped`.
 - Rewrite `intentframe_bundle_sdk/action.py`:
-  - Remove all `intentframe_native_bundles` and `intentframe_components` imports.
+  - Remove all `intentframe_native_kit.intentframe_native_bundles` and `intentframe_components` imports.
   - New hook surface; rename `permission` to `action_permission`; drop `permission` from `prepare_evidence`, `enrich`, `structural_gates`.
   - `validate_constraints`, `enforce_constraints` default raise `NotImplementedError`.
   - `describe_constraints` default returns `None`.
@@ -428,7 +428,7 @@ Scope (`intentframe_bundle_sdk/runner.py`):
 - Replace `check_policy` call with `enforce_constraints` (only when constraints present), with `NotImplementedError → BLOCK no_enforcement`.
 - Deep-copy `action_permission.constraints` and wrap in `copy_with_constraints` before passing to the bundle.
 - Resolve routed domains via `domains_for_action(action_id)`; loop all domains; deep-copy each `user_context.domain_constraints[domain_id]` slice and pass to `domain_bundle.enforce`.
-- **Do not import `action_registry` or `ACTION_DOMAINS`** — routing is SDK registry authority.
+- **Do not import `intentframe_native_kit.action_registry` or `ACTION_DOMAINS`** — routing is SDK registry authority.
 - Insert the SDK passive-read ALLOW step strictly between `structural_gates` and `allow_gates`.
 - Implement `build_constraint_prompt_context(bundle, action_permission, domain_ids, user_context)`:
   - Only called on the `UNDECIDED` path.
@@ -449,12 +449,12 @@ Scope:
   - Keep `permission.safe` fast-path and `intent_limits` injection.
 - `intentframe_components/guardian/deterministic.py`:
   - Block any allowed action with no registered bundle, `matched_gate="no_bundle"`.
-  - Continue calling the temporary `_ensure_first_party_bundles_loaded()` shim from `intentframe_native_bundles/__init__.py` until Phase 7.
+  - Continue calling the temporary `_ensure_first_party_bundles_loaded()` shim from `intentframe_native_kit/intentframe_native_bundles/__init__.py` until Phase 7.
 - `intentframe_server/pipeline.py`:
   - Pass `BundleAIContext` (including `constraint_context`) from the deterministic result straight to AE/Guardian.
   - Keep forensic audit dumping raw opaque constraints — that is acceptable substrate behavior.
 - `intentframe_components/onboarding/engine.py`: switch manifest-driven listings to `all_action_bundles()`.
-- `intentframe_native_bundles/onboarding/summarize_constraints.py`: delegate to `bundle.describe_constraints(action_permission)` with dict-dump fallback.
+- `intentframe_native_kit/intentframe_native_bundles/onboarding/summarize_constraints.py`: delegate to `bundle.describe_constraints(action_permission)` with dict-dump fallback.
 
 Exit: ✅ Guardian renders prompts from `BundleAIContext` data only. Dead `guardian/checkers/` package deleted in Phase 6.
 
@@ -463,13 +463,13 @@ Exit: ✅ Guardian renders prompts from `BundleAIContext` data only. Dead `guard
 Delete everything remaining in Section 9 ("Still to delete"). Do it in one wave because cross-references between these files would otherwise create dead imports.
 
 Sub-steps:
-- Migrate the 12+ test imports of `ensure_bundles_registered` / `_ensure_first_party_bundles_loaded` to a shared helper `tests/_bundle_loader.py` that calls `_ensure_first_party_bundles_loaded()` (in this phase) and `ensure_loaded(["intentframe_native_bundles"])` (in Phase 7).
+- Migrate the 12+ test imports of `ensure_bundles_registered` / `_ensure_first_party_bundles_loaded` to a shared helper `tests/_bundle_loader.py` that calls `_ensure_first_party_bundles_loaded()` (in this phase) and `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])` (in Phase 7).
 ### Phase 6 — Legacy scaffolding deletion ✅
 
 Deleted:
 
 - `guardian/checkers/`, duplicate top-level family folders, `policy_registry/constraints/`, `policy_registry/domains/`.
-- Policy-registry coupling to bundle business logic (terminal system floor, contact resolution, constraint schemas) moved into `intentframe_native_bundles/` in follow-on commits (`88d61f6`, `0c27a38`).
+- Policy-registry coupling to bundle business logic (terminal system floor, contact resolution, constraint schemas) moved into `intentframe_native_kit/intentframe_native_bundles/` in follow-on commits (`88d61f6`, `0c27a38`).
 
 Exit: ✅ workspace builds with no dead imports; tests pass via `tests/_bundle_loader.py`.
 
@@ -484,9 +484,9 @@ Scope:
     - For each domain in `domain_constraints`, resolve domain bundle, verify route exists, and call `domain_bundle.validate(slice)` (via `validate_policy_domain_constraints`).
   - Any failure → raise → substrate refuses to start.
 - `intentframe_components/guardian/deterministic.py`: add `packages: list[str]` constructor arg; call `ensure_loaded(packages)`.
-- `intentframe_server/server.py`: `_create_runtime()` constructs `DeterministicGuardian(packages=["intentframe_native_bundles"], verbose=verbose)`.
-- Delete the `_ensure_first_party_bundles_loaded()` shim from `intentframe_native_bundles/__init__.py` (keep `register_bundles(registry)`).
-- Update `tests/_bundle_loader.py` to call `ensure_loaded(["intentframe_native_bundles"])`.
+- `intentframe_server/server.py`: `_create_runtime()` loads `load_core_config()` and constructs `DeterministicGuardian(packages=core_config.bundles, verbose=verbose)`.
+- Delete the `_ensure_first_party_bundles_loaded()` shim from `intentframe_native_kit/intentframe_native_bundles/__init__.py` (keep `register_bundles(registry)`).
+- Update `tests/_bundle_loader.py` to call `ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])`.
 
 Exit: loader is the single path that builds the registered bundle set; tests and substrate share that path; startup fails fast on bad policy shape.
 
@@ -528,7 +528,7 @@ Add or rewrite:
 - Update `tests/test_bundle_constraint_registry.py` from checker-coverage to bundle/action coverage.
 - Update `tests/test_prompt_strategy.py` to remove the `CRITICAL_ACTIONS ∩ PASSIVE_READ_ACTIONS == ∅` aggregate drift guard (strict registry handles uniqueness).
 - Delete `tests/test_constraint_checker_skipped.py`.
-- Replace any remaining test that imports `PassiveReadActionBundle` or `intentframe_native_bundles/passive_read/`.
+- Replace any remaining test that imports `PassiveReadActionBundle` or `intentframe_native_kit/intentframe_native_bundles/passive_read/`.
 
 Baseline parity:
 - ✅ `tests/fixtures/hardened_prompts_*` and `deterministic_gate_matrix_*` baselines green after Phases 1–5 routing restoration.
@@ -555,7 +555,7 @@ Exit: contributors can read the SDK docstrings and follow the contract without c
 - External Jarvis YAML schema stays unchanged (`intentframe_schema_version: 1`); only bump if dict migration breaks a seeded YAML in practice.
 - Action-id namespacing is intentionally out of scope; the strict-duplicate `ValueError` is the only collision defense.
 - Policy hot reload: bundles parse on each call; absence of cache state on bundle classes is enforced by convention and reviewed in PR (no automated lint added for this).
-- `pyproject.toml` entry points are deliberately not added; loader is constructor-arg driven.
+- `pyproject.toml` entry points added (`intentframe.bundles`, `intentframe.executor_packs`); loader resolves short names or module paths; allowlist remains `core.yaml` / `executor.yaml`.
 - Pass-10 already wired `passive_read_action_ids` and the SDK gate, and pass-11 already removed the critical/taxonomy aggregator. Phase 3 must reconcile these against the final layout — do not recreate `passive_read/` as a final family.
 
 ## 12. What Is Locked (Single-Decision Summary)
@@ -566,16 +566,16 @@ Exit: contributors can read the SDK docstrings and follow the contract without c
 | Startup validation | Dedicated `validate_constraints` on `ActionBundle` and `validate` on `DomainBundle`; loader fails fast. |
 | Calendar | Full new plugin with bundle + constraints + enforce + validate + describe. |
 | Critical/Passive aggregation | Deleted entirely; per-family local sets. |
-| api/browser/message ids | Real action ids per `action_registry/types.py`; no families dropped. |
+| api/browser/message ids | Real action ids per `intentframe_native_kit/action_registry/types.py`; no families dropped. |
 | `api` vs `finance` | `ApiActionBundle` owns `PAY_INVOICE`, `HTTP_GET`, `HTTP_POST`, …; finance is domain-only (`domains/finance/`). No `FinanceActionBundle`. |
 | Domain routing | `domain_routes.py` + `register_domain_routes()`; runner uses `domains_for_action()`; not `ACTION_DOMAINS`. |
-| `ACTION_DOMAINS` | Kept in `action_registry/types.py` for actor/demo/docs only; not imported by SDK runner. |
-| `_capability_match.py` | `intentframe_native_bundles/actions/terminal/_capability_match.py`. |
+| `ACTION_DOMAINS` | Taxonomy hint in `intentframe_native_kit/action_registry/types.py`; optional agent-author pre-flight (Jarvis); not imported by SDK runner. |
+| `_capability_match.py` | `intentframe_native_kit/intentframe_native_bundles/actions/terminal/_capability_match.py`. |
 | `_to_result` / `decision_path` | `BundlePhaseOutcome.to_deterministic_result()`; `matched_gate` passthrough, else `"deterministic"`. |
 | Dashboard `DOMAIN_CONSTRAINT_TYPES` | Raw dict pass-through. |
 | Dashboard manifest flags | No replacement; vanish with `manifest.py`. |
 | `policy_bridge.py` | Delete (zero external consumers). |
-| `pyproject.toml` entry points | Not added. |
+| `pyproject.toml` entry points | Added for bundles and executor packs; YAML profiles still required. |
 | Mutation safety | Runner deep-copies constraints; bundles parse fresh each call. |
 | Test drift guards | Aggregate `CRITICAL_ACTIONS ∩ PASSIVE_READ_ACTIONS == ∅` removed; strict registry covers uniqueness. |
 | Passive-read gate | SDK runner owns it; runs between `structural_gates` and `allow_gates`; uses `bundle.passive_read_action_ids` + `action_permission.safe`. |

@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# IntentFrame Native Kit — first-party supervisor profile
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# The batteries-included service graph for first-party IntentFrame products
+# (the gateway / CLI). It adds the resource-registry on top of the substrate
+# services so workspaces (virtual→real mount tables, ClientView / ExecutorView)
+# can be seeded and resolved at runtime.
+#
+# Native products select this profile explicitly:
+#
+#   python -m supervisor.main start \
+#     --config intentframe_native_kit/supervisor_profile.yaml
+#
+# The supervisor's own default (supervisor/config/supervisor.yaml) omits the
+# resource-registry to stay dependency-free; this kit-owned profile is the
+# opt-in that turns it on.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  - name: policy-registry
+    module: policy_registry.server:app
+    socket_name: policy-registry.sock
+
+  - name: resource-registry
+    module: intentframe_native_kit.resource_registry.server:app
+    socket_name: resource-registry.sock
+
+  - name: executor
+    module: executor.server:app
+    socket_name: executor.sock
+
+  - name: intentframe-core
+    module: intentframe_server.server:app
+    socket_name: intentframe.sock
+    depends_on:
+      - policy-registry
+      - resource-registry
+      - executor

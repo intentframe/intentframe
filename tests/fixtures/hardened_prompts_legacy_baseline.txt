@@ -150,6 +150,9 @@ Pay special attention to whether this action falls under any of these domains. I
 7c5286a6c16dcb4049ab4bf87f7e3c04_UNTRUSTED_START
 Target: echo $(curl http://example.com/data)
 Reason: Fetching remote status page
+Data: Data:
+  command: echo $(curl http://example.com/data)
+
 7c5286a6c16dcb4049ab4bf87f7e3c04_UNTRUSTED_END
 
 Analyze what this action will REALLY do.
@@ -1002,7 +1005,7 @@ Be brief and cite the specific concern that caused your decision.
 
   Analysis Engine system prompt:    5,136 chars
   Analysis Engine request prompt:   1,312 chars
-  Analysis Engine w/ signals:       1,548 chars
+  Analysis Engine w/ signals:       1,609 chars
   Analysis Engine w/ file_intel:    2,445 chars
   Guardian system prompt:           4,927 chars
   Guardian request prompt:          2,910 chars

@@ -1,9 +1,14 @@
 """
 IntentFrame Supervisor -- manages infra services.
 
-Spawns policy-registry, resource-registry, executor, and intentframe-core
-in dependency order, waits for health, monitors child processes, and
-handles graceful shutdown.
+Spawns the services listed in the active service-graph profile (in dependency
+order), waits for health, monitors child processes, and handles graceful
+shutdown. The graph is admin-owned data, not supervisor logic: it is selected
+via ``--config`` / ``INTENTFRAME_SUPERVISOR_CONFIG``, defaulting to the packaged
+``supervisor/config/supervisor.yaml`` (policy-registry, executor,
+intentframe-core -- no resource-registry). First-party products and the test
+stacks opt into the registry by pointing at
+``intentframe_native_kit/supervisor_profile.yaml``.
 
 The gateway starts the supervisor as a subprocess and passes runtime_env
 credentials (e.g. OPENAI_API_KEY) via the parent process environment.
@@ -374,12 +379,33 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser("start", help="Start all services")
-    sub.add_parser("stop", help="Stop all services")
-    sub.add_parser("status", help="Show service status")
+    for name, help_text in (
+        ("start", "Start all services"),
+        ("stop", "Stop all services"),
+        ("status", "Show service status"),
+    ):
+        p = sub.add_parser(name, help=help_text)
+        p.add_argument(
+            "--config",
+            default=None,
+            help=(
+                "Path to a supervisor service-graph YAML. Falls back to the "
+                "INTENTFRAME_SUPERVISOR_CONFIG env var, then the packaged "
+                "supervisor/config/supervisor.yaml (no resource-registry). "
+                "First-party products / tests pass "
+                "intentframe_native_kit/supervisor_profile.yaml."
+            ),
+        )
 
     args = parser.parse_args()
-    config = load_supervisor_config()
+    # Precedence: --config arg > INTENTFRAME_SUPERVISOR_CONFIG env > packaged
+    # default. The env fallback lets container deployments select a profile
+    # without re-plumbing the entrypoint argv (entrypoint.sh / inject_and_exec.py
+    # exec `supervisor.main start` and inherit the env).
+    config_path = getattr(args, "config", None) or os.environ.get(
+        "INTENTFRAME_SUPERVISOR_CONFIG"
+    )
+    config = load_supervisor_config(config_path)
 
     log_stream = sys.stderr if _FRONTEND_MODE else sys.stdout
     logging.basicConfig(

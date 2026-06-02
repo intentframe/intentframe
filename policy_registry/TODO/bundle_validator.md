@@ -31,7 +31,7 @@ So the answer to your question — "registry makes an HTTP call to validate, int
 | Property | Old loader | Future bundle-runtime service |
 |---|---|---|
 | Single place that catches all writes | Yes (per-process) | Yes (per-deployment) |
-| Plugin set picked by deployment, not loader | No (hardcoded) | Yes (bundle-runtime decides) |
+| Plugin set picked by deployment, not loader | Yes (`core.yaml` `bundles:`; gateway `resolve_core_config_path()`) | Yes (bundle-runtime decides) |
 | Registry depends on bundle SDK at import time | Yes (layering violation) | No — only an HTTP client |
 | Bypassable by external installers | Yes (raw POST works) | **No** — registry rejects unvalidated writes |
 | Multi-process safety / isolation | No | Yes (separate process boundaries) |

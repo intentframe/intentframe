@@ -12,9 +12,9 @@ This doc covers all three registries together because they share the same shape 
 
 | Registry | Source | What it stores | Who writes it | Who reads it |
 |---|---|---|---|---|
-| **Action registry** | `action_registry/` | The universal *taxonomy* — every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category, its metadata | IntentFrame developers (it's a static catalog) | Policy registry (to validate user policies); pipeline (to dispatch to adapters) |
+| **Action registry** | `intentframe_native_kit/action_registry/` | The universal *taxonomy* — every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category, its metadata | IntentFrame developers (it's a static catalog) | Policy registry (to validate user policies); pipeline (to dispatch to adapters) |
 | **Policy registry** | `policy_registry/` | The user's *rules* — which actions are allowed, opaque constraint dicts, intent limits | The user (via dashboard / CLI / SDK at registration time) | Guardian (every validation), Analysis Engine (to adjust depth) |
-| **Resource registry** | `resource_registry/` | The user's *workspaces* and resource mounts — virtual paths, real paths, writability, file filters, plus the registered adapter inventory | The user (when defining workspaces) and platform (when adapters register) | Agent client (sees `ClientView` — virtual paths only); executor (sees `ExecutorView` — full mount table with real paths) |
+| **Resource registry** | `intentframe_native_kit/resource_registry/` | The user's *workspaces* and resource mounts — virtual paths, real paths, writability, file filters, plus the registered adapter inventory | The user (when defining workspaces) and platform (when adapters register) | Agent client (sees `ClientView` — virtual paths only); executor (sees `ExecutorView` — full mount table with real paths) |
 
 Capability-tagging (the tag taxonomy used inside `TerminalConstraints`) is owned by `command_shield`, not by a registry of its own.
 
@@ -49,7 +49,7 @@ Capability-tagging (the tag taxonomy used inside `TerminalConstraints`) is owned
 │                                                                      │
 │  Guardian reads policy_registry to decide ALLOW / BLOCK              │
 │  Executor reads resource_registry executor_view to resolve real paths│
-│  Pipeline uses action_registry to dispatch to the right adapter      │
+│  Pipeline uses intentframe_native_kit.action_registry to dispatch to the right adapter      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -69,33 +69,39 @@ The "Why isn't this a single big config?" question. Three reasons:
 
 ## The action registry
 
-`action_registry/` defines the universal action vocabulary. It's a static, in-process catalog — not a service.
+`intentframe_native_kit/action_registry/` defines the universal action vocabulary (import: `intentframe_native_kit.action_registry`). It's a static, in-process catalog — not a service.
 
 ### What's in it
 
 ```
 ActionCategory ─── enum (FILE, HOST_FILE, TERMINAL, EMAIL, CALENDAR, …)
-ActionType ─────── enum (READ_FILE, WRITE_FILE, RUN_COMMAND, PAY_INVOICE, …)
+ActionType ─────── str enum (READ_FILE, WRITE_FILE, RUN_COMMAND, PAY_INVOICE, …)
 ActionMeta ─────── per-action metadata (category, domain, description)
-DomainType ─────── enum (FINANCE, COMMUNICATION, FILESYSTEM, …)
-ActionCatalog ──── lookup: ActionType → ActionMeta
+DomainType ─────── enum (FINANCE, DELETION)
+ACTION_DOMAINS ─── map ActionType → DomainType (critical-domain tag)
+ActionCatalog ──── lookup: action id string → ActionMeta
+domains/ ───────── domain intent schemas (FinancialIntentData, DeletionIntentData, DOMAIN_SCHEMAS)
 ```
+
+`IntentFrame.action` in core is a plain `str`. `ActionType` members are drop-in strings (`ActionType(str, Enum)`). Platform-only catalog actions (e.g. `RUN_SHORTCUT`, `WATCH_FILESYSTEM`) may exist in `ActionCatalog` without being enum members — they still flow as strings through the pipeline.
 
 Each `ActionType` belongs to exactly one `ActionCategory`. Categories determine which constraint schema applies when a user writes a policy. For example:
 
 - `READ_FILE`, `WRITE_FILE`, `LIST_DIRECTORY` → `ActionCategory.FILE` → `FileConstraints` (allowed paths, file filters)
-- `SEND_EMAIL`, `READ_EMAIL` → `ActionCategory.EMAIL` → `EmailConstraints` (in `intentframe_native_bundles/actions/email/constraints.py`)
-- `RUN_COMMAND` → `ActionCategory.TERMINAL` → `TerminalConstraints` (in `intentframe_native_bundles/actions/terminal/constraints.py`)
+- `SEND_EMAIL`, `READ_EMAIL` → `ActionCategory.EMAIL` → `EmailConstraints` (in `intentframe_native_kit/intentframe_native_bundles/actions/email/constraints.py`)
+- `RUN_COMMAND` → `ActionCategory.TERMINAL` → `TerminalConstraints` (in `intentframe_native_kit/intentframe_native_bundles/actions/terminal/constraints.py`)
 - `PAY_INVOICE` → `ActionCategory.API` + `DomainType.FINANCE` → finance hard gate
 
 ### Why it's a separate module
 
-So the policy registry can validate that a user's rule references a real action type, and so the pipeline can dispatch typed intents to the right adapter — both without depending on each other. Both `policy_registry` and the IntentFrame pipeline import from `action_registry`; nothing else points the other way.
+So bundles, executor packs, policy YAML, and optional agent-author tooling share one vocabulary without coupling that vocabulary into `intentframe_core`. **`intentframe_native_kit.action_registry` depends on `intentframe_core`** (for `DomainSchema`); core does not import the registry. The deterministic runner routes domains via `domain_routes.py` and the bundle SDK registry — not via `ACTION_DOMAINS` at runtime.
 
 ### Where to look
 
-- `action_registry/types.py` — enums and metadata models
-- `action_registry/catalog.py` — `ActionCatalog` registration
+- `intentframe_native_kit/action_registry/types.py` — enums, `ACTION_CATEGORIES`, `ACTION_DOMAINS`
+- `intentframe_native_kit/action_registry/catalog.py` — `ActionCatalog` registration
+- `intentframe_native_kit/action_registry/domains/` — `DOMAIN_SCHEMAS`, `FinancialIntentData`, `DeletionIntentData`
+- `intentframe_native_kit/action_registry/platforms/<os>/actions.py` — platform-only catalog entries
 
 ---
 
@@ -105,14 +111,14 @@ So the policy registry can validate that a user's rule references a real action 
 
 ### Process and storage
 
-Runs as a uvicorn FastAPI service on `~/.intentframe/run/policy-registry.sock`. Source: `policy_registry/server.py`. Backed by local SQLite. Started by the supervisor as one of its four core services.
+Runs as a uvicorn FastAPI service on `~/.intentframe/run/policy-registry.sock`. Source: `policy_registry/server.py`. Backed by local SQLite. Started by the supervisor in every profile, including the packaged minimal default.
 
 ### What it stores
 
 ```
 UserPolicy
 ├── user_id
-├── allowed_actions: dict[ActionType → ActionPermission]
+├── allowed_actions: dict[str → ActionPermission]   # keys are action id strings (e.g. "READ_FILE")
 │        ActionPermission:
 │          • safe: bool                ← critical for fast-path routing
 │          • constraints: dict | None  ← opaque JSON; schema owned by action bundles
@@ -125,7 +131,7 @@ UserPolicy
 └── (per-policy metadata)
 ```
 
-The registry stores constraint dicts **opaquely**. It does not validate shapes, resolve dynamic sources (e.g. `contacts_all` → email addresses), or merge system safety floors. Those responsibilities live in the **action bundles** that own each constraint schema (see `intentframe_native_bundles/actions/*/constraints.py` and `intentframe_bundle_sdk/runner.py`).
+The registry stores constraint dicts **opaquely**. It does not validate shapes, resolve dynamic sources (e.g. `contacts_all` → email addresses), or merge system safety floors. Those responsibilities live in the **action bundles** that own each constraint schema (see `intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py` and `intentframe_bundle_sdk/runner.py`). Which bundles are loaded is declared in `core.yaml` (`bundles:`) — see [plugin-profiles.md](plugin-profiles.md). Gateway policy seeding validates against that same bundle set when `INTENTFRAME_CORE_CONFIG` is set.
 
 ### Two important properties
 
@@ -139,9 +145,9 @@ The registry stores constraint dicts **opaquely**. It does not validate shapes, 
 
 ### System floor
 
-Terminal command safety floors are **not** applied by the policy registry. `TerminalActionBundle.enforce_constraints` merges `SYSTEM_TERMINAL_BLOCKED_PATTERNS` (defined in `intentframe_native_bundles/actions/terminal/constraints.py`) with the user's `blocked_patterns` at runtime. A user can *add* deny patterns; they cannot remove the system floor. This guarantees a baseline even if the user's terminal policy is empty.
+Terminal command safety floors are **not** applied by the policy registry. `TerminalActionBundle.enforce_constraints` merges `SYSTEM_TERMINAL_BLOCKED_PATTERNS` (defined in `intentframe_native_kit/intentframe_native_bundles/actions/terminal/constraints.py`) with the user's `blocked_patterns` at runtime. A user can *add* deny patterns; they cannot remove the system floor. This guarantees a baseline even if the user's terminal policy is empty.
 
-Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jarvis YAML) are also resolved at runtime by the email and message bundles during `enforce_constraints`, via `intentframe_native_bundles/platform/contacts_client.py`.
+Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jarvis YAML) are also resolved at runtime by the email and message bundles during `enforce_constraints`, via `intentframe_native_kit/intentframe_native_bundles/platform/contacts_client.py`.
 
 ### Where to look
 
@@ -150,18 +156,18 @@ Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jar
 - `policy_registry/models.py` — `UserPolicy`, `ActionPermission`, `SemanticIntentLimit`
 - `policy_registry/server.py` — FastAPI service
 - `policy_registry/client.py` — async client for callers
-- `intentframe_native_bundles/actions/*/constraints.py` — typed constraint schemas per action family
-- `intentframe_native_bundles/platform/contacts_client.py` — resolves contact-based policy sources at bundle enforcement time
+- `intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py` — typed constraint schemas per action family
+- `intentframe_native_kit/intentframe_native_bundles/platform/contacts_client.py` — resolves contact-based policy sources at bundle enforcement time
 
 ---
 
 ## The resource registry
 
-`resource_registry/` is what holds the user's workspaces and the platform's adapter inventory.
+`intentframe_native_kit/resource_registry/` is what holds the user's workspaces and the platform's adapter inventory.
 
 ### Process and storage
 
-Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `resource_registry/server.py`. Backed by local SQLite. Started by the supervisor as one of its four core services.
+Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `intentframe_native_kit/resource_registry/server.py`. Backed by local SQLite. **Opt-in**: the supervisor only starts it under the first-party kit profile (`intentframe_native_kit/supervisor_profile.yaml`), not the packaged minimal default. Deployments that only use static executor mounts can omit it entirely.
 
 ### What it stores
 
@@ -198,12 +204,12 @@ The resource registry doesn't enforce path access — that's the executor's `Fil
 
 ### Where to look
 
-- `resource_registry/__init__.py` — public API
-- `resource_registry/registry.py` — `ResourceRegistry` class, view derivation
-- `resource_registry/models.py` — `ClientView`, `ExecutorView`, `ResourceMount`, `Workspace`
-- `resource_registry/server.py` — FastAPI service
-- `resource_registry/client.py` — async client
-- `resource_registry/floor.py` — defaults / floor mounts
+- `intentframe_native_kit/resource_registry/__init__.py` — public API
+- `intentframe_native_kit/resource_registry/registry.py` — `ResourceRegistry` class, view derivation
+- `intentframe_native_kit/resource_registry/models.py` — `ClientView`, `ExecutorView`, `ResourceMount`, `Workspace`
+- `intentframe_native_kit/resource_registry/server.py` — FastAPI service
+- `intentframe_native_kit/resource_registry/client.py` — async client
+- `intentframe_native_kit/resource_registry/floor.py` — defaults / floor mounts
 
 ---
 
@@ -212,7 +218,7 @@ The resource registry doesn't enforce path access — that's the executor's `Fil
 When an `IntentFrame` arrives at the pipeline:
 
 ```
-1. Pipeline looks up the action in action_registry
+1. Pipeline looks up the action in intentframe_native_kit.action_registry
    → finds the ActionCategory and dispatching adapter
    → "READ_FILE belongs to FILE category, served by FilesAdapter"
 
@@ -228,7 +234,7 @@ When an `IntentFrame` arrives at the pipeline:
    - any fast-path ALLOW?                            (passive-read or allow_gates)
 
 4. If executor reached:
-   executor calls resource_registry.executor_view(workspace_id)
+   executor calls intentframe_native_kit.resource_registry.executor_view(workspace_id)
    → resolves virtual path to real path
    → FilesAdapter reads/writes that real path
 ```
@@ -261,7 +267,7 @@ The capability tags that `TerminalConstraints` uses (`capability:read_only:*`, `
 
 - **Single-user.** The current registries are designed for one user's device. Multi-tenant policy administration (org-wide policies, per-team overrides) is not shipped.
 - **No version history.** A policy edit overwrites the previous policy. There's no audit log of *who changed what when* on the configuration plane (the executor's audit log is for *executions*, not *configuration changes*).
-- **Static action registry.** `action_registry` is in-process Python. New action types require a code change. (Adapters are pluggable; the action vocabulary is not, intentionally — it's the shared language between policy and pipeline.)
+- **Static action registry.** `intentframe_native_kit.action_registry` is in-process Python. New action types require a code change. (Adapters are pluggable; the action vocabulary is not, intentionally — it's the shared language between policy and pipeline.)
 - **In-memory by default in dev mode.** The demo setup uses in-memory stores. Production runs the registries as supervised services with SQLite.
 
 ---

@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from command_shield import Verdict
 from command_shield.verdict import Signal
 from intentframe_core.enums import Decision, RiskLevel, Reversibility
@@ -27,8 +27,8 @@ from intentframe_core.types import (
     UserContext,
     ValidationResult,
 )
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.actions.terminal.evidence_keys import COMMAND_INTEL_KEY
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence_keys import COMMAND_INTEL_KEY
 from intentframe_bundle_sdk.types import BundleAIContext, BundleContext
 from intentframe_server.pipeline import IntentFrameRuntime
 from policy_registry.models import ActionPermission
@@ -76,6 +76,7 @@ def _intent(command: str) -> IntentFrame:
     return IntentFrame(
         action=ActionType.RUN_COMMAND,
         target=command,
+        data={"command": command},
         reason="test",
         agent_id="test_agent",
     )
@@ -493,14 +494,14 @@ class TestCommandIntelPlumbing:
         assert "TERMINAL COMMAND" not in ai_ctx.ae_external_context
 
     def test_command_intel_is_bounded(self):
-        from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 
         huge_caps = tuple(f"capability:x{i}:y" for i in range(5000))
         intel = CommandIntel(capabilities=huge_caps)
         assert len(intel.capabilities) <= 64
 
     def test_command_intel_is_frozen(self):
-        from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 
         intel = CommandIntel(verdict="SAFE")
         with pytest.raises(Exception):
@@ -583,7 +584,7 @@ class TestDeterministicGuardianPipelineFlow:
 
     def test_constraint_block_is_deterministic(self):
         """blocked_patterns BLOCK happens at DG, before AE runs."""
-        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         runtime = _make_runtime()
         user = UserContext(
@@ -650,13 +651,13 @@ class TestDgExceptionFailClosed:
     """Bundle/checker crashes must BLOCK fail-closed — no AI degradation."""
 
     def test_dg_exception_blocks_without_ai_and_audits_dg_exception(self, monkeypatch):
-        from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 
         async def raise_boom(self, intent, action_permission, ctx, *, verbose=False):
             del self, intent, action_permission, ctx, verbose
             raise RuntimeError("boom")
 
-        from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+        from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
 
         monkeypatch.setattr(TerminalActionBundle, "enforce_constraints", raise_boom)
 

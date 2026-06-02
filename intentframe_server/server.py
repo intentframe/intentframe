@@ -39,6 +39,7 @@ from intentframe_core.types import (
 from intentframe_components.guardian import AIGuardian
 from intentframe_components.guardian.deterministic import DeterministicGuardian
 from intentframe_components.onboarding import AIOnboardingEngine
+from intentframe_server.config import load_core_config
 from intentframe_server.pipeline import IntentFrameRuntime
 
 logger = logging.getLogger(__name__)
@@ -49,35 +50,25 @@ _runtime: IntentFrameRuntime | None = None
 def _create_runtime() -> IntentFrameRuntime:
     """Wire up the Runtime with AI engines and an executor client.
 
-    Executor selection is controlled by ``INTENTFRAME_EXECUTOR_MODE``:
-
-      * ``real`` (default) — talks to the executor service over UDS via
-        :class:`ExecutorHTTPClient`; normal production path.
-      * ``dry_run``        — uses :class:`DryRunExecutor`, which returns
-        synthetic success results without touching the host.  Intended
-        for tests (root-demo in particular) that must exercise the real
-        Analysis Engine + Guardian but must not run commands on the
-        host.  Never enable in production.
-
-    Unknown values raise so accidental typos never silently fall back
-    to a less-safe mode.  Default is ``real``; omitting the var keeps
-    existing deployments unchanged.
+    The core profile is selected by ``INTENTFRAME_CORE_CONFIG`` and must declare
+    the action bundles to load. Existing ``INTENTFRAME_EXECUTOR_*`` env vars are
+    still accepted as runtime overrides during the transition to core.yaml.
     """
-    executor_mode = os.environ.get("INTENTFRAME_EXECUTOR_MODE", "real").strip().lower()
-    verbose = os.environ.get("INTENTFRAME_VERBOSE", "1") == "1"
+    core_config = load_core_config()
+    executor_mode = core_config.executor.mode
+    verbose = core_config.runtime.verbose
 
     if executor_mode == "real":
         from executor_client.http_client import ExecutorHTTPClient
 
-        executor_socket = os.environ.get(
-            "INTENTFRAME_EXECUTOR_SOCKET",
-            "~/.intentframe/run/executor.sock",
-        )
+        executor_socket = core_config.executor.socket_path
         executor = ExecutorHTTPClient(socket_path=executor_socket)
         logger.info("Executor mode: real (socket=%s)", executor_socket)
     elif executor_mode == "dry_run":
         from intentframe_server.dry_run_executor import DryRunExecutor
 
+        if core_config.executor.dry_run_context:
+            os.environ["INTENTFRAME_DRY_RUN_CONTEXT"] = core_config.executor.dry_run_context
         executor = DryRunExecutor()
         logger.warning(
             "Executor mode: DRY_RUN — no real I/O. This runtime will NOT "
@@ -103,8 +94,11 @@ def _create_runtime() -> IntentFrameRuntime:
         execution_context.executor_running_as_root,
     )
 
-    skip_onboarding = os.environ.get("INTENTFRAME_SKIP_ONBOARDING", "0") == "1"
-    onboarding = None if skip_onboarding else AIOnboardingEngine(verbose=verbose)
+    onboarding = (
+        None
+        if core_config.runtime.skip_onboarding
+        else AIOnboardingEngine(verbose=verbose)
+    )
 
     return IntentFrameRuntime(
         analysis_engine=AIAnalysisEngine(verbose=verbose),
@@ -113,7 +107,7 @@ def _create_runtime() -> IntentFrameRuntime:
         execution_context=execution_context,
         onboarding_engine=onboarding,
         deterministic_guardian=DeterministicGuardian(
-            packages=["intentframe_native_bundles"],
+            packages=core_config.bundles,
             verbose=verbose,
         ),
         verbose=verbose,

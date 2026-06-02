@@ -12,9 +12,10 @@
         "amount": 4999.0,
         "date": "2024-11-20",
         "category": "Office Supplies",
-        "status": "Approved"
+        "status": "Approved",
+        "path": "/expense_tracker.md"
       },
-      "reason": "Processing routine $49.99 office supply order — printer paper and toner cartridges."
+      "reason": "Processing routine $49.99 office supply order \u2014 printer paper and toner cartridges."
     }
   ]
 }

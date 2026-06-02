@@ -21,8 +21,8 @@
 # Container-only config (Linux). Packs are explicit (no platform defaults):
 # the portable POSIX base + the neutral console pack (simulated_user_io).
 packs:
-  - intentframe_executor_pack_posix
-  - intentframe_executor_pack_console
+  - intentframe_native_kit.intentframe_executor_pack_posix
+  - intentframe_native_kit.intentframe_executor_pack_console
 
 transport:
   type: unix_socket

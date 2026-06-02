@@ -14,8 +14,8 @@ The repo is divided into roughly six layers of concern:
 
 | Layer | Purpose | Modules |
 |---|---|---|
-| **Shared types** | Data model used by everyone | `intentframe_core`, `action_registry` |
-| **Configuration plane** | What the user has authorized | `policy_registry`, `resource_registry` |
+| **Shared types** | Data model used by everyone | `intentframe_core`, `intentframe_native_kit.action_registry` |
+| **Configuration plane** | What the user has authorized | `policy_registry`, `intentframe_native_kit.resource_registry` |
 | **Pipeline (decision)** | Validates intents | `intentframe_components` (analysis, guardian, onboarding), `intentframe_server` |
 | **Execution (action)** | Touches the world | `executor`, `executor_client`, `command_shield` |
 | **Platform services** | OS / data-source bridges | `intentframe_credentials`, `external_data_ingestion`, `macos-appkit-server` |
@@ -27,24 +27,48 @@ The rest of this doc walks each module in turn.
 
 ## Shared types
 
+### Layering (core vs registry vs actor)
+
+```
+intentframe_core          neutral DTOs; IntentFrame.action is str; DomainSchema base only
+       ▲
+       │  intentframe_native_kit.action_registry depends on core (not the reverse)
+intentframe_native_kit.action_registry           ActionType, DomainType, ACTION_DOMAINS, domain intent schemas
+       ▲
+       │  optional — agent authors only
+agent tools (e.g. Jarvis) may import intentframe_native_kit.action_registry for fail-fast pre-flight
+intentframe_actor         thin transport; no intentframe_native_kit.action_registry import
+```
+
 ### `intentframe_core/`
 
 | | |
 |---|---|
-| **What** | Shared types and enums (`ActionType`, `Decision`, `RiskLevel`, `IntentFrame`, `RuntimeContext`, …). Zero dependencies on the rest of IntentFrame. |
-| **Why** | Both the server and the Actor SDK import from here. Without a shared types package, the server-side and agent-side would drift apart, and a common dataclass change would require edits in two unrelated trees. |
+| **What** | Shared types and enums (`Decision`, `RiskLevel`, `IntentFrame`, `RuntimeContext`, …) plus `DomainSchema` base in `domains/base.py`. Does **not** export `ActionType` or domain intent schemas. |
+| **Why** | Both the server and the Actor SDK import from here. Without a shared types package, the server-side and agent-side would drift apart. Core must not import `intentframe_native_kit.action_registry` — the action taxonomy lives one layer up. |
 | **Where** | `intentframe_core/` |
 | **Process** | None — it's an importable Python package, not a service. |
 | **Public docs** | [architecture.md](architecture.md) (uses these types throughout) |
 | **Module README** | None — purpose is clear from the `__init__.py` docstring. |
 
-### `action_registry/`
+### `intentframe_native_kit/`
 
 | | |
 |---|---|
-| **What** | Static catalog of every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …) and its category (FILE, TERMINAL, EMAIL, …). |
-| **Why** | The vocabulary the policy registry validates against and the pipeline dispatches on. Splitting it from `policy_registry` and from the pipeline lets both depend on a small, dependency-free taxonomy. |
-| **Where** | `action_registry/` |
+| **What** | Umbrella for the first-party native action surface: `intentframe_native_kit.action_registry/`, `intentframe_native_kit.intentframe_native_bundles/`, `intentframe_executor_pack_*`, and `extras/` (demo bridge). Import names stay at the repo root via setuptools `package-dir` remapping. |
+| **Why** | Keeps action taxonomy, governance bundles, and executor adapters out of substrate packages (`intentframe_core`, `intentframe_actor`, `executor`, `executor_sdk`). |
+| **Where** | `intentframe_native_kit/` |
+| **Process** | None — importable Python packages. |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [registries.md § Action registry](registries.md#the-action-registry); [dev/action-family-wiring.md](dev/action-family-wiring.md) |
+| **Profiles** | `intentframe_native_kit/core.yaml` (bundles); executor packs via `jarvis_pa/executor.yaml` and siblings — see [plugin-profiles.md](plugin-profiles.md) |
+
+### `intentframe_native_kit.action_registry/`
+
+| | |
+|---|---|
+| **What** | Static catalog of every action that *can* exist (`READ_FILE`, `RUN_COMMAND`, `PAY_INVOICE`, …), its category (FILE, TERMINAL, EMAIL, …), critical-domain tags (`DomainType`, `ACTION_DOMAINS`), and domain intent schemas in `intentframe_native_kit.action_registry/domains/` (`FinancialIntentData`, `DeletionIntentData`, `DOMAIN_SCHEMAS`). `ActionType` is a `str` enum — members are interchangeable with the plain `str` on `IntentFrame.action`. |
+| **Why** | Shared vocabulary for bundles, executor packs, policy YAML, and optional agent-author validation. Depends on `intentframe_core` for `DomainSchema`; core does not depend back. |
+| **Where** | `intentframe_native_kit/action_registry/` |
 | **Process** | None — in-process Python module. |
 | **Public docs** | [registries.md § Action registry](registries.md#the-action-registry) |
 | **Module README** | None — purpose is clear from the `__init__.py` docstring. |
@@ -64,14 +88,14 @@ The rest of this doc walks each module in turn.
 | **Public docs** | [registries.md § Policy registry](registries.md#the-policy-registry) |
 | **Module README** | None — design is described in `__init__.py` and `registry.py` docstrings. |
 
-### `resource_registry/`
+### `intentframe_native_kit/resource_registry/`
 
 | | |
 |---|---|
 | **What** | Workspaces and resource mounts. Serves separate read views to the agent (virtual paths only) and the executor (real paths). |
 | **Why** | Implements the virtual filesystem. The agent can never name a path outside its mounts; path traversal becomes structurally impossible. |
-| **Where** | `resource_registry/` |
-| **Process** | `resource-registry` (uvicorn) on `~/.intentframe/run/resource-registry.sock`, started by the supervisor. |
+| **Where** | `intentframe_native_kit/resource_registry/` |
+| **Process** | `resource-registry` (uvicorn) on `~/.intentframe/run/resource-registry.sock`, started by the supervisor only under the first-party kit profile (opt-in, not in the minimal default). |
 | **Public docs** | [registries.md § Resource registry](registries.md#the-resource-registry); [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
 | **Module README** | None. |
 
@@ -86,19 +110,19 @@ The rest of this doc walks each module in turn.
 | **What** | Bundle lifecycle contract: `ActionBundle` / `DomainBundle` hooks, `DeterministicRunner` (fixed gate order), registry + domain routes, `ensure_loaded(packages)` loader, opaque `ActionPermission` / `BundleAIContext` types. |
 | **Why** | Substrate orchestrates; plugins own action/domain logic. The SDK is action- and domain-agnostic — no family-specific constraint field names or industry vocabulary. |
 | **Where** | `intentframe_bundle_sdk/` |
-| **Process** | None — imported by `intentframe_components`, `intentframe_native_bundles`, and tests. |
-| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
+| **Process** | None — imported by `intentframe_components`, `intentframe_native_kit.intentframe_native_bundles`, and tests. |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | Module docstrings in `loader.py`, `action.py`, `runner.py`. |
 
-### `intentframe_native_bundles/`
+### `intentframe_native_kit.intentframe_native_bundles/`
 
 | | |
 |---|---|
 | **What** | First-party plugins: `actions/<family>/` (action ids + constraints + enforcement), `shared/<topic>/` (cross-family libraries — e.g. `shared/files/` for write-payload `FileIntel`, pre-pipeline, AE prompts used by `files` and `host_files`), `domains/<domain>/` (domain overlays), `platform/contacts_client.py` (contact-based recipient resolution at enforce time), `domain_routes.py` (routing manifest), `onboarding/<family>/onboarding_guardrails.py` (per-bundle onboarding copy), `onboarding/manifest.py` (cross-bundle `OnboardingManifest`), `register_bundles(registry)` entry point. |
 | **Why** | All family-specific logic lives here — not in `intentframe_components` or `policy_registry`. Action bundles must not import sibling bundles (`actions/<A>` ↛ `actions/<B>`); shared code lives under `shared/<topic>/`, which must not import `actions/*` (enforced in `tests/test_boundary_imports.py`). Domain bundles do not import action bundles; routing is separate metadata. Onboarding copy is also bundle-owned: each bundle contributes via `onboarding_guardrails()`; cross-cutting rules go in the manifest. |
-| **Where** | `intentframe_native_bundles/` |
-| **Process** | Loaded at runtime via `ensure_loaded(["intentframe_native_bundles"])`. |
-| **Public docs** | [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
+| **Where** | `intentframe_native_kit/intentframe_native_bundles/` |
+| **Process** | Loaded by `intentframe-core` from the active `INTENTFRAME_CORE_CONFIG` profile (`bundles:` list). |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [dev/action-family-wiring.md](dev/action-family-wiring.md); [\_internal\_/substrate-plugin-refactor.md](_internal_/substrate-plugin-refactor.md) (refactor narrative) |
 | **Module README** | None — see `register_bundles` in `__init__.py`. |
 
 ---
@@ -109,7 +133,7 @@ The rest of this doc walks each module in turn.
 
 | | |
 |---|---|
-| **What** | The pipeline building blocks: `analysis/` (Analysis Engine), `guardian/` (deterministic + AI Guardian), `onboarding/` (agent handshake), `executor/` (executor base ABC). Action-family path/vocabulary rules live in `intentframe_native_bundles/`. |
+| **What** | The pipeline building blocks: `analysis/` (Analysis Engine), `guardian/` (deterministic + AI Guardian), `onboarding/` (agent handshake), `executor/` (executor base ABC). Action-family path/vocabulary rules live in `intentframe_native_kit/intentframe_native_bundles/`. |
 | **Why** | Each layer of the pipeline gets its own sub-package with a base class plus a default AI implementation, so you can swap the AI implementation without touching pipeline assembly. |
 | **Where** | `intentframe_components/` |
 | **Process** | None directly — used by `intentframe_server`. The `intentframe-core` process imports from here. |
@@ -124,7 +148,8 @@ The rest of this doc walks each module in turn.
 | **Why** | The pipeline needs a service surface so the Actor SDK can submit intents from a different process. This is that service. |
 | **Where** | `intentframe_server/` |
 | **Process** | `intentframe-core` (uvicorn) on `~/.intentframe/run/intentframe.sock`, started by the supervisor. This is the process that calls OpenAI for AE + Guardian. |
-| **Public docs** | [architecture.md](architecture.md), [processes.md § intentframe-core](processes.md) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md); [architecture.md](architecture.md), [processes.md § intentframe-core](processes.md) |
+| **Profiles** | `intentframe_server/config.py` + [`config/core.example.yaml`](../intentframe_server/config/core.example.yaml) — loaded via `INTENTFRAME_CORE_CONFIG` |
 | **Module README** | None. |
 
 ---
@@ -139,14 +164,14 @@ The rest of this doc walks each module in turn.
 | **Why** | Concentrating every IO and every credential in one process is what makes credential isolation, audit, and rollback structurally enforceable. The executor is "the engine, not the workbench." |
 | **Where** | `executor/` |
 | **Process** | `executor` (uvicorn) on `~/.intentframe/run/executor.sock`, started by the supervisor. |
-| **Public docs** | [executor.md](executor.md), [executor/architecture.md](executor/architecture.md), [executor/security-model.md](executor/security-model.md), [executor/why-foundation.md](executor/why-foundation.md), [executor/standalone-product.md](executor/standalone-product.md) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md) (`packs:` / `EXECUTOR_CONFIG`); [executor.md](executor.md), [executor/architecture.md](executor/architecture.md), [executor/security-model.md](executor/security-model.md), [executor/why-foundation.md](executor/why-foundation.md), [executor/standalone-product.md](executor/standalone-product.md) |
 | **Module README** | `executor/README.md` (sub-references: `executor/sandbox.md`, `executor/plan.md`) |
 
 ### `executor_client/`
 
 | | |
 |---|---|
-| **What** | Two implementations of the `Executor` ABC — `ExecutorHTTPClient` (calls the executor service over UDS) and `ExecutorBridge` (in-process, for tests / demo). Plus wire-protocol models. |
+| **What** | `ExecutorHTTPClient` (calls the executor service over UDS) plus wire-protocol models. In-process demo bridge: `intentframe_native_kit.extras.bridge.ExecutorBridge`. |
 | **Why** | The pipeline talks to the executor through the same interface in both production (HTTP) and tests (in-process). Letting tests skip the HTTP layer keeps test runtime fast without diverging from production code paths. |
 | **Where** | `executor_client/` |
 | **Process** | None directly — imported by the pipeline (`intentframe-core`). |
@@ -213,18 +238,18 @@ The rest of this doc walks each module in turn.
 | **Why** | Frontends shouldn't have to know which sockets exist or how to start each subsystem. They talk to one socket; the gateway hides everything else. |
 | **Where** | `intentframe_gateway/` |
 | **Process** | `intentframe-gateway-cli` (uvicorn) on `~/.intentframe/run/gateway.sock`. The user-facing entry point — the one process the user actually starts. |
-| **Public docs** | [processes.md § Process tree](processes.md), [architecture.md § Runtime model and privacy](architecture.md#runtime-model-and-privacy) |
+| **Public docs** | [plugin-profiles.md](plugin-profiles.md) (forwards `INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG`); [processes.md § Process tree](processes.md), [architecture.md § Runtime model and privacy](architecture.md#runtime-model-and-privacy) |
 | **Module README** | `intentframe_gateway/README.md` |
 
 ### `supervisor/`
 
 | | |
 |---|---|
-| **What** | A small process manager that spawns and monitors the four core services (`policy-registry`, `resource-registry`, `executor`, `intentframe-core`) in dependency order, waits for health, and shuts them down gracefully. |
+| **What** | A small process manager that spawns and monitors the services in an admin-owned, config-driven graph, in dependency order, waits for health, and shuts them down gracefully. The packaged minimal default starts `policy-registry`, `executor`, and `intentframe-core`; the first-party kit profile (`intentframe_native_kit/supervisor_profile.yaml`, what the gateway passes) adds `resource-registry`. Selected via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG`. |
 | **Why** | Splitting startup orchestration out of the gateway keeps the gateway focused on the user-facing API. The supervisor also injects `runtime_env` credentials into spawned children, so the children never call the vault themselves. |
 | **Where** | `supervisor/` |
 | **Process** | `supervisor`, started by the gateway in Step 6. |
-| **Public docs** | [processes.md § supervisor](processes.md), [credentials-vault.md § Lifecycle](credentials-vault.md#lifecycle) |
+| **Public docs** | [processes.md § supervisor](processes.md), [plugin-profiles.md](plugin-profiles.md) (forwards profile env to children); [credentials-vault.md § Lifecycle](credentials-vault.md#lifecycle) |
 | **Module README** | None. |
 
 ### `intentframe_cli/`
@@ -339,9 +364,9 @@ A direct answer to "does docs/ cover all tracked workspace modules?":
 | Module | Has module README | Has dedicated public doc | Covered in docs |
 |---|---|---|---|
 | `intentframe_core` | — | — | ✅ via [architecture.md](architecture.md) |
-| `action_registry` | — | — | ✅ via [registries.md](registries.md) |
+| `intentframe_native_kit.action_registry` | — | — | ✅ via [registries.md](registries.md) |
 | `policy_registry` | — | — | ✅ via [registries.md](registries.md) |
-| `resource_registry` | — | — | ✅ via [registries.md](registries.md), [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
+| `intentframe_native_kit.resource_registry` | — | — | ✅ via [registries.md](registries.md), [vfs-vs-host-tools.md](vfs-vs-host-tools.md) |
 | `intentframe_components` | — | — | ✅ via [architecture.md](architecture.md) |
 | `intentframe_server` | — | — | ✅ via [architecture.md](architecture.md), [processes.md](processes.md) |
 | `executor` | ✅ (sub-folder of refs) | ✅ [executor.md](executor.md) | ✅ |

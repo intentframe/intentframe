@@ -5,7 +5,7 @@ Governed lifecycle contract for **action** and **domain** plugins. The substrate
 this package owns hook shapes, registry, loader, fixed gate order, and the data
 that flows to Analysis Engine / Guardian on the UNDECIDED path.
 
-First-party reference implementation: `intentframe_native_bundles/`.
+First-party reference implementation: `intentframe_native_kit/intentframe_native_bundles/`.
 
 ---
 
@@ -60,12 +60,15 @@ Public API is re-exported from `intentframe_bundle_sdk/__init__.py` (`__all__`).
 ```python
 from intentframe_bundle_sdk import ensure_loaded, validate_policy_against_registry
 
-ensure_loaded(["intentframe_native_bundles"])
+# In production, package list comes from core.yaml (INTENTFRAME_CORE_CONFIG).
+# Short entry-point names work when the distribution is installed, e.g. ["native"].
+ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])
 validate_policy_against_registry(user_policy)
 ```
 
 `ensure_loaded()`:
 
+- Resolves each ref via the `intentframe.bundles` entry-point group (short name) or as a dotted module path — see [docs/plugin-profiles.md](../docs/plugin-profiles.md).
 - Imports each plugin package and calls `register_bundles(registry)`.
 - Is **idempotent** for the same package set.
 - Raises if called again with a **different** package set (process-wide registry).
@@ -166,7 +169,7 @@ class MyActionBundle(ActionBundle):
         return BundlePhaseOutcome.continue_(ctx)
 ```
 
-Reference: `intentframe_native_bundles/actions/email/bundle.py` (enrichment + `aclose`).
+Reference: `intentframe_native_kit/intentframe_native_bundles/actions/email/bundle.py` (enrichment + `aclose`).
 
 ---
 
@@ -230,7 +233,7 @@ def register_bundles(registry) -> None:
     registry.register_onboarding_manifest(MY_ONBOARDING_MANIFEST)  # optional
 ```
 
-See `intentframe_native_bundles/__init__.py` for the first-party pattern.
+See `intentframe_native_kit/intentframe_native_bundles/__init__.py` for the first-party pattern.
 
 ---
 
@@ -273,12 +276,19 @@ second bundle needs multi-resource teardown.
 Typical wiring in `intentframe_server`:
 
 ```python
-DeterministicGuardian(packages=["intentframe_native_bundles"])
+core_config = load_core_config()  # INTENTFRAME_CORE_CONFIG -> core.yaml
+DeterministicGuardian(packages=core_config.bundles)
   → ensure_loaded(packages) on init
   → permission gate
   → DeterministicRunner.run_action_bundle(...)
   → BundleDeterministicResult → AE / Guardian / Executor
 ```
+
+Each bundle ref is either a short name advertised under the
+`intentframe.bundles` entry-point group or a dotted module path exposing
+`register_bundles(registry)`. The host selects refs in `core.yaml` (`bundles:`)
+via `INTENTFRAME_CORE_CONFIG` — entry points alone do not load anything.
+See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
 
 `IntentFrameRuntime.startup()` / `aclose()` fan out to `startup_bundles()` /
 `shutdown_bundles()` and close the executor (`aclose` or `close`, awaited if async).

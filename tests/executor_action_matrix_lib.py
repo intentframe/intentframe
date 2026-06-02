@@ -18,17 +18,17 @@ from pathlib import Path
 from typing import Callable
 from unittest.mock import AsyncMock, patch
 
-from action_registry import ActionType
+from intentframe_native_kit.action_registry import ActionType
 from executor_sdk.adapters.base import CapabilityAdapter
-from intentframe_executor_pack_macos.sandbox.config import SandboxConfig
+from intentframe_native_kit.intentframe_executor_pack_macos.sandbox.config import SandboxConfig
 from executor_sdk.models import AdapterManifest, ExecutionResult
-from intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
-from intentframe_executor_pack_macos.adapters.files import FilesAdapter
-from intentframe_executor_pack_macos.adapters.files_config import FilesConfig, FilesMount
-from intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
-from intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
-from intentframe_executor_pack_macos.adapters.http_api import HttpApiAdapter
-from intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
+from intentframe_native_kit.intentframe_executor_pack_console.adapters.console_user_io import ConsoleUserIOAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.files import FilesAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.files_config import FilesConfig, FilesMount
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files import HostFilesAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.http_api import HttpApiAdapter
+from intentframe_native_kit.intentframe_executor_pack_macos.adapters.terminal import TerminalAdapter
 
 BASELINE_COMMIT = "5c266a4"
 
@@ -593,114 +593,114 @@ def action_cases() -> tuple[ActionCase, ...]:
 
     # ── adapter validation rows (13 previously unexercised adapters) ────
     def browser_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.browser import BrowserAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.browser import BrowserAdapter
 
         adapter = BrowserAdapter()
         return _run(adapter.safe_execute(ActionType.OPEN_URL.value, {}))
 
     def calendar_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.calendar import CalendarAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.calendar import CalendarAdapter
 
         adapter = CalendarAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.calendar",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.calendar",
             adapter,
             ActionType.CREATE_EVENT.value,
             {},
         )
 
     def clipboard_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.clipboard import ClipboardAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.clipboard import ClipboardAdapter
 
         adapter = ClipboardAdapter()
         return _run(adapter.safe_execute("NOT_CLIPBOARD", {}))
 
     def contacts_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.contacts import ContactsAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.contacts import ContactsAdapter
 
         adapter = ContactsAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.contacts",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.contacts",
             adapter,
             ActionType.ADD_CONTACT.value,
             {},
         )
 
     def mail_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.mail import MailAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.mail import MailAdapter
 
         adapter = MailAdapter()
         return _run(adapter.safe_execute(ActionType.SEND_EMAIL.value, {}))
 
     def messages_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.messages import MessagesAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.messages import MessagesAdapter
 
         adapter = MessagesAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.messages",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.messages",
             adapter,
             ActionType.SEND_MESSAGE.value,
             {},
         )
 
     def notes_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.notes import NotesAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.notes import NotesAdapter
 
         adapter = NotesAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.notes",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.notes",
             adapter,
             ActionType.CREATE_NOTE.value,
             {},
         )
 
     def notifications_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.notifications import NotificationsAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.notifications import NotificationsAdapter
 
         adapter = NotificationsAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.notifications",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.notifications",
             adapter,
             ActionType.SHOW_NOTIFICATION.value,
             {},
         )
 
     def reminders_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.reminders import RemindersAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.reminders import RemindersAdapter
 
         adapter = RemindersAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.reminders",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.reminders",
             adapter,
             ActionType.CREATE_REMINDER.value,
             {},
         )
 
     def shortcuts_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.shortcuts import ShortcutsAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.shortcuts import ShortcutsAdapter
 
         adapter = ShortcutsAdapter()
         return _run(adapter.safe_execute("RUN_SHORTCUT", {}))
 
     def spotlight_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.spotlight import SpotlightAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.spotlight import SpotlightAdapter
 
         adapter = SpotlightAdapter()
         return _run(adapter.safe_execute(ActionType.SEARCH_SPOTLIGHT.value, {}))
 
     def system_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.system import SystemAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.system import SystemAdapter
 
         adapter = SystemAdapter()
         return _run_with_platform_patch(
-            "intentframe_executor_pack_macos.adapters.system",
+            "intentframe_native_kit.intentframe_executor_pack_macos.adapters.system",
             adapter,
             "SET_VOLUME",
             {},
         )
 
     def user_io_validation() -> ExecutionResult:
-        from intentframe_executor_pack_macos.adapters.user_io import UserIOAdapter
+        from intentframe_native_kit.intentframe_executor_pack_macos.adapters.user_io import UserIOAdapter
 
         adapter = UserIOAdapter()
         return _run(adapter.safe_execute("NOT_USER_IO", {}))
@@ -755,10 +755,10 @@ def capture_manifest_rows() -> tuple[ManifestRow, ...]:
     import importlib
 
     from executor_sdk.adapters import _ADAPTER_REGISTRY
-    from intentframe_executor_pack_console.adapters import (
+    from intentframe_native_kit.intentframe_executor_pack_console.adapters import (
         register_all_adapters as register_console_adapters,
     )
-    from intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
+    from intentframe_native_kit.intentframe_executor_pack_macos.adapters import _ADAPTER_SPECS, register_all_adapters
 
     _ADAPTER_REGISTRY.clear()
     register_all_adapters()
@@ -770,7 +770,7 @@ def capture_manifest_rows() -> tuple[ManifestRow, ...]:
     specs = list(_ADAPTER_SPECS) + [
         (
             "console_user_io",
-            "intentframe_executor_pack_console.adapters.console_user_io",
+            "intentframe_native_kit.intentframe_executor_pack_console.adapters.console_user_io",
             "ConsoleUserIOAdapter",
         ),
     ]

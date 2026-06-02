@@ -40,11 +40,11 @@ PROJECT_ROOT = DEMO_ROOT.parent
 sys.path.insert(0, str(DEMO_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from resource_registry import ResourceRegistry, ResourceMount
+from intentframe_native_kit.resource_registry import ResourceRegistry, ResourceMount
 
-from action_registry import ActionType
+from intentframe_native_kit.action_registry import ActionType
 from intentframe_core import IntentFrame
-from executor_client import ExecutorBridge
+from intentframe_native_kit.extras.bridge import ExecutorBridge
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEMO_DATA = DEMO_ROOT / "demo_data"
@@ -79,12 +79,20 @@ def intent(
     reason: str = "",
     data: dict | None = None,
 ) -> IntentFrame:
-    """Build an IntentFrame with auto-incrementing sequence."""
+    """Build an IntentFrame with auto-incrementing sequence.
+
+    ``path`` is the executable contract carried in ``data`` (the field file
+    adapters read). ``target`` is display/audit only; the executor no longer
+    translates it into ``params["path"]``. For these file-oriented demo cases
+    the path equals the target, so it is mirrored into ``data["path"]``.
+    """
+    merged = dict(data or {})
+    merged.setdefault("path", target)
     return IntentFrame(
         action=action,
         target=target,
         reason=reason,
-        data=data,
+        data=merged or None,
         agent_id="test-executor-agent",
         session_id="test-session-001",
         sequence_id=_next_seq(),
@@ -299,7 +307,7 @@ def main():
     header("TEST 10: HASH CHAIN INTEGRITY")
     print("  Verifying tamper-evident audit trail...")
 
-    from intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
+    from intentframe_native_kit.intentframe_executor_pack_macos.audit_logger import SQLiteAuditLogger
     logger = SQLiteAuditLogger(db_path=DB_PATH)
     chain_valid = bridge._run_async(logger.verify_chain_integrity())
     logger.close()

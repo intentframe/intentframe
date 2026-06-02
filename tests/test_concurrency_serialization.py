@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicResult,
@@ -79,7 +79,7 @@ class _YieldingGuardian:
 
 class _CompletedExecutor:
     def execute(self, validated_intent: IntentFrame) -> ExecutionResult:
-        return ExecutionResult(success=True, data={"action": validated_intent.action.value})
+        return ExecutionResult(success=True, data={"action": validated_intent.action})
 
 
 class _AwaitableResult:

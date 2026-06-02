@@ -10,21 +10,22 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
     DeterministicResult,
 )
 from intentframe_core.types import IntentFrame, UserContext
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 from tests.deterministic_accuracy._helpers import (
     decide_dg_sync,
     run_dg,
     run_dg_with_intel,
 )
+from tests._bundle_loader import make_deterministic_guardian
 
 LEGACY_COMMIT = "66e567c"
 
@@ -68,14 +69,21 @@ class GateCase:
 
 
 def _dg() -> DeterministicGuardian:
-    return DeterministicGuardian()
+    return make_deterministic_guardian()
 
 
 def _intent(action: ActionType, target: str = "", **data) -> IntentFrame:
+    payload = dict(data) if data else {}
+    if (
+        action == ActionType.RUN_COMMAND
+        and target
+        and "command" not in payload
+    ):
+        payload["command"] = target
     return IntentFrame(
         action=action,
         target=target,
-        data=dict(data) if data else None,
+        data=payload or None,
         reason="gate matrix",
         agent_id="gate_matrix",
     )
@@ -113,7 +121,7 @@ def gate_cases() -> tuple[GateCase, ...]:
     def domain_block(dg: DeterministicGuardian) -> DeterministicResult:
         return decide_dg_sync(
             dg,
-            _intent(ActionType.DELETE_FILE, "/tmp/foo", irreversible=True),
+            _intent(ActionType.DELETE_FILE, "/tmp/foo", path="/tmp/foo", irreversible=True),
             UserContext(
                 user_id="gate_matrix",
                 allowed_actions={"DELETE_FILE": perm_unsafe},
@@ -134,12 +142,12 @@ def gate_cases() -> tuple[GateCase, ...]:
     def write_file_sensitive_path_block(dg: DeterministicGuardian) -> DeterministicResult:
         return decide_dg_sync(
             dg,
-            _intent(ActionType.WRITE_FILE, "/home/.zshrc"),
+            _intent(ActionType.WRITE_FILE, "/home/.zshrc", path="/home/.zshrc"),
             _user(WRITE_FILE=perm_safe),
         )
 
     def write_host_file_floor_block(dg: DeterministicGuardian) -> DeterministicResult:
-        from resource_registry.floor import (
+        from intentframe_native_kit.resource_registry.floor import (
             DENY_WRITE_PREFIXES,
             canonicalize_real_path,
         )
@@ -151,12 +159,12 @@ def gate_cases() -> tuple[GateCase, ...]:
         )
         return decide_dg_sync(
             dg,
-            _intent(ActionType.WRITE_HOST_FILE, "/etc/sudoers"),
+            _intent(ActionType.WRITE_HOST_FILE, "/etc/sudoers", path="/etc/sudoers"),
             _user(WRITE_HOST_FILE=perm_unsafe),
         )
 
     def delete_host_file_floor_block(dg: DeterministicGuardian) -> DeterministicResult:
-        from resource_registry.floor import (
+        from intentframe_native_kit.resource_registry.floor import (
             DENY_WRITE_PREFIXES,
             canonicalize_real_path,
         )
@@ -168,7 +176,7 @@ def gate_cases() -> tuple[GateCase, ...]:
         )
         return decide_dg_sync(
             dg,
-            _intent(ActionType.DELETE_HOST_FILE, "/etc/sudoers"),
+            _intent(ActionType.DELETE_HOST_FILE, "/etc/sudoers", path="/etc/sudoers"),
             _user(DELETE_HOST_FILE=perm_unsafe),
         )
 

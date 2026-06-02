@@ -9,7 +9,7 @@ Uses OpenAI Agents to make policy decisions based on:
 This is the "judge" - it makes ALLOW/BLOCK decisions.
 
 Decision semantics:
-    ALLOW – Action is authorized; execute as-is (or with modified_intent).
+    ALLOW – Action is authorized; runtime executes the actor-submitted intent.
     BLOCK – Hard policy violation, action rejected.
 
 Guardian does NOT construct alternatives or interact with the user.
@@ -193,7 +193,7 @@ class AIGuardian(Guardian):
     ) -> ValidationResult:
         """Validate intent against user policies (AI path after DG UNDECIDED)."""
         del bundle_context
-        action = intent.action.value
+        action = intent.action
 
         # ── Step 1: Permission check (deny-by-default) ─────────────
         if action not in user_context.allowed_actions:
@@ -356,7 +356,7 @@ class AIGuardian(Guardian):
         trusted_sections: dict[str, str] = {}
 
         trusted_sections["Context"] = (
-            f"Action: {intent.action.value}\n"
+            f"Action: {intent.action}\n"
             f"Agent: {intent.agent_type or intent.agent_id}\n"
             f"Task: {intent.task_description or 'Not specified'}"
         )

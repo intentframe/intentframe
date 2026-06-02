@@ -89,8 +89,11 @@ For most root-demo development, start the supervisor with a synthetic executor:
 ```bash
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 python -m supervisor.main start
 ```
+
+Profile env vars (`INTENTFRAME_CORE_CONFIG`, `EXECUTOR_CONFIG`, entry points): [plugin-profiles.md](../plugin-profiles.md).
 
 This does **not** require `sudo bash intentframe_setup_root_demo.sh`, does not
 load `jarvis_pa/executor_root.yaml`, and does not require
@@ -104,7 +107,7 @@ if any later ALLOW result is missing the dry-run tag. This keeps the policy /
 Guardian test surface real while preventing accidental host mutation.
 
 Use real root-capable executor mode only when you explicitly need to validate the final
-`intentframe_executor_pack_macos/sandbox` escalate/sudo path.
+`intentframe_native_kit/intentframe_executor_pack_macos/sandbox` escalate/sudo path.
 
 ### 1. Install the root-demo capability once
 
@@ -141,13 +144,15 @@ intentframe-gateway-cli --profile root
 The CLI translates that into:
 
 - `JARVIS_VARIANT=root`
+- `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`
 - `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` (only if the operator did not already set `EXECUTOR_CONFIG`)
 
 ### 2a. (Alternative) Launch supervisor directly (faster dev loop)
 
 If you are running the supervisor **without** `intentframe-gateway-cli`,
-you must supply the same **three** pieces the gateway would otherwise
-set: profile, executor YAML, and machine capability for root-demo.
+you must supply the same **four** pieces the gateway would otherwise
+set: profile, core bundle profile, executor YAML, and machine capability for
+root-demo.
 
 **Faster dev loop** (no gateway process, no credential-vault checks, no
 CLI/gateway teardown cycle). This is only appropriate when
@@ -157,6 +162,7 @@ successfully on this machine — otherwise `pack_options.sandbox.escalate: sudo`
 
 ```bash
 JARVIS_VARIANT=root \
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
 python -m supervisor.main start

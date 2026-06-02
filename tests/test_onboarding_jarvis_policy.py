@@ -328,7 +328,7 @@ async def _run(
     )
     print(f"constrained       : {constrained}")
 
-    ensure_loaded(["intentframe_native_bundles"])
+    ensure_loaded(["intentframe_native_kit.intentframe_native_bundles"])
     engine = AIOnboardingEngine(verbose=True)
     return await engine.onboard(
         capabilities=capabilities,

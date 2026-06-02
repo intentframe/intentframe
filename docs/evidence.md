@@ -309,11 +309,11 @@ Two independent sandboxing layers enforce boundaries at execution time:
 
 ### Workspace VFS (Resource Registry)
 
-`resource_registry/` provides virtual-filesystem isolation per user/agent. Agents only see virtual paths mapped by the dashboard (via `ResourceMount` entries). The executor resolves virtual paths to real paths through the registry. An agent requesting `/invoices/report.pdf` hits a virtual mount point — the real path on disk is never exposed.
+`intentframe_native_kit/resource_registry/` provides virtual-filesystem isolation per user/agent. Agents only see virtual paths mapped by the dashboard (via `ResourceMount` entries). The executor resolves virtual paths to real paths through the registry. An agent requesting `/invoices/report.pdf` hits a virtual mount point — the real path on disk is never exposed.
 
 ### macOS Seatbelt SBPL Kernel Sandbox
 
-Every `RUN_COMMAND` subprocess is wrapped in a dynamically-generated SBPL (Seatbelt Profile Language) profile and launched via `sandbox-exec`. The profile is built per-execution from the planner's capability set (`intentframe_executor_pack_macos/sandbox/`):
+Every `RUN_COMMAND` subprocess is wrapped in a dynamically-generated SBPL (Seatbelt Profile Language) profile and launched via `sandbox-exec`. The profile is built per-execution from the planner's capability set (`intentframe_native_kit/intentframe_executor_pack_macos/sandbox/`):
 
 ```
 Profile structure:
@@ -347,7 +347,7 @@ entry_2: hash(entry_data_2 + H1) = H2
 ...
 ```
 
-Implementation: `executor_sdk/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`intentframe_executor_pack_macos/audit_logger.py`) stores `prev_hash` and `entry_hash` columns in every row.
+Implementation: `executor_sdk/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`intentframe_native_kit/intentframe_executor_pack_macos/audit_logger.py`) stores `prev_hash` and `entry_hash` columns in every row.
 
 **What this proves:** modifying any historical audit entry invalidates that entry's hash AND every subsequent entry's chain link. `audit_logger.verify_integrity()` walks the entire chain and detects any modification or insertion.
 

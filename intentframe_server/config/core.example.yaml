@@ -1,0 +1,42 @@
+# Example intentframe-core profile.
+#
+# Use:
+#   export INTENTFRAME_CORE_CONFIG=/path/to/core.yaml
+#   python -m supervisor.main start --config /path/to/supervisor_profile.yaml
+#
+# Mapping from env to config:
+#   INTENTFRAME_CORE_CONFIG      -> path to this file (required selector)
+#   INTENTFRAME_EXECUTOR_MODE    -> executor.mode override (legacy/env override)
+#   INTENTFRAME_EXECUTOR_SOCKET  -> executor.socket_path override
+#   INTENTFRAME_DRY_RUN_CONTEXT  -> executor.dry_run_context override
+#   INTENTFRAME_VERBOSE          -> runtime.verbose override ("1" = true)
+#   INTENTFRAME_SKIP_ONBOARDING  -> runtime.skip_onboarding override ("1" = true)
+#
+# Long-term shape: declare behavior here; use env for profile selection,
+# secrets, and deployment-specific overrides.
+
+# Action/domain bundle refs loaded by intentframe-core at startup.
+# Each item is either:
+#   1. an entry-point short name from [project.entry-points."intentframe.bundles"]
+#   2. an importable module exposing register_bundles(registry)
+bundles:
+  # Installed distribution entry-point example:
+  # - acme
+  # Source checkout / explicit module example:
+  - intentframe_native_kit.intentframe_native_bundles
+
+executor:
+  # real    -> core talks to the executor service over UDS
+  # dry_run -> core uses the in-process synthetic executor
+  mode: real
+  socket_path: ~/.intentframe/run/executor.sock
+  # Set to root for root-demo dry-run sweeps.
+  dry_run_context: null
+
+runtime:
+  verbose: true
+  skip_onboarding: false
+
+# Reserved for future bundle-owned options. Core validates only mapping shape;
+# bundle packages own their option schemas when they opt into this contract.
+bundle_options: {}

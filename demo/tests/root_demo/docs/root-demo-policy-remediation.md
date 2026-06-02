@@ -200,7 +200,7 @@ accuracy matrix reflects the real production profile.
 
 > **Note (2026-05):** `TerminalChecker` (`guardian/checkers/terminal.py`) was
 > superseded by `TerminalActionBundle.enforce_constraints` in
-> `intentframe_native_bundles/actions/terminal/bundle.py`. The behavior
+> `intentframe_native_kit.intentframe_native_bundles/actions/terminal/bundle.py`. The behavior
 > described below is unchanged; only the enforcement site moved.
 
 `TerminalActionBundle.enforce_constraints` already consumed `deny_capabilities` from

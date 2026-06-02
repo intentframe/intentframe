@@ -9,8 +9,8 @@ and gets back an ExecutionResult.
 Platform-specific adapter implementations register themselves via
 register_adapter() and are instantiated at startup from config.
 
-Implementations are registered by executor packs (e.g.
-intentframe_executor_pack_macos, intentframe_executor_pack_console).
+Implementations are registered by executor packs under ``intentframe_native_kit/``
+(e.g. ``intentframe_native_kit.intentframe_executor_pack_macos``, ``intentframe_native_kit.intentframe_executor_pack_console``).
 """
 
 from __future__ import annotations

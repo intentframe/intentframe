@@ -50,6 +50,10 @@ def register_domain_bundle(bundle: DomainBundle) -> DomainBundle:
         raise ValueError("domain bundle_id must be non-empty")
     if not bundle.domain_id:
         raise ValueError(f"domain bundle {bundle.bundle_id!r}: domain_id must be non-empty")
+    if getattr(bundle, "intent_schema", None) is None:
+        raise ValueError(
+            f"domain bundle {bundle.bundle_id!r}: intent_schema is required"
+        )
     if bundle.domain_id in _DOMAIN_BY_ID:
         existing = _DOMAIN_BY_ID[bundle.domain_id]
         raise ValueError(

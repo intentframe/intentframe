@@ -9,7 +9,8 @@ from __future__ import annotations
 from abc import ABC
 from typing import TYPE_CHECKING, Any
 
-from intentframe_bundle_sdk.types import BundlePhaseOutcome
+from intentframe_bundle_sdk.types import BundleContext, BundlePhaseOutcome
+from intentframe_core.domains.base import DomainSchema
 
 if TYPE_CHECKING:
     from intentframe_core.types import IntentFrame
@@ -20,6 +21,7 @@ class DomainBundle(ABC):
 
     bundle_id: str
     domain_id: str
+    intent_schema: type[DomainSchema]
 
     def validate(self, domain_constraints: dict[str, Any] | None) -> None:
         """Startup-only validation of policy YAML shape for this domain."""
@@ -49,3 +51,35 @@ class DomainBundle(ABC):
     async def aclose(self) -> None:
         """Optional resource release on shutdown. Must be idempotent."""
         return None
+
+
+def check_domain_intent_shape(
+    bundle: DomainBundle,
+    intent: IntentFrame,
+) -> BundlePhaseOutcome:
+    """Framework-owned domain intent slice check before author enforcement.
+
+    Validates only the fields declared on ``bundle.intent_schema``. Unrelated
+    keys in ``IntentFrame.data`` are ignored so multiple domains can route to
+    the same action without a shared exhaustive payload model.
+    """
+    ctx = BundleContext(intent=intent.model_copy(deep=True))
+    schema = getattr(bundle, "intent_schema", None)
+    if schema is None:
+        return BundlePhaseOutcome.block(
+            ctx,
+            reason=f"domain {bundle.domain_id!r}: no intent_schema declared",
+            matched_gate="domain_schema",
+        )
+    try:
+        schema.validate_slice(intent.data)
+    except Exception as exc:
+        return BundlePhaseOutcome.block(
+            ctx,
+            reason=(
+                f"Domain violation ({bundle.domain_id}): "
+                f"invalid intent shape: {exc}"
+            ),
+            matched_gate="domain_schema",
+        )
+    return BundlePhaseOutcome.continue_(ctx)

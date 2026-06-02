@@ -1,9 +1,9 @@
-"""Unit tests for :class:`intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`.
+"""Unit tests for :class:`intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle.HostFilesActionBundle`.
 
 ``HostFilesActionBundle.enforce_constraints`` is the per-action constraint
 enforcer for the ``HOST_FILE`` category.  Unlike the virtual ``files``
 family, it operates on real host paths — ``~`` expansion + symlink
-resolution via :func:`resource_registry.floor.canonicalize_real_path`, then
+resolution via :func:`intentframe_native_kit.resource_registry.floor.canonicalize_real_path`, then
 fnmatch matching against ``HostFileConstraints.allowed_host_paths``.
 
 The floor (``match_deny_prefix``) is a separate wall enforced by DG
@@ -21,17 +21,20 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
-from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.bundle import HostFilesActionBundle
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
 from intentframe_core.types import IntentFrame
 from intentframe_bundle_sdk.types import ActionPermission, BundleContext, PhaseDecision
 
 
 def _intent(target: str, action: ActionType = ActionType.READ_HOST_FILE) -> IntentFrame:
+    # ``path`` in data is the executable contract enforced by the bundle;
+    # ``target`` is display/audit only.
     return IntentFrame(
         action=action,
         target=target,
+        data={"path": target},
         reason="test",
         agent_id="host-checker-tester",
     )

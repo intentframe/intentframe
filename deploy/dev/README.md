@@ -27,12 +27,13 @@ difference is the secret flow:
 │  3. seed_vault.py        OPENAI_API_KEY ─┘                 │
 │        (runtime_env, env_name=OPENAI_API_KEY)              │
 │  4. inject_and_exec.py   Vault ─► runtime_env ─► supervisor│
-│        policy-registry / resource-registry /              │
-│        executor / intentframe-core   (all UDS)            │
+│        policy-registry / executor / intentframe-core (UDS) │
+│        (+ resource-registry with the kit profile)         │
 └───────────────┬─────────────────────────────────────────────┘
                 │ if-run volume (sockets)
 ┌───────────────▼─ intentframe-edge container ──────────────┐
-│ HTTP :8443  →  policy / resource / core sockets           │
+│ HTTP :8443  →  policy / core sockets                      │
+│               (+ /workspaces → resource with kit profile) │
 └───────────────┬─────────────────────────────────────────────┘
                 │ HTTP
        your Mac: tests / agents  (base_url = http://localhost:8443)
@@ -78,8 +79,23 @@ Verify the edge and backends are healthy:
 
 ```bash
 curl -fsS http://localhost:8443/health
-# → {"status":"ok","backends":{"policy-registry":true,"resource-registry":true,"intentframe-core":true}}
+# minimal default → {"status":"ok","backends":{"policy-registry":true,"intentframe-core":true}}
+# with kit profiles → also includes "resource-registry":true
 ```
+
+> **Most test suites need workspaces.** The supervisor/edge default is the
+> minimal substrate (no `resource-registry`, no `/workspaces`). Any suite that
+> uses `ResourceRegistryClient()` / `INTENTFRAME_RESOURCE_URL` (dashboard,
+> invoice attack suites, root-demo workspace seeding) must run with the
+> first-party kit profiles enabled — export **both** before `up`:
+>
+> ```bash
+> export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+> export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+> ```
+>
+> These live in the container image at `/app/...`. Changing them requires an
+> `up` recreate (container env is fixed at `up` time — see [§2d](#2d-when-to-restart-the-container)).
 
 Confirm the key really came from Vault — the runtime logs show:
 
@@ -93,6 +109,9 @@ Confirm the key really came from Vault — the runtime logs show:
 The registry/runtime clients accept a `base_url` and also read it from the
 environment, so existing harnesses run unmodified — just point them at the edge.
 The executor config to use depends on which test suite you're running:
+The core config declares which action bundles `intentframe-core` loads; the
+compose default is `/app/intentframe_native_kit/core.yaml`. Executor packs are
+selected separately via `EXECUTOR_CONFIG`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
 ### 2a. Dashboard + basic pipeline tests
 
@@ -100,6 +119,9 @@ The executor config to use depends on which test suite you're running:
 # default EXECUTOR_CONFIG (executor_hashicorp.yaml — mounts demo_data)
 cd deploy/dev
 export OPENAI_API_KEY=sk-...
+# workspaces are needed by the dashboard — enable the kit profiles:
+export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
 docker compose -f docker-compose.dev.yml up --build
 
 # Mac:
@@ -124,8 +146,10 @@ For container runs, set `EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.
 in audit) works over HTTP without shared `demo/` mounts — see [§2c](#2c-limitations-when-running-tests-over-http).
 
 ```bash
-# override EXECUTOR_CONFIG before up:
+# override EXECUTOR_CONFIG before up + enable workspace kit profiles:
 export EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
 export OPENAI_API_KEY=sk-...
 docker compose -f docker-compose.dev.yml up --build
 
@@ -270,6 +294,8 @@ is fixed at **`docker compose up`** time — change it, then recreate the stack.
 |---|---|---|
 | Run a different test against same stack (same `EXECUTOR_CONFIG`, `real` mode) | No | Export `INTENTFRAME_*_URL` on Mac only |
 | Dashboard ↔ invoice attacks (`EXECUTOR_CONFIG`) | **Yes** | `down`, set `EXECUTOR_CONFIG`, `up --build` |
+| Core action bundle set (`INTENTFRAME_CORE_CONFIG`) | **Yes** | `down`, set profile path, `up --build` |
+| Enable/disable workspaces (`INTENTFRAME_SUPERVISOR_CONFIG` + `INTENTFRAME_EDGE_CONFIG`) | **Yes** | `down`, export/unset both kit profiles, `up` |
 | Real executor ↔ root dry-run (`INTENTFRAME_EXECUTOR_MODE`) | **Yes** | `down`, set `dry_run` + `INTENTFRAME_DRY_RUN_CONTEXT=root`, `up` |
 | Code changes after git push (stale cached `git clone` layer) | **Yes** | See [Clean slate](#clean-slate-remove-everything) |
 
@@ -301,6 +327,9 @@ cd deploy/dev
 export OPENAI_API_KEY=sk-...
 export INTENTFRAME_EXECUTOR_MODE=dry_run
 export INTENTFRAME_DRY_RUN_CONTEXT=root
+# root-demo suites seed workspaces — enable the kit profiles:
+export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
 docker compose -f docker-compose.dev.yml up --build
 ```
 
@@ -416,7 +445,7 @@ from `deploy/dev` while the stack is up (`up -d`).
 |---|---|---|
 | `intentframe-core.log` | intentframe-core | Pipeline, Guardian, Actor, dry-run or executor bridge |
 | `policy-registry.log` | policy-registry | Policy registry HTTP/UDS server |
-| `resource-registry.log` | resource-registry | Resource registry HTTP/UDS server |
+| `resource-registry.log` | resource-registry | Resource registry HTTP/UDS server *(only when the kit `INTENTFRAME_SUPERVISOR_CONFIG` profile is enabled)* |
 | `executor.log` | executor | Executor gateway startup, pack loading, adapter wiring *(only when `INTENTFRAME_EXECUTOR_MODE=real`)* |
 
 **Follow (live tail) — one file each:**
@@ -622,12 +651,15 @@ Only use when you intentionally want to wipe Docker state machine-wide.
 | `seed_vault.py` | store `OPENAI_API_KEY` in Vault as `runtime_env` |
 | `inject_and_exec.py` | fetch `runtime_env` from Vault, `exec` the supervisor |
 | `docker-compose.dev.yml` | runtime + edge, wired to host Vault |
+| `../../intentframe_native_kit/core.yaml` | kit core profile (loads first-party action bundles) — selected by `INTENTFRAME_CORE_CONFIG` ([docs/plugin-profiles.md](../../docs/plugin-profiles.md)) |
 | `../../demo/config/executor_hashicorp.yaml` | default executor config (dashboard + basic pipeline tests) |
 | `../../demo/config/executor_attacks_hashicorp.yaml` | executor config for invoice attack suites |
+| `../../intentframe_native_kit/supervisor_profile.yaml` | kit supervisor profile (adds `resource-registry`) — export as `INTENTFRAME_SUPERVISOR_CONFIG` |
+| `../../intentframe_native_kit/edge_profile.yaml` | kit edge profile (adds `/workspaces` route) — export as `INTENTFRAME_EDGE_CONFIG` |
 
 Both HashiCorp configs are Linux/container-safe: they load the portable POSIX pack
-(`intentframe_executor_pack_posix`) plus the neutral console pack
-(`intentframe_executor_pack_console`), and enable `simulated_user_io` for
+(`intentframe_native_kit.intentframe_executor_pack_posix`) plus the neutral console pack
+(`intentframe_native_kit.intentframe_executor_pack_console`), and enable `simulated_user_io` for
 headless user interaction (no stdin, no macOS dialogs). Override with
 `EXECUTOR_CONFIG` before `docker compose up` when running attack tests (see §2b).
 

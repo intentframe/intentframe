@@ -6,8 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from tests._bundle_loader import ensure_test_bundles_loaded
-from intentframe_native_bundles.actions.files.constraints import FileConstraints
-from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints import FileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
 from intentframe_bundle_sdk.registry import action_bundle_for
 from intentframe_bundle_sdk.types import ActionPermission as SdkActionPermission
 from policy_registry.models import ActionPermission, UserPolicy

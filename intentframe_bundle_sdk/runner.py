@@ -33,6 +33,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from intentframe_bundle_sdk.constraints import describe_permission_constraints
+from intentframe_bundle_sdk.domain import check_domain_intent_shape
 from intentframe_bundle_sdk.registry import domain_bundle_for, domains_for_action
 from intentframe_bundle_sdk.trace import emit_skip, make_trace_id, traced_acall, traced_call
 from intentframe_bundle_sdk.types import (
@@ -201,7 +202,7 @@ class DeterministicRunner:
             )
 
         # ── domain enforce ─────────────────────────────────────────────
-        action_id = intent.action.value
+        action_id = intent.action
         domain_ids = domains_for_action(action_id)
         for domain_id in domain_ids:
             domain_bundle = domain_bundle_for(domain_id)
@@ -213,6 +214,16 @@ class DeterministicRunner:
                     reason="no domain bundle registered",
                 )
                 continue
+            shape = traced_call(
+                check_domain_intent_shape, domain_bundle, intent,
+                lane="runtime",
+                trace_id=trace_id,
+                phase=f"domain_schema:{domain_id}",
+                terminal_from=lambda r: r.terminal,
+            )
+            if shape.terminal:
+                merged = replace(shape, context=ctx)
+                return merged.to_deterministic_result()
             slice_ = deepcopy(
                 (user_context.domain_constraints or {}).get(domain_id)
             )
@@ -342,7 +353,7 @@ class DeterministicRunner:
         action_permission: ActionPermission,
         ctx: BundleContext,
     ) -> BundlePhaseOutcome | None:
-        action = intent.action.value
+        action = intent.action
         if action not in bundle.passive_read_action_ids:
             return None
         if not action_permission.safe:

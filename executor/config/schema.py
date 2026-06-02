@@ -199,7 +199,7 @@ class ExecutorConfig(BaseModel):
             "Executor packs to load at startup, in order (required -- there are "
             "no built-in or platform-default packs). Each entry is either an "
             "importable module path exposing register_all() (e.g. "
-            "'intentframe_executor_pack_posix'), or the short name of a pack "
+            "'intentframe_native_kit.intentframe_executor_pack_posix'), or the short name of a pack "
             "advertised via the 'intentframe.executor_packs' entry-point group "
             "(e.g. an external org's installed pack). Packs register the "
             "transport, auth, credential, storage and adapter implementations "

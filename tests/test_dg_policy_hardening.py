@@ -7,15 +7,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from action_registry.types import ActionType
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
+from intentframe_native_kit.action_registry.types import ActionType
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.bundle import TerminalActionBundle
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
 from intentframe_core.types import ExecutionResult, IntentFrame, UserContext
 from policy_registry.models import ActionPermission
+from tests._bundle_loader import make_deterministic_guardian
 from tests.deterministic_accuracy._helpers import decide_dg_sync, run_dg_with_intel
 
 
@@ -30,12 +31,13 @@ class TestExceptionFailClosedPolicy:
 
         monkeypatch.setattr(TerminalActionBundle, "prepare_evidence", boom)
 
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
         result = decide_dg_sync(
             dg,
             IntentFrame(
                 action=ActionType.RUN_COMMAND,
                 target="echo hi",
+                data={"command": "echo hi"},
                 reason="test",
                 agent_id="a",
             ),
@@ -52,7 +54,7 @@ class TestExceptionFailClosedPolicy:
         assert result.dg_exception == "ValueError('shield blew up')"
 
     def test_permission_block_has_no_dg_exception(self) -> None:
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
         result = decide_dg_sync(
             dg,
             IntentFrame(
@@ -69,7 +71,7 @@ class TestExceptionFailClosedPolicy:
         assert result.dg_exception == ""
 
     def test_constraint_block_has_no_dg_exception(self) -> None:
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
         constraints = {"blocked_patterns": ["sudo"]}
         result = run_dg_with_intel(
             "sudo ls",
@@ -94,6 +96,7 @@ class TestExceptionFailClosedPolicy:
             analysis_engine=AsyncMock(),
             guardian=AsyncMock(),
             executor=MagicMock(),
+            deterministic_guardian=make_deterministic_guardian(),
             verbose=False,
         )
         runtime._resolve_user_context = MagicMock(side_effect=lambda uc: uc)
@@ -115,12 +118,13 @@ class TestExceptionFailClosedPolicy:
 
 class TestCalendarConstraintEnforcement:
     def test_calendar_constraints_enforced_at_runtime(self) -> None:
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
         result = decide_dg_sync(
             dg,
             IntentFrame(
                 action=ActionType.CREATE_EVENT,
                 target="personal",
+                data={"calendar": "personal"},
                 reason="test",
                 agent_id="a",
             ),
@@ -139,12 +143,13 @@ class TestCalendarConstraintEnforcement:
         assert result.matched_gate == "constraint"
 
     def test_calendar_undecided_carries_constraint_context(self) -> None:
-        dg = DeterministicGuardian()
+        dg = make_deterministic_guardian()
         result = decide_dg_sync(
             dg,
             IntentFrame(
                 action=ActionType.CREATE_EVENT,
                 target="work",
+                data={"calendar": "work"},
                 reason="test",
                 agent_id="a",
             ),

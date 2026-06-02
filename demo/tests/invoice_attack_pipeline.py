@@ -16,9 +16,12 @@ Callers:
 
 Prerequisites:
   - Repo root as current working directory when starting supervisor.
-  - Supervisor with attack executor config::
+  - Supervisor with attack executor config + the kit profile (this module calls
+    ResourceRegistryClient.create_workspace, so resource-registry must be up)::
 
-      EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start
+      EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
+      python -m supervisor.main start \
+        --config intentframe_native_kit/supervisor_profile.yaml
 
   Over HTTP against ``deploy/dev/`` container: defense validation works without
   Mac/container filesystem sync; see ``deploy/dev/README.md`` §2c.
@@ -31,8 +34,8 @@ from pathlib import Path
 from typing import Any
 
 from policy_registry.client import PolicyRegistryClient
-from resource_registry.client import ResourceRegistryClient
-from resource_registry.models import ResourceMount
+from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
+from intentframe_native_kit.resource_registry.models import ResourceMount
 
 from intentframe_server.client import IntentFrameClient
 

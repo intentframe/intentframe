@@ -14,14 +14,14 @@ checker-reorder shows up here with a tight, readable diff.
 
 from __future__ import annotations
 
-from action_registry.types import ActionType
+from intentframe_native_kit.action_registry.types import ActionType
 from intentframe_components.guardian.deterministic import (
     DeterministicDecision,
     DeterministicGuardian,
 )
-from intentframe_native_bundles.actions.terminal.evidence import CommandIntel
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
 from intentframe_core.types import IntentFrame, UserContext
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission
 
 from ._helpers import build_command_intel, run_dg, run_dg_with_intel
@@ -123,7 +123,7 @@ def test_allow_capabilities_no_op_on_empty_caps() -> None:
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="mkdir some_directory",
-        data=None,
+        data={"command": "mkdir some_directory"},
         reason="precedence test",
         agent_id="precedence",
     )
@@ -146,7 +146,7 @@ def test_missing_intel_cannot_allow() -> None:
     intent = IntentFrame(
         action=ActionType.RUN_COMMAND,
         target="",
-        data=None,
+        data={"command": ""},
         reason="precedence test",
         agent_id="precedence",
     )

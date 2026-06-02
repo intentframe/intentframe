@@ -398,7 +398,7 @@ Two-stage algorithmic failure:
    structural signals include `command-substitution`. Correct behavior —
    the classifier can't know what `$(echo pip)` evaluates to.
 2. DG's gates skip on empty caps: in
-   [`intentframe_native_bundles/actions/terminal/bundle.py`](../../intentframe_native_bundles/actions/terminal/bundle.py),
+   [`intentframe_native_kit.intentframe_native_bundles/actions/terminal/bundle.py`](../../intentframe_native_kit.intentframe_native_bundles/actions/terminal/bundle.py),
    the guard `if constraints.deny_capabilities and capabilities:` makes
    the deny check a no-op when `capabilities` is an empty tuple. Same
    for `allow_capabilities`.
@@ -524,6 +524,8 @@ end-to-end security claim, pair this folder with an AE accuracy harness.
 ---
 
 ## Running the tests
+
+These tests use `tests/_bundle_loader.make_deterministic_guardian()` (explicit bundle packages). The repo-wide `tests/conftest.py` autouse fixture sets `INTENTFRAME_CORE_CONFIG` for tests that call `load_core_config()` directly. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
 ```sh
 # Everything

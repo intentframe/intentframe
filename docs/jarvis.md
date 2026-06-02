@@ -38,11 +38,12 @@ Jarvis exposes around 60 LLM-callable tools — every one of them routes through
 | **Memory** | Search its own memory, read its workspace files, capture facts to long-term storage |
 | **Self-management** | Spawn focused sub-agents, run heartbeat checks, manage its own session |
 
-The full tool list lives in [`../jarvis_pa/jarvis/tools.py`](../jarvis_pa/jarvis/tools.py). The key point: the agent never touches any of these surfaces directly. Each tool is a thin wrapper around `actor.submit(action)` — the Actor SDK call that hands the action off to IntentFrame for evaluation.
+The full tool list lives in [`../jarvis_pa/jarvis/tools.py`](../jarvis_pa/jarvis/tools.py). The key point: the agent never touches any of these surfaces directly. Each tool is a thin wrapper around `actor.submit(action)` — the Actor SDK call that hands the action off to IntentFrame for evaluation. Jarvis optionally imports `intentframe_native_kit.action_registry` in that tool layer for fail-fast pre-flight (unknown action ids, malformed finance/deletion payloads); server-side domain bundles re-validate authoritatively regardless.
 
 ```
 You type a message
     → Jarvis (LLM reasoning)
+        → [optional] intentframe_native_kit.action_registry pre-flight in tools.py
         → actor.submit(action)    ← every tool ends here
             → IntentFrame pipeline (Analysis Engine → Guardian → executor)
         ← result

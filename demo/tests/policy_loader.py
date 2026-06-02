@@ -13,14 +13,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from intentframe_native_bundles.actions.api.constraints import ApiConstraints
-from intentframe_native_bundles.actions.browser.constraints import BrowserConstraints
-from intentframe_native_bundles.actions.calendar.constraints import CalendarConstraints
-from intentframe_native_bundles.actions.email.constraints import EmailConstraints
-from intentframe_native_bundles.actions.files.constraints import FileConstraints
-from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
-from intentframe_native_bundles.actions.message.constraints import MessageConstraints
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.api.constraints import ApiConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.browser.constraints import BrowserConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.calendar.constraints import CalendarConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints import FileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.message.constraints import MessageConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.seeds import load_policy_seed
 
@@ -36,6 +36,7 @@ _DEFAULT_POLICY_PATH = (
 # ``demo/tests/stub_pipeline_agent.py::STUB_PIPELINE_AGENT_ID``;
 # ``tests/test_demo_loader_agent_id_in_sync.py`` pins them together.
 _STUB_PIPELINE_AGENT_ID = "stub_pipeline_agent"
+_BUNDLE_PACKAGES = ["intentframe_native_kit.intentframe_native_bundles"]
 
 
 def load_test_policy(
@@ -63,6 +64,7 @@ def load_test_policy(
         user_id=user_id,
         agent_id=agent_id,
         metadata=metadata,
+        bundle_packages=_BUNDLE_PACKAGES,
     )
 
 

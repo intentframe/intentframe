@@ -22,7 +22,11 @@ Contract summary:
 
 from intentframe_bundle_sdk.action import ActionBundle
 from intentframe_bundle_sdk.domain import DomainBundle
-from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
+from intentframe_bundle_sdk.loader import (
+    ENTRY_POINT_GROUP,
+    ensure_loaded,
+    validate_policy_against_registry,
+)
 from intentframe_bundle_sdk.lifecycle import shutdown_bundles, startup_bundles
 from intentframe_bundle_sdk.onboarding_manifest import OnboardingManifest
 from intentframe_bundle_sdk.registry import (
@@ -97,6 +101,7 @@ __all__ = [
     "describe_action_constraints_from_policy",
     "describe_permission_constraints",
     "DeterministicRunner",
+    "ENTRY_POINT_GROUP",
     "configure_trace_logging",
     "DomainBundle",
     "ensure_loaded",

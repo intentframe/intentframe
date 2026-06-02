@@ -111,7 +111,7 @@ If an agent has direct file, shell, browser, API, or credential access outside I
 | Policy Registry | Trusted | Developer/user-defined, immutable at runtime |
 | `command_shield` | Trusted | Deterministic regex/AST, no AI, no external input influences rules |
 | `DeterministicGuardian` | Trusted | Deterministic permission/constraint/domain checks, no AI |
-| Workspace VFS isolation | Trusted | `resource_registry/` — virtual paths per user; agents only see what's mounted |
+| Workspace VFS isolation | Trusted | `intentframe_native_kit/resource_registry/` — virtual paths per user; agents only see what's mounted |
 | macOS Seatbelt SBPL kernel sandbox | Trusted | Every `RUN_COMMAND` subprocess wrapped via `sandbox-exec` with dynamically-generated SBPL profile (`deny default` + curated allow rules) |
 | Adapter `quick_check()` | Trusted | Pure regex at execution boundary |
 | Analysis Engine (AI) | Partially trusted | Bounded inputs, structured outputs, field-length caps — but can be semantically fooled |
@@ -371,9 +371,9 @@ See [demo/tests/root_demo/docs/2026-04-27-attack-sweep-host-impact.md](../demo/t
 
 These are real, in-code defenses that sit alongside the pipeline. They are listed separately from Known Gaps so the distinction between "shipped capability" and "open gap" stays clean.
 
-1. **Tamper-evident audit trail (SHA-256 hash chain).** `executor_sdk/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`intentframe_executor_pack_macos/audit_logger.py`) stores `prev_hash` and `entry_hash` on every row. `audit_logger.verify_integrity()` walks the chain and detects any modification or insertion. Modifying any historical entry invalidates that entry's hash and every subsequent chain link.
-2. **Kernel-enforced execution sandbox.** Every `RUN_COMMAND` subprocess is wrapped in a per-execution macOS Seatbelt SBPL profile (`intentframe_executor_pack_macos/sandbox/`) launched via `sandbox-exec`, with `(deny default)` and a curated allowlist. Even root-UID subprocesses cannot violate the profile without a kernel exploit.
-3. **Workspace VFS isolation.** `resource_registry/` enforces per-user/per-agent virtual paths; the executor resolves virtual to real paths through the registry, so the real path on disk is never exposed to the agent.
+1. **Tamper-evident audit trail (SHA-256 hash chain).** `executor_sdk/services/hash_chain.py` computes `H_i = SHA-256(entry_data_i + H_{i-1})`. The macOS audit logger (`intentframe_native_kit/intentframe_executor_pack_macos/audit_logger.py`) stores `prev_hash` and `entry_hash` on every row. `audit_logger.verify_integrity()` walks the chain and detects any modification or insertion. Modifying any historical entry invalidates that entry's hash and every subsequent chain link.
+2. **Kernel-enforced execution sandbox.** Every `RUN_COMMAND` subprocess is wrapped in a per-execution macOS Seatbelt SBPL profile (`intentframe_native_kit/intentframe_executor_pack_macos/sandbox/`) launched via `sandbox-exec`, with `(deny default)` and a curated allowlist. Even root-UID subprocesses cannot violate the profile without a kernel exploit.
+3. **Workspace VFS isolation.** `intentframe_native_kit/resource_registry/` enforces per-user/per-agent virtual paths; the executor resolves virtual to real paths through the registry, so the real path on disk is never exposed to the agent.
 4. **Credential scrubbing on outputs.** `intentframe_credentials/redaction.py` (re-exported via `executor/services/credential_scrubber.py`) scrubs known credential patterns from executor outputs and audit log entries.
 
 See [docs/evidence.md § Execution Sandboxing](evidence.md#execution-sandboxing) and [§ Tamper-Evident Audit Trail](evidence.md#tamper-evident-audit-trail) for the deep-dives.

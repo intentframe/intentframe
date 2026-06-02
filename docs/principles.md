@@ -108,8 +108,8 @@ A user policy combines three kinds of rules, each enforced by a different layer:
 
 | Rule type | Where it lives | What it does | Enforced by |
 |---|---|---|---|
-| `allowed_actions` | `UserPolicy` | Permission map: which `ActionType`s are allowed at all (deny-by-default), and per-action `safe` flag + per-category `constraints` (paths, recipients, amounts) | Deterministic — `DeterministicGuardian` permission + constraint checks |
-| `domain_constraints` | `UserPolicy` (per critical domain — finance, deletion) | Typed structural rules: `max_amount`, `allowed_currencies`, `allowed_recipients`, `block_irreversible` | Deterministic — domain modules in `intentframe_components/guardian/domains/` |
+| `allowed_actions` | `UserPolicy` | Permission map: which action ids are allowed at all (deny-by-default), and per-action `safe` flag + per-category `constraints` (paths, recipients, amounts) | Deterministic — bundle `enforce_constraints` + `DeterministicGuardian` permission checks |
+| `domain_constraints` | `UserPolicy` (per critical domain — finance, deletion) | Typed structural rules: `max_amount`, `allowed_currencies`, `allowed_recipients`, `block_irreversible` | Deterministic — domain bundles in `intentframe_native_kit/intentframe_native_bundles/domains/` via `check_domain_intent_shape()` in the bundle SDK runner |
 | `intent_limits` | `UserPolicy` | Cross-cutting semantic boundaries written as natural language with structured metadata: `limit_id`, `domain` (e.g., `spending`), `raw` text, optional `threshold`, `effect` | Semantic — injected into Guardian's prompt as a trusted, named policy boundary the Guardian cites verbatim when it blocks |
 
 Domain modules can BLOCK on structural violation but never ALLOW. Passing the structural check means "structurally valid," not "safe" — AI still evaluates everything else. Intent limits catch cases that structural rules cannot reach: an `HTTP_POST` to a payment API can be classified as "spending" by the Analysis Engine and bounded by the same `max-spend-per-txn` limit that catches `PAY_INVOICE`, even though there is no per-category amount constraint on `HTTP_POST`.

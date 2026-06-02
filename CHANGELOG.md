@@ -6,12 +6,27 @@ This project follows semantic versioning where practical. While IntentFrame is i
 
 ## [Unreleased]
 
+### Added
+
+- Config-driven **intentframe-core** profiles: `core.yaml` selected by `INTENTFRAME_CORE_CONFIG` (`intentframe_server/config.py`, `intentframe_server/config/core.example.yaml`, first-party `intentframe_native_kit/core.yaml`).
+- `intentframe.bundles` and `intentframe.executor_packs` **entry-point groups** in root `pyproject.toml` for short-name plugin discovery.
+- Gateway helper `intentframe_gateway/profiles.py` (`resolve_core_config_path()`) so bootstrap and supervisor child env share one core-profile resolution (missing/empty env → kit default).
+- Public doc [docs/plugin-profiles.md](docs/plugin-profiles.md) for bundles, packs, YAML profiles, and entry points.
+
 ### Changed
+
+- **intentframe-core** loads action bundles only from the active core profile; no hardcoded native-kit fallback in substrate (`DeterministicGuardian`, `intentframe_server/server.py`, `policy_registry/seeds/loader.py`).
+- Removed **`INTENTFRAME_BUNDLES`** env shortcut (parity with executor — no pack-list env var).
+- Policy seed validation takes explicit `bundle_packages` from the deployment's `core.yaml` (gateway bootstrap, `jarvis_pa/seed_policies.py`).
+- Native action surface packaging: `intentframe_native_kit.action_registry`, `intentframe_native_kit.intentframe_native_bundles`,
+  and `intentframe_executor_pack_*` now live under `intentframe_native_kit/`
+  (import names unchanged; demo `ExecutorBridge` lives in
+  `intentframe_native_kit/extras/bridge.py` only).
 
 - Policy registry decoupling: constraint schemas, system terminal floors, and
   contact-based recipient resolution moved from `policy_registry/` into action
-  bundles (`intentframe_native_bundles/actions/*/constraints.py`) and
-  `intentframe_native_bundles/platform/contacts_client.py`. The registry stores
+  bundles (`intentframe_native_kit/intentframe_native_bundles/actions/*/constraints.py`) and
+  `intentframe_native_kit/intentframe_native_bundles/platform/contacts_client.py`. The registry stores
   opaque constraint dicts only; bundles enforce shape and runtime resolution.
 
 ### Added

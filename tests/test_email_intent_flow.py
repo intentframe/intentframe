@@ -105,7 +105,7 @@ class CaptureExecutor:
         _dump("STAGE 6: Executor received validated intent", validated_intent)
 
         self.adapter_params = ExecutorHTTPClient._translate_params(
-            validated_intent.action.value,
+            validated_intent.action,
             validated_intent,
         )
         _dump(
@@ -116,7 +116,7 @@ class CaptureExecutor:
         return ExecutionResult(
             success=True,
             data={
-                "captured_action": validated_intent.action.value,
+                "captured_action": validated_intent.action,
                 "captured_target": validated_intent.target,
                 "captured_params": self.adapter_params,
             },
@@ -179,7 +179,7 @@ async def main() -> None:
     _dump("STAGE 2: IntentFrame from Actor (pre-enrichment)", intent_from_actor)
 
     from intentframe_components.prompt import format_intent_data
-    import intentframe_native_bundles.actions.email.enrich as email_enrich_module
+    import intentframe_native_kit.intentframe_native_bundles.actions.email.enrich as email_enrich_module
     from intentframe_server.pipeline import IntentFrameRuntime
 
     real_enrich_intent = email_enrich_module.enrich_intent
@@ -238,14 +238,14 @@ async def main() -> None:
             _dump("STAGE 9: Runtime audit log entry", runtime.get_audit_log())
 
             print("\n--- Mail adapter dispatch check ---")
-            from intentframe_executor_pack_macos.adapters.mail import (
+            from intentframe_native_kit.intentframe_executor_pack_macos.adapters.mail import (
                 _ACCOUNT_ACTIONS,
                 _MESSAGE_ACTIONS,
             )
             if executor.received_intent is None or executor.adapter_params is None:
                 raise RuntimeError("Executor did not capture the final validated intent")
 
-            action_value = executor.received_intent.action.value
+            action_value = executor.received_intent.action
             executor_params = executor.adapter_params
             if action_value in _MESSAGE_ACTIONS:
                 mid = executor_params.get("rfc_message_id") or executor_params.get("message_id")

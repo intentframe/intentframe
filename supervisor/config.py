@@ -4,22 +4,61 @@ Supervisor Configuration.
 Defines the config schema for the supervisor: socket paths, startup order,
 health check intervals, process resource limits, and logging.
 
+The service graph is admin-owned data, not supervisor logic: it is read from a
+YAML file (``--config <path>`` on the CLI, falling back to the packaged default
+``supervisor/config/supervisor.yaml``).  The packaged default is deliberately
+dependency-free and EXCLUDES the resource-registry; first-party products opt
+into the registry by pointing at ``intentframe_native_kit/supervisor_profile.yaml``.
+
 Configuration sources (in priority order):
-    1. CLI arguments
-    2. Environment variables (INTENTFRAME_*)
-    3. Config file (~/.intentframe/config.toml)
-    4. Defaults
+    1. CLI arguments (``--config`` path)
+    2. Packaged default config file (supervisor/config/supervisor.yaml)
+    3. Environment variables (INTENTFRAME_RUN_DIR / INTENTFRAME_LOG_DIR /
+       INTENTFRAME_EXECUTOR_MODE) overlaid on top
+    4. In-code minimal default (resilient fallback if no file is found)
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
+import yaml
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("supervisor")
 
 _VALID_EXECUTOR_MODES = {"real", "dry_run"}
 _EXECUTOR_SERVICE_NAME = "executor"
+_DEFAULT_CONFIG_FILENAME = "supervisor.yaml"
+
+
+def _default_services() -> list[ServiceConfig]:
+    """In-code minimal service graph (no resource-registry).
+
+    Mirrors the packaged ``supervisor/config/supervisor.yaml`` so that direct
+    ``SupervisorConfig()`` construction and the no-file fallback path both yield
+    the same dependency-free default.
+    """
+    return [
+        ServiceConfig(
+            name="policy-registry",
+            module="policy_registry.server:app",
+            socket_name="policy-registry.sock",
+        ),
+        ServiceConfig(
+            name="executor",
+            module="executor.server:app",
+            socket_name="executor.sock",
+        ),
+        ServiceConfig(
+            name="intentframe-core",
+            module="intentframe_server.server:app",
+            socket_name="intentframe.sock",
+            depends_on=["policy-registry", "executor"],
+        ),
+    ]
 
 
 def _default_run_dir() -> Path:
@@ -50,29 +89,7 @@ class SupervisorConfig(BaseModel):
     health_timeout: float = 5.0           # seconds per health request
     graceful_shutdown_timeout: float = 10.0
 
-    services: list[ServiceConfig] = Field(default_factory=lambda: [
-        ServiceConfig(
-            name="policy-registry",
-            module="policy_registry.server:app",
-            socket_name="policy-registry.sock",
-        ),
-        ServiceConfig(
-            name="resource-registry",
-            module="resource_registry.server:app",
-            socket_name="resource-registry.sock",
-        ),
-        ServiceConfig(
-            name="executor",
-            module="executor.server:app",
-            socket_name="executor.sock",
-        ),
-        ServiceConfig(
-            name="intentframe-core",
-            module="intentframe_server.server:app",
-            socket_name="intentframe.sock",
-            depends_on=["policy-registry", "resource-registry", "executor"],
-        ),
-    ])
+    services: list[ServiceConfig] = Field(default_factory=_default_services)
 
     def socket_path(self, service_name: str) -> Path:
         """Full path to a service's Unix Domain Socket."""
@@ -95,7 +112,7 @@ def _executor_mode_from_env() -> str:
 def _apply_executor_mode(config: SupervisorConfig, mode: str) -> None:
     """Adjust the service graph for the selected runtime executor mode.
 
-    ``real`` keeps the standard four-service graph.  ``dry_run`` makes
+    ``real`` keeps the loaded service graph as-is.  ``dry_run`` makes
     intentframe-core use DryRunExecutor in-process, so the standalone
     executor service would be unused and is deliberately not started;
     we also strip ``executor`` from *every* service's ``depends_on`` so
@@ -124,9 +141,47 @@ def _apply_executor_mode(config: SupervisorConfig, mode: str) -> None:
     ]
 
 
-def load_supervisor_config() -> SupervisorConfig:
-    """Load config from file / env / defaults."""
-    config = SupervisorConfig()
+def _packaged_default_config() -> Path:
+    """Path to the supervisor's built-in default service graph YAML."""
+    return Path(__file__).parent / "config" / _DEFAULT_CONFIG_FILENAME
+
+
+def _load_config_file(path: Path) -> SupervisorConfig:
+    """Validate a supervisor config YAML into a :class:`SupervisorConfig`."""
+    with open(path) as fh:
+        data = yaml.safe_load(fh)
+    if not isinstance(data, dict):
+        raise ValueError(f"Supervisor config must be a YAML mapping: {path}")
+    return SupervisorConfig.model_validate(data)
+
+
+def load_supervisor_config(
+    config_path: str | Path | None = None,
+) -> SupervisorConfig:
+    """Load the supervisor config from a file path, env, and defaults.
+
+    Resolution order for the service graph:
+        1. ``config_path`` (from ``--config`` on the CLI), if given.
+        2. The packaged default ``supervisor/config/supervisor.yaml``.
+        3. The in-code minimal default (if no file is found on disk).
+
+    ``run_dir`` / ``log_dir`` env overrides and the executor-mode adjustment
+    are always overlaid on top of whichever graph was loaded.
+    """
+    path = Path(config_path) if config_path else _packaged_default_config()
+
+    if path.exists():
+        config = _load_config_file(path)
+    elif config_path is not None:
+        # An explicit path was requested but does not exist -- fail loudly
+        # rather than silently falling back to a different service graph.
+        raise FileNotFoundError(f"Supervisor config not found: {path}")
+    else:
+        logger.debug(
+            "No supervisor config file at %s -- using in-code minimal default",
+            path,
+        )
+        config = SupervisorConfig()
 
     run_dir = os.environ.get("INTENTFRAME_RUN_DIR")
     if run_dir:

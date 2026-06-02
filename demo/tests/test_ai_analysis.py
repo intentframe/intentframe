@@ -13,7 +13,7 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from action_registry import ActionType
+from intentframe_native_kit.action_registry import ActionType
 from intentframe_core import IntentFrame
 from intentframe_components.analysis import AIAnalysisEngine
 
@@ -39,6 +39,7 @@ async def _run_test():
         IntentFrame(
             action=ActionType.READ_FILE,
             target="/invoices/new/office_depot.md",
+            data={"path": "/invoices/new/office_depot.md"},
             reason="Reading invoice to process",
             agent_id="invoice_agent",
             session_id="test_001",
@@ -49,6 +50,7 @@ async def _run_test():
             action=ActionType.APPEND_ROW,
             target="/expense_tracker.md",
             data={
+                "path": "/expense_tracker.md",
                 "vendor": "TechConsult Inc",
                 "amount": 12000,
                 "date": "2024-11-18",
@@ -88,7 +90,7 @@ async def _run_test():
 
     for i, intent in enumerate(test_intents, 1):
         print(f"\n{'─' * 70}")
-        print(f"  Test {i}: {intent.action.value}")
+        print(f"  Test {i}: {intent.action}")
         print(f"  Target: {intent.target}")
         print(f"  Reason: {intent.reason}")
         print(f"{'─' * 70}")

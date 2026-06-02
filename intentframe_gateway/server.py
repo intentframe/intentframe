@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -30,6 +31,7 @@ from intentframe_gateway.bootstrap import Bootstrapper
 from intentframe_gateway.config import GatewayConfig, load_gateway_config
 from intentframe_gateway.credential_gate import CredentialGate
 from intentframe_gateway.escalation import detect_escalation_state
+from intentframe_gateway.profiles import resolve_core_config_path
 from intentframe_gateway.process_manager import ProcessManager
 from intentframe_proxy.proxy import UDSProxy
 
@@ -47,13 +49,31 @@ def _emit(event: dict[str, Any]) -> None:
 # ── Supervisor subprocess helpers ────────────────────────────────────────────
 
 
+def _supervisor_config_path() -> str:
+    """Resolve the supervisor service-graph profile for first-party products.
+
+    The gateway is a first-party product, so it defaults to the kit profile
+    (``intentframe_native_kit/supervisor_profile.yaml``) which includes the
+    resource-registry. ``INTENTFRAME_SUPERVISOR_CONFIG`` overrides this for
+    deployments that ship their own graph.
+    """
+    override = os.environ.get("INTENTFRAME_SUPERVISOR_CONFIG")
+    if override:
+        return override
+    import intentframe_native_kit
+
+    return str(Path(intentframe_native_kit.__file__).parent / "supervisor_profile.yaml")
+
+
 async def _start_supervisor(
     config: GatewayConfig,
     runtime_env: dict[str, str],
+    supervisor_config_path: str,
 ) -> subprocess.Popen:
     """Spawn the supervisor as a child process."""
     child_env = {**os.environ, "PYTHONUNBUFFERED": "1", **runtime_env}
     child_env["EXECUTOR_CONFIG"] = os.environ.get("EXECUTOR_CONFIG") or "jarvis_pa/executor.yaml"
+    child_env["INTENTFRAME_CORE_CONFIG"] = resolve_core_config_path()
 
     # Detect root-demo escalation capability and stamp it into the
     # supervisor/executor env.  Both sides use this single env var as
@@ -78,7 +98,10 @@ async def _start_supervisor(
     log_file = open(log_path, "a")
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "supervisor.main", "start"],
+        [
+            sys.executable, "-m", "supervisor.main", "start",
+            "--config", supervisor_config_path,
+        ],
         stdout=subprocess.PIPE if _FRONTEND_MODE else log_file,
         stderr=log_file,
         env=child_env,
@@ -91,6 +114,7 @@ async def _start_supervisor(
 async def _wait_for_supervisor(
     proc: subprocess.Popen,
     config: GatewayConfig,
+    supervisor_config_path: str,
     *,
     timeout: float = 120.0,
 ) -> bool:
@@ -105,7 +129,9 @@ async def _wait_for_supervisor(
         return await _read_supervisor_progress(proc, timeout)
 
     from supervisor.config import load_supervisor_config
-    sup_config = load_supervisor_config()
+    # Load the same profile the supervisor was started with so we poll the
+    # exact service set it is bringing up (e.g. with/without resource-registry).
+    sup_config = load_supervisor_config(supervisor_config_path)
     for svc in sup_config.services:
         sock = config.socket_path(svc.socket_name)
         _emit({"type": "starting", "service": svc.name})
@@ -295,9 +321,10 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("Platform server unavailable — native features disabled")
 
-    # ── Step 6: Start supervisor (4 infra services) ───────────────
-    supervisor_proc = await _start_supervisor(config, combined_env)
-    sup_ok = await _wait_for_supervisor(supervisor_proc, config)
+    # ── Step 6: Start supervisor (infra services) ─────────────────
+    supervisor_config_path = _supervisor_config_path()
+    supervisor_proc = await _start_supervisor(config, combined_env, supervisor_config_path)
+    sup_ok = await _wait_for_supervisor(supervisor_proc, config, supervisor_config_path)
     if not sup_ok:
         logger.error("Supervisor startup failed")
         _emit({"type": "failed", "services": ["supervisor"]})

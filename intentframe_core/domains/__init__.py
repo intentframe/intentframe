@@ -1,30 +1,10 @@
-"""
-Typed intent data schemas for critical domains.
+"""Domain schema base type for ``IntentFrame.data`` slices.
 
-These are protocol contracts: they define what goes inside
-``IntentFrame.data`` when the action belongs to a critical domain.
-
-Both the Actor (producer) and Guardian (consumer) import from here.
-Schemas are validated at the Actor boundary — if a critical-domain
-action arrives with malformed data, it is rejected before entering
-the pipeline.
+Concrete domain intent schemas (finance, deletion, …) live in
+``intentframe_native_kit.action_registry.domains``. This package only provides the shared
+``DomainSchema`` base so ``intentframe_core`` stays free of registry imports.
 """
 
-from __future__ import annotations
-
-from action_registry.types import DomainType
 from intentframe_core.domains.base import DomainSchema
-from intentframe_core.domains.finance import FinancialIntentData
-from intentframe_core.domains.deletion import DeletionIntentData
 
-DOMAIN_SCHEMAS: dict[DomainType, type[DomainSchema]] = {
-    DomainType.FINANCE: FinancialIntentData,
-    DomainType.DELETION: DeletionIntentData,
-}
-
-__all__ = [
-    "DOMAIN_SCHEMAS",
-    "DeletionIntentData",
-    "DomainSchema",
-    "FinancialIntentData",
-]
+__all__ = ["DomainSchema"]

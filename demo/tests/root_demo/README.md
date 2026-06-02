@@ -76,7 +76,7 @@ for the full privilege-separation design.
 
 ## 2. Starting the supervisor
 
-Tests assume the supervisor is already running. Three paths are supported:
+Tests assume the supervisor is already running. Four paths are supported:
 
 ### 2a. Dry-run supervisor launch (recommended for development)
 
@@ -86,10 +86,18 @@ real policy / Guardian path but replaces only the final executor with
 service, so there is no `executor.sock` that can accidentally run commands.
 
 ```bash
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
-python -m supervisor.main start
+python -m supervisor.main start \
+  --config intentframe_native_kit/supervisor_profile.yaml
 ```
+
+(`INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG` — what loads at startup: [docs/plugin-profiles.md](../../../docs/plugin-profiles.md).)
+
+The kit profile starts `resource-registry` so workspace seeding works. The
+packaged supervisor default omits it; use this profile for every root-demo run
+(local or container).
 
 The root-demo runner detects this via the preflight response
 (`data["dry_run"] == True`) and fails closed if any later ALLOW result lacks the
@@ -130,7 +138,10 @@ The CLI starts the gateway, which:
 
 1. Runs `detect_escalation_state()` and decides whether root-demo is armed.
 2. Injects `INTENTFRAME_ESCALATION_ARMED=1` (or `0`) into the supervisor env.
-3. Spawns the supervisor with `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml`.
+3. Spawns the supervisor with `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml`,
+   `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`, and the
+   first-party kit service graph (`intentframe_native_kit/supervisor_profile.yaml`,
+   including `resource-registry`).
 
 You should see the banner:
 
@@ -154,9 +165,11 @@ fail at runtime with a cryptic "password required" error:
 
 ```bash
 JARVIS_VARIANT=root \
+INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
-python -m supervisor.main start
+python -m supervisor.main start \
+  --config intentframe_native_kit/supervisor_profile.yaml
 ```
 
 The gateway's README notes that `INTENTFRAME_ESCALATION_ARMED` should never be
@@ -184,6 +197,37 @@ to unprivileged `sandbox-exec` and root-only commands (`dmesg`,
 `ls /var/root`) will fail with permission errors even though the pipeline
 ALLOWs them. This was the failure mode we debugged today — see the
 [`INTENTFRAME_ESCALATION_ARMED` note in the gateway README](../../../intentframe_gateway/README.md#L191).
+
+### 2e. Root dry-run against the dev container (Linux)
+
+On macOS you can run the attack/benign/gray_area sweeps against the stack in
+`deploy/dev/` instead of a local supervisor. Real root (`sudo -n sandbox-exec`)
+still requires the Mac host (§2c/2d above); only **dry-run** works in the container.
+
+**Start the runtime** (from `deploy/dev`):
+
+```bash
+export OPENAI_API_KEY=sk-...
+export INTENTFRAME_EXECUTOR_MODE=dry_run
+export INTENTFRAME_DRY_RUN_CONTEXT=root
+export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
+export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+docker compose -f docker-compose.dev.yml up --build
+```
+
+**Run suites from the Mac** (repo root):
+
+```bash
+export INTENTFRAME_CORE_URL=http://localhost:8443
+export INTENTFRAME_POLICY_URL=http://localhost:8443
+export INTENTFRAME_RESOURCE_URL=http://localhost:8443
+
+python demo/tests/root_demo/test_attacks.py
+python demo/tests/root_demo/test_benign.py \
+  --policy demo/tests/root_demo/test_policy_root_benign.yaml
+```
+
+Full matrix and restart rules: **[deploy/dev/README.md §3](../../../deploy/dev/README.md#3-root-dry-run-tests-against-the-container)**.
 
 ---
 

@@ -26,10 +26,10 @@ from pydantic import ValidationError
 
 from intentframe_gateway import bootstrap
 from jarvis.policies import builtin_policy_path
-from intentframe_native_bundles.actions.email.constraints import EmailConstraints
-from intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
-from intentframe_native_bundles.actions.message.constraints import MessageConstraints
-from intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.email.constraints import EmailConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.message.constraints import MessageConstraints
+from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
 from policy_registry.models import (
     INTENTFRAME_POLICY_SCHEMA_VERSION,
     UserPolicy,
@@ -43,6 +43,7 @@ from policy_registry.seeds import (
     resolve_user_id,
 )
 from policy_registry.seeds import resolver as _resolver
+from tests._bundle_loader import DEFAULT_TEST_PACKAGES
 
 
 # ── Loader smoke tests ───────────────────────────────────────────────────────
@@ -151,7 +152,12 @@ def test_domain_constraints_reject_legacy_domain_field(tmp_path: Path) -> None:
         "    max_amount: 5000.0\n",
     )
     with pytest.raises(ValidationError, match="domain"):
-        load_policy_seed(yaml_path, user_id="u", agent_id="stub_pipeline_agent")
+        load_policy_seed(
+            yaml_path,
+            user_id="u",
+            agent_id="stub_pipeline_agent",
+            bundle_packages=DEFAULT_TEST_PACKAGES,
+        )
 
 
 # ── Schema version validation ────────────────────────────────────────────────
