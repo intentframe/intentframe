@@ -217,7 +217,10 @@ def _print_executor_alert() -> None:
     print("#  REQUIRED:")
     print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
     print("#    python -m supervisor.main start \\")
-    print("#      --config "${KIT}/supervisor_profile.yaml"   # KIT=$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')")
+    print(
+        '#      --config "${KIT}/supervisor_profile.yaml"  '
+        '# (KIT=… — see demo/README.md)'
+    )
     print("#")
     print("#  (--config starts resource-registry so the attack workspace can be")
     print("#   created; it is NOT in the supervisor's minimal default graph.)")
