@@ -19,6 +19,7 @@ members = [
     "intentframe-native-kit",
     "intentframe-policy-registry",
     "intentframe-prompt-library",
+    "intentframe-runtime",
     "intentframe-server",
     "jarvis-pa",
     "jarvis-telegram",
@@ -820,6 +821,7 @@ dependencies = [
     { name = "intentframe-native-kit" },
     { name = "intentframe-policy-registry" },
     { name = "intentframe-prompt-library" },
+    { name = "intentframe-runtime" },
     { name = "intentframe-server" },
     { name = "jarvis-pa" },
     { name = "jarvis-telegram" },
@@ -872,6 +874,7 @@ requires-dist = [
     { name = "intentframe-native-kit", editable = "packages/intentframe-native-kit" },
     { name = "intentframe-policy-registry", editable = "packages/policy-registry" },
     { name = "intentframe-prompt-library", editable = "packages/intentframe-prompt-library" },
+    { name = "intentframe-runtime", editable = "packages/intentframe-runtime" },
     { name = "intentframe-server", editable = "packages/intentframe-server" },
     { name = "jarvis-pa", editable = "jarvis_pa" },
     { name = "jarvis-telegram", editable = "jarvis_telegram" },
@@ -1125,6 +1128,23 @@ requires-dist = [
 name = "intentframe-prompt-library"
 version = "0.1.0"
 source = { editable = "packages/intentframe-prompt-library" }
+
+[[package]]
+name = "intentframe-runtime"
+version = "0.1.0"
+source = { editable = "packages/intentframe-runtime" }
+dependencies = [
+    { name = "intentframe-executor" },
+    { name = "intentframe-policy-registry" },
+    { name = "intentframe-server" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "intentframe-executor", editable = "packages/executor" },
+    { name = "intentframe-policy-registry", editable = "packages/policy-registry" },
+    { name = "intentframe-server", editable = "packages/intentframe-server" },
+]
 
 [[package]]
 name = "intentframe-server"

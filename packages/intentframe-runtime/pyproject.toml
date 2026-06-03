@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-runtime"
+version = "0.1.0"
+description = "IntentFrame runtime — the three-process substrate (policy-registry, executor, server) the supervisor spawns"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "runtime"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+# Dependency-only meta-package. Installing it makes the three service modules
+# the supervisor spawns importable in one environment:
+#   policy_registry.server:app  /  executor.server:app  /  intentframe_server.server:app
+# Each dependency carries its own transitive deps (core, components,
+# prompt-library, SDKs, executor-client), so this is the complete runnable
+# substrate. The resource-registry / native-kit "flavour" is deliberately NOT
+# here — that lives at the supervisor layer.
+dependencies = [
+    "intentframe-policy-registry",
+    "intentframe-executor",
+    "intentframe-server",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+# No source modules to ship — build a dependency-only wheel.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true

@@ -59,6 +59,7 @@ dependencies = [
     "intentframe-executor-client",
     "intentframe-executor",
     "intentframe-server",
+    "intentframe-runtime",
     "intentframe-native-kit",
 ]
 
@@ -133,6 +134,7 @@ members = [
     "packages/executor-client",
     "packages/executor",
     "packages/intentframe-server",
+    "packages/intentframe-runtime",
     "packages/intentframe-native-kit",
     "jarvis_pa",
     "external_data_ingestion",
@@ -157,6 +159,7 @@ intentframe-components = { workspace = true }
 intentframe-executor-client = { workspace = true }
 intentframe-executor = { workspace = true }
 intentframe-server = { workspace = true }
+intentframe-runtime = { workspace = true }
 intentframe-native-kit = { workspace = true }
 
 [tool.uv]
