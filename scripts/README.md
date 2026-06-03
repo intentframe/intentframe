@@ -2,6 +2,10 @@
 
 Utility scripts for local development setup.
 
+## Admin (reference)
+
+See [`admin/README.md`](admin/README.md) for `seed_policy.py` — load a policy YAML and upsert into policy-registry over UDS or `INTENTFRAME_POLICY_URL`.
+
 ## Git Hooks
 
 The `git-hooks/` directory contains shared git hooks that are tracked in the repository. These enforce code hygiene rules locally, before anything reaches CI.
