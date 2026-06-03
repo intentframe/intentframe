@@ -99,7 +99,7 @@ is the stable core — it orchestrates the flow but never needs modification
 when capabilities, transports, or services change.
 
 The worker pool is a bounded execution mechanism, not the singleton safety
-boundary. In the local IntentFrame deployment, `intentframe-core` is the
+boundary. In the local IntentFrame deployment, `intentframe-server` is the
 serialized caller: it holds its runtime lock across evaluation, decision,
 execution, and audit, so the executor normally receives one validated
 execution request at a time. `max_workers` is a ceiling for executor robustness

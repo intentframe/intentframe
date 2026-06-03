@@ -27,7 +27,7 @@ difference is the secret flow:
 │  3. seed_vault.py        OPENAI_API_KEY ─┘                 │
 │        (runtime_env, env_name=OPENAI_API_KEY)              │
 │  4. inject_and_exec.py   Vault ─► runtime_env ─► supervisor│
-│        policy-registry / executor / intentframe-core (UDS) │
+│        policy-registry / executor / intentframe-server (UDS) │
 │        (+ resource-registry with the kit profile)         │
 └───────────────┬─────────────────────────────────────────────┘
                 │ if-run volume (sockets)
@@ -40,7 +40,7 @@ difference is the secret flow:
 ```
 
 `OPENAI_API_KEY` is **dropped from the env** before the fetch in step 4, so the
-value the supervisor (and `intentframe-core`) sees provably comes from Vault.
+value the supervisor (and `intentframe-server`) sees provably comes from Vault.
 
 ## Prerequisites
 
@@ -79,7 +79,7 @@ Verify the edge and backends are healthy:
 
 ```bash
 curl -fsS http://localhost:8443/health
-# minimal default → {"status":"ok","backends":{"policy-registry":true,"intentframe-core":true}}
+# minimal default → {"status":"ok","backends":{"policy-registry":true,"intentframe-server":true}}
 # with kit profiles → also includes "resource-registry":true
 ```
 
@@ -109,7 +109,7 @@ Confirm the key really came from Vault — the runtime logs show:
 The registry/runtime clients accept a `base_url` and also read it from the
 environment, so existing harnesses run unmodified — just point them at the edge.
 The executor config to use depends on which test suite you're running:
-The core config declares which action bundles `intentframe-core` loads; the
+The core config declares which action bundles `intentframe-server` loads; the
 compose default is `/app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml`. Executor packs are
 selected separately via `EXECUTOR_CONFIG`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
@@ -401,7 +401,7 @@ cd deploy/dev
 
 # Dashboard / pipeline / Guardian (most useful while running demo_dashboard.py)
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
-  tail -f /home/intentframe/.intentframe/logs/intentframe-core.log
+  tail -f /home/intentframe/.intentframe/logs/intentframe-server.log
 
 # Executor startup / pack loading / health-check failures
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
@@ -451,7 +451,7 @@ from `deploy/dev` while the stack is up (`up -d`).
 
 | Log file | Service | What you'll see |
 |---|---|---|
-| `intentframe-core.log` | intentframe-core | Pipeline, Guardian, Actor, dry-run or executor bridge |
+| `intentframe-server.log` | intentframe-server | Pipeline, Guardian, Actor, dry-run or executor bridge |
 | `policy-registry.log` | policy-registry | Policy registry HTTP/UDS server |
 | `resource-registry.log` | resource-registry | Resource registry HTTP/UDS server *(only when the kit `INTENTFRAME_SUPERVISOR_CONFIG` profile is enabled)* |
 | `executor.log` | executor | Executor gateway startup, pack loading, adapter wiring *(only when `INTENTFRAME_EXECUTOR_MODE=real`)* |
@@ -461,7 +461,7 @@ from `deploy/dev` while the stack is up (`up -d`).
 ```bash
 # Pipeline / Guardian / tests hitting core (most useful during dashboard runs)
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
-  tail -f /home/intentframe/.intentframe/logs/intentframe-core.log
+  tail -f /home/intentframe/.intentframe/logs/intentframe-server.log
 
 # Policy registry
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
@@ -480,7 +480,7 @@ docker compose -f docker-compose.dev.yml exec intentframe-runtime \
 
 ```bash
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
-  tail -n 100 /home/intentframe/.intentframe/logs/intentframe-core.log
+  tail -n 100 /home/intentframe/.intentframe/logs/intentframe-server.log
 
 docker compose -f docker-compose.dev.yml exec intentframe-runtime \
   tail -n 100 /home/intentframe/.intentframe/logs/policy-registry.log

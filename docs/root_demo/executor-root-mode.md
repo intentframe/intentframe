@@ -293,7 +293,7 @@ This is read by `intentframe_server/server.py` at runtime startup:
 
 The supervisor also reads this value. In dry-run mode it does not start the
 standalone executor service and removes `executor` from
-`intentframe-core.depends_on`. Unknown values raise at startup. This is
+`intentframe-server` service graph / `depends_on`. Unknown values raise at startup. This is
 deliberate: typos must never silently fall back to a less-safe mode.
 
 ### `INTENTFRAME_DRY_RUN_CONTEXT`

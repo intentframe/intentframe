@@ -31,7 +31,7 @@ IntentFrame separates three concerns:
   PolicyRegistryClient.set_user_policy()  ← POST /policies
       │
       ▼
-  intentframe-core GET /policies/{user}/{agent}  on each handshake/process
+  intentframe-server GET /policies/{user}/{agent}  on each handshake/process
 ```
 
 **Two validation kinds:**
@@ -137,7 +137,7 @@ No script changes — `PolicyRegistryClient` reads `INTENTFRAME_POLICY_URL` when
 | [`intentframe_gateway/bootstrap.py`](../../intentframe_gateway/bootstrap.py) | Gateway proxy HTTP | Yes (`core.yaml` bundles) | Yes |
 | [`jarvis_pa/seed_policies.py`](../../jarvis_pa/seed_policies.py) | Raw UDS `httpx` today | If `INTENTFRAME_CORE_CONFIG` set | Yes |
 | [`demo/tests/policy_loader.py`](../../demo/tests/policy_loader.py) | Via test `PolicyRegistryClient` | Yes | Via test helpers |
-| [`intentframe_server`](../../intentframe_server/) | GET only | N/A (reads store) | N/A |
+| [`intentframe_server`](../../packages/intentframe-server/intentframe_server/) | GET only | N/A (reads store) | N/A |
 
 ## Validate without posting
 

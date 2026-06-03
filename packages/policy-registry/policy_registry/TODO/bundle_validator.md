@@ -24,7 +24,7 @@ Now every property the old loader was implicitly giving you maps onto an explici
 - The bundle process exposes `POST /policies/validate` (or the equivalent gRPC method) — one round trip, returns 204 / 422.
 - The policy-registry server, on every `POST /policies` and `PATCH …/constraints`, calls the bundle service over UDS before storing. If the bundle service is down → registry refuses writes (fail closed). The supervisor `depends_on` ensures bundle-runtime is healthy first, so this is normal.
 
-So the answer to your question — "registry makes an HTTP call to validate, internally or via an internal bundle SDK client?" — is: **HTTP/UDS, via a thin client**, mirroring how everything else in IntentFrame already talks. The same way `intentframe-core` reaches `policy-registry` today.
+So the answer to your question — "registry makes an HTTP call to validate, internally or via an internal bundle SDK client?" — is: **HTTP/UDS, via a thin client**, mirroring how everything else in IntentFrame already talks. The same way `intentframe-server` reaches `policy-registry` today.
 
 ## Why this is strictly better than what the old loader did
 
@@ -48,6 +48,6 @@ The `IntentFrameRuntime.startup()` validation we just added is **on the path** t
 - The function signature is small and easy to delete or keep — it doesn't bake in any assumption about validation living in the runtime.
 - And critically: it does not require us to ship the bundle-runtime service today. That work is non-trivial (per `path_to_production.md` items 1-9), and tying validation to it would block correctness on platform work.
 
-The conceptual model you're describing — registry asks the bundle owner — is the **target state**. The SDK is currently in-process, so today's validator can only run in the process that loaded the SDK. That happens to be `intentframe-core`. Once the SDK becomes its own service, the validator moves to that service and the registry calls it. Same idea, correct layer.
+The conceptual model you're describing — registry asks the bundle owner — is the **target state**. The SDK is currently in-process, so today's validator can only run in the process that loaded the SDK. That happens to be `intentframe-server`. Once the SDK becomes its own service, the validator moves to that service and the registry calls it. Same idea, correct layer.
 
 If you want to lay the groundwork without doing the full process split now, the smallest preparatory move is to **define the validation contract as an HTTP/RPC interface today** (e.g. `intentframe_bundle_sdk.client.BundleClient.validate_policy(policy)`) and have `IntentFrameRuntime.startup()` call that client against a local in-process implementation. When you later spin up `bundle-runtime` as its own UDS process, the only change is swapping the in-process implementation for a UDS HTTP client — registry and core code don't change. That's how you avoid two refactors instead of one.

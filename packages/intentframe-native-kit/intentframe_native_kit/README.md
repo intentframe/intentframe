@@ -128,7 +128,7 @@ flowchart LR
     ES[executor_sdk]
   end
   subgraph runtime ["Substrate runtime"]
-    CORE[intentframe-core service]
+    CORE[intentframe-server service]
     EX[executor]
     POL[policy-registry]
   end

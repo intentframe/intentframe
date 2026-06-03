@@ -12,7 +12,7 @@ the remote container.
 │    1. credential-vault  (HashiCorp backend)  ── first up   │
 │    2. supervisor  (minimal graph by default)               │
 │         policy-registry ─┐                                 │
-│         executor ────────┴─► intentframe-core (UDS)        │
+│         executor ────────┴─► intentframe-server (UDS)        │
 │         (resource-registry only with the kit profile)      │
 │  shared volume: ~/.intentframe/run/*.sock                  │
 └───────────────┬────────────────────────────────────────────┘
@@ -28,14 +28,14 @@ the remote container.
 ```
 
 Supervisor and edge are generic, config-driven substrate. By **default** they
-run the minimal graph — `policy-registry`, `executor`, `intentframe-core`, and
+run the minimal graph — `policy-registry`, `executor`, `intentframe-server`, and
 the edge routes `/policies` + `/handshake|/process|/audit`. The
 **resource-registry** service and its `/workspaces` route are **opt-in** via the
 first-party kit profiles (see [§4](#4-enable-workspaces-resource-registry)). The
 **executor** and **credential-vault** are never exposed by the edge — they stay
 UDS-only inside the environment.
 
-`intentframe-core` is also config-driven: `INTENTFRAME_CORE_CONFIG` points at a
+`intentframe-server` is also config-driven: `INTENTFRAME_CORE_CONFIG` points at a
 `core.yaml` profile declaring the action bundles to load. The compose default is
 the first-party kit profile (`/app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml`); third
 parties ship their own profile just like they ship their own executor config.
@@ -59,7 +59,7 @@ Health checks:
 ```bash
 # edge (and the backends behind it) — minimal default graph
 curl -fsS http://localhost:8443/health
-# → {"status":"ok","backends":{"policy-registry":true,"intentframe-core":true}}
+# → {"status":"ok","backends":{"policy-registry":true,"intentframe-server":true}}
 ```
 
 With the kit profiles enabled (see [§4](#4-enable-workspaces-resource-registry))
@@ -139,7 +139,7 @@ Verify the registry is now live:
 
 ```bash
 curl -fsS http://localhost:8443/health
-# → {"status":"ok","backends":{"policy-registry":true,"resource-registry":true,"intentframe-core":true}}
+# → {"status":"ok","backends":{"policy-registry":true,"resource-registry":true,"intentframe-server":true}}
 ```
 
 This is exactly how a third party runs IntentFrame for their own requirements:

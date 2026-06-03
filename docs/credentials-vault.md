@@ -54,7 +54,7 @@ A standalone process that runs alongside the rest of IntentFrame, exposes a smal
 
 | Secret | Stored as | Used by | Delivery mode |
 |---|---|---|---|
-| OpenAI API key | `namespace="openai", key="api_key"` | `intentframe-core` (AE + Guardian), `jarvis` (agent reasoning) | `runtime_env` → `OPENAI_API_KEY` |
+| OpenAI API key | `namespace="openai", key="api_key"` | `intentframe-server` (AE + Guardian), `jarvis` (agent reasoning) | `runtime_env` → `OPENAI_API_KEY` |
 | IMAP/SMTP password | `namespace="email.<address>", key="password"` | `email-sync-daemon` | `executor_only` |
 | Telegram bot token | `namespace="telegram", key="bot_token"` | `jarvis-telegram` | `runtime_env` |
 | OAuth tokens (Slack, GitHub, etc.) | `namespace="<service>", key="token"` | `executor` adapters | `executor_only` |
@@ -73,16 +73,16 @@ There are two ways a credential gets from the vault into a process. The choice i
 The supervisor fetches the value at spawn time and injects it as an environment variable. The child process reads it from `os.environ` at startup.
 
 ```
-1. Supervisor about to spawn intentframe-core
+1. Supervisor about to spawn intentframe-server
 2. Supervisor calls vault.list_runtime_env()  → ["openai/api_key", ...]
 3. Supervisor calls vault.get("openai", "api_key")  → "sk-proj-..."
 4. Supervisor sets OPENAI_API_KEY in the spawned process's env
-5. intentframe-core reads os.environ["OPENAI_API_KEY"] at startup
+5. intentframe-server reads os.environ["OPENAI_API_KEY"] at startup
 6. The OpenAI client is built once with that key, in-process
 7. The vault is never re-queried for this credential
 ```
 
-Used for: OpenAI key (needed by `intentframe-core`, `jarvis`, `onboarding`), Telegram bot token (needed by `jarvis-telegram`).
+Used for: OpenAI key (needed by `intentframe-server`, `jarvis`, `onboarding`), Telegram bot token (needed by `jarvis-telegram`).
 
 ### `executor_only` — for trusted internal services
 

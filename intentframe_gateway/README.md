@@ -35,7 +35,7 @@ The gateway eliminates all of that.
 │     └──→ policy-registry            │
 │     └──→ resource-registry          │
 │     └──→ executor                   │
-│     └──→ intentframe-core           │
+│     └──→ intentframe-server         │
 │  Manages ──→ jarvis                 │
 │  Manages ──→ edi (email daemon)     │
 │  Manages ──→ telegram (bot)         │
@@ -187,7 +187,7 @@ uvicorn intentframe_gateway.server:app --uds /tmp/gateway.sock --log-level info
 | `INTENTFRAME_FRONTEND_MODE` | unset | Set to `1` for JSON progress on stdout (native frontend) |
 | `PLATFORM_SERVER_APP` | auto-detected | Path to `macos-appkit-server.app` bundle |
 | `JARVIS_VARIANT` | `user` | Set to `root` to activate the Jarvis root-mode variant (controls bootstrap and `EXECUTOR_CONFIG` default). Normally set by the CLI via `--profile root`. |
-| `INTENTFRAME_CORE_CONFIG` | kit `core.yaml` | Path to the intentframe-core profile (`bundles:` list). Set on the supervisor child env at spawn (via `resolve_core_config_path()` in `profiles.py`). Bootstrap uses the same resolver so seeded policies validate against the bundles core will load. Unset or empty → first-party kit `core.yaml` (resolved via `resolve_core_config_path()` in profiles.py). |
+| `INTENTFRAME_CORE_CONFIG` | kit `core.yaml` | Path to the core bundle profile (`bundles:` list). Set on the supervisor child env at spawn (via `resolve_core_config_path()` in `profiles.py`). Bootstrap uses the same resolver so seeded policies validate against the bundles core will load. Unset or empty → first-party kit `core.yaml` (resolved via `resolve_core_config_path()` in profiles.py). |
 | `EXECUTOR_CONFIG` | `jarvis_pa/executor.yaml` | Path to the executor YAML config file (`packs:` list). Overridden to `jarvis_pa/executor_root.yaml` when `JARVIS_VARIANT=root` and the operator has not set it explicitly. |
 | `INTENTFRAME_USER_ID` | (set by gateway) | Operator/owner id passed to Jarvis (and any other child agent). Comes from `~/.intentframe/gateway.yaml::identity.user_id`. The Actor SDK uses `(INTENTFRAME_USER_ID, INTENTFRAME_AGENT_ID)` to look up the policy slot the gateway seeded. |
 | `INTENTFRAME_AGENT_ID` | (set by gateway) | Agent identity for the spawned Jarvis process — `jarvis` for the user variant, `jarvis_root` for the root variant. The policy registry keys on this together with `INTENTFRAME_USER_ID`. |

@@ -18,8 +18,24 @@ The same word often means different things in different layers. Use these qualif
 | **Credential plane** | `intentframe_credentials` vault service + `CredentialVault` consumer interface; executor is wired to this today through `executor_sdk.services.credential_vault` |
 | **Native kit** | First-party plugin author code under `intentframe_native_kit/` — replaceable like a third-party product would ship |
 | **`intentframe_core` package** | Internal neutral DTOs (`IntentFrame`, `Decision`, …); substrate and SDKs import it; **plugins do not** |
-| **`intentframe-core` service** | Supervisor process name for the pipeline; implemented by `intentframe_server` + `intentframe_components`; **there is no `intentframe-core/` folder** |
-| **`core.yaml` profile** | Config file listing `bundles:` for the core service (`INTENTFRAME_CORE_CONFIG`) — not the types package |
+| **`intentframe-server` service** | Supervisor process name for the pipeline (log: `intentframe-server.log`); implemented by the `intentframe-server` package (`intentframe_server` + `intentframe_components`); **no `intentframe-server/` folder at repo root** |
+| **`core.yaml` profile** | Config file listing `bundles:` for the pipeline service (`INTENTFRAME_CORE_CONFIG`) — not the types package |
+| **`intentframe-runtime`** | Pip meta-package: `intentframe-policy-registry` + `intentframe-executor` + `intentframe-server` (no code) |
+| **`intentframe-supervisor`** | Process manager + `intentframe` / `intentframe-backend` scripts; depends on `intentframe-runtime` |
+| **`intentframe-supervisor[native]`** | Adds `intentframe-native-kit` so the 4-service kit profile can run (config-only; supervisor does not auto-detect) |
+
+---
+
+## Installable runtime stack (pip)
+
+```text
+intentframe-supervisor[native]     # product / demo / gateway substrate
+├── intentframe-supervisor         # spawns uvicorn children from YAML graph
+│   └── intentframe-runtime        # pulls policy-registry, executor, intentframe-server
+└── [native] intentframe-native-kit   # resource-registry module + kit YAML profiles
+```
+
+Base supervisor default graph: `packages/intentframe-supervisor/supervisor/config/supervisor.yaml` (3 services, no resource-registry). Kit graph: `intentframe_native_kit/supervisor_profile.yaml` on the installed package — select via `--config` or `INTENTFRAME_SUPERVISOR_CONFIG` (see [demo/README.md](../demo/README.md) for the `KIT=…` resolver).
 
 ---
 
@@ -42,7 +58,7 @@ Modules group into layers by responsibility: author-facing contracts, plugin cod
                                 │ intentframe_bundle_sdk, executor_sdk
 ┌───────────────────────────────▼─────────────────────────────────┐
 │  Substrate runtime (supervisor default graph)                   │
-│  policy-registry │ intentframe-core │ executor                  │
+│  policy-registry │ intentframe-server │ executor                  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │ intentframe_core, prompt_library,
                                 │ command_shield (libraries)
@@ -80,7 +96,7 @@ flowchart TB
   end
   subgraph runtime ["Runtime services"]
     POL[policy-registry]
-    CORE[intentframe-core]
+    CORE[intentframe-server]
     EX[executor]
   end
   subgraph creds ["Credential plane"]
@@ -118,11 +134,11 @@ What you implement against when writing bundles, packs, or agents.
 
 | Module | Role | Process |
 |--------|------|---------|
-| [`intentframe_bundle_sdk/`](../intentframe_bundle_sdk/) | Action/domain bundle contract: hooks, `DeterministicRunner`, loader, registry. Re-exports wire types (`IntentFrame`, `DomainSchema`, `normalize_virtual_path`, …) so plugins need not import `intentframe_core`. | Library |
+| [`intentframe_bundle_sdk/`](../../packages/intentframe-bundle-sdk/intentframe_bundle_sdk/) | Action/domain bundle contract: hooks, `DeterministicRunner`, loader, registry. Re-exports wire types (`IntentFrame`, `DomainSchema`, `normalize_virtual_path`, …) so plugins need not import `intentframe_core`. | Library |
 | [`executor_sdk/`](../executor_sdk/) | Executor pack contract: ABCs + `register_*` registries for adapters and (optionally) platform backends; wire models; credential vault facade. **`executor/` is also a consumer** — factories and gateway helpers live in the SDK today. See [executor_sdk/README.md](../executor_sdk/README.md). | Library |
-| [`intentframe_actor/`](../intentframe_actor/) | Agent SDK — `Actor` submits intents to the pipeline over UDS/HTTP. | Runs in agent process |
+| [`intentframe_actor/`](../../packages/intentframe-actor/intentframe_actor/) | Agent SDK — `Actor` submits intents to the pipeline over UDS/HTTP. | Runs in agent process |
 
-Docs: [`intentframe_bundle_sdk/README.md`](../intentframe_bundle_sdk/README.md), [`executor_sdk/README.md`](../executor_sdk/README.md), [plugin-profiles.md](plugin-profiles.md), [actor-sdk.md](actor-sdk.md).
+Docs: [`intentframe_bundle_sdk/README.md`](../../packages/intentframe-bundle-sdk/README.md), [`executor_sdk/README.md`](../../packages/executor-sdk/README.md), [plugin-profiles.md](plugin-profiles.md), [actor-sdk.md](actor-sdk.md).
 
 ### 2. Internal shared libraries (substrate + SDK deps)
 
@@ -130,21 +146,21 @@ Not the plugin author surface. `intentframe_core` stays internal; SDKs re-export
 
 | Module | Role | Process |
 |--------|------|---------|
-| [`intentframe_core/`](../intentframe_core/) | Neutral DTOs and enums. `IntentFrame.action` is a plain `str`. | Library |
-| [`intentframe_prompt_library/`](../intentframe_prompt_library/) | Default AE/Guardian prompt bodies shared by substrate and bundles. | Library |
-| [`command_shield/`](../command_shield/) | Deterministic shell/code inspector — **fact producer**, not a policy engine. Used by pipeline, bundles, and adapters. | Library |
-| [`executor_client/`](../executor_client/) | Client + wire models for core → executor over UDS. | Library |
-| [`intentframe_client/`](../intentframe_client/) | HTTP/UDS client for agents and tools → intentframe-core (`/handshake`, `/process`, `/audit`). Used by Actor and dashboard; not part of the server process. | Library |
+| [`intentframe_core/`](../../packages/intentframe-core/intentframe_core/) | Neutral DTOs and enums. `IntentFrame.action` is a plain `str`. | Library |
+| [`intentframe_prompt_library/`](../../packages/intentframe-prompt-library/intentframe_prompt_library/) | Default AE/Guardian prompt bodies shared by substrate and bundles. | Library |
+| [`command_shield/`](../../packages/command-shield/command_shield/) | Deterministic shell/code inspector — **fact producer**, not a policy engine. Used by pipeline, bundles, and adapters. | Library |
+| [`executor_client/`](../../packages/executor-client/executor_client/) | Client + wire models for core → executor over UDS. | Library |
+| [`intentframe_client/`](../../packages/intentframe-client/intentframe_client/) | HTTP/UDS client for agents and tools → intentframe-server (`/handshake`, `/process`, `/audit`). Used by Actor and dashboard; not part of the server process. | Library |
 
 ### 3. Substrate runtime (minimal supervisor graph)
 
-Default [`supervisor/config/supervisor.yaml`](../supervisor/config/supervisor.yaml): `policy-registry`, `executor`, `intentframe-core`. Kit profile adds `resource-registry`.
+Default [`supervisor/config/supervisor.yaml`](../../packages/intentframe-supervisor/supervisor/config/supervisor.yaml): `policy-registry`, `executor`, `intentframe-server`. Kit profile adds `resource-registry`.
 
 | Module | Service name | Role |
 |--------|--------------|------|
-| [`policy_registry/`](../policy_registry/) | `policy-registry` | User policies (opaque constraint dicts). Configuration plane. |
-| [`intentframe_server/`](../intentframe_server/) + [`intentframe_components/`](../intentframe_components/) | **`intentframe-core`** | Pipeline: DG → AE → Guardian → forward to executor. Loads bundles from `core.yaml`. |
-| [`executor/`](../executor/) | `executor` | Only process that performs real I/O; loads packs from `executor.yaml`; its internal `ExecutorGateway` owns a `CredentialVault` instance for adapter secrets. |
+| [`policy_registry/`](../../packages/policy-registry/policy_registry/) | `policy-registry` | User policies (opaque constraint dicts). Configuration plane. |
+| [`intentframe_server/`](../../packages/intentframe-server/intentframe_server/) + [`intentframe_components/`](../../packages/intentframe-components/intentframe_components/) | **`intentframe-server`** | Pipeline: DG → AE → Guardian → forward to executor. Loads bundles from `core.yaml`. |
+| [`executor/`](../../packages/executor/executor/) | `executor` | Only process that performs real I/O; loads packs from `executor.yaml`; its internal `ExecutorGateway` owns a `CredentialVault` instance for adapter secrets. |
 
 Docs: [processes.md](processes.md), [architecture.md](architecture.md), [executor.md](executor.md).
 
@@ -155,8 +171,8 @@ The credential vault is not just launcher convenience. In the normal runtime, `e
 | Module | Service / role | Notes |
 |--------|----------------|-------|
 | [`intentframe_credentials/`](../intentframe_credentials/) | `credential-vault` | Process on `credential-vault.sock`; stores secrets in keyring / HashiCorp / env backend depending on `IF_VAULT_BACKEND`. |
-| [`executor_sdk/services/credential_vault.py`](../executor_sdk/services/credential_vault.py) | Consumer facade | Imports and re-exports the `intentframe_credentials` backends (`service`, `keyring`, `hashicorp`, `env`) for executor config and pack registration. |
-| [`executor/gateway.py`](../executor/gateway.py) | Credential consumer | Fetches `api_key` / `credential` for adapters that declare `requires_credentials=True`. |
+| [`executor_sdk/services/credential_vault.py`](../../packages/executor-sdk/executor_sdk/services/credential_vault.py) | Consumer facade | Imports and re-exports the `intentframe_credentials` backends (`service`, `keyring`, `hashicorp`, `env`) for executor config and pack registration. |
+| [`executor/gateway.py`](../../packages/executor/executor/gateway.py) | Credential consumer | Fetches `api_key` / `credential` for adapters that declare `requires_credentials=True`. |
 
 Important split: `IF_VAULT_BACKEND` configures where the vault **service** stores secrets; `executor.yaml` `credentials.backend` configures how the **executor** obtains a `CredentialVault` object. Normal deployments keep executor on `service`.
 
@@ -168,7 +184,7 @@ Generic orchestration — replaceable with Docker Compose, systemd, etc. No doma
 
 | Module | Service / role | Notes |
 |--------|----------------|-------|
-| [`supervisor/`](../supervisor/) | `supervisor` | Spawns uvicorn children from YAML graph; injects `runtime_env`. |
+| [`supervisor/`](../../packages/intentframe-supervisor/supervisor/) | `supervisor` (`intentframe-supervisor` package) | Spawns uvicorn children from YAML graph; injects `runtime_env`. |
 | [`intentframe_gateway/`](../intentframe_gateway/) | `intentframe-gateway-cli` | Product entry point; starts vault → supervisor → optional EDI/Jarvis. |
 | [`intentframe_edge/`](../intentframe_edge/) | `intentframe-edge` | HTTP/TLS ingress; default routes: `/policies`, `/handshake`, `/process`, `/audit`. |
 | [`intentframe_proxy/`](../intentframe_proxy/) | — | Shared UDS proxy helper for gateway and edge. |
@@ -310,7 +326,7 @@ intentframe_executor_pack_*   adapters (+ optional platform backends)
 | **What** | Bundle lifecycle contract + re-exported wire types for plugin authors. |
 | **Who imports** | `intentframe_components`, `intentframe_server`, native bundles, third-party bundles. |
 | **Process** | None (library). |
-| **README** | [`intentframe_bundle_sdk/README.md`](../intentframe_bundle_sdk/README.md) |
+| **README** | [`intentframe_bundle_sdk/README.md`](../../packages/intentframe-bundle-sdk/README.md) |
 
 ### `executor_sdk/`
 
@@ -349,7 +365,7 @@ intentframe_executor_pack_*   adapters (+ optional platform backends)
 | | |
 |---|---|
 | **What** | Pipeline runtime (`IntentFrameRuntime`), FastAPI app, AE/Guardian/onboarding. |
-| **Process** | **`intentframe-core`** on `intentframe.sock`. |
+| **Process** | **`intentframe-server`** on `intentframe.sock`. |
 | **Config** | `INTENTFRAME_CORE_CONFIG` → `core.yaml` with non-empty `bundles:`. |
 | **Docs** | [plugin-profiles.md](plugin-profiles.md), [processes.md](processes.md) |
 
@@ -361,7 +377,7 @@ intentframe_executor_pack_*   adapters (+ optional platform backends)
 | **Process** | `executor` on `executor.sock`. |
 | **Config** | `EXECUTOR_CONFIG` → `executor.yaml` with non-empty `packs:`. |
 | **Credential path** | `executor.main.build_gateway()` creates a `CredentialVault` from `executor_sdk.services.credential_vault.create_credential_vault(config.credentials)`. With normal `credentials.backend: service`, the executor talks to `credential-vault.sock` through `ServiceVault`. |
-| **README** | [`executor/README.md`](../executor/README.md) |
+| **README** | [`executor/README.md`](../../packages/executor/README.md) |
 
 ### `command_shield/`
 
@@ -401,12 +417,13 @@ First-party `ActionBundle` / `DomainBundle` implementations. Loaded when listed 
 | **Who depends on it today** | Gateway starts it and gates startup on mandatory credentials; supervisor injects `runtime_env` credentials; executor reaches it through `executor_sdk.services.credential_vault` when `credentials.backend: service`; EDI calls it for IMAP/SMTP passwords. |
 | **Docs** | [credentials-vault.md](credentials-vault.md), [credential-vault-faq.md](credential-vault-faq.md) |
 
-### `supervisor/`
+### `intentframe-supervisor` (`packages/intentframe-supervisor/supervisor/`)
 
 | | |
 |---|---|
 | **What** | Generic process manager: read YAML → spawn uvicorn → health-check → monitor. Service graph is **admin-owned data**, not supervisor logic. |
-| **Default graph** | `policy-registry`, `executor`, `intentframe-core`. |
+| **Package** | [`packages/intentframe-supervisor/`](../packages/intentframe-supervisor/); console scripts `intentframe`, `intentframe-backend`. |
+| **Default graph** | `policy-registry`, `executor`, `intentframe-server`. |
 | **Kit graph** | Adds `resource-registry` via `${KIT}/supervisor_profile.yaml` (with `KIT` resolved from the installed package). |
 
 ### `intentframe_gateway/`, `intentframe_edge/`, `intentframe_proxy/`
@@ -425,9 +442,11 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 
 ## Workspace layout vs. installable packages
 
-**Main wheel** (`pyproject.toml` `include`): substrate, SDKs, bootstrap, native kit, and related Python packages. Note that `intentframe_credentials` is a separate workspace member but is still part of the normal runtime dependency chain: gateway starts the vault service, and executor reaches it through the `service` credential backend.
+**Root umbrella** (`intentframe` on `pyproject.toml`): gateway, CLI, edge, dashboard, credentials, agents — depends on `intentframe-supervisor[native]` and the split workspace packages under `packages/`.
 
-**Separate workspace members** (`[tool.uv.workspace]`): `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion`, `intentframe_credentials` — own `pyproject.toml`, depended on by the root package.
+**Runtime stack** (workspace): `intentframe-runtime` → `intentframe-supervisor` → optional `[native]` → `intentframe-native-kit`. Substrate services live in `packages/intentframe-server`, `packages/executor`, `packages/policy-registry`, etc.
+
+**Separate workspace members** (`[tool.uv.workspace]`): all `packages/*` plus `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion`, `intentframe_credentials` — each with its own `pyproject.toml`.
 
 **Not Python packages:** `macos-appkit-server/` (Swift), `demo/`, `deploy/`, `docs/`, `tests/`, `scripts/`.
 
@@ -454,7 +473,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 | `executor_sdk` | ✅ | [plugin-profiles.md](plugin-profiles.md), [executor.md](executor.md), [credential-vault-faq.md](credential-vault-faq.md) | Adapter + platform pack contract; host also imports factories today |
 | `intentframe_prompt_library` | — | [architecture.md](architecture.md) | |
 | `policy_registry` | — | [registries.md](registries.md) | |
-| `intentframe_server` / `intentframe_components` | — | [architecture.md](architecture.md), [processes.md](processes.md) | = `intentframe-core` service |
+| `intentframe_server` / `intentframe_components` | — | [architecture.md](architecture.md), [processes.md](processes.md) | = `intentframe-server` service |
 | `executor` | ✅ | [executor.md](executor.md), [credentials-vault.md](credentials-vault.md) | Uses `CredentialVault`; normal backend is `service` over UDS to vault |
 | `executor_client` | — | [architecture.md](architecture.md) | |
 | `command_shield` | ✅ | [executor/security-model.md](executor/security-model.md) | Library, not runtime service |
@@ -463,7 +482,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 | `external_data_ingestion` | ✅ | [email-sync.md](email-sync.md) | Workspace member |
 | `macos-appkit-server` | ✅ | [macos-platform-server.md](macos-platform-server.md) | Swift |
 | `intentframe_gateway` | ✅ | [processes.md](processes.md) | |
-| `supervisor` | — | [processes.md](processes.md) | Convenience launcher |
+| `intentframe-supervisor` | ✅ | [processes.md](processes.md) | Process manager; `intentframe` / `intentframe-backend` scripts |
 | `intentframe_edge` | — | [deploy/prod/README.md](../deploy/prod/README.md) | |
 | `intentframe_proxy` | — | — | Shared helper |
 | `intentframe_cli` | ✅ | [quickstart.md](quickstart.md) | |
@@ -487,4 +506,6 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 - [intentframe_native_kit/README.md](../packages/intentframe-native-kit/intentframe_native_kit/README.md) — Kit layout and import rules
 - [executor_sdk/README.md](../executor_sdk/README.md) — Executor pack roles, registration, import surface
 - [TODO/executor_sdk_layering.md](../TODO/executor_sdk_layering.md) — Accepted monolith today; future contracts / host split
-- [intentframe_bundle_sdk/README.md](../intentframe_bundle_sdk/README.md) — Bundle contract and plugin import surface
+- [intentframe_bundle_sdk/README.md](../../packages/intentframe-bundle-sdk/README.md) — Bundle contract and plugin import surface
+- [intentframe-runtime/README.md](../../packages/intentframe-runtime/README.md) — Runtime meta-package
+- [intentframe-supervisor/README.md](../../packages/intentframe-supervisor/README.md) — Supervisor and console scripts

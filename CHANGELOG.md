@@ -8,6 +8,17 @@ This project follows semantic versioning where practical. While IntentFrame is i
 
 ### Added
 
+- **`intentframe-runtime`** workspace package — dependency-only meta-package (`intentframe-policy-registry`, `intentframe-executor`, `intentframe-server`).
+- **`intentframe-supervisor`** workspace package — supervisor code, default `supervisor.yaml`, console scripts `intentframe` / `intentframe-backend`; depends on `intentframe-runtime`; optional **`[native]`** extra pulls `intentframe-native-kit` (4-service kit profile is still selected via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG`, not auto-detected).
+
+### Changed
+
+- Supervisor service graph: pipeline process renamed **`intentframe-core` → `intentframe-server`** (per-service log: `intentframe-server.log`; socket unchanged: `intentframe.sock`). The **`intentframe-core`** pip package / `intentframe_core` import name is unchanged (shared DTOs).
+- Supervisor source moved to `packages/intentframe-supervisor/`; root `intentframe` depends on `intentframe-supervisor[native]`.
+- Docs and deploy examples: kit YAML paths resolved from the installed `intentframe-native-kit` package (`KIT=…`); Docker defaults use `/app/packages/intentframe-native-kit/intentframe_native_kit/…`.
+
+### Added (prior)
+
 - Config-driven **intentframe-core** profiles: `core.yaml` selected by `INTENTFRAME_CORE_CONFIG` (`intentframe_server/config.py`, `intentframe_server/config/core.example.yaml`, first-party `intentframe_native_kit/core.yaml`).
 - `intentframe.bundles` and `intentframe.executor_packs` **entry-point groups** in root `pyproject.toml` for short-name plugin discovery.
 - Gateway helper `intentframe_gateway/profiles.py` (`resolve_core_config_path()`) so bootstrap and supervisor child env share one core-profile resolution (missing/empty env → kit default).

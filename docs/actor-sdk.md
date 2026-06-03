@@ -313,7 +313,7 @@ Three audiences, in increasing order of independence:
 | Can I bypass the Actor SDK for performance? | You can — but then IntentFrame doesn't see the action and offers no protection for it. Safe reads (`READ_FILE`, `LIST_DIRECTORY`, etc.) resolve in milliseconds via the deterministic fast-path with no AI call. Consequential writes and novel commands run two small-model calls (Analysis Engine + Guardian), adding ~8–15s at current API response times — acceptable for autonomous background work, noticeable in a tight synchronous loop. See [faq.md § Q5](faq.md#q5-what-is-the-latency-cost). |
 | Do I have to define my own actions? | Today, you pick from the action registry the runtime ships with — file ops, shell, email, calendar, contacts, HTTP, SQL, user-IO, and the rest. New action families require runtime-side adapters (see [`dev/action-family-wiring.md`](dev/action-family-wiring.md)). |
 | Where does `runtime_ctx` come from? | The runtime's onboarding engine: it reads the user's stored policies, computes the agent's allowed actions and constraints, and returns them as a `RuntimeContext` for your system prompt. The user controls policy; your agent receives the resolved envelope. |
-| Can I use this without Jarvis or the gateway? | Yes — the runtime (`intentframe-core`) is a standalone service, not coupled to Jarvis. Jarvis is *one* client of it. Your agent can be another. |
+| Can I use this without Jarvis or the gateway? | Yes — the runtime (`intentframe-server`) is a standalone service, not coupled to Jarvis. Jarvis is *one* client of it. Your agent can be another. |
 
 ---
 

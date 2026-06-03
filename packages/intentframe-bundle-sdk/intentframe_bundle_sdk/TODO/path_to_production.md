@@ -28,7 +28,7 @@ Honest answer: **production-ready for first-party use, not yet for third-party p
 **1. Process-wide singletons in the registry**
 `_ACTION_BY_ID`, `_ACTION_INSTANCES`, `_DOMAIN_BY_ID`, `_ACTION_TO_DOMAINS`, `_LOADED_PACKAGES` are module globals.
 - One process = one bundle set. No multi-tenant isolation.
-- `ensure_loaded` enforces a single package set per process — fine for `intentframe-core`, hostile for embedding the SDK in a host that wants different bundle sets per request/tenant.
+- `ensure_loaded` enforces a single package set per process — fine for `intentframe-server`, hostile for embedding the SDK in a host that wants different bundle sets per request/tenant.
 - Test suite needed `_bundle_registry_snapshot.py` precisely because the global state is fragile.
 
 **2. Trust model assumes first-party plugins**
@@ -74,7 +74,7 @@ Honest answer: **production-ready for first-party use, not yet for third-party p
 
 | Use case | Ready? | Notes |
 |----------|--------|-------|
-| First-party `intentframe-core` deployment | **Yes** | Boundary, parity, lifecycle, leak smoke all green |
+| First-party `intentframe-server` deployment | **Yes** | Boundary, parity, lifecycle, leak smoke all green |
 | Single-tenant SaaS with first-party bundles only | **Yes** | Same as above |
 | Multi-tenant runtime with shared bundle set | Partial | Globals make policy/domain isolation per tenant impossible |
 | Multi-tenant with different bundle sets per tenant | **No** | Process-wide registry; would need rearchitect |

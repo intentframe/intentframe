@@ -8,7 +8,7 @@ the supervisor.
 
 The supervisor inherits this process's environment and forwards it to every
 supervised service, so the OpenAI key and INTENTFRAME_CORE_CONFIG reach
-intentframe-core. The supervisor also reads INTENTFRAME_SUPERVISOR_CONFIG from
+intentframe-server. The supervisor also reads INTENTFRAME_SUPERVISOR_CONFIG from
 this inherited env to pick its service-graph profile (minimal default unless the
 kit profile is exported).
 
@@ -71,7 +71,7 @@ def main() -> int:
     if not runtime_env:
         print(
             "[bootstrap] WARNING: no runtime_env credentials in vault; "
-            "intentframe-core may fail its mandatory credential check",
+            "intentframe-server may fail its mandatory credential check",
             file=sys.stderr,
         )
 

@@ -10,11 +10,11 @@ in the SDK README.
 
 The trace log is **SDK-internal forensic data**. It is separate from:
 
-- Substrate audit entries (`intentframe-core` pipeline audit)
+- Substrate audit entries (`intentframe-server` pipeline audit)
 - `BundleDeterministicResult` returned to callers
 
 An auditor inspects the bundle-runtime process log directly. Trace data never
-appears on the wire to `intentframe-core` consumers.
+appears on the wire to `intentframe-server` consumers.
 
 Each hook invocation (or deliberate skip) writes **one JSON line** to
 `bundle-sdk.log`. Every record captures the **full function frame**:
@@ -40,7 +40,7 @@ There is no curated field list. New hook parameters show up automatically.
 Rotated backups (10 MB each, up to 3): `bundle-sdk.log.1`, `.2`, `.3`.
 
 The logger name is `bundle_sdk.trace`. Records do **not** propagate to
-`intentframe-core.log`.
+`intentframe-server.log`.
 
 **First write:** the file is created on the first traced hook in the process
 (policy validation at boot, bundle `startup`, first intent through the runner,

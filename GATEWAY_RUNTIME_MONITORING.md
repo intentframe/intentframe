@@ -31,7 +31,7 @@ gateway
     ├── policy-registry
     ├── resource-registry
     ├── executor
-    └── intentframe-core
+    └── intentframe-server
 ```
 
 On macOS, `platform-server` is launched separately via `open` so it may not appear in the same process group as the Python children.
@@ -200,7 +200,7 @@ Common log files:
 - `policy-registry.log`
 - `resource-registry.log`
 - `executor.log`
-- `intentframe-core.log`
+- `intentframe-server.log`
 - `platform-server.log`
 
 ## EDI Lifecycle: Startup vs Idle
