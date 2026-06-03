@@ -41,6 +41,8 @@ From repo root (after ``uv sync``):
   uv run python scripts/admin/seed_policy.py ... --no-validate-bundles
 
 Copy and edit this file for custom installers; keep bundle validation in the orchestrator.
+
+Documentation: docs/dev/policy-seeding.md
 """
 
 from __future__ import annotations

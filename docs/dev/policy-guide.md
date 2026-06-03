@@ -20,7 +20,8 @@ The important pieces are:
 
 - `jarvis_pa/jarvis/policies/jarvis.yaml`: packaged user-mode Jarvis policy.
 - `jarvis_pa/jarvis/policies/jarvis_root.yaml`: packaged root-demo Jarvis policy.
-- `policy_registry/seeds/loader.py`: YAML → `UserPolicy` (opaque constraint dicts; bundle shape validation via `validate_policy_against_registry`).
+- `policy_registry/seeds/loader.py`: YAML → `UserPolicy` (structure + schema version only).
+- `scripts/admin/seed_policy.py`: reference orchestrator — load, `validate_policy_with_bundles`, `POST /policies` (UDS or `INTENTFRAME_POLICY_URL`). See [policy-seeding.md](policy-seeding.md).
 - `policy_registry/seeds/resolver.py`: resolves user override files under
   `~/.intentframe/policies/`.
 - `intentframe_gateway/bootstrap.py`: seeds Jarvis policy and workspace on
@@ -126,7 +127,7 @@ For Jarvis, `intentframe_gateway/bootstrap.py` resolves:
 2. User id: gateway identity config, with environment fallback.
 3. Agent id: `jarvis` for user mode or `jarvis_root` for root mode.
 4. YAML path: user override first, packaged policy second.
-5. Validated policy: `policy_registry.seeds.load_policy_seed(..., bundle_packages=...)` (registry fields + host-supplied bundle constraint schemas).
+5. `load_policy_seed(...)` then `validate_policy_with_bundles(policy, core.bundles)` in the gateway orchestrator (not inside the registry loader).
 
 The bootstrapper then posts the policy into the policy registry.
 
@@ -315,27 +316,43 @@ Common effects:
 - `require_confirmation`: require user confirmation when supported by the
   action flow.
 
-## Validate A Policy YAML
+## Validate and seed a policy YAML
 
-There is no dedicated end-user `policy validate` CLI command yet. Developers can
-validate a YAML with the same loader the gateway uses:
+There is no dedicated end-user `policy validate` CLI yet. Use the reference admin
+script or the same steps the gateway uses. Full layering and examples:
+[policy-seeding.md](policy-seeding.md).
+
+**Validate + upsert (recommended):**
 
 ```bash
-python - <<'PY'
+uv run python scripts/admin/seed_policy.py \
+  --policy ~/.intentframe/policies/jarvis.yaml \
+  --user-id jarvis_default \
+  --agent-id jarvis \
+  --bundle intentframe_native_kit.intentframe_native_bundles
+```
+
+**Validate only (no POST):**
+
+```bash
+uv run python - <<'PY'
 from pathlib import Path
+from intentframe_bundle_sdk.loader import validate_policy_with_bundles
 from policy_registry.seeds import load_policy_seed
 
 policy = load_policy_seed(
     Path("~/.intentframe/policies/jarvis.yaml").expanduser(),
-    bundle_packages=["my_org.intentframe_bundles"],
+    user_id="jarvis_default",
+    agent_id="jarvis",
 )
-print(policy.model_dump(mode="json", exclude={"created_at"}))
+validate_policy_with_bundles(policy, ["my_org.intentframe_bundles"])
+print("OK")
 PY
 ```
 
-If the YAML has a schema-version problem, unknown fields, invalid constraints,
-or an action shape Pydantic cannot validate, this command fails before the
-gateway tries to seed it.
+Schema-version errors, unknown fields, and bundle constraint mismatches fail
+before the registry stores anything when you use `seed_policy.py` or the gateway
+bootstrap path.
 
 ## External Agent Policy TODOs
 

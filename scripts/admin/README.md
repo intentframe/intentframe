@@ -2,6 +2,8 @@
 
 Reference admin utilities for seeding IntentFrame registries. Copy or edit these scripts for installers, demos, and one-off dev workflows.
 
+**Strategy and longer examples:** [docs/dev/policy-seeding.md](../../docs/dev/policy-seeding.md) (layering, who validates what, deploy/dev HTTP).
+
 ## `seed_policy.py`
 
 Loads a policy YAML, optionally validates constraint shapes against registered bundles, and upserts into **policy-registry** via `PolicyRegistryClient`.
