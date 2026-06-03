@@ -157,7 +157,7 @@ The gateway is a first-party product launcher. It does not load bundles or packs
 
 | Helper | Used for |
 |--------|----------|
-| `resolve_core_config_path()` | `INTENTFRAME_CORE_CONFIG` on supervisor child env; bootstrap bundle list for `load_policy_seed(..., bundle_packages=…)` |
+| `resolve_core_config_path()` | `INTENTFRAME_CORE_CONFIG` on supervisor child env; bootstrap uses `core.yaml` `bundles:` with `validate_policy_with_bundles` after `load_policy_seed` |
 | `EXECUTOR_CONFIG` (env or default `jarvis_pa/executor.yaml`) | Executor child |
 
 `resolve_core_config_path()` treats a **missing or empty** `INTENTFRAME_CORE_CONFIG` as “use first-party kit `core.yaml`”. That normalization is **gateway-only**. `intentframe-core` itself still fails closed if started without a valid config path.
@@ -223,7 +223,7 @@ For adapter-level detail, see [executor.md](executor.md) § extending the execut
 | `packs:` missing or empty in `executor.yaml` | `ConfigurationError` |
 | Ref not in entry-point group and not importable | `ImportError` / `ConfigurationError` |
 | Second `ensure_loaded()` with a different bundle set | `RuntimeError` (bundles load once per process) |
-| Policy seed references unknown actions | Validation fails when `bundle_packages` is supplied |
+| Policy seed references unknown actions | `validate_policy_with_bundles` fails in orchestrator before POST |
 
 ---
 
@@ -237,7 +237,8 @@ For adapter-level detail, see [executor.md](executor.md) § extending the execut
 | [`intentframe_bundle_sdk/loader.py`](../intentframe_bundle_sdk/loader.py) | `intentframe.bundles` entry-point + module resolution |
 | [`executor/server.py`](../executor/server.py) | `intentframe.executor_packs` pack loading |
 | [`intentframe_gateway/profiles.py`](../intentframe_gateway/profiles.py) | `resolve_core_config_path()` (gateway-only empty/missing → kit default) |
-| [`intentframe_gateway/bootstrap.py`](../intentframe_gateway/bootstrap.py) | Policy seed `bundle_packages` from same resolver |
+| [`intentframe_gateway/bootstrap.py`](../intentframe_gateway/bootstrap.py) | Policy seed: `load_policy_seed` + `validate_policy_with_bundles` using `core.yaml` bundles |
+| [`scripts/admin/seed_policy.py`](../scripts/admin/seed_policy.py) | Reference admin seed (UDS or `INTENTFRAME_POLICY_URL`) |
 | [`intentframe_gateway/server.py`](../intentframe_gateway/server.py) | Forwards `INTENTFRAME_CORE_CONFIG` to supervisor child |
 | [`jarvis_pa/seed_policies.py`](../jarvis_pa/seed_policies.py) | Dev seeding; uses `INTENTFRAME_CORE_CONFIG` only (no bundle env shortcut) |
 | [`tests/conftest.py`](../tests/conftest.py) | Autouse temp `core.yaml` for unit tests |

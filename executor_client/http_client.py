@@ -1,14 +1,14 @@
 """
 Executor HTTP Client — calls the Executor service over HTTP/UDS.
 
-Implements the Executor ABC from intentframe_components.executor.base so the
+Implements the Executor ABC from intentframe_core.executor so the
 Runtime can use it as a drop-in replacement for the in-process ExecutorBridge.
 
 Handles:
     1. IntentFrame → ExecutionRequest translation
     2. HMAC request signing
     3. HTTP POST to executor service over UDS
-    4. ExecutionResult translation back to intentframe types
+    4. Wire ExecutionResult → intentframe ExecutionResult
 
 This module has zero dependency on the executor server package.  Wire-protocol
 models are imported from executor_client.models.
@@ -28,7 +28,7 @@ from intentframe_core.types import (
     ExecutionResult as IFExecutionResult,
     IntentFrame,
 )
-from intentframe_components.executor.base import Executor
+from intentframe_core.executor import Executor
 
 from executor_client.models import (
     AuthorizationProof,
@@ -41,34 +41,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SOCKET = "~/.intentframe/run/executor.sock"
 _DEMO_HMAC_KEY = "intentframe_demo_secret_key_do_not_use_in_production"
-
-# ── Result reshaping: adapter result dict → IntentFrame result dict ────────
-# Only needed when the adapter's output key doesn't match what the caller
-# expects.  Actions not listed here pass through unchanged.
-#
-# RUN_COMMAND: the terminal adapter returns {stdout, stderr, return_code,
-# command}.  We keep the historical ``{"content": stdout}`` shape (that
-# the LLM and demo harnesses already read) and add ``stderr`` next to
-# it — success or failure.  That single extra field is enough to make
-# silent failures visible (e.g. ``ps aux --sort=-%cpu | head`` on macOS
-# where ps errors to stderr, head exits 0, pipeline rc=0) without
-# reshaping the payload into a structured terminal-session-looking
-# dict, which was priming the LLM to summarise ("output above") instead
-# of quoting the actual bytes back to the user.  ``return_code`` and
-# ``command`` are intentionally not forwarded: the tool call arguments
-# already carry ``command``, and stderr presence is a more reliable
-# "something went wrong" signal than rc given pipe semantics.
-_RESULT_MAP: dict[str, Any] = {
-    "LIST_DIRECTORY": lambda d: {"files": d.get("entries", d.get("files", []))},
-    "READ_FILE":      lambda d: {"content": d.get("content", "")},
-    "RUN_COMMAND":    lambda d: {
-        "content": d.get("stdout", ""),
-        "stderr": d.get("stderr", ""),
-    },
-    "APPEND_ROW":     lambda d: {"appended": True},
-    "ASK_USER":       lambda d: {"response": d.get("response")},
-    "SHOW_OPTIONS":   lambda d: {"response": d.get("response")},
-}
 
 
 class ExecutorHTTPClient(Executor):
@@ -114,11 +86,10 @@ class ExecutorHTTPClient(Executor):
         resp.raise_for_status()
 
         wire_result = WireExecutionResult.model_validate(resp.json())
-        translated_data = self._translate_result_data(action, wire_result.data)
 
         return IFExecutionResult(
             success=wire_result.success,
-            data=translated_data,
+            data=wire_result.data,
             error=wire_result.error,
             execution_id=wire_result.execution_id,
             timestamp=wire_result.timestamp,
@@ -166,12 +137,3 @@ class ExecutorHTTPClient(Executor):
         """
         del action
         return dict(intent.data or {})
-
-    @staticmethod
-    def _translate_result_data(
-        action: str, data: dict[str, Any] | None,
-    ) -> dict[str, Any] | None:
-        if data is None:
-            return None
-        translator = _RESULT_MAP.get(action)
-        return translator(data) if translator else data

@@ -6,7 +6,7 @@ import logging
 from typing import Any, Protocol
 
 from intentframe_native_kit.action_registry.types import ActionType
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame
 
 logger = logging.getLogger(__name__)
 

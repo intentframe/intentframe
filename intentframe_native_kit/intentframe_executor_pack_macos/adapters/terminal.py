@@ -105,9 +105,9 @@ class TerminalAdapter(CapabilityAdapter):
         if not command:
             return ExecutionResult(success=False, error="No command provided")
 
-        from intentframe_native_kit.intentframe_native_bundles.shared.floors import check_terminal_execute
+        from command_shield import quick_check
 
-        report = check_terminal_execute(command)
+        report = quick_check(command)
         if report.is_catastrophic:
             matched = report.signals[0].signal_id if report.signals else "unknown"
             logger.warning("Blocked catastrophic command: pattern=%r command=%s", matched, command[:120])

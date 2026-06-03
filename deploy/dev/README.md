@@ -157,6 +157,14 @@ docker compose -f docker-compose.dev.yml up --build
 export INTENTFRAME_CORE_URL=http://localhost:8443
 export INTENTFRAME_POLICY_URL=http://localhost:8443
 export INTENTFRAME_RESOURCE_URL=http://localhost:8443
+
+# Optional: seed policy with the reference admin script (tests also upsert themselves)
+uv run python scripts/admin/seed_policy.py \
+  --policy demo/config/test_policy.yaml \
+  --user-id attack_tester \
+  --agent-id stub_pipeline_agent \
+  --bundle intentframe_native_kit.intentframe_native_bundles
+
 python demo/tests/test_attacks.py 1 2 3
 python demo/tests/test_advanced_attacks.py
 python demo/tests/test_redteam_attacks.py

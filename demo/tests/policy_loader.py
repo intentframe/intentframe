@@ -21,6 +21,7 @@ from intentframe_native_kit.intentframe_native_bundles.actions.files.constraints
 from intentframe_native_kit.intentframe_native_bundles.actions.host_files.constraints import HostFileConstraints
 from intentframe_native_kit.intentframe_native_bundles.actions.message.constraints import MessageConstraints
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal.constraints import TerminalConstraints
+from intentframe_bundle_sdk.loader import validate_policy_with_bundles
 from policy_registry.models import ActionPermission, UserPolicy
 from policy_registry.seeds import load_policy_seed
 
@@ -59,13 +60,14 @@ def load_test_policy(
         yaml_path: Override the default YAML location.
         metadata:  Optional metadata dict merged into the policy.
     """
-    return load_policy_seed(
+    policy = load_policy_seed(
         yaml_path or _DEFAULT_POLICY_PATH,
         user_id=user_id,
         agent_id=agent_id,
         metadata=metadata,
-        bundle_packages=_BUNDLE_PACKAGES,
     )
+    validate_policy_with_bundles(policy, _BUNDLE_PACKAGES)
+    return policy
 
 
 def _parse_constraints(raw: dict[str, Any] | None) -> Any:

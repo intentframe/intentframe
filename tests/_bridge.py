@@ -1,10 +1,10 @@
 """
-ExecutorBridge -- Adapter between IntentFrame and the production Executor.
+ExecutorBridge -- test helper: in-process adapter between IntentFrame and Executor.
 
 Client-side code that translates IntentFrame types into ExecutionRequest
 types, signs requests with HMAC, and forwards them through the
 ExecutorGateway. Neither intentframe nor executor depend on each other;
-this module is the glue between them.
+this module is test-only glue between them.
 
 Responsibilities:
     1. Convert IntentFrame  -> production ExecutionRequest
@@ -37,7 +37,7 @@ from typing import Any
 
 # ── IntentFrame types ─────────────────────────────────────────────────────────
 from intentframe_native_kit.action_registry import ActionType  # noqa: F401 -- canonical source of truth
-from intentframe_core.types import (
+from intentframe_bundle_sdk import (
     ExecutionResult as DemoExecutionResult,
     IntentFrame,
 )
@@ -152,21 +152,22 @@ class ExecutorBridge:
             ),
         )
 
-    # ── Result reshaping: adapter result dict → demo result dict ────────
-    # Only needed when the adapter's output key doesn't match what the
-    # demo agent expects.  Actions not listed here pass through unchanged.
+    # ── Result reshaping: adapter result dict → IntentFrame result dict ────────
+    # Only needed when the adapter's output key doesn't match what the caller
+    # expects.  Actions not listed here pass through unchanged.
     #
-    # RUN_COMMAND: the terminal adapter returns
-    # {stdout, stderr, return_code, command}.  We keep the historical
-    # ``{"content": stdout}`` shape (that the LLM and demo harnesses
-    # already read) and add ``stderr`` next to it — success or failure.
-    # That single extra field is enough to make silent failures visible
-    # (e.g. ``ps aux --sort=-%cpu | head`` on macOS where ps errors to
-    # stderr, head exits 0, pipeline rc=0) without reshaping the payload
-    # into a structured terminal-session-looking dict that primed the
-    # LLM to summarise ("output above") instead of quoting the output
-    # back to the user.  ``return_code`` and ``command`` are intentionally
-    # not forwarded.
+    # RUN_COMMAND: the terminal adapter returns {stdout, stderr, return_code,
+    # command}.  We keep the historical ``{"content": stdout}`` shape (that
+    # the LLM and demo harnesses already read) and add ``stderr`` next to
+    # it — success or failure.  That single extra field is enough to make
+    # silent failures visible (e.g. ``ps aux --sort=-%cpu | head`` on macOS
+    # where ps errors to stderr, head exits 0, pipeline rc=0) without
+    # reshaping the payload into a structured terminal-session-looking
+    # dict, which was priming the LLM to summarise ("output above") instead
+    # of quoting the actual bytes back to the user.  ``return_code`` and
+    # ``command`` are intentionally not forwarded: the tool call arguments
+    # already carry ``command``, and stderr presence is a more reliable
+    # "something went wrong" signal than rc given pipe semantics.
     _RESULT_MAP: dict[str, Any] = {
         "LIST_DIRECTORY": lambda d: {"files": d.get("entries", d.get("files", []))},
         "READ_FILE":      lambda d: {"content": d.get("content", "")},

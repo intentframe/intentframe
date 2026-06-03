@@ -1,15 +1,11 @@
 """
-IntentFrame Client -- low-level HTTP transport to IntentFrame Core.
-
-Used internally by the Actor SDK (intentframe_actor) to send
-IntentFrames to the Runtime over UDS.
+IntentFrame Client — low-level HTTP transport to IntentFrame Core.
 
 Two variants:
-    IntentFrameClient      -- sync  (admin scripts, CLI tools, dashboard)
-    AsyncIntentFrameClient -- async (used inside Actor SDK)
+    IntentFrameClient      — sync  (admin scripts, CLI tools, dashboard)
+    AsyncIntentFrameClient — async (used inside Actor SDK)
 
-Not meant to be used directly by agent developers.  Agent developers
-use the Actor SDK (``from intentframe_actor import Actor``).
+Agent developers should use the Actor SDK (``from intentframe_actor import Actor``).
 """
 
 from __future__ import annotations

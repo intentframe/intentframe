@@ -5,8 +5,7 @@ from __future__ import annotations
 import fnmatch
 
 from intentframe_native_kit.action_registry.types import ActionType
-from intentframe_core.paths import normalize_virtual_path
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame, normalize_virtual_path
 
 from intentframe_native_kit.intentframe_native_bundles.shared.files.ai_context import (
     render_file_external_context,

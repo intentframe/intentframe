@@ -57,10 +57,12 @@ If you're new to IntentFrame, read in this order:
 
 - [privacy.md](privacy.md) — on-disk layout, outbound traffic catalog, what never happens
 - [credentials-vault.md](credentials-vault.md) — how secrets are stored and accessed
+- [credential-vault-faq.md](credential-vault-faq.md) — vault service vs executor backend registry vs pack registration
 
 ### "How do specific subsystems work?"
 
 - [credentials-vault.md](credentials-vault.md) — secret storage and the vault service
+- [credential-vault-faq.md](credential-vault-faq.md) — `_BACKEND_REGISTRY`, `credentials.backend`, `IF_VAULT_BACKEND`, and adapter credential flow
 - [registries.md](registries.md) — policy registry, resource registry, action registry
 - [email-sync.md](email-sync.md) — IMAP / SMTP sync daemon (EDI)
 - [macos-platform-server.md](macos-platform-server.md) — Swift native bridge for Calendar / Contacts / iMessage / etc.
@@ -139,6 +141,7 @@ If you're new to IntentFrame, read in this order:
 | Doc | What it covers |
 |---|---|
 | [credentials-vault.md](credentials-vault.md) | Secret storage backed by OS keyring, exposed over a UDS service |
+| [credential-vault-faq.md](credential-vault-faq.md) | Implementation FAQ for vault service vs executor `CredentialVault`, backend registry, pack registration, and `IF_VAULT_BACKEND` |
 | [registries.md](registries.md) | Policy registry (rules), resource registry (VFS + adapters), action registry (taxonomy) |
 | [email-sync.md](email-sync.md) | The EDI daemon — IMAP IDLE + SMTP + local SQLite mirror |
 | [macos-platform-server.md](macos-platform-server.md) | Swift native bridge for Calendar / Contacts / Reminders / iMessage / Notes / Notifications |

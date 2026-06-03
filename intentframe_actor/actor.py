@@ -30,7 +30,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from intentframe_server.client import AsyncIntentFrameClient
+from intentframe_client import AsyncIntentFrameClient
 from intentframe_core.types import (
     AgentCapabilities,
     ExecutionResult,

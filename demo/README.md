@@ -131,8 +131,9 @@ demo/
     ├── test_ai_analysis.py        # AE unit tests
     ├── test_adapters.py           # Executor adapter tests
     ├── test_domain_hardening.py   # Domain constraint tests
-    ├── test_executor.py           # Executor service tests
     └── test_transitive_injection_live.py  # AE → Guardian boundary (live LLM)
+
+Executor pipeline coverage: ``tests/test_executor.py`` (bridge helper: ``tests/_bridge.py``).
 ```
 
 ## Attack test cases

@@ -22,7 +22,7 @@ Used by ``DeletionDomainBundle`` and optionally by agent authors via
 
 from __future__ import annotations
 
-from intentframe_core.domains.base import DomainSchema
+from intentframe_bundle_sdk import DomainSchema
 
 
 class DeletionIntentData(DomainSchema):

@@ -3,8 +3,9 @@ IntentFrame Core — shared types and enums used across the entire system.
 
 Both the server (``intentframe_server/``) and the Actor SDK
 (``intentframe_actor/``) import from here. This package is the neutral
-foundation layer: it must not import ``intentframe_native_kit.action_registry`` (the action
-taxonomy lives there; ``IntentFrame.action`` is a plain string).
+foundation layer: it must not import ``policy_registry`` or
+``intentframe_native_kit.action_registry`` (the action taxonomy lives there;
+``IntentFrame.action`` is a plain string).
 
 Concrete domain intent schemas (finance, deletion, …) also live in
 ``intentframe_native_kit.action_registry.domains``; ``intentframe_core.domains`` only exposes

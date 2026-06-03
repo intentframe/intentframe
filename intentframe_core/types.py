@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from intentframe_core.enums import Decision, Reversibility, RiskLevel
-from policy_registry.models import ActionPermission, SemanticIntentLimit
+from intentframe_core.policy import ActionPermission, SemanticIntentLimit
 
 INTENT_SIGNALS_MAX_ITEMS = 32
 INTENT_SIGNAL_VALUE_MAX_LEN = 300

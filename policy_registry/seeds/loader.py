@@ -23,14 +23,13 @@ and ``agent_id`` explicitly (the gateway derives them from
 populated — either via the YAML or via the keyword overrides — or
 :meth:`UserPolicy.model_validate` raises.
 
-Constraint validation
----------------------
+Constraint dicts
+----------------
 :meth:`UserPolicy.model_validate` stores ``constraints`` as opaque dicts.
-When callers pass ``bundle_packages``,
-:func:`intentframe_bundle_sdk.loader.validate_policy_against_registry` routes
-each ``allowed_actions`` entry to its registered action bundle, which validates
-the dict against the family schema (e.g. ``allowed_paths`` vs
-``allowed_host_paths``).  See ``tests/test_policy_host_constraints_roundtrip.py``.
+Bundle-specific constraint *semantics* (e.g. ``allowed_paths`` vs
+``allowed_host_paths``) are validated by the orchestrator that loads
+the policy (gateway bootstrap, seed CLI, test loaders) after
+:func:`load_policy_seed` returns — not by this module.
 """
 
 from __future__ import annotations
@@ -56,7 +55,6 @@ def load_policy_seed(
     user_id: str | None = None,
     agent_id: str | None = None,
     metadata: dict[str, Any] | None = None,
-    bundle_packages: list[str] | None = None,
 ) -> UserPolicy:
     """Build a :class:`UserPolicy` from a YAML seed.
 
@@ -70,9 +68,6 @@ def load_policy_seed(
         metadata: Shallow overlay on the YAML ``metadata`` dict
             (caller wins).  Useful for runtime tags like
             ``{"note": "Auto-seeded by gateway bootstrap"}``.
-        bundle_packages: Optional action-bundle package refs used for startup
-            constraint validation. Hosts pass the same bundle list that
-            intentframe-core will enforce with.
 
     Returns:
         A validated :class:`UserPolicy`.
@@ -98,17 +93,7 @@ def load_policy_seed(
         merged.update(metadata)
         raw["metadata"] = merged
 
-    policy = UserPolicy.model_validate(raw)
-    if bundle_packages is not None:
-        _validate_loaded_policy(policy, bundle_packages)
-    return policy
-
-
-def _validate_loaded_policy(policy: UserPolicy, bundle_packages: list[str]) -> None:
-    from intentframe_bundle_sdk.loader import ensure_loaded, validate_policy_against_registry
-
-    ensure_loaded(bundle_packages)
-    validate_policy_against_registry(policy)
+    return UserPolicy.model_validate(raw)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:

@@ -37,7 +37,10 @@ from intentframe_native_kit.action_registry import ActionType
 from executor_sdk.adapters.base import CapabilityAdapter
 from executor_sdk.models import AdapterManifest, ExecutionResult
 from intentframe_native_kit.intentframe_executor_pack_macos.adapters.host_files_config import HostFilesConfig
-from intentframe_native_kit.resource_registry.floor import canonicalize_real_path
+from intentframe_native_kit.resource_registry.floor import (
+    canonicalize_real_path,
+    match_deny_prefix,
+)
 
 # MIME types we refuse up-front rather than surfacing cryptic decode
 # errors.  Mirrors LocalVirtualFileSystem._BINARY_UNSUPPORTED so the
@@ -150,9 +153,7 @@ class HostFilesAdapter(CapabilityAdapter):
             ActionType.WRITE_HOST_FILE.value,
             ActionType.DELETE_HOST_FILE.value,
         }:
-            from intentframe_native_kit.intentframe_native_bundles.shared.floors import check_host_file_floor
-
-            matched = check_host_file_floor(canonical, action)
+            matched = match_deny_prefix(canonical)
             if matched is not None:
                 return ExecutionResult(
                     success=False,

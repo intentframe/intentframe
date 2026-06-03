@@ -294,7 +294,7 @@ Beyond the primary suites, the codebase includes:
 | `demo/tests/test_ai_pipeline.py` | Full Actor → AE → Guardian → Executor integration | End-to-end pipeline correctness |
 | `demo/tests/test_adapters.py` | Executor adapter contracts — file, email, calendar, terminal | Each adapter respects its interface boundaries |
 | `demo/tests/test_domain_hardening.py` | Domain modules — finance and deletion structural rules | Domain-level typed constraints work independently |
-| `demo/tests/test_executor.py` | Executor service — credential handling, rollback, sandboxing | Execution boundary enforcement |
+| `tests/test_executor.py` | Executor service — credential handling, rollback, sandboxing | Execution boundary enforcement |
 | `tests/test_prompt_hardening.py` | Unicode normalization (NFKC), zero-width stripping, boundary tokens, role anchoring, base64 detection | Prompt hardening primitives work in isolation |
 | `tests/test_transitive_injection.py` | Deterministic counterpart to the live suite (CI-safe, no API key) | Validates prompt zoning, field bounds, anomaly detection, and overflow handling without requiring an API key |
 | `demo/tests/ai_naive_invoice_agent.py` | **Comparison agent** — naive invoice-processing agent relying on prompt-only enforcement and hardcoded web-app sandboxing (no IntentFrame pipeline) | Demonstrates the typical web-app pattern: limits exist only in the system prompt and simple if-checks in tool functions |
@@ -530,7 +530,7 @@ The evidence proves that the architecture works, that deterministic layers hold 
 | Full pipeline integration | `demo/tests/test_ai_pipeline.py` |
 | Adapter contract tests | `demo/tests/test_adapters.py` |
 | Domain hardening tests | `demo/tests/test_domain_hardening.py` |
-| Executor service tests | `demo/tests/test_executor.py` |
+| Executor service tests | `tests/test_executor.py` |
 | Comparison agent (prompt-only enforcement) | `demo/tests/ai_naive_invoice_agent.py` |
 | Test README + methodology | `demo/tests/README.md` |
 | Security analysis | `demo/tests/security_analysis.md` |

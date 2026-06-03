@@ -6,7 +6,7 @@ from typing import Any
 
 from command_shield import Verdict, inspect_command as shield_inspect
 from intentframe_native_kit.intentframe_native_bundles.actions.terminal.evidence import CommandIntel
-from intentframe_core.types import ExecutionResult, IntentFrame
+from intentframe_bundle_sdk import ExecutionResult, IntentFrame
 
 
 def run_terminal_pre_pipeline(

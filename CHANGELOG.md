@@ -15,13 +15,15 @@ This project follows semantic versioning where practical. While IntentFrame is i
 
 ### Changed
 
+- **Core HTTP client** moved from `intentframe_server/client.py` to neutral package `intentframe_client/` (no re-exports on `intentframe_server`). Actor, dashboard, and demo tests import `intentframe_client` directly so `import intentframe_actor` does not load the pipeline.
 - **intentframe-core** loads action bundles only from the active core profile; no hardcoded native-kit fallback in substrate (`DeterministicGuardian`, `intentframe_server/server.py`, `policy_registry/seeds/loader.py`).
 - Removed **`INTENTFRAME_BUNDLES`** env shortcut (parity with executor — no pack-list env var).
 - Policy seed validation takes explicit `bundle_packages` from the deployment's `core.yaml` (gateway bootstrap, `jarvis_pa/seed_policies.py`).
 - Native action surface packaging: `intentframe_native_kit.action_registry`, `intentframe_native_kit.intentframe_native_bundles`,
   and `intentframe_executor_pack_*` now live under `intentframe_native_kit/`
-  (import names unchanged; demo `ExecutorBridge` lives in
-  `intentframe_native_kit/extras/bridge.py` only).
+  (import names unchanged). Demo `ExecutorBridge` moved to test helper
+  `tests/_bridge.py`; executor pipeline coverage lives in
+  `tests/test_executor.py`.
 
 - Policy registry decoupling: constraint schemas, system terminal floors, and
   contact-based recipient resolution moved from `policy_registry/` into action

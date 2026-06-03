@@ -7,7 +7,7 @@ intent slice validated by the bundle SDK before ``enforce()`` runs.
 from __future__ import annotations
 
 from intentframe_native_kit.action_registry.domains.finance import FinancialIntentData
-from intentframe_core.types import IntentFrame
+from intentframe_bundle_sdk import IntentFrame
 
 from intentframe_native_kit.intentframe_native_bundles.domains.finance.constraints import FinanceConstraints
 from intentframe_bundle_sdk.domain import DomainBundle

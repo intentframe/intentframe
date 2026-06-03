@@ -3,7 +3,7 @@
 Forwards HTTP requests to a backend service over a Unix Domain Socket.
 Shared by ``intentframe_gateway`` (consumer product API) and
 ``intentframe_edge`` (B2B network ingress). Uses the same httpx UDS
-transport pattern as intentframe_server/client.py and the registry clients.
+transport pattern as intentframe_client/client.py and the registry clients.
 """
 
 from __future__ import annotations

@@ -6,7 +6,7 @@ metadata mappings (``ACTION_CATEGORIES``, ``ACTION_DOMAINS``). No enforcement
 logic — bundles and the Guardian consume these definitions at runtime.
 
 ``ActionType`` subclasses ``str`` so enum members are interchangeable with
-the plain ``str`` on :attr:`~intentframe_core.types.IntentFrame.action`.
+the plain ``str`` on :attr:`~intentframe_bundle_sdk.IntentFrame.action`.
 Platform-only actions (``RUN_SHORTCUT``, …) may exist in :class:`ActionCatalog`
 without being enum members; they still flow as strings through the pipeline.
 """
@@ -52,8 +52,8 @@ class ActionType(str, Enum):
 
     Subclasses ``str`` so members are drop-in string identifiers: an
     ``ActionType`` member equals its ``.value`` and can populate the plain
-    ``str`` ``IntentFrame.action`` field directly. ``intentframe_core`` stays
-    decoupled from this taxonomy.
+    ``str`` ``IntentFrame.action`` field directly. Substrate and internal
+    ``intentframe_core`` stay decoupled from this taxonomy.
     """
 
     # ── FILE ──────────────────────────────────────────────────────

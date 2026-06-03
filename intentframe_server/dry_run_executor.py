@@ -33,7 +33,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from intentframe_components.executor.base import Executor
+from intentframe_core.executor import Executor
 from intentframe_core.types import ExecutionResult, IntentFrame
 
 logger = logging.getLogger(__name__)

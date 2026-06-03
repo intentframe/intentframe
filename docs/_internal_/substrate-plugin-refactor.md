@@ -87,7 +87,7 @@ intentframe_native_kit/
     onboarding/                 # first-party onboarding copy
     __init__.py                 # register_bundles(registry) only
   intentframe_executor_pack_*/  # posix / macos / console
-  extras/                       # demo bridge (ExecutorBridge)
+  # ExecutorBridge demo glue → tests/_bridge.py (test helper, not kit)
 ```
 
 Import layering (CI-enforced in `tests/test_boundary_imports.py`):

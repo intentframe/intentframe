@@ -36,7 +36,7 @@ from policy_registry.models import ActionPermission, SemanticIntentLimit, UserPo
 from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 from intentframe_native_kit.resource_registry.models import ResourceMount
 
-from intentframe_server.client import IntentFrameClient
+from intentframe_client import IntentFrameClient
 
 from intentframe_dashboard.manifest import AgentManifest
 from intentframe_dashboard.loader import scan_agents

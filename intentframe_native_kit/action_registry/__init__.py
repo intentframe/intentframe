@@ -6,17 +6,17 @@ shared vocabulary (``ActionType``, ``ActionCategory``, ``DomainType``,
 ``ACTION_DOMAINS``, …).
 
 Layering:
-    - ``intentframe_core`` — neutral DTOs; ``IntentFrame.action`` is a plain
-      string and must not import this package.
-    - ``intentframe_native_kit.action_registry`` (this package) — taxonomy + domain intent schemas
-      in ``intentframe_native_kit.action_registry.domains``; may import ``intentframe_core``.
-    - Agent authors (Jarvis, third-party agents) — optional local imports for
-      fail-fast validation before ``Actor.submit()``.
-    - Bundles / executor — enforce policy and dispatch using string action ids.
+    - Substrate / ``intentframe_core`` (internal) — ``IntentFrame.action`` is a plain
+      string; neither imports this package.
+    - ``intentframe_bundle_sdk`` — plugin-facing wire types (``IntentFrame``, ``DomainSchema``, …).
+    - ``intentframe_native_kit.action_registry`` (this package) — taxonomy + domain schemas
+      in ``domains/``; imports ``DomainSchema`` from ``intentframe_bundle_sdk`` only.
+    - Agent authors — optional imports here for fail-fast validation before ``Actor.submit()``.
+    - Bundles / executor packs — enforce and dispatch using string action ids.
 
 Domain schemas are **not** re-exported from this ``__init__`` (import
-``intentframe_native_kit.action_registry.domains`` directly) to avoid a circular import through
-``intentframe_core.enums`` at package load time.
+``intentframe_native_kit.action_registry.domains`` directly) to avoid circular imports at
+package load time.
 
 Usage::
 

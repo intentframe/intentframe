@@ -24,9 +24,18 @@ STRICT_ROOTS = (
     REPO_ROOT / "executor",
 )
 
-# Substrate may reference bundle-owned floor helpers until executor SDK
-# owns its own copy.  macOS pack files moved to intentframe_native_kit.intentframe_executor_pack_macos.
 ALLOWLISTED_IMPORTS: dict[Path, frozenset[str]] = {}
+
+# Executor packs must not import action bundles — floor checks use
+# resource_registry.floor and command_shield directly.
+PACK_FORBIDDEN_IMPORT_PREFIXES = (
+    "intentframe_native_kit.intentframe_native_bundles",
+)
+PACK_STRICT_ROOTS = (
+    REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_posix",
+    REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_macos",
+    REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_console",
+)
 
 
 def _collect_imports(path: Path) -> set[str]:
@@ -68,3 +77,24 @@ def test_executor_allowlisted_imports_are_explicit() -> None:
         imports = _collect_imports(path)
         for mod in allowed:
             assert mod in imports, f"{path} no longer imports allowlisted {mod!r}"
+
+
+def _pack_violations() -> list[str]:
+    violations: list[str] = []
+    for root in PACK_STRICT_ROOTS:
+        for path in sorted(root.rglob("*.py")):
+            if path.name.startswith("test_"):
+                continue
+            for imported in _collect_imports(path):
+                if any(
+                    imported.startswith(prefix)
+                    for prefix in PACK_FORBIDDEN_IMPORT_PREFIXES
+                ):
+                    rel = path.relative_to(REPO_ROOT)
+                    violations.append(f"{rel}: imports {imported!r}")
+    return violations
+
+
+def test_executor_packs_do_not_import_native_bundles() -> None:
+    violations = _pack_violations()
+    assert not violations, "executor pack boundary violations:\n" + "\n".join(violations)

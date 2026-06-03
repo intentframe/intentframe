@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from intentframe_native_kit.action_registry.types import ActionType
-from intentframe_core.enums import Reversibility, RiskLevel
-from intentframe_core.types import AnalysisReport, IntentFrame
+from intentframe_bundle_sdk import AnalysisReport, IntentFrame, Reversibility, RiskLevel
 
 CATASTROPHIC_COMMAND_PATTERNS: dict[str, str] = {
     "sudo": "Privilege escalation — runs command as superuser",

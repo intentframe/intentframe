@@ -44,7 +44,7 @@ import logging
 import os
 from pathlib import Path
 
-from intentframe_core.identity import owner_home
+from executor_sdk import owner_home
 
 from .config import SandboxConfig
 
