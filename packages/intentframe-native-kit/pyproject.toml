@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-native-kit"
+version = "0.1.0"
+description = "IntentFrame first-party kit — action registry, native bundles, executor packs (console/posix/macos), and resource registry"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "adapters", "bundles"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "intentframe-bundle-sdk",
+    "intentframe-executor-sdk",
+    "command-shield",
+    "fastapi",
+    "httpx>=0.28.1",
+    "pydantic>=2.12.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+# Executor packs advertise themselves here so deployments (including other
+# orgs) can reference them by short name in executor.yaml `packs:`. Each value
+# points at the pack's module-level register_all() callable.
+[project.entry-points."intentframe.executor_packs"]
+console = "intentframe_native_kit.intentframe_executor_pack_console:register_all"
+posix = "intentframe_native_kit.intentframe_executor_pack_posix:register_all"
+macos = "intentframe_native_kit.intentframe_executor_pack_macos:register_all"
+
+[project.entry-points."intentframe.bundles"]
+native = "intentframe_native_kit.intentframe_native_bundles:register_bundles"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intentframe_native_kit"]
+exclude = ["intentframe_native_kit/intentframe_native_bundles/TODO"]

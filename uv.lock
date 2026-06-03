@@ -16,6 +16,7 @@ members = [
     "intentframe-executor",
     "intentframe-executor-client",
     "intentframe-executor-sdk",
+    "intentframe-native-kit",
     "intentframe-policy-registry",
     "intentframe-prompt-library",
     "intentframe-server",
@@ -816,6 +817,7 @@ dependencies = [
     { name = "intentframe-executor" },
     { name = "intentframe-executor-client" },
     { name = "intentframe-executor-sdk" },
+    { name = "intentframe-native-kit" },
     { name = "intentframe-policy-registry" },
     { name = "intentframe-prompt-library" },
     { name = "intentframe-server" },
@@ -867,6 +869,7 @@ requires-dist = [
     { name = "intentframe-executor", editable = "packages/executor" },
     { name = "intentframe-executor-client", editable = "packages/executor-client" },
     { name = "intentframe-executor-sdk", editable = "packages/executor-sdk" },
+    { name = "intentframe-native-kit", editable = "packages/intentframe-native-kit" },
     { name = "intentframe-policy-registry", editable = "packages/policy-registry" },
     { name = "intentframe-prompt-library", editable = "packages/intentframe-prompt-library" },
     { name = "intentframe-server", editable = "packages/intentframe-server" },
@@ -1069,6 +1072,29 @@ dependencies = [
 requires-dist = [
     { name = "intentframe-core", editable = "packages/intentframe-core" },
     { name = "intentframe-credentials", editable = "intentframe_credentials" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+]
+
+[[package]]
+name = "intentframe-native-kit"
+version = "0.1.0"
+source = { editable = "packages/intentframe-native-kit" }
+dependencies = [
+    { name = "command-shield" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "intentframe-bundle-sdk" },
+    { name = "intentframe-executor-sdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "command-shield", editable = "packages/command-shield" },
+    { name = "fastapi" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "intentframe-bundle-sdk", editable = "packages/intentframe-bundle-sdk" },
+    { name = "intentframe-executor-sdk", editable = "packages/executor-sdk" },
     { name = "pydantic", specifier = ">=2.12.5" },
 ]
 

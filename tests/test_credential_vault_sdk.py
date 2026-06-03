@@ -25,7 +25,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import intentframe_native_kit
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
+_MACOS_PACK_ROOT = (
+    Path(intentframe_native_kit.__file__).resolve().parent
+    / "intentframe_executor_pack_macos"
+)
 
 # ---------------------------------------------------------------------------
 # 1.  SDK import auto-registers every backend
@@ -105,7 +111,7 @@ def _pack_violations(pack_root: Path) -> list[str]:
 def test_macos_pack_does_not_import_credentials_directly():
     """The macOS executor pack must route through executor_sdk, not reach
     into intentframe_credentials.  See executor_sdk/services/credential_vault.py."""
-    pack_root = REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_macos"
+    pack_root = _MACOS_PACK_ROOT
     if not pack_root.exists():
         pytest.skip("intentframe_native_kit/intentframe_executor_pack_macos not present")
 
@@ -186,7 +192,7 @@ def test_create_credential_vault_unknown_backend_raises():
 def test_macos_pack_keychainvault_is_sdk_keyringvault():
     """KeychainVault in the macOS pack is the same class as KeyringVault in
     the SDK — no separate subclass, no credentials import."""
-    macos_pack = REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_macos"
+    macos_pack = _MACOS_PACK_ROOT
     if not macos_pack.exists():
         pytest.skip("intentframe_native_kit/intentframe_executor_pack_macos not present")
 

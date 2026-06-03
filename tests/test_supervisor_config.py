@@ -12,9 +12,10 @@ from supervisor.config import (
     _packaged_default_config,
 )
 
+import intentframe_native_kit
+
 _KIT_PROFILE = (
-    Path(__file__).resolve().parents[1]
-    / "intentframe_native_kit"
+    Path(intentframe_native_kit.__file__).resolve().parent
     / "supervisor_profile.yaml"
 )
 

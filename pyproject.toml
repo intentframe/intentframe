@@ -59,6 +59,7 @@ dependencies = [
     "intentframe-executor-client",
     "intentframe-executor",
     "intentframe-server",
+    "intentframe-native-kit",
 ]
 
 [project.optional-dependencies]
@@ -72,34 +73,25 @@ Homepage = "https://github.com/intentframe/intentframe"
 Repository = "https://github.com/intentframe/intentframe"
 Issues = "https://github.com/intentframe/intentframe/issues"
 
-# Executor packs advertise themselves here so deployments (including other
-# orgs) can reference them by short name in executor.yaml `packs:`. Each value
-# points at the pack's module-level register_all() callable.
-[project.entry-points."intentframe.executor_packs"]
-console = "intentframe_native_kit.intentframe_executor_pack_console:register_all"
-posix = "intentframe_native_kit.intentframe_executor_pack_posix:register_all"
-macos = "intentframe_native_kit.intentframe_executor_pack_macos:register_all"
-
-[project.entry-points."intentframe.bundles"]
-native = "intentframe_native_kit.intentframe_native_bundles:register_bundles"
+# NOTE: the intentframe.executor_packs and intentframe.bundles entry points
+# now live in the intentframe-native-kit distribution under packages/, which
+# owns those modules and advertises them on install.
 
 [tool.setuptools.package-data]
-# Ship the supervisor's default service graph and the kit's first-party
-# profile so `--config` resolution works from an installed wheel, not just a
-# repo checkout. (intentframe_server now ships its config from the
-# intentframe-server distribution under packages/.)
+# Ship the supervisor's default service graph so `--config` resolution works
+# from an installed wheel, not just a repo checkout. (intentframe_server and
+# intentframe_native_kit now ship their config/profile data from their own
+# distributions under packages/.)
 supervisor = ["config/*.yaml"]
-intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml", "core.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 # NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
 # intentframe_bundle_sdk, executor_sdk, command_shield, intentframe_prompt_library,
-# intentframe_components, executor_client, executor, and intentframe_server now ship
-# as separate workspace distributions under packages/ and are pulled in as
-# dependencies above.
+# intentframe_components, executor_client, executor, intentframe_server, and
+# intentframe_native_kit now ship as separate workspace distributions under
+# packages/ and are pulled in as dependencies above.
 include = [
-    "intentframe_native_kit*",
     "intentframe_dashboard*",
     "supervisor*",
     "intentframe_gateway*",
@@ -141,6 +133,7 @@ members = [
     "packages/executor-client",
     "packages/executor",
     "packages/intentframe-server",
+    "packages/intentframe-native-kit",
     "jarvis_pa",
     "external_data_ingestion",
     "intentframe_credentials",
@@ -164,6 +157,7 @@ intentframe-components = { workspace = true }
 intentframe-executor-client = { workspace = true }
 intentframe-executor = { workspace = true }
 intentframe-server = { workspace = true }
+intentframe-native-kit = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev"]

@@ -10,11 +10,13 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import intentframe_native_kit
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FORBIDDEN_IMPORT_PREFIXES = ("intentframe_core",)
 
-STRICT_ROOTS = (REPO_ROOT / "intentframe_native_kit",)
+STRICT_ROOTS = (Path(intentframe_native_kit.__file__).resolve().parent,)
 
 
 def _collect_imports(path: Path) -> set[str]:
