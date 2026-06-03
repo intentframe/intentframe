@@ -1,7 +1,7 @@
 """
 Executor HTTP Client — calls the Executor service over HTTP/UDS.
 
-Implements the Executor ABC from intentframe_components.executor.base so the
+Implements the Executor ABC from intentframe_core.executor so the
 Runtime can use it as a drop-in replacement for the in-process ExecutorBridge.
 
 Handles:
@@ -28,7 +28,7 @@ from intentframe_core.types import (
     ExecutionResult as IFExecutionResult,
     IntentFrame,
 )
-from intentframe_components.executor.base import Executor
+from intentframe_core.executor import Executor
 
 from executor_client.models import (
     AuthorizationProof,
