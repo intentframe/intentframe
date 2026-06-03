@@ -67,6 +67,7 @@ from intentframe_gateway.config import GatewayConfig
 from intentframe_gateway.profiles import resolve_core_config_path
 from intentframe_server.config import load_core_config
 from intentframe_proxy.proxy import UDSProxy
+from intentframe_bundle_sdk.loader import validate_policy_with_bundles
 from policy_registry.seeds import load_policy_seed, resolve_seed_path
 
 logger = logging.getLogger(__name__)
@@ -203,8 +204,8 @@ def _build_jarvis_policy(variant: JarvisVariant = "user") -> dict[str, Any]:
         user_id=user_id,
         agent_id=agent_id,
         metadata={"note": "Auto-seeded by gateway bootstrap"},
-        bundle_packages=_core_bundle_packages(),
     )
+    validate_policy_with_bundles(policy, _core_bundle_packages())
     return policy.model_dump(mode="json", exclude={"created_at"})
 
 
@@ -236,11 +237,13 @@ def _split_safe_unsafe(seed_dict: dict[str, Any]) -> tuple[list[str], list[str]]
     return safe, unsafe
 
 
-_USER_SEED = load_policy_seed(
+_user_policy = load_policy_seed(
     builtin_policy_path("user"),
     user_id="jarvis_default",
-    bundle_packages=_core_bundle_packages(),
-).model_dump(mode="json", exclude={"created_at"})
+)
+validate_policy_with_bundles(_user_policy, _core_bundle_packages())
+_USER_SEED = _user_policy.model_dump(mode="json", exclude={"created_at"})
+del _user_policy
 SAFE_ACTIONS, UNSAFE_ACTIONS = _split_safe_unsafe(_USER_SEED)
 INTENT_LIMITS: list[dict[str, Any]] = list(_USER_SEED.get("intent_limits", []))
 del _USER_SEED

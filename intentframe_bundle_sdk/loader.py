@@ -90,6 +90,12 @@ def _load_register_bundles(package: str) -> Callable:
     return register
 
 
+def validate_policy_with_bundles(policy: UserPolicy, packages: list[str]) -> None:
+    """Orchestration helper: load bundles, then validate policy constraint semantics."""
+    ensure_loaded(packages)
+    validate_policy_against_registry(policy)
+
+
 def validate_policy_against_registry(policy: UserPolicy) -> None:
     """Fail closed when seeded policy references bundles that cannot enforce it."""
     for action_id in policy.allowed_actions:

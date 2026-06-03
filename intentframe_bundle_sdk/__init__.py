@@ -26,6 +26,7 @@ from intentframe_bundle_sdk.loader import (
     ENTRY_POINT_GROUP,
     ensure_loaded,
     validate_policy_against_registry,
+    validate_policy_with_bundles,
 )
 from intentframe_bundle_sdk.lifecycle import shutdown_bundles, startup_bundles
 from intentframe_bundle_sdk.onboarding_manifest import OnboardingManifest
@@ -142,6 +143,7 @@ __all__ = [
     "routed_domain_ids",
     "validate_policy_domain_constraints",
     "validate_policy_against_registry",
+    "validate_policy_with_bundles",
     # Re-exported from intentframe_core (plugin public surface)
     "AnalysisReport",
     "Decision",

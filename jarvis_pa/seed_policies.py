@@ -53,6 +53,7 @@ from jarvis.policies import (
     JarvisVariant,
     builtin_policy_path,
 )
+from intentframe_bundle_sdk.loader import validate_policy_with_bundles
 from intentframe_server.config import CoreConfigurationError, load_core_config
 from policy_registry.seeds import (
     load_policy_seed,
@@ -113,8 +114,10 @@ def _build_policy_payload(variant: JarvisVariant, user_id: str) -> dict:
         user_id=user_id,
         agent_id=agent_id,
         metadata={"note": "Auto-seeded by seed_policies.py"},
-        bundle_packages=_configured_bundle_packages(),
     )
+    packages = _configured_bundle_packages()
+    if packages is not None:
+        validate_policy_with_bundles(policy, packages)
     return policy.model_dump(mode="json", exclude={"created_at"})
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from intentframe_bundle_sdk.loader import validate_policy_with_bundles
 from policy_registry.models import UserPolicy
 from policy_registry.seeds import load_policy_seed
 
@@ -33,10 +34,11 @@ def load_root_demo_policy(
     *,
     agent_id: str = ROOT_DEMO_AGENT_ID,
 ) -> UserPolicy:
-    return load_policy_seed(
+    policy = load_policy_seed(
         policy_path or DEFAULT_ROOT_POLICY_PATH,
         user_id=user_id,
         agent_id=agent_id,
         metadata={"profile": "root-demo-test"},
-        bundle_packages=_BUNDLE_PACKAGES,
     )
+    validate_policy_with_bundles(policy, _BUNDLE_PACKAGES)
+    return policy
