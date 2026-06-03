@@ -44,7 +44,7 @@ from typing import Any, Dict, List
 
 from policy_registry.client import PolicyRegistryClient
 from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
-from intentframe_server.client import IntentFrameClient
+from intentframe_client import IntentFrameClient
 
 from invoice_attack_pipeline import (
     ATTACK_USER_ID,

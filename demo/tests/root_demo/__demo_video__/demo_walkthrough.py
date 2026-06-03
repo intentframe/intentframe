@@ -81,7 +81,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from intentframe_server.client import IntentFrameClient
+from intentframe_client import IntentFrameClient
 from policy_registry.client import PolicyRegistryClient
 from intentframe_native_kit.resource_registry.client import ResourceRegistryClient
 

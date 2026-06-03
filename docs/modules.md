@@ -134,6 +134,7 @@ Not the plugin author surface. `intentframe_core` stays internal; SDKs re-export
 | [`intentframe_prompt_library/`](../intentframe_prompt_library/) | Default AE/Guardian prompt bodies shared by substrate and bundles. | Library |
 | [`command_shield/`](../command_shield/) | Deterministic shell/code inspector — **fact producer**, not a policy engine. Used by pipeline, bundles, and adapters. | Library |
 | [`executor_client/`](../executor_client/) | Client + wire models for core → executor over UDS. | Library |
+| [`intentframe_client/`](../intentframe_client/) | HTTP/UDS client for agents and tools → intentframe-core (`/handshake`, `/process`, `/audit`). Used by Actor and dashboard; not part of the server process. | Library |
 
 ### 3. Substrate runtime (minimal supervisor graph)
 
