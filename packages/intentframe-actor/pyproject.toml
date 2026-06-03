@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-actor"
+version = "0.1.0"
+description = "IntentFrame Actor SDK — agent-side client for routing tool calls through the policy pipeline"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "sdk"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "intentframe-client",
+    "intentframe-core",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intentframe_actor"]

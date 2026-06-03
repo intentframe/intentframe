@@ -213,7 +213,7 @@ def main() -> None:
         lines.append(f"- `{tactic}`: **{n}**")
     lines.append("")
 
-    out = Path("command_shield/COVERAGE.md")
+    out = Path(__file__).parent / "COVERAGE.md"
     out.write_text("\n".join(lines), encoding="utf-8")
     mapped = sum(len(v) for v in by_tactic.values())
     print(f"wrote {out} ({mapped} mapped rules, {len(unmapped)} unmapped)")

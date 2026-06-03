@@ -119,7 +119,7 @@ def test_mitre_family_names_are_from_corpus() -> None:
 
 
 def test_coverage_md_references_every_rule() -> None:
-    md = Path("command_shield/COVERAGE.md").read_text(encoding="utf-8")
+    md = (Path(__file__).parent.parent / "COVERAGE.md").read_text(encoding="utf-8")
     for rule in CORPUS.rules:
         assert f"`{rule.id}`" in md, rule.id
 

@@ -4,9 +4,16 @@ requires-python = ">=3.14"
 
 [manifest]
 members = [
+    "command-shield",
     "email-sync-service",
     "intentframe",
+    "intentframe-actor",
+    "intentframe-bundle-sdk",
+    "intentframe-client",
+    "intentframe-core",
     "intentframe-credentials",
+    "intentframe-executor-sdk",
+    "intentframe-policy-registry",
     "jarvis-pa",
     "jarvis-telegram",
 ]
@@ -308,6 +315,30 @@ sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
 ]
+
+[[package]]
+name = "command-shield"
+version = "0.1.0"
+source = { editable = "packages/command-shield" }
+dependencies = [
+    { name = "bashlex" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+review = [
+    { name = "openai-agents" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bashlex", specifier = ">=0.18" },
+    { name = "openai-agents", marker = "extra == 'review'", specifier = ">=0.7.0" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+]
+provides-extras = ["review"]
 
 [[package]]
 name = "courlan"
@@ -767,10 +798,17 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "bashlex" },
+    { name = "command-shield" },
     { name = "email-sync-service" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "intentframe-actor" },
+    { name = "intentframe-bundle-sdk" },
+    { name = "intentframe-client" },
+    { name = "intentframe-core" },
     { name = "intentframe-credentials" },
+    { name = "intentframe-executor-sdk" },
+    { name = "intentframe-policy-registry" },
     { name = "jarvis-pa" },
     { name = "jarvis-telegram" },
     { name = "keyring", marker = "sys_platform == 'darwin'" },
@@ -805,11 +843,18 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21" },
     { name = "bashlex", specifier = ">=0.18" },
+    { name = "command-shield", editable = "packages/command-shield" },
     { name = "email-sync-service", editable = "external_data_ingestion" },
     { name = "fastapi" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "intentframe-actor", editable = "packages/intentframe-actor" },
+    { name = "intentframe-bundle-sdk", editable = "packages/intentframe-bundle-sdk" },
+    { name = "intentframe-client", editable = "packages/intentframe-client" },
+    { name = "intentframe-core", editable = "packages/intentframe-core" },
     { name = "intentframe-credentials", editable = "intentframe_credentials" },
     { name = "intentframe-credentials", extras = ["hashicorp"], marker = "extra == 'hashicorp'", editable = "intentframe_credentials" },
+    { name = "intentframe-executor-sdk", editable = "packages/executor-sdk" },
+    { name = "intentframe-policy-registry", editable = "packages/policy-registry" },
     { name = "jarvis-pa", editable = "jarvis_pa" },
     { name = "jarvis-telegram", editable = "jarvis_telegram" },
     { name = "keyring", marker = "sys_platform == 'darwin'" },
@@ -835,6 +880,64 @@ dev = [
     { name = "pytest", specifier = ">=9.0" },
     { name = "pytest-asyncio", specifier = ">=0.23" },
 ]
+
+[[package]]
+name = "intentframe-actor"
+version = "0.1.0"
+source = { editable = "packages/intentframe-actor" }
+dependencies = [
+    { name = "intentframe-client" },
+    { name = "intentframe-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "intentframe-client", editable = "packages/intentframe-client" },
+    { name = "intentframe-core", editable = "packages/intentframe-core" },
+]
+
+[[package]]
+name = "intentframe-bundle-sdk"
+version = "0.1.0"
+source = { editable = "packages/intentframe-bundle-sdk" }
+dependencies = [
+    { name = "intentframe-core" },
+    { name = "intentframe-policy-registry" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "intentframe-core", editable = "packages/intentframe-core" },
+    { name = "intentframe-policy-registry", editable = "packages/policy-registry" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+]
+
+[[package]]
+name = "intentframe-client"
+version = "0.1.0"
+source = { editable = "packages/intentframe-client" }
+dependencies = [
+    { name = "httpx" },
+    { name = "intentframe-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "intentframe-core", editable = "packages/intentframe-core" },
+]
+
+[[package]]
+name = "intentframe-core"
+version = "0.1.0"
+source = { editable = "packages/intentframe-core" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.12.5" }]
 
 [[package]]
 name = "intentframe-credentials"
@@ -875,6 +978,46 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"] },
 ]
 provides-extras = ["hashicorp", "dev"]
+
+[[package]]
+name = "intentframe-executor-sdk"
+version = "0.1.0"
+source = { editable = "packages/executor-sdk" }
+dependencies = [
+    { name = "intentframe-core" },
+    { name = "intentframe-credentials" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "intentframe-core", editable = "packages/intentframe-core" },
+    { name = "intentframe-credentials", editable = "intentframe_credentials" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+]
+
+[[package]]
+name = "intentframe-policy-registry"
+version = "0.1.0"
+source = { editable = "packages/policy-registry" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "intentframe-core" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "intentframe-core", editable = "packages/intentframe-core" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "uvicorn", extras = ["standard"] },
+]
 
 [[package]]
 name = "jaraco-classes"

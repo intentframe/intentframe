@@ -45,6 +45,14 @@ dependencies = [
     "jarvis-telegram",
     "prompt-toolkit>=3.0",
     "rich>=13.0",
+    # Split workspace distributions (foundation + SDKs), see packages/
+    "intentframe-core",
+    "intentframe-policy-registry",
+    "intentframe-client",
+    "intentframe-actor",
+    "intentframe-bundle-sdk",
+    "intentframe-executor-sdk",
+    "command-shield",
 ]
 
 [project.optional-dependencies]
@@ -79,21 +87,18 @@ intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml", "core.
 
 [tool.setuptools.packages.find]
 where = ["."]
+# NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
+# intentframe_bundle_sdk, executor_sdk, and command_shield now ship as separate
+# workspace distributions under packages/ and are pulled in as dependencies above.
 include = [
     "intentframe_native_kit*",
-    "intentframe_bundle_sdk*",
-    "intentframe_core*",
     "intentframe_prompt_library*",
     "intentframe_components*",
-    "intentframe_client*",
     "intentframe_server*",
-    "intentframe_actor*",
     "intentframe_dashboard*",
-    "executor*",
+    "executor",
+    "executor.*",
     "executor_client*",
-    "executor_sdk*",
-    "policy_registry*",
-    "command_shield*",
     "supervisor*",
     "intentframe_gateway*",
     "intentframe_cli*",
@@ -121,13 +126,32 @@ asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 
 [tool.uv.workspace]
-members = ["jarvis_pa", "external_data_ingestion", "intentframe_credentials", "jarvis_telegram"]
+members = [
+    "packages/intentframe-core",
+    "packages/policy-registry",
+    "packages/intentframe-client",
+    "packages/intentframe-actor",
+    "packages/intentframe-bundle-sdk",
+    "packages/executor-sdk",
+    "packages/command-shield",
+    "jarvis_pa",
+    "external_data_ingestion",
+    "intentframe_credentials",
+    "jarvis_telegram",
+]
 
 [tool.uv.sources]
 jarvis-pa = { workspace = true }
 email-sync-service = { workspace = true }
 intentframe-credentials = { workspace = true }
 jarvis-telegram = { workspace = true }
+intentframe-core = { workspace = true }
+intentframe-policy-registry = { workspace = true }
+intentframe-client = { workspace = true }
+intentframe-actor = { workspace = true }
+intentframe-bundle-sdk = { workspace = true }
+intentframe-executor-sdk = { workspace = true }
+command-shield = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev"]
