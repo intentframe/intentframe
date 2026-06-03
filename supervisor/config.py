@@ -53,7 +53,7 @@ def _default_services() -> list[ServiceConfig]:
             socket_name="executor.sock",
         ),
         ServiceConfig(
-            name="intentframe-core",
+            name="intentframe-server",
             module="intentframe_server.server:app",
             socket_name="intentframe.sock",
             depends_on=["policy-registry", "executor"],
@@ -113,7 +113,7 @@ def _apply_executor_mode(config: SupervisorConfig, mode: str) -> None:
     """Adjust the service graph for the selected runtime executor mode.
 
     ``real`` keeps the loaded service graph as-is.  ``dry_run`` makes
-    intentframe-core use DryRunExecutor in-process, so the standalone
+    intentframe-server use DryRunExecutor in-process, so the standalone
     executor service would be unused and is deliberately not started;
     we also strip ``executor`` from *every* service's ``depends_on`` so
     startup ordering stays valid and no future service silently waits

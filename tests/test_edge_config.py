@@ -26,7 +26,7 @@ def test_default_backends_exclude_resource_registry(
 
     config = load_edge_config()
 
-    assert _names(config) == {"policy-registry", "intentframe-core"}
+    assert _names(config) == {"policy-registry", "intentframe-server"}
     assert "resource-registry" not in _names(config)
 
 

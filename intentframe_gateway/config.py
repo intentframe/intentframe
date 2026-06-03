@@ -48,7 +48,7 @@ class GatewayConfig(BaseModel):
 
     infra_sockets: list[BackendSocket] = Field(default_factory=lambda: [
         BackendSocket(name="resource-registry", socket_name="resource-registry.sock", prefix=""),
-        BackendSocket(name="intentframe-core", socket_name="intentframe.sock", prefix=""),
+        BackendSocket(name="intentframe-server", socket_name="intentframe.sock", prefix=""),
         BackendSocket(name="executor", socket_name="executor.sock", prefix=""),
         BackendSocket(name="platform-server", socket_name="platform.sock", prefix=""),
     ])

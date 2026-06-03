@@ -140,7 +140,7 @@ app = FastAPI(
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    service: str = "intentframe-core"
+    service: str = "intentframe-server"
 
 
 class HandshakeRequest(BaseModel):

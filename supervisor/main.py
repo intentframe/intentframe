@@ -6,7 +6,7 @@ order), waits for health, monitors child processes, and handles graceful
 shutdown. The graph is admin-owned data, not supervisor logic: it is selected
 via ``--config`` / ``INTENTFRAME_SUPERVISOR_CONFIG``, defaulting to the packaged
 ``supervisor/config/supervisor.yaml`` (policy-registry, executor,
-intentframe-core -- no resource-registry). First-party products and the test
+intentframe-server -- no resource-registry). First-party products and the test
 stacks opt into the registry by pointing at
 ``intentframe_native_kit/supervisor_profile.yaml``.
 

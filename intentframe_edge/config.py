@@ -7,7 +7,7 @@ The backend list is admin-owned data, not edge logic. It is read from a YAML
 profile (``INTENTFRAME_EDGE_CONFIG`` / ``--config``) when provided, falling back
 to the in-code minimal default. The minimal default deliberately exposes only
 the substrate services that every deployment runs (``policy-registry`` and
-``intentframe-core``); the ``resource-registry`` ``/workspaces`` route is
+``intentframe-server``); the ``resource-registry`` ``/workspaces`` route is
 optional and lives in the first-party kit profile
 (``intentframe_native_kit/edge_profile.yaml``), mirroring the supervisor's
 registry-less default + opt-in kit profile split.
@@ -61,7 +61,7 @@ DEFAULT_BACKENDS: list[Backend] = [
         prefixes=("/policies",),
     ),
     Backend(
-        name="intentframe-core",
+        name="intentframe-server",
         socket_name="intentframe.sock",
         upstream_host="intentframe",
         prefixes=("/handshake", "/process", "/audit"),

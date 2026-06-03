@@ -30,7 +30,7 @@ services:
     module: executor.server:app
     socket_name: executor.sock
 
-  - name: intentframe-core
+  - name: intentframe-server
     module: intentframe_server.server:app
     socket_name: intentframe.sock
     depends_on:

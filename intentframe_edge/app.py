@@ -38,7 +38,7 @@ def create_app(config: EdgeConfig | None = None) -> FastAPI:
     # (prefix, proxy) pairs, matched longest-prefix-first.
     routes: list[tuple[str, UDSProxy]] = []
     for backend in config.backends:
-        timeout = _CORE_TIMEOUT if backend.name == "intentframe-core" else _DEFAULT_TIMEOUT
+        timeout = _CORE_TIMEOUT if backend.name == "intentframe-server" else _DEFAULT_TIMEOUT
         proxy = UDSProxy(
             config.socket_path(backend),
             f"http://{backend.upstream_host}",
