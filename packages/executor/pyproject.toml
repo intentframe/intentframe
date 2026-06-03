@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-executor"
+version = "0.1.0"
+description = "IntentFrame executor service — dispatches approved actions to capability adapters"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "executor"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "intentframe-executor-sdk",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["executor"]
+exclude = ["executor/plan.md", "executor/requirements.txt"]

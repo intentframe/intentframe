@@ -53,6 +53,12 @@ dependencies = [
     "intentframe-bundle-sdk",
     "intentframe-executor-sdk",
     "command-shield",
+    # Split workspace distributions (runtime layer), see packages/
+    "intentframe-prompt-library",
+    "intentframe-components",
+    "intentframe-executor-client",
+    "intentframe-executor",
+    "intentframe-server",
 ]
 
 [project.optional-dependencies]
@@ -80,25 +86,21 @@ native = "intentframe_native_kit.intentframe_native_bundles:register_bundles"
 [tool.setuptools.package-data]
 # Ship the supervisor's default service graph and the kit's first-party
 # profile so `--config` resolution works from an installed wheel, not just a
-# repo checkout.
+# repo checkout. (intentframe_server now ships its config from the
+# intentframe-server distribution under packages/.)
 supervisor = ["config/*.yaml"]
-intentframe_server = ["config/*.yaml"]
 intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml", "core.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 # NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
-# intentframe_bundle_sdk, executor_sdk, and command_shield now ship as separate
-# workspace distributions under packages/ and are pulled in as dependencies above.
+# intentframe_bundle_sdk, executor_sdk, command_shield, intentframe_prompt_library,
+# intentframe_components, executor_client, executor, and intentframe_server now ship
+# as separate workspace distributions under packages/ and are pulled in as
+# dependencies above.
 include = [
     "intentframe_native_kit*",
-    "intentframe_prompt_library*",
-    "intentframe_components*",
-    "intentframe_server*",
     "intentframe_dashboard*",
-    "executor",
-    "executor.*",
-    "executor_client*",
     "supervisor*",
     "intentframe_gateway*",
     "intentframe_cli*",
@@ -134,6 +136,11 @@ members = [
     "packages/intentframe-bundle-sdk",
     "packages/executor-sdk",
     "packages/command-shield",
+    "packages/intentframe-prompt-library",
+    "packages/intentframe-components",
+    "packages/executor-client",
+    "packages/executor",
+    "packages/intentframe-server",
     "jarvis_pa",
     "external_data_ingestion",
     "intentframe_credentials",
@@ -152,6 +159,11 @@ intentframe-actor = { workspace = true }
 intentframe-bundle-sdk = { workspace = true }
 intentframe-executor-sdk = { workspace = true }
 command-shield = { workspace = true }
+intentframe-prompt-library = { workspace = true }
+intentframe-components = { workspace = true }
+intentframe-executor-client = { workspace = true }
+intentframe-executor = { workspace = true }
+intentframe-server = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev"]

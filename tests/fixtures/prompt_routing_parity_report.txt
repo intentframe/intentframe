@@ -1,6 +1,6 @@
 PROMPT ROUTING PARITY REPORT
 ========================================================================
-Generated:        2026-06-03 12:36:23 UTC
+Generated:        2026-06-03 13:19:21 UTC
 Legacy baseline:    /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/prompt_routing_legacy_baseline.txt
 Legacy commit:      66e567c
 Inspect script:     tests/inspect_prompt_routing.py

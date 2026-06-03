@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-server"
+version = "0.1.0"
+description = "IntentFrame core runtime — the FastAPI policy pipeline (analysis, guardian, executor)"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "runtime"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "intentframe-core",
+    "intentframe-components",
+    "intentframe-policy-registry",
+    "intentframe-executor-client",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intentframe_server"]

@@ -930,6 +930,8 @@ def test_message_bundle_read_blocks_unfiltered_read_under_contact_policy() -> No
 
 
 def test_aiguardian_source_has_no_plugin_registry_coupling() -> None:
-    source = Path("intentframe_components/guardian/engine.py").read_text(encoding="utf-8")
+    import intentframe_components.guardian.engine as _aiguardian_engine
+
+    source = Path(_aiguardian_engine.__file__).read_text(encoding="utf-8")
     for token in _FORBIDDEN_IN_AIGUARDIAN:
         assert token not in source, f"AIGuardian must not reference {token!r}"
