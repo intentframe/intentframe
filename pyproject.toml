@@ -60,6 +60,7 @@ dependencies = [
     "intentframe-executor",
     "intentframe-server",
     "intentframe-runtime",
+    "intentframe-supervisor[native]",
     "intentframe-native-kit",
 ]
 
@@ -78,23 +79,16 @@ Issues = "https://github.com/intentframe/intentframe/issues"
 # now live in the intentframe-native-kit distribution under packages/, which
 # owns those modules and advertises them on install.
 
-[tool.setuptools.package-data]
-# Ship the supervisor's default service graph so `--config` resolution works
-# from an installed wheel, not just a repo checkout. (intentframe_server and
-# intentframe_native_kit now ship their config/profile data from their own
-# distributions under packages/.)
-supervisor = ["config/*.yaml"]
-
 [tool.setuptools.packages.find]
 where = ["."]
 # NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
 # intentframe_bundle_sdk, executor_sdk, command_shield, intentframe_prompt_library,
-# intentframe_components, executor_client, executor, intentframe_server, and
-# intentframe_native_kit now ship as separate workspace distributions under
-# packages/ and are pulled in as dependencies above.
+# intentframe_components, executor_client, executor, intentframe_server,
+# intentframe_native_kit, and the supervisor (now intentframe-supervisor) ship as
+# separate workspace distributions under packages/ and are pulled in as
+# dependencies above.
 include = [
     "intentframe_dashboard*",
-    "supervisor*",
     "intentframe_gateway*",
     "intentframe_cli*",
     "intentframe_edge*",
@@ -108,8 +102,8 @@ dev = [
 ]
 
 [project.scripts]
-intentframe = "supervisor.main:main"
-intentframe-backend = "supervisor.main:backend_main"
+# `intentframe` / `intentframe-backend` are owned by the intentframe-supervisor
+# distribution (packages/intentframe-supervisor) and reach PATH via that dep.
 intentframe-gateway-cli = "intentframe_cli.main:main"
 intentframe-gateway-backend = "intentframe_gateway.entry:backend_main"
 intentframe-edge = "intentframe_edge.__main__:main"
@@ -135,6 +129,7 @@ members = [
     "packages/executor",
     "packages/intentframe-server",
     "packages/intentframe-runtime",
+    "packages/intentframe-supervisor",
     "packages/intentframe-native-kit",
     "jarvis_pa",
     "external_data_ingestion",
@@ -160,6 +155,7 @@ intentframe-executor-client = { workspace = true }
 intentframe-executor = { workspace = true }
 intentframe-server = { workspace = true }
 intentframe-runtime = { workspace = true }
+intentframe-supervisor = { workspace = true }
 intentframe-native-kit = { workspace = true }
 
 [tool.uv]

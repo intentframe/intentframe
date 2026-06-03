@@ -21,6 +21,7 @@ members = [
     "intentframe-prompt-library",
     "intentframe-runtime",
     "intentframe-server",
+    "intentframe-supervisor",
     "jarvis-pa",
     "jarvis-telegram",
 ]
@@ -823,6 +824,7 @@ dependencies = [
     { name = "intentframe-prompt-library" },
     { name = "intentframe-runtime" },
     { name = "intentframe-server" },
+    { name = "intentframe-supervisor", extra = ["native"] },
     { name = "jarvis-pa" },
     { name = "jarvis-telegram" },
     { name = "keyring", marker = "sys_platform == 'darwin'" },
@@ -876,6 +878,7 @@ requires-dist = [
     { name = "intentframe-prompt-library", editable = "packages/intentframe-prompt-library" },
     { name = "intentframe-runtime", editable = "packages/intentframe-runtime" },
     { name = "intentframe-server", editable = "packages/intentframe-server" },
+    { name = "intentframe-supervisor", extras = ["native"], editable = "packages/intentframe-supervisor" },
     { name = "jarvis-pa", editable = "jarvis_pa" },
     { name = "jarvis-telegram", editable = "jarvis_telegram" },
     { name = "keyring", marker = "sys_platform == 'darwin'" },
@@ -1172,6 +1175,34 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "uvicorn", extras = ["standard"] },
 ]
+
+[[package]]
+name = "intentframe-supervisor"
+version = "0.1.0"
+source = { editable = "packages/intentframe-supervisor" }
+dependencies = [
+    { name = "httpx" },
+    { name = "intentframe-runtime" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+native = [
+    { name = "intentframe-native-kit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "intentframe-native-kit", marker = "extra == 'native'", editable = "packages/intentframe-native-kit" },
+    { name = "intentframe-runtime", editable = "packages/intentframe-runtime" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "uvicorn", extras = ["standard"] },
+]
+provides-extras = ["native"]
 
 [[package]]
 name = "jaraco-classes"
