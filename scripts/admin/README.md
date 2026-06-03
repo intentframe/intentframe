@@ -17,7 +17,7 @@ Loads a policy YAML, optionally validates constraint shapes against registered b
 
 ```bash
 python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+  --config "${KIT}/supervisor_profile.yaml"
 
 uv run python scripts/admin/seed_policy.py \
   --policy demo/config/test_policy.yaml \

@@ -10,9 +10,10 @@
 #
 # Select it explicitly (mirrors the supervisor profile):
 #
-#   INTENTFRAME_EDGE_CONFIG=intentframe_native_kit/edge_profile.yaml \
+#   INTENTFRAME_EDGE_CONFIG=/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml \
 #     python -m intentframe_edge
-#   # or: python -m intentframe_edge --config intentframe_native_kit/edge_profile.yaml
+#   # or: KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+python -m intentframe_edge --config "${KIT}/edge_profile.yaml"
 #
 # The edge's own default (intentframe_edge/config.py::DEFAULT_BACKENDS) exposes
 # only policy-registry + intentframe-server; this kit-owned profile is the opt-in

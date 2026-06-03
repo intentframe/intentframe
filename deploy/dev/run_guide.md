@@ -70,8 +70,8 @@ export OPENAI_API_KEY=sk-...               # your actual key
 the supervisor starts `resource-registry` and the edge exposes `/workspaces`:
 
 ```bash
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 ```
 
 Leave both unset for the minimal substrate (policy-registry + executor + core).

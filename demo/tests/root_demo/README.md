@@ -86,11 +86,14 @@ real policy / Guardian path but replaces only the final executor with
 service, so there is no `executor.sock` that can accidentally run commands.
 
 ```bash
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 (`INTENTFRAME_CORE_CONFIG` / `EXECUTOR_CONFIG` — what loads at startup: [docs/plugin-profiles.md](../../../docs/plugin-profiles.md).)
@@ -139,9 +142,9 @@ The CLI starts the gateway, which:
 1. Runs `detect_escalation_state()` and decides whether root-demo is armed.
 2. Injects `INTENTFRAME_ESCALATION_ARMED=1` (or `0`) into the supervisor env.
 3. Spawns the supervisor with `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml`,
-   `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`, and the
-   first-party kit service graph (`intentframe_native_kit/supervisor_profile.yaml`,
-   including `resource-registry`).
+   `INTENTFRAME_CORE_CONFIG` pointing at the kit `core.yaml`, and the
+   first-party kit service graph (including `resource-registry`). The gateway
+   resolves these paths from the installed `intentframe-native-kit` package.
 
 You should see the banner:
 
@@ -164,12 +167,15 @@ is already installed** — otherwise the env var is a lie and `sudo -n` will
 fail at runtime with a cryptic "password required" error:
 
 ```bash
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
 JARVIS_VARIANT=root \
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 The gateway's README notes that `INTENTFRAME_ESCALATION_ARMED` should never be
@@ -210,8 +216,8 @@ still requires the Mac host (§2c/2d above); only **dry-run** works in the conta
 export OPENAI_API_KEY=sk-...
 export INTENTFRAME_EXECUTOR_MODE=dry_run
 export INTENTFRAME_DRY_RUN_CONTEXT=root
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="$(python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent / "supervisor_profile.yaml")')"
+export INTENTFRAME_EDGE_CONFIG="$(python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent / "edge_profile.yaml")')"
 docker compose -f docker-compose.dev.yml up --build
 ```
 

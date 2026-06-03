@@ -28,7 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 # The "native" flavour. Adds intentframe-native-kit, which provides the
 # resource-registry service module (intentframe_native_kit.resource_registry.server:app)
-# and the 4-service kit profile (intentframe_native_kit/supervisor_profile.yaml).
+# and the 4-service kit profile (kit supervisor profile in the installed package).
 #
 # Flavor selection stays purely config-driven: point --config /
 # INTENTFRAME_SUPERVISOR_CONFIG at the kit profile to start the resource-registry.

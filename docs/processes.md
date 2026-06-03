@@ -26,7 +26,7 @@ intentframe-gateway-cli                ← 1 entry-point process you launch
   │     │                                  kit profile, so 4 children here)
   │     │  Spawned by supervisor in dependency order from its service-graph
   │     │  profile (supervisor/config.py, supervisor/main.py). The gateway
-  │     │  selects intentframe_native_kit/supervisor_profile.yaml:
+  │     │  selects ${KIT}/supervisor_profile.yaml (installed package):
   │     │
   │     ├── policy-registry            (uvicorn, UDS)
   │     ├── resource-registry          (uvicorn, UDS — kit profile only)
@@ -202,7 +202,7 @@ what bundles or packs mean.
 | **Holds credentials?** | OpenAI key only (passed via env from the gateway) |
 | **Lifecycle** | Optional. Started by the gateway in Step 8 if Jarvis is enabled. |
 
-The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-core` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`intentframe_native_kit.action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
+The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-server` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`intentframe_native_kit.action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
 
 ### 11. `jarvis-telegram` — Telegram bridge (optional)
 
@@ -370,7 +370,7 @@ The process model above is the macOS / Jarvis deployment. Other deployments adju
 | **Linux core** | No platform-server (Swift binary is macOS-only); native adapters become "unavailable"; everything else identical |
 | **Cloud (planned)** | Transport changes from UDS to gRPC; platform-server replaced by cloud-equivalent adapters; credential vault may delegate to KMS / Vault |
 
-The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile (see [plugin-profiles.md](plugin-profiles.md)). `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
+The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-server` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`${KIT}/supervisor_profile.yaml` (with `KIT` resolved from the installed package) + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile (see [plugin-profiles.md](plugin-profiles.md)). `intentframe-server`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
 
 ---
 

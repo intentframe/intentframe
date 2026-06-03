@@ -4,7 +4,7 @@ Configuration is env-driven (see ``intentframe_edge.config``); CLI flags
 override host/port and select the backend profile for convenience::
 
     python -m intentframe_edge --host 0.0.0.0 --port 8443
-    python -m intentframe_edge --config intentframe_native_kit/edge_profile.yaml
+    python -m intentframe_edge --config "${KIT}/edge_profile.yaml"
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def main() -> None:
         help=(
             "Path to an edge backend profile YAML. Defaults to the in-code "
             "minimal backends (policy-registry + intentframe-core). First-party "
-            "products / test harnesses pass intentframe_native_kit/edge_profile.yaml "
+            "products / test harnesses pass the kit edge profile (${KIT}/edge_profile.yaml) "
             "to expose /workspaces. Equivalent to INTENTFRAME_EDGE_CONFIG."
         ),
     )

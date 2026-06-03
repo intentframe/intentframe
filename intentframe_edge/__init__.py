@@ -9,7 +9,7 @@ backend set is minimal:
     /handshake, /process, /audit*   → intentframe.sock
 
 The optional ``/workspaces* → resource-registry.sock`` route is added by the
-first-party kit profile (``intentframe_native_kit/edge_profile.yaml``), selected
+first-party kit profile (kit `edge_profile.yaml` in the installed package), selected
 via ``INTENTFRAME_EDGE_CONFIG`` / ``--config``. This mirrors the supervisor's
 registry-less default + opt-in kit profile.
 

@@ -9,7 +9,7 @@ to the in-code minimal default. The minimal default deliberately exposes only
 the substrate services that every deployment runs (``policy-registry`` and
 ``intentframe-server``); the ``resource-registry`` ``/workspaces`` route is
 optional and lives in the first-party kit profile
-(``intentframe_native_kit/edge_profile.yaml``), mirroring the supervisor's
+(kit `edge_profile.yaml` in the installed package), mirroring the supervisor's
 registry-less default + opt-in kit profile split.
 """
 
@@ -50,7 +50,7 @@ class Backend(BaseModel):
 
 # Minimal default: only the substrate services every deployment runs.
 # ``resource-registry`` (/workspaces) is optional and added by the first-party
-# kit profile (intentframe_native_kit/edge_profile.yaml). Executor and
+# kit profile (edge_profile.yaml in the installed native-kit package). Executor and
 # credential-vault are intentionally never exposed — they stay UDS-only inside
 # the environment.
 DEFAULT_BACKENDS: list[Backend] = [

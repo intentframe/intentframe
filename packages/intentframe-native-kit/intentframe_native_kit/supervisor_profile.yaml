@@ -10,7 +10,7 @@
 # Native products select this profile explicitly:
 #
 #   python -m supervisor.main start \
-#     --config intentframe_native_kit/supervisor_profile.yaml
+#     --config "${KIT}/supervisor_profile.yaml"
 #
 # The supervisor's own default (supervisor/config/supervisor.yaml) omits the
 # resource-registry to stay dependency-free; this kit-owned profile is the

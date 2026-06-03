@@ -8,7 +8,7 @@ via ``--config`` / ``INTENTFRAME_SUPERVISOR_CONFIG``, defaulting to the packaged
 ``supervisor/config/supervisor.yaml`` (policy-registry, executor,
 intentframe-server -- no resource-registry). First-party products and the test
 stacks opt into the registry by pointing at
-``intentframe_native_kit/supervisor_profile.yaml``.
+the kit `supervisor_profile.yaml` (installed package).
 
 The gateway starts the supervisor as a subprocess and passes runtime_env
 credentials (e.g. OPENAI_API_KEY) via the parent process environment.
@@ -392,8 +392,8 @@ def main() -> None:
                 "Path to a supervisor service-graph YAML. Falls back to the "
                 "INTENTFRAME_SUPERVISOR_CONFIG env var, then the packaged "
                 "supervisor/config/supervisor.yaml (no resource-registry). "
-                "First-party products / tests pass "
-                "intentframe_native_kit/supervisor_profile.yaml."
+                "First-party products / tests pass the kit supervisor profile "
+                "(intentframe_native_kit/supervisor_profile.yaml in the installed package)."
             ),
         )
 

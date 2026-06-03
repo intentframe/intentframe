@@ -92,10 +92,21 @@ Entry points: `intentframe.executor_packs` (`posix`, `macos`, `console`). Sandbo
 | `supervisor_profile.yaml` | Adds `resource-registry` to the supervisor graph |
 | `edge_profile.yaml` | Exposes `/workspaces` (pair with supervisor kit profile) |
 
+**Local / monorepo** (resolve from the installed package):
+
 ```bash
-export INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml
-export INTENTFRAME_SUPERVISOR_CONFIG=intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=intentframe_native_kit/edge_profile.yaml
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+export INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml"
+export INTENTFRAME_SUPERVISOR_CONFIG="${KIT}/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="${KIT}/edge_profile.yaml"
+```
+
+**Docker** (repo cloned to `/app`):
+
+```bash
+export INTENTFRAME_CORE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml"
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 ```
 
 Deploy: [`deploy/dev/README.md`](../deploy/dev/README.md).

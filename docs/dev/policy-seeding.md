@@ -57,10 +57,13 @@ It is the canonical “admin orchestrator” example: same pattern as `demo/test
 Supervisor running with `policy-registry` (kit profile for demos that need workspaces):
 
 ```bash
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 From repo root: `uv sync`.

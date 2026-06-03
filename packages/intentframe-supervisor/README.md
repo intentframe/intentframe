@@ -25,11 +25,11 @@ start is decided entirely by the profile YAML it is pointed at, via
   executor, intentframe-server). No resource-registry.
 - **`[native]`** — installs `intentframe-native-kit`, which provides the
   resource-registry service module and the 4-service profile
-  (`intentframe_native_kit/supervisor_profile.yaml`). Select it explicitly:
+  (kit `supervisor_profile.yaml` in the installed package). Select it explicitly:
 
 ```bash
 python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 The `[native]` extra only makes that module and profile *present*; it does not

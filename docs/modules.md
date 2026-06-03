@@ -182,7 +182,7 @@ Generic orchestration — replaceable with Docker Compose, systemd, etc. No doma
 
 ### 7. Native kit — first-party plugin author code
 
-**Not substrate.** A third party would ship an equivalent tree for their product (e.g. Jarvus). See [`intentframe_native_kit/README.md`](../intentframe_native_kit/README.md).
+**Not substrate.** A third party would ship an equivalent tree for their product (e.g. Jarvus). See [`intentframe_native_kit/README.md`](../packages/intentframe-native-kit/intentframe_native_kit/README.md).
 
 | Path | Role |
 |------|------|
@@ -377,7 +377,7 @@ intentframe_executor_pack_*   adapters (+ optional platform backends)
 |---|---|
 | **What** | First-party plugins, taxonomy, optional resource-registry service, kit profiles. |
 | **Why** | Reference integration — same shape a third-party product (Jarvus) would ship. |
-| **README** | [`intentframe_native_kit/README.md`](../intentframe_native_kit/README.md) |
+| **README** | [`intentframe_native_kit/README.md`](../packages/intentframe-native-kit/intentframe_native_kit/README.md) |
 | **Docs** | [plugin-profiles.md](plugin-profiles.md), [dev/action-family-wiring.md](dev/action-family-wiring.md) |
 
 #### `intentframe_native_kit/action_registry/`
@@ -407,7 +407,7 @@ First-party `ActionBundle` / `DomainBundle` implementations. Loaded when listed 
 |---|---|
 | **What** | Generic process manager: read YAML → spawn uvicorn → health-check → monitor. Service graph is **admin-owned data**, not supervisor logic. |
 | **Default graph** | `policy-registry`, `executor`, `intentframe-core`. |
-| **Kit graph** | Adds `resource-registry` via `intentframe_native_kit/supervisor_profile.yaml`. |
+| **Kit graph** | Adds `resource-registry` via `${KIT}/supervisor_profile.yaml` (with `KIT` resolved from the installed package). |
 
 ### `intentframe_gateway/`, `intentframe_edge/`, `intentframe_proxy/`
 
@@ -484,7 +484,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 - [registries.md](registries.md) — Policy vs resource registry
 - [credentials-vault.md](credentials-vault.md) — Vault service lifecycle and delivery modes
 - [credential-vault-faq.md](credential-vault-faq.md) — Executor `CredentialVault`, backend registry, `service` backend, and `IF_VAULT_BACKEND`
-- [intentframe_native_kit/README.md](../intentframe_native_kit/README.md) — Kit layout and import rules
+- [intentframe_native_kit/README.md](../packages/intentframe-native-kit/intentframe_native_kit/README.md) — Kit layout and import rules
 - [executor_sdk/README.md](../executor_sdk/README.md) — Executor pack roles, registration, import surface
 - [TODO/executor_sdk_layering.md](../TODO/executor_sdk_layering.md) — Accepted monolith today; future contracts / host split
 - [intentframe_bundle_sdk/README.md](../intentframe_bundle_sdk/README.md) — Bundle contract and plugin import surface

@@ -69,9 +69,13 @@ The demo runs an AI invoice-processing agent through a constrained IntentFrame s
 (`INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` select which action bundles and executor packs load; see [plugin-profiles.md](plugin-profiles.md).)
 
 ```bash
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor.yaml \
-python -m supervisor.main start
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 **Terminal 2 — run the demo dashboard:**
@@ -92,10 +96,14 @@ The dashboard registers a demo user and workspace, installs the `invoice_bot` ag
 The root demo exercises 100 adversarial attack intents through the IntentFrame pipeline in dry-run mode (no commands actually execute):
 
 ```bash
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
-python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 Then in another terminal:

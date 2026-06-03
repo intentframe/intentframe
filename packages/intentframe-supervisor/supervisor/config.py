@@ -8,7 +8,7 @@ The service graph is admin-owned data, not supervisor logic: it is read from a
 YAML file (``--config <path>`` on the CLI, falling back to the packaged default
 ``supervisor/config/supervisor.yaml``).  The packaged default is deliberately
 dependency-free and EXCLUDES the resource-registry; first-party products opt
-into the registry by pointing at ``intentframe_native_kit/supervisor_profile.yaml``.
+into the registry by pointing at the kit `supervisor_profile.yaml` (installed package path).
 
 Configuration sources (in priority order):
     1. CLI arguments (``--config`` path)

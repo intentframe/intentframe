@@ -265,10 +265,13 @@ See [`../../tests/README.md`](../../tests/README.md) for the full test guide.
 ```bash
 # Start supervisor with attack executor profile + kit profile (workspaces)
 # Profile selection: docs/plugin-profiles.md
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 
 # Foundation attacks (1-6)
 python demo/tests/test_attacks.py

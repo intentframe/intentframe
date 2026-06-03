@@ -90,8 +90,8 @@ curl -fsS http://localhost:8443/health
 > first-party kit profiles enabled — export **both** before `up`:
 >
 > ```bash
-> export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-> export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+> export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+> export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 > ```
 >
 > These live in the container image at `/app/...`. Changing them requires an
@@ -110,7 +110,7 @@ The registry/runtime clients accept a `base_url` and also read it from the
 environment, so existing harnesses run unmodified — just point them at the edge.
 The executor config to use depends on which test suite you're running:
 The core config declares which action bundles `intentframe-core` loads; the
-compose default is `/app/intentframe_native_kit/core.yaml`. Executor packs are
+compose default is `/app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml`. Executor packs are
 selected separately via `EXECUTOR_CONFIG`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
 ### 2a. Dashboard + basic pipeline tests
@@ -120,8 +120,8 @@ selected separately via `EXECUTOR_CONFIG`. See [docs/plugin-profiles.md](../../d
 cd deploy/dev
 export OPENAI_API_KEY=sk-...
 # workspaces are needed by the dashboard — enable the kit profiles:
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 docker compose -f docker-compose.dev.yml up --build
 
 # Mac:
@@ -148,8 +148,8 @@ in audit) works over HTTP without shared `demo/` mounts — see [§2c](#2c-limit
 ```bash
 # override EXECUTOR_CONFIG before up + enable workspace kit profiles:
 export EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 export OPENAI_API_KEY=sk-...
 docker compose -f docker-compose.dev.yml up --build
 
@@ -336,8 +336,8 @@ export OPENAI_API_KEY=sk-...
 export INTENTFRAME_EXECUTOR_MODE=dry_run
 export INTENTFRAME_DRY_RUN_CONTEXT=root
 # root-demo suites seed workspaces — enable the kit profiles:
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 docker compose -f docker-compose.dev.yml up --build
 ```
 
@@ -659,11 +659,11 @@ Only use when you intentionally want to wipe Docker state machine-wide.
 | `seed_vault.py` | store `OPENAI_API_KEY` in Vault as `runtime_env` |
 | `inject_and_exec.py` | fetch `runtime_env` from Vault, `exec` the supervisor |
 | `docker-compose.dev.yml` | runtime + edge, wired to host Vault |
-| `../../intentframe_native_kit/core.yaml` | kit core profile (loads first-party action bundles) — selected by `INTENTFRAME_CORE_CONFIG` ([docs/plugin-profiles.md](../../docs/plugin-profiles.md)) |
+| `../../packages/intentframe-native-kit/intentframe_native_kit/core.yaml` | kit core profile (loads first-party action bundles) — selected by `INTENTFRAME_CORE_CONFIG` ([docs/plugin-profiles.md](../../docs/plugin-profiles.md)) |
 | `../../demo/config/executor_hashicorp.yaml` | default executor config (dashboard + basic pipeline tests) |
 | `../../demo/config/executor_attacks_hashicorp.yaml` | executor config for invoice attack suites |
-| `../../intentframe_native_kit/supervisor_profile.yaml` | kit supervisor profile (adds `resource-registry`) — export as `INTENTFRAME_SUPERVISOR_CONFIG` |
-| `../../intentframe_native_kit/edge_profile.yaml` | kit edge profile (adds `/workspaces` route) — export as `INTENTFRAME_EDGE_CONFIG` |
+| `../../packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml` | kit supervisor profile (adds `resource-registry`) — export as `INTENTFRAME_SUPERVISOR_CONFIG` |
+| `../../packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml` | kit edge profile (adds `/workspaces` route) — export as `INTENTFRAME_EDGE_CONFIG` |
 
 Both HashiCorp configs are Linux/container-safe: they load the portable POSIX pack
 (`intentframe_native_kit.intentframe_executor_pack_posix`) plus the neutral console pack

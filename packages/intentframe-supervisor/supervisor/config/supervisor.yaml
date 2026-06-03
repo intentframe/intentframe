@@ -12,7 +12,7 @@
 # profile that includes it, e.g. the first-party kit profile:
 #
 #   python -m supervisor.main start \
-#     --config intentframe_native_kit/supervisor_profile.yaml
+#     --config "${KIT}/supervisor_profile.yaml"
 #
 # The supervisor reads `--config <path>` from its CLI args; when omitted it
 # falls back to this file. Mechanism (spawn/health/monitor) lives in

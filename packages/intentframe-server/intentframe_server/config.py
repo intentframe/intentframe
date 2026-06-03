@@ -84,7 +84,7 @@ def load_core_config(
         3. ``INTENTFRAME_CORE_CONFIG``.
 
     There is deliberately no native-kit fallback. A deployment must declare
-    which bundles intentframe-core loads.
+    which bundles intentframe-server loads.
     """
 
     if config_dict is not None:

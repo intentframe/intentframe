@@ -5,12 +5,12 @@
 #   intentframe-edge      : HTTP front door (:8443) → the runtime's UDS sockets
 #
 # Supervisor and edge are generic, config-driven substrate. By default they run
-# the minimal graph (policy-registry + executor + intentframe-core; edge exposes
+# the minimal graph (policy-registry + executor + intentframe-server; edge exposes
 # /policies + /handshake|/process|/audit) — NO resource-registry / /workspaces.
 # The test suites that need workspaces opt in by exporting the first-party kit
 # profiles before `up` (see deploy/dev/README.md):
-#   export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-#   export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+#   export INTENTFRAME_SUPERVISOR_CONFIG=/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml
+#   export INTENTFRAME_EDGE_CONFIG=/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml
 #
 # The runtime seeds OPENAI_API_KEY into the Vault and then fetches it back to
 # inject into the supervisor (see deploy/dev/entrypoint.dev.sh). One command
@@ -103,10 +103,10 @@ services:
       # Override from your shell:
       #   export EXECUTOR_CONFIG=demo/config/executor_attacks_hashicorp.yaml
       EXECUTOR_CONFIG: "${EXECUTOR_CONFIG:-/app/demo/config/executor_hashicorp.yaml}"
-      # Core config — declares the action bundles intentframe-core loads.
+      # Core config — declares the action bundles intentframe-server loads.
       # Override for third-party bundle sets:
       #   export INTENTFRAME_CORE_CONFIG=/app/acme/core.yaml
-      INTENTFRAME_CORE_CONFIG: "${INTENTFRAME_CORE_CONFIG:-/app/intentframe_native_kit/core.yaml}"
+      INTENTFRAME_CORE_CONFIG: "${INTENTFRAME_CORE_CONFIG:-/app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml}"
       # Executor mode:
       #   real     — starts the executor service (default; for dashboard / pipeline tests)
       #   dry_run  — skips the executor service; use for root-demo sweeps on this Linux container
@@ -120,7 +120,7 @@ services:
       # Supervisor service-graph profile. Empty = minimal default (no
       # resource-registry). Export the kit profile to run workspace-dependent
       # test suites (must be paired with INTENTFRAME_EDGE_CONFIG on the edge):
-      #   /app/intentframe_native_kit/supervisor_profile.yaml
+      #   /app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml
       INTENTFRAME_SUPERVISOR_CONFIG: "${INTENTFRAME_SUPERVISOR_CONFIG:-}"
     extra_hosts:
       # Only needed if you override VAULT_ADDR to reach a Vault on the host
@@ -162,7 +162,7 @@ services:
       # Edge backend profile. Empty = minimal default (/policies + core routes,
       # no /workspaces). Export the kit profile to expose /workspaces for
       # workspace-dependent tests (pair with INTENTFRAME_SUPERVISOR_CONFIG):
-      #   /app/intentframe_native_kit/edge_profile.yaml
+      #   /app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml
       INTENTFRAME_EDGE_CONFIG: "${INTENTFRAME_EDGE_CONFIG:-}"
       # Optional coarse bearer auth / TLS — see deploy/prod/README.md.
       # INTENTFRAME_EDGE_TOKEN: "${INTENTFRAME_EDGE_TOKEN:-}"

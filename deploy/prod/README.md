@@ -37,7 +37,7 @@ UDS-only inside the environment.
 
 `intentframe-core` is also config-driven: `INTENTFRAME_CORE_CONFIG` points at a
 `core.yaml` profile declaring the action bundles to load. The compose default is
-the first-party kit profile (`/app/intentframe_native_kit/core.yaml`); third
+the first-party kit profile (`/app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml`); third
 parties ship their own profile just like they ship their own executor config.
 Entry-point short names vs module paths: [docs/plugin-profiles.md](../../docs/plugin-profiles.md).
 
@@ -48,7 +48,7 @@ export OPENAI_API_KEY=sk-...
 export VAULT_ADDR=https://vault.acme.com:8200
 export VAULT_ROLE_ID=...
 export VAULT_SECRET_ID=...
-# optional override; defaults to /app/intentframe_native_kit/core.yaml
+# optional override; defaults to /app/packages/intentframe-native-kit/intentframe_native_kit/core.yaml
 # export INTENTFRAME_CORE_CONFIG=/app/acme/core.yaml
 
 docker compose -f deploy/prod/docker-compose.yml up --build
@@ -130,8 +130,8 @@ Enable them by setting **both** kit profiles before `up` (the runtime gets the
 service, the edge gets the route — they must match):
 
 ```bash
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 docker compose -f deploy/prod/docker-compose.yml up --build
 ```
 

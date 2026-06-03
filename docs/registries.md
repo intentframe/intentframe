@@ -167,7 +167,7 @@ Dynamic recipient/contact sources (`recipient_sources`, `contact_sources` in Jar
 
 ### Process and storage
 
-Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `intentframe_native_kit/resource_registry/server.py`. Backed by local SQLite. **Opt-in**: the supervisor only starts it under the first-party kit profile (`intentframe_native_kit/supervisor_profile.yaml`), not the packaged minimal default. Deployments that only use static executor mounts can omit it entirely.
+Runs as a uvicorn FastAPI service on `~/.intentframe/run/resource-registry.sock`. Source: `intentframe_native_kit/resource_registry/server.py`. Backed by local SQLite. **Opt-in**: the supervisor only starts it under the first-party kit profile (`${KIT}/supervisor_profile.yaml` (with `KIT` resolved from the installed package)), not the packaged minimal default. Deployments that only use static executor mounts can omit it entirely.
 
 ### What it stores
 

@@ -66,7 +66,7 @@ flowchart TB
 
 Example and env mapping comments: [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml).
 
-First-party default profile: [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml).
+First-party default profile: [`intentframe_native_kit/core.yaml`](../packages/intentframe-native-kit/intentframe_native_kit/core.yaml).
 
 ### executor (`executor.yaml`)
 
@@ -233,7 +233,7 @@ For adapter-level detail, see [executor.md](executor.md) § extending the execut
 |------|------|
 | [`intentframe_server/config.py`](../intentframe_server/config.py) | `load_core_config()`, fail-closed validation |
 | [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml) | Annotated template + legacy env mapping |
-| [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml) | First-party default profile |
+| [`intentframe_native_kit/core.yaml`](../packages/intentframe-native-kit/intentframe_native_kit/core.yaml) | First-party default profile |
 | [`intentframe_bundle_sdk/loader.py`](../intentframe_bundle_sdk/loader.py) | `intentframe.bundles` entry-point + module resolution |
 | [`executor/server.py`](../executor/server.py) | `intentframe.executor_packs` pack loading |
 | [`intentframe_gateway/profiles.py`](../intentframe_gateway/profiles.py) | `resolve_core_config_path()` (gateway-only empty/missing → kit default) |
@@ -266,6 +266,6 @@ Example YAML shipped with the repo:
 | File | Role |
 |------|------|
 | [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml) | Annotated core profile template |
-| [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml) | First-party default `bundles:` |
+| [`intentframe_native_kit/core.yaml`](../packages/intentframe-native-kit/intentframe_native_kit/core.yaml) | First-party default `bundles:` |
 | [`executor/config/executor.yaml`](../executor/config/executor.yaml) | Reference `packs:` and adapter wiring |
 | [`jarvis_pa/executor.yaml`](../jarvis_pa/executor.yaml) | Jarvis user-mode executor profile |
