@@ -4,7 +4,7 @@ Utility scripts for local development setup.
 
 ## GitHub release wheels
 
-See [`github-release/README.md`](github-release/README.md) for the manual release-assets runbook: build, upload `dist/publish/*.whl`, verify, and update future releases.
+See [`github-release/README.md`](github-release/README.md) for the manual release-assets runbook: build, upload `dist/publish/*.whl`, verify, and update future releases. Boot supervisor + edge from published wheels: [`kits-two-venv/gh-release-venv/`](kits-two-venv/gh-release-venv/).
 
 See [`github-install/README.md`](github-install/README.md) for the consumer-side `uv` source template and install verifier.
 

@@ -12,6 +12,12 @@ Related docs:
 - Install verification and consumer TOML template: [`../github-install/README.md`](../github-install/README.md)
 - Package licensing split: [`../../docs/licensing.md`](../../docs/licensing.md)
 
+## Scripts here
+
+| Script | Purpose |
+|--------|---------|
+| [`../kits-two-venv/gh-release-venv/start_runtime_from_release.sh`](../kits-two-venv/gh-release-venv/start_runtime_from_release.sh) | Install the published wheels into `.venv-release` and start supervisor + edge from them (same env as the kits-two-venv harness). Proves the release boots the full multi-process stack. |
+
 ## What We Publish
 
 Publish the **wheel** files from `dist/publish/` as GitHub release assets.
@@ -283,6 +289,50 @@ If a wheel stops being `py3-none-any`:
 | Replace assets after announcement | Reproducibility risk | Publish a new version instead. |
 | Use GitHub Actions artifacts as install URLs | Expiry/auth problems | Use GitHub release assets. |
 | Private repo release assets | Consumers need auth | Keep repo public or use an authenticated package/index solution. |
+
+## Start the Runtime From a Release (boot smoke test)
+
+Verify the published wheels actually boot the full runtime — supervisor + its
+spawned services + edge — not just that they install.
+
+```bash
+export OPENAI_API_KEY=sk-...
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+```
+
+What it does:
+
+1. Installs all 18 release wheels into `.venv-release` (separate from `.venv` / `.venv-runtime`).
+2. Resolves `INTENTFRAME_CORE_CONFIG` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG` from the installed native-kit wheel.
+3. Starts `supervisor.main start` (spawns policy-registry, resource-registry, executor, intentframe-server over UDS) and waits for core health.
+4. Starts `intentframe_edge` on `:8443` and waits for HTTP `/health`.
+
+Environment and run/log dirs match `scripts/kits-two-venv/start_runtime.sh`
+exactly — `~/.intentframe/run` and `~/.intentframe/logs` are used as-is (no
+`INTENTFRAME_RUN_DIR` / `INTENTFRAME_LOG_DIR` override). `EXECUTOR_CONFIG`
+defaults to `demo/config/executor_hashicorp.yaml` (override via env), so the repo
+checkout still supplies the operator executor profile.
+
+Run demo tests against it from the client venv (same as the harness):
+
+```bash
+bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
+```
+
+Stop it with the existing harness stopper (matches by run-dir supervisor pid and
+the edge listener on `EDGE_PORT`):
+
+```bash
+bash scripts/kits-two-venv/stop_runtime.sh
+```
+
+Notes:
+
+- This installs the native kit directly into `.venv-release`, so it does **not**
+  exercise the `INTENTFRAME_KITS_DIR` wheelhouse + constraints boundary that the
+  kits-two-venv harness tests. It validates that the published wheels boot the
+  stack, which is what a release consumer experiences.
+- Requires `uv`, network access to the release + PyPI, and Python 3.14.
 
 ## When PyPI Is Ready
 

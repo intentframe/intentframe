@@ -45,6 +45,19 @@ bash scripts/kits-two-venv/stop_runtime.sh
 # or: bash scripts/stop_runtime.sh
 ```
 
+### GitHub release wheels (runtime smoke test)
+
+Prove the **published** wheels boot supervisor + edge (install into `.venv-release`, not `.venv-runtime`):
+
+```bash
+export OPENAI_API_KEY=sk-...
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
+bash scripts/kits-two-venv/stop_runtime.sh
+```
+
+See [`gh-release-venv/README.md`](gh-release-venv/README.md). `stop_runtime.sh` clears both harness pid dirs (kits-two-venv and gh-release-venv).
+
 **Why there is no step “bootstrap only”:** `bootstrap_kits.sh` must be **sourced** (it exports `INTENTFRAME_*_CONFIG`). The default flow runs it inside `start_runtime.sh` so the kit is always installed before supervisor/edge start. Use a standalone bootstrap only for dry-runs or debugging — see [Kit install policy](#kit-install-policy-constraints--uv) and [bootstrap_kits.sh](#bootstrap_kitssh-must-be-sourced).
 
 | You changed… | Re-run |
