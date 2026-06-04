@@ -47,6 +47,15 @@ PID_DIR="${REPO_ROOT}/.intentframe/kits-two-venv"
 SUPERVISOR_PID_FILE="${PID_DIR}/supervisor.pid"
 EDGE_PID_FILE="${PID_DIR}/edge.pid"
 
+# GitHub-release wheel runtime (scripts/kits-two-venv/gh-release-venv/).
+RELEASE_VENV="${RELEASE_VENV:-${REPO_ROOT}/.venv-release}"
+RELEASE_PYTHON="${RELEASE_VENV}/bin/python"
+GH_RELEASE_PID_DIR="${REPO_ROOT}/.intentframe/gh-release-venv"
+GH_RELEASE_SUPERVISOR_PID_FILE="${GH_RELEASE_PID_DIR}/supervisor.pid"
+GH_RELEASE_EDGE_PID_FILE="${GH_RELEASE_PID_DIR}/edge.pid"
+# Legacy path from an earlier script version (stop still clears it).
+GH_RELEASE_PID_DIR_LEGACY="${REPO_ROOT}/.intentframe/github-release"
+
 _kits_require_repo() {
   if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
     echo "REPO_ROOT does not look like the intentframe repo: ${REPO_ROOT}" >&2

@@ -36,5 +36,6 @@ If yes, describe the impact and how it was tested:
 
 - [ ] No secrets, tokens, private keys, or local-only paths committed
 - [ ] Docs updated if behaviour changed
+- [ ] Package metadata and `docs/licensing.md` updated if distribution boundaries or licenses changed
 - [ ] Tests added or updated where appropriate
 - [ ] Fail-closed behaviour preserved — a failure in this code should not allow an unsafe action through

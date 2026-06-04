@@ -20,22 +20,23 @@ other materials ("Contribution") to IntentFrame, you agree to the following:
 3. **You confirm** that you have the legal right to grant this license, and
    that your Contribution does not violate any third-party rights.
 
-4. **You understand** that IntentFrame is dual-licensed and currently
-   distributed under AGPL-3.0 with a separate commercial license available to
-   third parties. Portions of the project (such as client SDKs) may in the
-   future be distributed under permissive open-source licenses such as
-   Apache-2.0. Your Contribution may be included under any of these licenses.
+4. **You understand** that IntentFrame uses a split licensing model: root
+   product/runtime code is AGPL-3.0 with a separate commercial license
+   available to third parties, while selected publishable packages are
+   distributed under permissive licenses such as Apache-2.0. Your Contribution
+   may be included under any of these licenses.
 
 ## Why this CLA exists
 
-IntentFrame uses a dual-licensing model (similar to Grafana, GitLab, and
-Nextcloud). The open source version is AGPL-3.0. A commercial license is
-available for organizations that cannot comply with AGPL terms.
+IntentFrame uses a split and commercial-licensing model. Root product/runtime
+code is AGPL-3.0; selected SDK, client, policy, ingress, native-kit, and vault
+packages are Apache-2.0. A commercial license is available for organizations
+that cannot comply with AGPL terms.
 
-Without this CLA, outside contributions could only be distributed under AGPL,
-which would prevent offering a commercial license for the combined work. This
-CLA ensures that all contributions can be included in both the open source and
-commercial versions.
+Without this CLA, contributions to AGPL-covered areas could not be included in
+commercially licensed versions of the combined work. This CLA ensures that all
+contributions can be included in the appropriate open-source package license
+and, where needed, commercial versions.
 
 ## How to sign
 

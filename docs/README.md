@@ -29,6 +29,14 @@ If you're new to IntentFrame, read in this order:
 - [processes.md](processes.md) — what processes will be running on your machine after startup
 - [faq.md](faq.md) — common setup and operational questions
 
+### "How do I install packages from a release?"
+
+- [package-consumers.md](package-consumers.md) — install IntentFrame packages into another `uv` project from release wheels
+- [../scripts/github-install/README.md](../scripts/github-install/README.md) — template `pyproject.toml` and install verifier details
+- [../scripts/github-release/README.md](../scripts/github-release/README.md) — manual release-asset publishing and verification runbook
+- [../scripts/release/README.md](../scripts/release/README.md) — PyPI/TestPyPI publishing, lockstep versioning, and rate-limit playbook
+- [licensing.md](licensing.md) — package-by-package AGPL/Apache split
+
 ### "What is this for, conceptually?"
 
 - [autonomy.md](autonomy.md) — the canonical thesis: delegatable autonomy as the goal, structural supervision as the means, the professional-licensing analogy
@@ -183,8 +191,14 @@ If you're new to IntentFrame, read in this order:
 
 | Doc | What it covers |
 |---|---|
+| [dev/README.md](dev/README.md) | Index of maintainer-facing developer docs |
 | [plugin-profiles.md](plugin-profiles.md) | Plugin hosts: `bundles:` / `packs:`, profile env vars, entry-point discovery |
 | [dev/action-family-wiring.md](dev/action-family-wiring.md) | How to wire a new action family end-to-end |
+| [dev/package-release-guide.md](dev/package-release-guide.md) | Package boundaries, lockstep releases, GitHub wheels, PyPI staging, and license checks |
+| [package-consumers.md](package-consumers.md) | Consumer-facing install guide for third-party projects |
+| [licensing.md](licensing.md) | Package-level AGPL/Apache split for publishable `packages/` distributions |
+| [../scripts/release/README.md](../scripts/release/README.md) | Lockstep package versioning and PyPI/TestPyPI release process |
+| [../scripts/github-install/README.md](../scripts/github-install/README.md) | GitHub release wheel install pattern for third-party `uv` projects |
 
 ---
 
@@ -223,4 +237,4 @@ The public-audience versions of these (in `docs/`) summarize what evaluators and
 - [`../README.md`](../README.md) — project README (Why IntentFrame, getting started, demo, architecture overview)
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contributor guidelines
 - [`../SECURITY.md`](../SECURITY.md) — how to report security issues
-- [`../LICENSE`](../LICENSE) — AGPL-3.0
+- [`../LICENSE`](../LICENSE) — AGPL-3.0 for root product code; see [licensing.md](licensing.md) for package-level licenses

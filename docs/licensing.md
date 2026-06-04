@@ -1,6 +1,8 @@
 # Licensing
 
-IntentFrame uses a split license model across publishable workspace packages (`packages/`). Publishing to PyPI (groups, rate limits, CI vs local): [`scripts/release/README.md`](../scripts/release/README.md).
+IntentFrame uses a split license model across publishable workspace packages (`packages/`). The root product code remains AGPL-3.0-only, while package-level metadata and included `LICENSE` files define the license for each published distribution.
+
+Current package release: [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0), a normal GitHub release with 18 wheel assets. Publishing to PyPI (groups, rate limits, CI vs local): [`scripts/release/README.md`](../scripts/release/README.md). Interim GitHub release wheels (publish, install verify, runtime boot): [`scripts/github-release/README.md`](../scripts/github-release/README.md), [`scripts/github-install/README.md`](../scripts/github-install/README.md).
 
 ## AGPL-3.0 (runtime stack)
 

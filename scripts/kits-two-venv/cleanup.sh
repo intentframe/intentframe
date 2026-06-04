@@ -97,7 +97,7 @@ else
 fi
 
 if [[ "${DO_HARNESS}" -eq 1 ]]; then
-  _rm_path "harness state" "${PID_DIR}"
+  _rm_path "harness state" "${PID_DIR}" "${GH_RELEASE_PID_DIR}" "${GH_RELEASE_PID_DIR_LEGACY}"
 fi
 
 if [[ "${DO_ARTIFACTS}" -eq 1 ]]; then

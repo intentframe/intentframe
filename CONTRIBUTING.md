@@ -37,9 +37,9 @@ uv run pytest demo/tests/               # security demo tests (needs OpenAI key)
 ## Project Structure
 
 IntentFrame is a `uv` workspace. The root `pyproject.toml` defines the main
-package; workspace members (`jarvis_pa`, `external_data_ingestion`,
-`intentframe_credentials`, `jarvis_telegram`) have their own `pyproject.toml`
-files and are linked via `[tool.uv.sources]`.
+product package; publishable packages live under `packages/`, and product
+workspace members (`jarvis_pa`, `external_data_ingestion`, `jarvis_telegram`)
+have their own `pyproject.toml` files linked via `[tool.uv.sources]`.
 
 Do **not** install workspace members with `pip install -e .` individually —
 use `uv sync` from the root.
@@ -68,11 +68,14 @@ If you find a security vulnerability, **do not open a public issue**. See
 By submitting a pull request, you agree to the [Contributor License
 Agreement](CLA.md). In short: you keep copyright over your contribution, but
 you grant IntentFrame a perpetual, irrevocable license to use, modify, and
-relicense it — including under commercial terms. This is standard practice
-for dual-licensed open source projects (Grafana, GitLab, Nextcloud, etc.).
+relicense it — including under commercial terms. This keeps the package-level
+license split and commercial licensing path workable.
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0
-(AGPL-3.0). By contributing, you agree that your contributions will be
-licensed under the same terms. See [LICENSE](LICENSE).
+Root product/runtime code is licensed under the GNU Affero General Public
+License v3.0 (AGPL-3.0). Some publishable packages under `packages/` are
+Apache-2.0; others remain AGPL-3.0. By contributing, you agree that your
+contributions may be distributed under the license of the package or area they
+land in, and under the CLA grant above. See [LICENSE](LICENSE) and
+[docs/licensing.md](docs/licensing.md).

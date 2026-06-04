@@ -45,6 +45,19 @@ bash scripts/kits-two-venv/stop_runtime.sh
 # or: bash scripts/stop_runtime.sh
 ```
 
+### GitHub release wheels (runtime smoke test)
+
+Prove the **published** wheels boot supervisor + edge (install into `.venv-release`, not `.venv-runtime`):
+
+```bash
+export OPENAI_API_KEY=sk-...
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
+bash scripts/kits-two-venv/stop_runtime.sh
+```
+
+See [`gh-release-venv/README.md`](gh-release-venv/README.md). `stop_runtime.sh` clears harness pid dirs (kits-two-venv, gh-release-venv, and legacy `github-release`).
+
 **Why there is no step “bootstrap only”:** `bootstrap_kits.sh` must be **sourced** (it exports `INTENTFRAME_*_CONFIG`). The default flow runs it inside `start_runtime.sh` so the kit is always installed before supervisor/edge start. Use a standalone bootstrap only for dry-runs or debugging — see [Kit install policy](#kit-install-policy-constraints--uv) and [bootstrap_kits.sh](#bootstrap_kitssh-must-be-sourced).
 
 | You changed… | Re-run |
@@ -148,6 +161,8 @@ Arbitrary **new** libraries in the kit are fine. Overriding **runtime-owned** ve
 | `KITS_INSTALL_DRY_RUN` | `0` | Set to `1` to resolve without installing |
 | `EXECUTOR_CONFIG` | `demo/config/executor_hashicorp.yaml` | Operator-owned executor profile |
 | `INTENTFRAME_EDGE_PORT` | `8443` | Edge HTTP port for external test `*_URL` env vars |
+| `RELEASE_VENV` | `.venv-release` | GitHub-release wheel runtime (gh-release-venv only) |
+| `GH_RELEASE_PID_DIR` | `.intentframe/gh-release-venv` | Pid/logs when started via `gh-release-venv/start_runtime_from_release.sh` |
 
 After bootstrap, profiles come from the **installed kit wheel**:
 
@@ -164,7 +179,8 @@ After bootstrap, profiles come from the **installed kit wheel**:
 | `bootstrap_kits.sh` | Constrained `uv pip install` + export profile env (**source**, do not execute) |
 | `start_runtime.sh` | bootstrap + supervisor + edge (background) |
 | `start_runtime_attacks.sh` | Same as `start_runtime.sh` with attack executor profile |
-| `stop_runtime.sh` | Stop edge and supervisor |
+| `gh-release-venv/start_runtime_from_release.sh` | Install release wheels into `.venv-release`, then supervisor + edge |
+| `stop_runtime.sh` | Stop harness edge/supervisor (kits-two-venv + gh-release-venv pid dirs) and product UDS |
 | `cleanup.sh` | Stop + remove harness artifacts (`--artifacts`, `--full`, `--logs`) |
 | `status_runtime.sh` | UDS + edge health |
 | `run_demo_tests.sh` | Client venv tests via edge HTTP |
@@ -195,6 +211,8 @@ Step-by-step behavior: [Script internals](#script-internals) below.
 | `.intentframe/kits-build/` | `publish_kit_wheel.sh` | Staging for `uv build` output |
 | `.intentframe/kits/` | `publish_kit_wheel.sh` | Wheelhouse (`--find-links`) |
 | `.intentframe/kits-two-venv/` | `start_runtime.sh` | Harness pid files + `supervisor.log` / `edge.log` |
+| `.venv-release/` | `gh-release-venv/start_runtime_from_release.sh` | Runtime from published GitHub wheels |
+| `.intentframe/gh-release-venv/` | `gh-release-venv/start_runtime_from_release.sh` | Harness pid/logs for release-wheel runtime |
 | `~/.intentframe/run/` | supervisor (product default) | UDS sockets + `supervisor.pid` |
 | `~/.intentframe/logs/` | runtime services | Service logs (not removed unless `cleanup.sh --logs`) |
 
@@ -211,7 +229,8 @@ Sets paths and helpers used by every script.
 | `REPO_ROOT`, `RUNTIME_VENV`, `CLIENT_VENV`, `INTENTFRAME_KITS_DIR` | Overridable via env |
 | `RUNTIME_CONSTRAINTS` | Constraint file path for kit install |
 | `RUN_DIR` | Fixed `~/.intentframe/run` (product UDS layout; harness does not override) |
-| `PID_DIR`, `SUPERVISOR_PID_FILE`, `EDGE_PID_FILE` | Harness process tracking under `.intentframe/kits-two-venv/` |
+| `PID_DIR`, `SUPERVISOR_PID_FILE`, `EDGE_PID_FILE` | Workspace harness pids under `.intentframe/kits-two-venv/` |
+| `RELEASE_VENV`, `GH_RELEASE_PID_DIR`, `GH_RELEASE_*_PID_FILE` | Release-wheel runtime (see `gh-release-venv/`) |
 | `_kits_require_*` | Fail fast if repo, venv, or constraints are missing |
 | `_kits_freeze_runtime_constraints` | Writes constraints via `importlib.metadata` (not raw `uv pip freeze`, which can emit invalid `-e file://` lines) |
 | `_kits_primary_wheels` | Resolves `KIT_WHEELS` or `intentframe_native_kit-*.whl` in the wheelhouse |
@@ -263,15 +282,21 @@ Exits early if the harness supervisor pid file already refers to a live process.
 
 Sets `EXECUTOR_CONFIG` to `demo/config/executor_attacks_hashicorp.yaml`, then `exec start_runtime.sh`. Required for attack / redteam demo paths (VFS mount layout).
 
+### `gh-release-venv/start_runtime_from_release.sh`
+
+See [`gh-release-venv/README.md`](gh-release-venv/README.md). Installs all 18 wheels from a GitHub release into `.venv-release`, resolves kit profiles from site-packages, then runs the same supervisor + edge startup sequence as `start_runtime.sh` (same env vars, default `RUN_DIR` / logs). Refuses to start if edge or core UDS is already healthy.
+
 ### `stop_runtime.sh`
+
+Stops a runtime started by `start_runtime.sh` **or** `gh-release-venv/start_runtime_from_release.sh` (shared product UDS and edge port).
 
 Shutdown order (best-effort):
 
-1. Harness edge pid (`.intentframe/kits-two-venv/edge.pid`) — TERM, then KILL.
+1. Harness edge pids — `.intentframe/kits-two-venv/edge.pid`, `.intentframe/gh-release-venv/edge.pid`, and legacy `.intentframe/github-release/edge.pid`.
 2. Product supervisor pid (`~/.intentframe/run/supervisor.pid`) — TERM the process **group**.
-3. Harness supervisor pid file.
-4. `lsof` holders of UDS sockets in `RUN_DIR`, then listeners on `EDGE_PORT`.
-5. Remove stale socket files; verify edge HTTP is down.
+3. Harness supervisor wrapper pids (same three pid dirs).
+4. `lsof` holders of UDS sockets in `RUN_DIR`, then listeners on `EDGE_PORT` (TERM, then KILL stragglers).
+5. Remove stale `*.sock` files; retry until edge HTTP `/health` is down.
 
 ### `status_runtime.sh`
 
@@ -290,7 +315,7 @@ Read-only checks: four UDS sockets, core UDS health, edge HTTP health JSON, harn
 ### `cleanup.sh`
 
 1. Invoke `stop_runtime.sh` first (unless `--dry-run`).
-2. Default: remove `.intentframe/kits-two-venv/` (harness logs and pids).
+2. Default: remove `.intentframe/kits-two-venv/`, `.intentframe/gh-release-venv/`, and legacy `.intentframe/github-release/` (harness logs and pids).
 3. `--artifacts`: wheelhouse, `kits-build`, constraints file.
 4. `--runtime-venv`: `.venv-runtime`.
 5. `--full`: artifacts + runtime venv.

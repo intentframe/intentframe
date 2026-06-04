@@ -2,6 +2,24 @@
 
 Utility scripts for local development setup.
 
+## GitHub release wheels (interim, before PyPI)
+
+| Directory | Role |
+|-----------|------|
+| [`github-release/`](github-release/README.md) | Publish runbook: version pins, build, upload wheels to a GitHub release, consumer notes |
+| [`github-install/`](github-install/README.md) | Install-only verify (`verify_release_install.sh`) + [`example-pyproject.toml`](github-install/example-pyproject.toml) for third-party `uv` projects |
+| [`kits-two-venv/gh-release-venv/`](kits-two-venv/gh-release-venv/README.md) | Boot supervisor + edge from release wheels (`.venv-release`); stop/tests via [`kits-two-venv/`](kits-two-venv/README.md) |
+
+Suggested verification after uploading wheels to a release:
+
+```bash
+./scripts/github-install/verify_release_install.sh --tag v0.1.0
+export OPENAI_API_KEY=sk-...
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
+bash scripts/kits-two-venv/stop_runtime.sh
+```
+
 ## PyPI release (`packages/` only)
 
 See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`).
@@ -11,9 +29,10 @@ See [`release/README.md`](release/README.md) — lockstep versioning (`set_versi
 See [`kits-two-venv/README.md`](kits-two-venv/README.md) — bare `.venv-runtime`, constrained `uv pip install` of kit wheels from `.intentframe/kits/`, start supervisor + edge, run demo tests from `.venv` over HTTP. Per-script behavior: [Script internals](kits-two-venv/README.md#script-internals).
 
 ```bash
-bash scripts/kits-two-venv/start_runtime.sh   # or: start via kits-two-venv README
-bash scripts/stop_runtime.sh                  # stop supervisor + edge
-bash scripts/cleanup_runtime.sh --full        # stop + reset harness (see kits-two-venv README)
+bash scripts/kits-two-venv/start_runtime.sh              # workspace runtime + kit wheelhouse
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0  # release wheels
+bash scripts/stop_runtime.sh                             # stops either start path (+ product UDS)
+bash scripts/cleanup_runtime.sh --full                     # stop + reset harness (see kits-two-venv README)
 ```
 
 ## Admin (reference)
