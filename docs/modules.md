@@ -171,7 +171,7 @@ The credential vault is not just launcher convenience. In the normal runtime, `e
 
 | Module | Service / role | Notes |
 |--------|----------------|-------|
-| [`intentframe_credentials/`](../intentframe_credentials/) | `credential-vault` | Process on `credential-vault.sock`; stores secrets in keyring / HashiCorp / env backend depending on `IF_VAULT_BACKEND`. |
+| [`intentframe_credentials/`](../packages/intentframe-credentials/intentframe_credentials/) | `credential-vault` (`intentframe-credentials` package) | Process on `credential-vault.sock`; stores secrets in keyring / HashiCorp / env backend depending on `IF_VAULT_BACKEND`. |
 | [`executor_sdk/services/credential_vault.py`](../../packages/executor-sdk/executor_sdk/services/credential_vault.py) | Consumer facade | Imports and re-exports the `intentframe_credentials` backends (`service`, `keyring`, `hashicorp`, `env`) for executor config and pack registration. |
 | [`executor/gateway.py`](../../packages/executor/executor/gateway.py) | Credential consumer | Fetches `api_key` / `credential` for adapters that declare `requires_credentials=True`. |
 
@@ -409,11 +409,12 @@ Workspaces and mount tables; `ClientView` / `ExecutorView`. **Opt-in** — minim
 
 First-party `ActionBundle` / `DomainBundle` implementations. Loaded when listed in `core.yaml`.
 
-### `intentframe_credentials/`
+### `intentframe-credentials` (`packages/intentframe-credentials/`)
 
 | | |
 |---|---|
 | **What** | Shared credential system: vault service, `VaultClient`, backend registry, keyring/hashicorp/env/service backends, redaction helpers. |
+| **Package** | [`packages/intentframe-credentials/`](../packages/intentframe-credentials/); distribution `intentframe-credentials`. |
 | **Process** | `credential-vault` — started by gateway before supervisor. |
 | **Who depends on it today** | Gateway starts it and gates startup on mandatory credentials; supervisor injects `runtime_env` credentials; executor reaches it through `executor_sdk.services.credential_vault` when `credentials.backend: service`; EDI calls it for IMAP/SMTP passwords. |
 | **Docs** | [credentials-vault.md](credentials-vault.md), [credential-vault-faq.md](credential-vault-faq.md) |
@@ -447,7 +448,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 
 **Runtime stack** (workspace): `intentframe-runtime` → `intentframe-supervisor` → optional `[native]` → `intentframe-native-kit`. Substrate services live in `packages/intentframe-server`, `packages/executor`, `packages/policy-registry`, etc. Network ingress is `packages/intentframe-edge` (depends on `packages/intentframe-proxy`); the two-venv harness installs both into `.venv-runtime` and pins them in `runtime-constraints.txt`.
 
-**Separate workspace members** (`[tool.uv.workspace]`): all `packages/*` plus `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion`, `intentframe_credentials` — each with its own `pyproject.toml`.
+**Separate workspace members** (`[tool.uv.workspace]`): all `packages/*` (including `intentframe-credentials`) plus `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion` — each with its own `pyproject.toml`.
 
 **Not Python packages:** `macos-appkit-server/` (Swift), `demo/`, `deploy/`, `docs/`, `tests/`, `scripts/`.
 

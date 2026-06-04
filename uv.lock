@@ -514,7 +514,7 @@ requires-dist = [
     { name = "aiosmtplib", specifier = ">=3.0.0" },
     { name = "aiosqlite", specifier = ">=0.21" },
     { name = "imap-tools", specifier = ">=1.7.0" },
-    { name = "intentframe-credentials", editable = "intentframe_credentials" },
+    { name = "intentframe-credentials", editable = "packages/intentframe-credentials" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
@@ -872,8 +872,8 @@ requires-dist = [
     { name = "intentframe-client", editable = "packages/intentframe-client" },
     { name = "intentframe-components", editable = "packages/intentframe-components" },
     { name = "intentframe-core", editable = "packages/intentframe-core" },
-    { name = "intentframe-credentials", editable = "intentframe_credentials" },
-    { name = "intentframe-credentials", extras = ["hashicorp"], marker = "extra == 'hashicorp'", editable = "intentframe_credentials" },
+    { name = "intentframe-credentials", editable = "packages/intentframe-credentials" },
+    { name = "intentframe-credentials", extras = ["hashicorp"], marker = "extra == 'hashicorp'", editable = "packages/intentframe-credentials" },
     { name = "intentframe-edge", editable = "packages/intentframe-edge" },
     { name = "intentframe-executor", editable = "packages/executor" },
     { name = "intentframe-executor-client", editable = "packages/executor-client" },
@@ -995,7 +995,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.12.5" }]
 [[package]]
 name = "intentframe-credentials"
 version = "0.1.0"
-source = { editable = "intentframe_credentials" }
+source = { editable = "packages/intentframe-credentials" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "fastapi" },
@@ -1104,7 +1104,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "intentframe-core", editable = "packages/intentframe-core" },
-    { name = "intentframe-credentials", editable = "intentframe_credentials" },
+    { name = "intentframe-credentials", editable = "packages/intentframe-credentials" },
     { name = "pydantic", specifier = ">=2.12.5" },
 ]
 

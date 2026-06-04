@@ -249,4 +249,4 @@ These are honest limitations, not hidden behaviors:
 - [threat-model.md](threat-model.md) — In-scope vs out-of-scope threats
 - [faq.md](faq.md) — Common objections answered
 - [`../external_data_ingestion/README.md`](../external_data_ingestion/README.md) — EDI's full design
-- [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md) — Credential vault details
+- [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md) — Credential vault details

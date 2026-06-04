@@ -63,7 +63,7 @@ uv run python -m intentframe_credentials.dev_server
 uv run python -m intentframe_credentials.dev_server --tcp
 ```
 
-See the [intentframe_credentials README](../intentframe_credentials/README.md) for how to configure the vault and seed email passwords.
+See the [intentframe_credentials README](../packages/intentframe-credentials/README.md) for how to configure the vault and seed email passwords.
 
 ### Credentials in memory and logs
 
@@ -86,7 +86,7 @@ uv sync
 Passwords live in the vault under namespace `email.<address>`, key `password`. The easiest way is to add the credentials to the vault `.env` file:
 
 ```bash
-# intentframe_credentials/intentframe_credentials/.env
+# packages/intentframe-credentials/intentframe_credentials/.env
 EMAIL_WORK_ADDRESS=you@gmail.com
 EMAIL_WORK_PASSWORD=xxxx-xxxx-xxxx-xxxx
 ```

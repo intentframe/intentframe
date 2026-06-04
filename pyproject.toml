@@ -86,9 +86,9 @@ where = ["."]
 # NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
 # intentframe_bundle_sdk, executor_sdk, command_shield, intentframe_prompt_library,
 # intentframe_components, executor_client, executor, intentframe_server,
-# intentframe_native_kit, intentframe_proxy, intentframe_edge, and the supervisor
-# (now intentframe-supervisor) ship as separate workspace distributions under
-# packages/ and are pulled in as dependencies above.
+# intentframe_native_kit, intentframe_proxy, intentframe_edge, intentframe_credentials,
+# and the supervisor (now intentframe-supervisor) ship as separate workspace distributions
+# under packages/ and are pulled in as dependencies above.
 include = [
     "intentframe_dashboard*",
     "intentframe_gateway*",
@@ -134,7 +134,7 @@ members = [
     "packages/intentframe-edge",
     "jarvis_pa",
     "external_data_ingestion",
-    "intentframe_credentials",
+    "packages/intentframe-credentials",
     "jarvis_telegram",
 ]
 

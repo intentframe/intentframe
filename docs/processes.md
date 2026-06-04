@@ -68,7 +68,7 @@ The gateway is a thin orchestrator. It owns the *startup choreography* but does 
 | | |
 |---|---|
 | **What it is** | A Unix-socket server that backs the `intentframe_credentials` library. |
-| **Source** | `intentframe_credentials/intentframe_credentials/server.py` |
+| **Source** | `packages/intentframe-credentials/intentframe_credentials/server.py` |
 | **Job** | Returns secrets (OpenAI API key, IMAP passwords, Telegram tokens) on request. Backed by macOS Keychain (or env-overlay for dev). |
 | **Storage** | macOS Keychain via `keyring_backend.py`; no plaintext on disk |
 | **OpenAI calls** | No |

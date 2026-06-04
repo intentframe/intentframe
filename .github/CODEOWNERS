@@ -54,7 +54,7 @@
 # Credentials, external ingestion, and external-agent integrations.
 /external_agents/ @maniotrix
 /external_data_ingestion/ @maniotrix
-/intentframe_credentials/ @maniotrix
+/packages/intentframe-credentials/ @maniotrix
 
 # Reference assistant and communication bridges.
 /jarvis_pa/ @maniotrix
