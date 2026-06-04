@@ -24,6 +24,11 @@ from intentframe_bundle_sdk.types import (
     BundlePhaseOutcome,
 )
 
+_MISSING_EDI_ERROR = (
+    "EDI email client is not installed. Install the product-side "
+    "external_data_ingestion package in this runtime to use native-kit email actions."
+)
+
 _EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 _ENRICHER_RESOLVED = frozenset({ActionType.REPLY_EMAIL.value})
 
@@ -67,7 +72,12 @@ class EmailActionBundle(ActionBundle):
                 if self._client is None:
                     if self._closed:
                         raise RuntimeError("EmailActionBundle is closed")
-                    from external_data_ingestion.email.client import EmailClient
+                    try:
+                        from external_data_ingestion.email.client import EmailClient
+                    except ModuleNotFoundError as exc:
+                        if exc.name == "external_data_ingestion":
+                            raise RuntimeError(_MISSING_EDI_ERROR) from exc
+                        raise
 
                     self._client = await EmailClient.create()
         return self._client

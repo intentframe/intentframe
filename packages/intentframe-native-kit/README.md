@@ -18,3 +18,16 @@ package is installed. Built on `intentframe-bundle-sdk`,
 ```bash
 pip install intentframe-native-kit
 ```
+
+## License
+
+`intentframe-native-kit` is distributed under the Apache License 2.0.
+
+## Email Integration
+
+Email bundles and adapters use the product-side EDI `EmailClient` through lazy
+imports. `email-sync-service` is intentionally not declared as a package
+dependency because it is not published to PyPI. Non-email actions work with a
+normal `pip install intentframe-native-kit`; email actions require
+`external_data_ingestion` to be installed in the same runtime environment by the
+product or deployment.

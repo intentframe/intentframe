@@ -33,6 +33,11 @@ from executor_sdk.models import AdapterManifest, ExecutionResult
 
 logger = logging.getLogger(__name__)
 
+_MISSING_EDI_ERROR = (
+    "EDI email client is not installed. Install the product-side "
+    "external_data_ingestion package in this runtime to use native-kit email actions."
+)
+
 _ACCOUNT_ACTIONS = frozenset({
     ActionType.SEND_EMAIL.value,
     ActionType.READ_EMAIL.value,
@@ -82,7 +87,12 @@ class MailAdapter(CapabilityAdapter):
     async def _get_client(self):
         """Lazy-init the EDI EmailClient (requires vault + config)."""
         if self._client is None:
-            from external_data_ingestion.email.client import EmailClient
+            try:
+                from external_data_ingestion.email.client import EmailClient
+            except ModuleNotFoundError as exc:
+                if exc.name == "external_data_ingestion":
+                    raise RuntimeError(_MISSING_EDI_ERROR) from exc
+                raise
 
             self._client = await EmailClient.create()
         return self._client
@@ -108,7 +118,7 @@ class MailAdapter(CapabilityAdapter):
     ) -> ExecutionResult:
         try:
             client = await self._get_client()
-        except (ConnectionError, FileNotFoundError, ValueError) as exc:
+        except (ConnectionError, FileNotFoundError, RuntimeError, ValueError) as exc:
             return ExecutionResult(
                 success=False,
                 error=f"EDI email service not available: {exc}",

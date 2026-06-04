@@ -7,7 +7,7 @@ name = "intentframe-native-kit"
 version = "0.1.0"
 description = "IntentFrame first-party kit — action registry, native bundles, executor packs (console/posix/macos), and resource registry"
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 requires-python = ">=3.14"
 authors = [{ name = "IntentFrame Contributors" }]
 keywords = ["ai", "agents", "security", "intentframe", "adapters", "bundles"]
@@ -25,6 +25,10 @@ dependencies = [
     "httpx>=0.28.1",
     "pydantic>=2.12.5",
 ]
+
+# Email actions integrate with the product-side EDI EmailClient via lazy imports.
+# email-sync-service is intentionally not declared here because it is not
+# published to PyPI.
 
 [project.urls]
 Homepage = "https://github.com/intentframe/intentframe"
