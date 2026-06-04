@@ -19,25 +19,40 @@ the loop only for external clients/tests**, so demo tests use the same HTTP
 ```bash
 cd /path/to/intentframe
 
-# 1) Runtime venv (substrate + edge) + freeze constraints (once, or after runtime package changes)
+# 1) Runtime venv (substrate + edge/proxy) + freeze constraints
+#    Once, or again after changing supervisor / edge / server packages.
 bash scripts/kits-two-venv/setup_runtime_venv.sh
 
 # 2) Client venv for demo tests (once)
 uv sync
 
 # 3) Build kit + wheelhouse deps into .intentframe/kits/
+#    Re-run whenever you change the native kit (or its workspace-only deps).
 bash scripts/kits-two-venv/publish_kit_wheel.sh
 
-# 4) Start runtime (bootstrap kits + supervisor + edge)
+# 4) Start runtime — one command; no separate bootstrap step on the happy path.
+#    start_runtime.sh sources bootstrap_kits.sh first (constrained uv pip install
+#    of the kit wheel), then supervisor, then edge. Re-run step 4 after republishing
+#    wheels to pick up kit changes (KIT_REINSTALL_PACKAGES is set by default).
 export OPENAI_API_KEY=sk-...
 bash scripts/kits-two-venv/start_runtime.sh
+# Attack/redteam suites: use start_runtime_attacks.sh instead (executor profile).
 
-# 5) Run tests from the client venv over HTTP
+# 5) Run tests from the client venv over HTTP (edge must already be healthy)
 bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
 
 bash scripts/kits-two-venv/stop_runtime.sh
 # or: bash scripts/stop_runtime.sh
 ```
+
+**Why there is no step “bootstrap only”:** `bootstrap_kits.sh` must be **sourced** (it exports `INTENTFRAME_*_CONFIG`). The default flow runs it inside `start_runtime.sh` so the kit is always installed before supervisor/edge start. Use a standalone bootstrap only for dry-runs or debugging — see [Kit install policy](#kit-install-policy-constraints--uv) and [bootstrap_kits.sh](#bootstrap_kitssh-must-be-sourced).
+
+| You changed… | Re-run |
+|--------------|--------|
+| Substrate or edge packages | Step 1, then 3–4 |
+| Native kit or `command-shield` | Step 3, then 4 (stop runtime first if already up) |
+| Demo test code only | Step 5 |
+| Executor profile for attacks | `start_runtime_attacks.sh` (step 4) |
 
 ### Reset / full redo
 
@@ -57,6 +72,10 @@ bash scripts/kits-two-venv/cleanup.sh --full --logs
 After `--full`, rerun the Quick start from step 1 (`setup_runtime_venv.sh` through `start_runtime.sh`).
 
 ## Kit install policy (constraints + uv)
+
+**Default path:** `start_runtime.sh` → `source bootstrap_kits.sh` → constrained install → supervisor → edge.
+
+**Manual bootstrap** (optional): after step 3 in Quick start, `source scripts/kits-two-venv/bootstrap_kits.sh` in your shell, then start processes yourself — only needed for `KITS_INSTALL_DRY_RUN=1`, custom `KIT_WHEELS`, or inspecting exports before start.
 
 After `setup_runtime_venv.sh`, the harness writes:
 
@@ -125,7 +144,7 @@ Arbitrary **new** libraries in the kit are fine. Overriding **runtime-owned** ve
 | `RUNTIME_VENV` | `.venv-runtime` | Substrate-only Python environment |
 | `CLIENT_VENV` | `.venv` | Demo test runner environment |
 | `KIT_WHEELS` | (auto: `intentframe_native_kit-*.whl`) | Primary kit wheel(s) to install |
-| `KIT_REINSTALL_PACKAGES` | (unset) | Optional `uv --reinstall-package` names when refreshing a kit |
+| `KIT_REINSTALL_PACKAGES` | `intentframe-native-kit` when using `start_runtime.sh` | `uv --reinstall-package` names when refreshing a kit after rebuild |
 | `KITS_INSTALL_DRY_RUN` | `0` | Set to `1` to resolve without installing |
 | `EXECUTOR_CONFIG` | `demo/config/executor_hashicorp.yaml` | Operator-owned executor profile |
 | `INTENTFRAME_EDGE_PORT` | `8443` | Edge HTTP port for external test `*_URL` env vars |
