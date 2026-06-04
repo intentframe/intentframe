@@ -7,7 +7,7 @@ name = "intentframe-supervisor"
 version = "0.1.0"
 description = "IntentFrame supervisor — process manager that spawns the runtime service graph"
 readme = "README.md"
-license = "Apache-2.0"
+license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 authors = [{ name = "IntentFrame Contributors" }]
