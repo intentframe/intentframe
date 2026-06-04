@@ -4,7 +4,7 @@ Utility scripts for local development setup.
 
 ## PyPI release (`packages/` only)
 
-See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`) and pre-publish validation (`validate_publish.sh`: build, `twine check`, clean-room install from `dist/publish/`).
+See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), and terminal uploads (`publish.py`).
 
 ## Kits two-venv harness (substrate + wheel, edge for tests)
 

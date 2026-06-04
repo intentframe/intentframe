@@ -1,7 +1,11 @@
 name: Release (packages/ → PyPI)
 
-# Manual-only. Trigger from the Actions tab ("Run workflow"), choose the target
-# index, and confirm. Nothing publishes automatically on push or tag.
+# Manual-only. Trigger from the Actions tab ("Run workflow"), choose target,
+# package group, and confirm. Nothing publishes automatically on push or tag.
+#
+# PyPI limits how many *new* project names an account can register per window.
+# For first-time production releases, run groups 1 → 2 → 3 (hours apart if needed)
+# instead of "all". Re-runs are safe: skip-existing ignores already-uploaded files.
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +17,16 @@ on:
         options:
           - testpypi
           - pypi
+      group:
+        description: "Package group to upload (use 1/2/3 for new PyPI projects)"
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - "1"
+          - "2"
+          - "3"
       version:
         description: "Expected version (must match packages/, e.g. 0.1.0)"
         type: string
@@ -52,13 +66,9 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish to ${{ inputs.target }}
+    name: Publish group ${{ inputs.group }} → ${{ inputs.target }}
     needs: build
     runs-on: ubuntu-latest
-    # Requires the confirmation phrase. The environment gate (below) lets you
-    # add required reviewers in repo Settings → Environments for an extra
-    # manual approval step before any upload runs, and is where the API token
-    # secret lives.
     if: ${{ inputs.confirm == 'publish' }}
     environment: ${{ inputs.target }}
     steps:
@@ -68,17 +78,52 @@ jobs:
           name: dist-publish
           path: dist/publish
 
+      # Self-contained: groups are defined here in the workflow. The local
+      # scripts/release/publish.py keeps its own copy for terminal use; the two
+      # are intentionally independent. Keep the buckets in sync if they change.
+      - name: Stage upload group
+        run: |
+          set -euo pipefail
+          mkdir -p dist/upload
+          case "${{ inputs.group }}" in
+            all)
+              cp dist/publish/* dist/upload/
+              ;;
+            1)
+              names="intentframe_core intentframe_policy_registry command_shield intentframe_prompt_library intentframe_bundle_sdk intentframe_executor_sdk"
+              ;;
+            2)
+              names="intentframe_executor_client intentframe_credentials intentframe_client intentframe_actor intentframe_components intentframe_executor"
+              ;;
+            3)
+              names="intentframe_server intentframe_runtime intentframe_supervisor intentframe_native_kit intentframe_proxy intentframe_edge"
+              ;;
+            *)
+              echo "unknown group: ${{ inputs.group }}" >&2; exit 1 ;;
+          esac
+          if [ "${{ inputs.group }}" != "all" ]; then
+            for n in ${names}; do
+              # trailing hyphen avoids prefix collisions
+              # (intentframe_executor- vs intentframe_executor_sdk-)
+              cp dist/publish/"${n}"-*.whl dist/publish/"${n}"-*.tar.gz dist/upload/
+            done
+          fi
+          echo "staged $(ls dist/upload | wc -l) file(s) for group ${{ inputs.group }}:"
+          ls dist/upload
+
       - name: Publish to TestPyPI
         if: ${{ inputs.target == 'testpypi' }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/publish
+          packages-dir: dist/upload
           repository-url: https://test.pypi.org/legacy/
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
 
       - name: Publish to PyPI
         if: ${{ inputs.target == 'pypi' }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/publish
+          packages-dir: dist/upload
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
