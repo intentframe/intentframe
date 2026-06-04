@@ -9,6 +9,7 @@
 #   ./scripts/github-install/verify_release_install.sh --tag v0.1.0 --keep-dir /tmp/if-verify
 #
 # Docs: scripts/github-install/README.md
+# Boot test (supervisor + edge): scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh
 set -euo pipefail
 
 REPO="intentframe/intentframe"

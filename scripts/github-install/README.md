@@ -22,11 +22,21 @@ Manual GitHub release publishing runbook: [`../github-release/README.md`](../git
 
    Re-upload with `--clobber` if replacing files on an existing release.
 
-4. Verify public install from the release:
+4. Verify wheels install (disposable venv):
 
    ```bash
    ./scripts/github-install/verify_release_install.sh --tag v0.1.0
    ```
+
+5. Optional — verify the wheels **boot** supervisor + edge (uses `.venv-release`, same stop/tests as kits-two-venv):
+
+   ```bash
+   export OPENAI_API_KEY=sk-...
+   bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+   bash scripts/kits-two-venv/stop_runtime.sh
+   ```
+
+   See [`../kits-two-venv/gh-release-venv/README.md`](../kits-two-venv/gh-release-venv/README.md).
 
 ## Verify script
 
@@ -51,46 +61,13 @@ Pass `--tag` for any lockstep release where:
 - All **18** wheels are uploaded with the same naming pattern (`py3-none-any`).
 - The package set and import smoke list in the script are unchanged.
 
-The script does **not** support tags whose version string differs from wheel versions (e.g. tag `v0.1.0-alpha.6` with wheels still `*-0.1.0-*`). Add a package or rename a distribution → update `WHEELS` and the embedded Python lists in the script.
+The script does **not** support tags whose version string differs from wheel versions (e.g. tag `v0.1.0-alpha.6` with wheels still `*-0.1.0-*`). Add a package or rename a distribution → update `WHEELS` and the embedded Python lists in [`verify_release_install.sh`](verify_release_install.sh) and [`../kits-two-venv/gh-release-venv/start_runtime_from_release.sh`](../kits-two-venv/gh-release-venv/start_runtime_from_release.sh).
 
 ## Consumer install (`uv` in another repo)
 
 `uv` applies `[tool.uv.sources]` for the **whole** resolution, including transitive IntentFrame deps. List every IntentFrame package in your dependency closure (simplest: all 18). Third-party deps (`fastapi`, `httpx`, …) still come from PyPI.
 
-Copy/edit template: [`example-pyproject.toml`](example-pyproject.toml).
-
-**`pyproject.toml` example** (agent that uses native kit + components):
-
-```toml
-[project]
-name = "my-agent"
-version = "0.1.0"
-requires-python = ">=3.14"
-dependencies = [
-  "intentframe-native-kit==0.1.0",
-  "intentframe-components==0.1.0",
-]
-
-[tool.uv.sources]
-command-shield = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/command_shield-0.1.0-py3-none-any.whl" }
-intentframe-actor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_actor-0.1.0-py3-none-any.whl" }
-intentframe-bundle-sdk = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_bundle_sdk-0.1.0-py3-none-any.whl" }
-intentframe-client = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_client-0.1.0-py3-none-any.whl" }
-intentframe-components = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_components-0.1.0-py3-none-any.whl" }
-intentframe-core = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_core-0.1.0-py3-none-any.whl" }
-intentframe-credentials = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_credentials-0.1.0-py3-none-any.whl" }
-intentframe-edge = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_edge-0.1.0-py3-none-any.whl" }
-intentframe-executor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor-0.1.0-py3-none-any.whl" }
-intentframe-executor-client = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor_client-0.1.0-py3-none-any.whl" }
-intentframe-executor-sdk = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor_sdk-0.1.0-py3-none-any.whl" }
-intentframe-native-kit = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_native_kit-0.1.0-py3-none-any.whl" }
-intentframe-policy-registry = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_policy_registry-0.1.0-py3-none-any.whl" }
-intentframe-prompt-library = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_prompt_library-0.1.0-py3-none-any.whl" }
-intentframe-proxy = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_proxy-0.1.0-py3-none-any.whl" }
-intentframe-runtime = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_runtime-0.1.0-py3-none-any.whl" }
-intentframe-server = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_server-0.1.0-py3-none-any.whl" }
-intentframe-supervisor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_supervisor-0.1.0-py3-none-any.whl" }
-```
+Copy/edit template: [`example-pyproject.toml`](example-pyproject.toml) (all 18 `[tool.uv.sources]` URLs; default direct deps are actor + bundle-sdk + executor-sdk — uncomment others as needed).
 
 Then:
 

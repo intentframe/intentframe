@@ -150,15 +150,17 @@ Before or in parallel with PyPI, you can ship the same `dist/publish/*.whl` file
 ./scripts/release/validate_publish.sh
 gh release upload v0.1.0 dist/publish/*.whl    # after creating the release tag
 ./scripts/github-install/verify_release_install.sh --tag v0.1.0
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0   # optional boot test
+bash scripts/kits-two-venv/stop_runtime.sh
 ```
 
-Use **wheels only** for this path; sdists on the release are optional. Tag version must match wheel versions (`v0.1.0` → `*-0.1.0-*.whl`).
+Use **wheels only** for this path; sdists on the release are optional. Tag version must match wheel versions (`v0.1.0` → `*-0.1.0-*.whl`). Boot test details: [`../github-release/README.md`](../github-release/README.md).
 
 ## Suggested release order
 
 1. `set_version.py <version>` → `uv sync` → run tests
 2. `./scripts/release/validate_publish.sh`
-3. **GitHub release (optional, interim):** create tag → `gh release upload v<version> dist/publish/*.whl` → `verify_release_install.sh --tag v<version>`
+3. **GitHub release (optional, interim):** create tag → `gh release upload v<version> dist/publish/*.whl` → `verify_release_install.sh` → optional `gh-release-venv/start_runtime_from_release.sh` → `stop_runtime.sh`
 4. **TestPyPI:** workflow `group=all` or `publish.py --all --target testpypi`; verify `pip install` from TestPyPI
 5. **PyPI (first time):** groups `1` → `2` → `3` via workflow or local `publish.py`, spaced if rate-limited; then `all` only when every name already exists
 6. `git tag v<version> && git push --tags` (if not already tagged for the GitHub release)

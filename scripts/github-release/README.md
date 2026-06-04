@@ -12,11 +12,21 @@ Related docs:
 - Install verification and consumer TOML template: [`../github-install/README.md`](../github-install/README.md)
 - Package licensing split: [`../../docs/licensing.md`](../../docs/licensing.md)
 
-## Scripts here
+## Scripts (by directory)
 
-| Script | Purpose |
-|--------|---------|
-| [`../kits-two-venv/gh-release-venv/start_runtime_from_release.sh`](../kits-two-venv/gh-release-venv/start_runtime_from_release.sh) | Install the published wheels into `.venv-release` and start supervisor + edge from them (same env as the kits-two-venv harness). Proves the release boots the full multi-process stack. |
+| Location | Script | Purpose |
+|----------|--------|---------|
+| [`../github-install/`](../github-install/README.md) | `verify_release_install.sh` | Disposable venv: install all 18 wheels + import smoke test |
+| [`../kits-two-venv/gh-release-venv/`](../kits-two-venv/gh-release-venv/README.md) | `start_runtime_from_release.sh` | `.venv-release` + boot supervisor + edge (full stack test) |
+| [`../kits-two-venv/`](../kits-two-venv/README.md) | `stop_runtime.sh`, `run_demo_tests.sh` | Shared stop and demo tests over edge HTTP |
+
+## Verification layers
+
+After uploading wheels to a release, run in order:
+
+1. **Install** — `verify_release_install.sh` (no long-running processes).
+2. **Boot** — `gh-release-venv/start_runtime_from_release.sh` (supervisor + edge from release wheels).
+3. **Behavior** (optional) — `run_demo_tests.sh` from client `.venv`, then `stop_runtime.sh`.
 
 ## What We Publish
 
@@ -69,6 +79,7 @@ The current scripts assume:
 If any of those change, update:
 
 - [`../github-install/verify_release_install.sh`](../github-install/verify_release_install.sh)
+- [`../kits-two-venv/gh-release-venv/start_runtime_from_release.sh`](../kits-two-venv/gh-release-venv/start_runtime_from_release.sh)
 - [`../github-install/example-pyproject.toml`](../github-install/example-pyproject.toml)
 - This README
 
@@ -167,10 +178,13 @@ gh release view v0.2.0 \
   --jq '.assets[].name' | sort
 ```
 
-Then run the clean install smoke test:
+Then run install + boot smoke tests:
 
 ```bash
 ./scripts/github-install/verify_release_install.sh --tag v0.2.0
+export OPENAI_API_KEY=sk-...
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.2.0
+bash scripts/kits-two-venv/stop_runtime.sh
 ```
 
 The verifier creates a temp venv, installs all 18 wheels from the release, checks
@@ -259,7 +273,7 @@ For a normal future release:
 4. Run `validate_publish.sh`.
 5. Create GitHub release tag `v<version>`.
 6. Upload `dist/publish/*.whl`.
-7. Run `verify_release_install.sh --tag v<version>`.
+7. Run `verify_release_install.sh --tag v<version>`, then `gh-release-venv/start_runtime_from_release.sh` (and `stop_runtime.sh`).
 8. Update `example-pyproject.toml` if the docs should point at the newest release.
 9. Continue PyPI/TestPyPI publishing separately when available.
 
@@ -270,8 +284,9 @@ If adding, removing, or renaming a package:
    - [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
    - [`../release/publish.py`](../release/publish.py)
 3. Update [`../github-install/verify_release_install.sh`](../github-install/verify_release_install.sh).
-4. Update [`../github-install/example-pyproject.toml`](../github-install/example-pyproject.toml).
-5. Update docs listing the 18-package assumption.
+4. Update [`../kits-two-venv/gh-release-venv/start_runtime_from_release.sh`](../kits-two-venv/gh-release-venv/start_runtime_from_release.sh).
+5. Update [`../github-install/example-pyproject.toml`](../github-install/example-pyproject.toml).
+6. Update docs listing the 18-package assumption.
 
 If a wheel stops being `py3-none-any`:
 
@@ -319,8 +334,8 @@ Run demo tests against it from the client venv (same as the harness):
 bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
 ```
 
-Stop it with the existing harness stopper (matches by run-dir supervisor pid and
-the edge listener on `EDGE_PORT`):
+Stop with the shared harness stopper (all harness pid dirs, product supervisor
+pgid, and edge port `8443`):
 
 ```bash
 bash scripts/kits-two-venv/stop_runtime.sh
