@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-edge"
+version = "0.1.0"
+description = "IntentFrame edge ingress — HTTP/TLS front door for runtime Unix domain socket services"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "edge"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "intentframe-proxy",
+    "fastapi",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+    "uvicorn[standard]",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[project.scripts]
+intentframe-edge = "intentframe_edge.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intentframe_edge"]

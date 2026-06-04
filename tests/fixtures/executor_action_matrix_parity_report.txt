@@ -1,6 +1,6 @@
 EXECUTOR ACTION MATRIX PARITY REPORT
 ========================================================================
-Generated:          2026-06-03 14:15:54 UTC
+Generated:          2026-06-04 03:33:21 UTC
 Baseline fixture:   /Users/prince/GitHub/orgs/intentframe/intentframe/tests/fixtures/executor_action_matrix_baseline.txt
 Baseline commit:    5c266a4
 Verify script:      tests/verify_executor_action_matrix.py

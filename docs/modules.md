@@ -69,7 +69,8 @@ Modules group into layers by responsibility: author-facing contracts, plugin cod
                                 │
 ┌───────────────────────────────▼─────────────────────────────────┐
 │  Bootstrap / ingress (convenience; replaceable)                 │
-│  supervisor, gateway, edge, proxy                               │
+│  intentframe-supervisor, gateway (root), intentframe-edge,     │
+│  intentframe-proxy (edge → proxy dep)                           │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼─────────────────────────────────┐
@@ -186,8 +187,8 @@ Generic orchestration — replaceable with Docker Compose, systemd, etc. No doma
 |--------|----------------|-------|
 | [`supervisor/`](../../packages/intentframe-supervisor/supervisor/) | `supervisor` (`intentframe-supervisor` package) | Spawns uvicorn children from YAML graph; injects `runtime_env`. |
 | [`intentframe_gateway/`](../intentframe_gateway/) | `intentframe-gateway-cli` | Product entry point; starts vault → supervisor → optional EDI/Jarvis. |
-| [`intentframe_edge/`](../intentframe_edge/) | `intentframe-edge` | HTTP/TLS ingress; default routes: `/policies`, `/handshake`, `/process`, `/audit`. |
-| [`intentframe_proxy/`](../intentframe_proxy/) | — | Shared UDS proxy helper for gateway and edge. |
+| [`intentframe_edge/`](../packages/intentframe-edge/intentframe_edge/) | `intentframe-edge` (`intentframe-edge` package) | HTTP/TLS ingress; default routes: `/policies`, `/handshake`, `/process`, `/audit`. |
+| [`intentframe_proxy/`](../packages/intentframe-proxy/intentframe_proxy/) | `intentframe-proxy` package | Shared UDS proxy helper for gateway and edge. |
 
 ### 6. Platform bridges (optional)
 
@@ -426,7 +427,7 @@ First-party `ActionBundle` / `DomainBundle` implementations. Loaded when listed 
 | **Default graph** | `policy-registry`, `executor`, `intentframe-server`. |
 | **Kit graph** | Adds `resource-registry` via `${KIT}/supervisor_profile.yaml` (with `KIT` resolved from the installed package). |
 
-### `intentframe_gateway/`, `intentframe_edge/`, `intentframe_proxy/`
+### `intentframe_gateway/`, `intentframe-edge`, `intentframe-proxy`
 
 Gateway = product orchestrator and unified API socket. Edge = network ingress to substrate backends. Proxy = shared UDS forwarding.
 
@@ -442,9 +443,9 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 
 ## Workspace layout vs. installable packages
 
-**Root umbrella** (`intentframe` on `pyproject.toml`): gateway, CLI, edge, dashboard, credentials, agents — depends on `intentframe-supervisor[native]` and the split workspace packages under `packages/`.
+**Root umbrella** (`intentframe` on `pyproject.toml`): gateway, CLI, dashboard, credentials, agents — depends on `intentframe-supervisor[native]` and the split workspace packages under `packages/`, including edge/proxy.
 
-**Runtime stack** (workspace): `intentframe-runtime` → `intentframe-supervisor` → optional `[native]` → `intentframe-native-kit`. Substrate services live in `packages/intentframe-server`, `packages/executor`, `packages/policy-registry`, etc.
+**Runtime stack** (workspace): `intentframe-runtime` → `intentframe-supervisor` → optional `[native]` → `intentframe-native-kit`. Substrate services live in `packages/intentframe-server`, `packages/executor`, `packages/policy-registry`, etc. Network ingress is `packages/intentframe-edge` (depends on `packages/intentframe-proxy`); the two-venv harness installs both into `.venv-runtime` and pins them in `runtime-constraints.txt`.
 
 **Separate workspace members** (`[tool.uv.workspace]`): all `packages/*` plus `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion`, `intentframe_credentials` — each with its own `pyproject.toml`.
 
@@ -483,8 +484,8 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 | `macos-appkit-server` | ✅ | [macos-platform-server.md](macos-platform-server.md) | Swift |
 | `intentframe_gateway` | ✅ | [processes.md](processes.md) | |
 | `intentframe-supervisor` | ✅ | [processes.md](processes.md) | Process manager; `intentframe` / `intentframe-backend` scripts |
-| `intentframe_edge` | — | [deploy/prod/README.md](../deploy/prod/README.md) | |
-| `intentframe_proxy` | — | — | Shared helper |
+| `intentframe_edge` | ✅ | [deploy/prod/README.md](../deploy/prod/README.md) | `intentframe-edge` package |
+| `intentframe_proxy` | ✅ | — | `intentframe-proxy` package; shared helper |
 | `intentframe_cli` | ✅ | [quickstart.md](quickstart.md) | |
 | `intentframe_dashboard` | — | [quickstart.md](quickstart.md) | |
 | `intentframe_actor` | — | [actor-sdk.md](actor-sdk.md) | |

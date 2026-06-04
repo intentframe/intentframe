@@ -13,12 +13,14 @@ members = [
     "intentframe-components",
     "intentframe-core",
     "intentframe-credentials",
+    "intentframe-edge",
     "intentframe-executor",
     "intentframe-executor-client",
     "intentframe-executor-sdk",
     "intentframe-native-kit",
     "intentframe-policy-registry",
     "intentframe-prompt-library",
+    "intentframe-proxy",
     "intentframe-runtime",
     "intentframe-server",
     "intentframe-supervisor",
@@ -816,12 +818,14 @@ dependencies = [
     { name = "intentframe-components" },
     { name = "intentframe-core" },
     { name = "intentframe-credentials" },
+    { name = "intentframe-edge" },
     { name = "intentframe-executor" },
     { name = "intentframe-executor-client" },
     { name = "intentframe-executor-sdk" },
     { name = "intentframe-native-kit" },
     { name = "intentframe-policy-registry" },
     { name = "intentframe-prompt-library" },
+    { name = "intentframe-proxy" },
     { name = "intentframe-runtime" },
     { name = "intentframe-server" },
     { name = "intentframe-supervisor", extra = ["native"] },
@@ -870,12 +874,14 @@ requires-dist = [
     { name = "intentframe-core", editable = "packages/intentframe-core" },
     { name = "intentframe-credentials", editable = "intentframe_credentials" },
     { name = "intentframe-credentials", extras = ["hashicorp"], marker = "extra == 'hashicorp'", editable = "intentframe_credentials" },
+    { name = "intentframe-edge", editable = "packages/intentframe-edge" },
     { name = "intentframe-executor", editable = "packages/executor" },
     { name = "intentframe-executor-client", editable = "packages/executor-client" },
     { name = "intentframe-executor-sdk", editable = "packages/executor-sdk" },
     { name = "intentframe-native-kit", editable = "packages/intentframe-native-kit" },
     { name = "intentframe-policy-registry", editable = "packages/policy-registry" },
     { name = "intentframe-prompt-library", editable = "packages/intentframe-prompt-library" },
+    { name = "intentframe-proxy", editable = "packages/intentframe-proxy" },
     { name = "intentframe-runtime", editable = "packages/intentframe-runtime" },
     { name = "intentframe-server", editable = "packages/intentframe-server" },
     { name = "intentframe-supervisor", extras = ["native"], editable = "packages/intentframe-supervisor" },
@@ -1027,6 +1033,27 @@ requires-dist = [
 provides-extras = ["hashicorp", "dev"]
 
 [[package]]
+name = "intentframe-edge"
+version = "0.1.0"
+source = { editable = "packages/intentframe-edge" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "intentframe-proxy" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi" },
+    { name = "intentframe-proxy", editable = "packages/intentframe-proxy" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "uvicorn", extras = ["standard"] },
+]
+
+[[package]]
 name = "intentframe-executor"
 version = "0.1.0"
 source = { editable = "packages/executor" }
@@ -1131,6 +1158,23 @@ requires-dist = [
 name = "intentframe-prompt-library"
 version = "0.1.0"
 source = { editable = "packages/intentframe-prompt-library" }
+
+[[package]]
+name = "intentframe-proxy"
+version = "0.1.0"
+source = { editable = "packages/intentframe-proxy" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "websockets", specifier = ">=14.0" },
+]
 
 [[package]]
 name = "intentframe-runtime"

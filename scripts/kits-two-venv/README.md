@@ -4,7 +4,7 @@ Prove the **substrate + `INTENTFRAME_KITS_DIR` wheelhouse** model on your Mac be
 
 | Venv | Role | Contains |
 |------|------|----------|
-| `.venv-runtime` | Runtime host | `intentframe-supervisor` (no `[native]`), executor, server, policy-registry — **no** kit |
+| `.venv-runtime` | Runtime host | `intentframe-supervisor` (no `[native]`), `intentframe-edge`, `intentframe-proxy`, executor, server, policy-registry — **no** kit |
 | `.venv` (default `uv sync`) | Test client | Full repo + demo harness (imports kit for policy fixtures only) |
 
 The native kit is built as wheels (kit + workspace deps), copied to `INTENTFRAME_KITS_DIR`, and installed with **`uv pip install` + full dependency resolution** under **runtime constraints** so kits cannot override substrate packages.
@@ -19,7 +19,7 @@ the loop only for external clients/tests**, so demo tests use the same HTTP
 ```bash
 cd /path/to/intentframe
 
-# 1) Bare substrate runtime venv + freeze constraints (once, or after substrate changes)
+# 1) Runtime venv (substrate + edge) + freeze constraints (once, or after runtime package changes)
 bash scripts/kits-two-venv/setup_runtime_venv.sh
 
 # 2) Client venv for demo tests (once)
@@ -158,9 +158,9 @@ Step-by-step behavior: [Script internals](#script-internals) below.
 
 ```text
   .venv (client)                    .venv-runtime (host)
-  uv sync full repo                 setup_runtime_venv: substrate only
+  uv sync full repo                 setup_runtime_venv: substrate + edge
         |                                    |
-        |  INTENTFRAME_*_URL ──HTTP──►  edge (:8443, repo PYTHONPATH)
+        |  INTENTFRAME_*_URL ──HTTP──►  edge (:8443, runtime venv)
         |                                    │ UDS proxy
         |                                    ▼
         |                             ~/.intentframe/run/*.sock
@@ -171,7 +171,7 @@ Step-by-step behavior: [Script internals](#script-internals) below.
 
 | Path | Written by | Purpose |
 |------|------------|---------|
-| `.venv-runtime/` | `setup_runtime_venv.sh` | Substrate Python env |
+| `.venv-runtime/` | `setup_runtime_venv.sh` | Runtime host venv (substrate + edge/proxy) |
 | `.intentframe/runtime-constraints.txt` | `setup_runtime_venv.sh` | `name==version` freeze for kit `--constraints` |
 | `.intentframe/kits-build/` | `publish_kit_wheel.sh` | Staging for `uv build` output |
 | `.intentframe/kits/` | `publish_kit_wheel.sh` | Wheelhouse (`--find-links`) |
@@ -179,7 +179,7 @@ Step-by-step behavior: [Script internals](#script-internals) below.
 | `~/.intentframe/run/` | supervisor (product default) | UDS sockets + `supervisor.pid` |
 | `~/.intentframe/logs/` | runtime services | Service logs (not removed unless `cleanup.sh --logs`) |
 
-**Edge note:** `intentframe_edge` and `intentframe_proxy` are not installed wheels yet. `start_runtime.sh` runs them from the repo via `PYTHONPATH=${REPO_ROOT}`. Only FastAPI, uvicorn, httpx, and related libs are in the runtime venv and listed in `runtime-constraints.txt`.
+**Edge note:** `intentframe_edge` and `intentframe_proxy` are installed into the runtime venv from `packages/intentframe-edge` and `packages/intentframe-proxy`, then frozen into `runtime-constraints.txt` with the rest of the runtime. Re-run `setup_runtime_venv.sh` after changing those packages so the constraints file on disk stays current.
 
 ## Script internals
 
@@ -201,9 +201,9 @@ Sets paths and helpers used by every script.
 ### `setup_runtime_venv.sh`
 
 1. Create `.venv-runtime` (Python 3.14) if missing.
-2. `uv pip install packages/intentframe-supervisor` — pulls `intentframe-runtime` → policy-registry, executor, server (+ transitive SDKs). No `[native]` extra, no kit.
-3. Install edge **third-party** deps only (FastAPI, uvicorn, httpx, pydantic, PyYAML); not `intentframe_edge` as a wheel.
-4. Uninstall any leftover `intentframe-native-kit` / `command-shield` so the freeze describes substrate only.
+2. `uv pip install packages/intentframe-supervisor packages/intentframe-proxy packages/intentframe-edge` — pulls `intentframe-runtime` → policy-registry, executor, server (+ transitive SDKs), plus the edge ingress and shared proxy. No `[native]` extra, no kit.
+3. Edge dependencies come from the `intentframe-edge` / `intentframe-proxy` package metadata.
+4. Uninstall any leftover `intentframe-native-kit` / `command-shield` so the freeze describes the bare runtime venv (substrate + edge/proxy), not a prior kit install.
 5. Write `runtime-constraints.txt`, run `uv pip freeze --strict`, verify substrate imports; warn if the kit is already importable.
 
 Re-run after substrate package changes or before a clean kit reinstall.
@@ -235,7 +235,7 @@ Use `source bootstrap_kits.sh` so exported `INTENTFRAME_*_CONFIG` persist in you
 2. Source `bootstrap_kits.sh`.
 3. Start `python -m supervisor.main start` in the background with only: `OPENAI_API_KEY`, core/supervisor configs, `EXECUTOR_CONFIG`, `INTENTFRAME_EXECUTOR_MODE`. No `INTENTFRAME_*_URL` — children use default UDS under `RUN_DIR`.
 4. Wait up to 90s for core health via `curl --unix-socket …/intentframe.sock`.
-5. Start edge with `PYTHONPATH=${REPO_ROOT}`, `python -m intentframe_edge`, kit `INTENTFRAME_EDGE_CONFIG`; log to `edge.log`.
+5. Start edge from the runtime venv with `python -m intentframe_edge`, kit `INTENTFRAME_EDGE_CONFIG`; log to `edge.log`.
 6. Wait up to 60s for `http://127.0.0.1:8443/health`.
 
 Exits early if the harness supervisor pid file already refers to a live process.

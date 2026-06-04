@@ -2,7 +2,7 @@
 # Source this file; do not execute directly.
 #
 # Two-venv model:
-#   RUNTIME_VENV  — substrate + kit wheels (supervisor children, UDS under RUN_DIR)
+#   RUNTIME_VENV  — substrate + edge/proxy (+ kit wheels after bootstrap); UDS under RUN_DIR
 #   CLIENT_VENV   — full repo via uv sync (demo tests only)
 #
 # Internals use ~/.intentframe/run/*.sock. External tests use EDGE_BASE_URL HTTP.
@@ -28,7 +28,8 @@ INTENTFRAME_KITS_DIR="${INTENTFRAME_KITS_DIR:-${REPO_ROOT}/.intentframe/kits}"
 RUNTIME_PYTHON="${RUNTIME_VENV}/bin/python"
 CLIENT_PYTHON="${CLIENT_VENV}/bin/python"
 
-# Pins substrate packages after setup_runtime_venv; kit installs must not override these.
+# Pins every runtime-venv distribution after setup_runtime_venv (substrate + edge/proxy);
+# kit installs must not override these.
 RUNTIME_CONSTRAINTS="${RUNTIME_CONSTRAINTS:-${REPO_ROOT}/.intentframe/runtime-constraints.txt}"
 
 # Runtime processes intentionally use the product defaults.
@@ -74,7 +75,7 @@ _kits_require_runtime_constraints() {
   fi
 }
 
-# Freeze the bare runtime venv so kit installs cannot upgrade/downgrade substrate deps.
+# Freeze the bare runtime venv so kit installs cannot upgrade/downgrade pinned runtime deps.
 # uv pip freeze includes editable/file:// lines that are invalid as --constraints; pin
 # every installed distribution as name==version instead.
 _kits_freeze_runtime_constraints() {

@@ -227,14 +227,14 @@ intentframe_gateway/
     ├── config_routes.py    # /config/*    — app preferences CRUD
     └── events_routes.py    # /events      — unified WS + SSE event stream
 
-intentframe_proxy/           # shared HTTP→UDS forwarder (gateway + edge)
-├── __init__.py
+packages/intentframe-proxy/intentframe_proxy/
+├── __init__.py              # shared HTTP→UDS forwarder (gateway + edge)
 └── proxy.py                 # UDSProxy class + proxy_websocket() helper
 
-intentframe_edge/            # B2B network edge (see deploy/prod/README.md)
+packages/intentframe-edge/intentframe_edge/
 ├── app.py                   # path-routes HTTP/TLS → runtime UDS sockets
 ├── config.py
-└── __main__.py
+└── __main__.py              # B2B network edge (see deploy/prod/README.md)
 
 intentframe_cli/
 ├── __init__.py

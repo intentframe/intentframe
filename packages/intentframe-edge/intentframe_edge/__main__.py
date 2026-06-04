@@ -31,7 +31,7 @@ def main() -> None:
         default=None,
         help=(
             "Path to an edge backend profile YAML. Defaults to the in-code "
-            "minimal backends (policy-registry + intentframe-core). First-party "
+            "minimal backends (policy-registry + intentframe-server). First-party "
             "products / test harnesses pass the kit edge profile (${KIT}/edge_profile.yaml) "
             "to expose /workspaces. Equivalent to INTENTFRAME_EDGE_CONFIG."
         ),

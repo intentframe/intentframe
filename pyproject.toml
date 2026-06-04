@@ -62,6 +62,8 @@ dependencies = [
     "intentframe-runtime",
     "intentframe-supervisor[native]",
     "intentframe-native-kit",
+    "intentframe-proxy",
+    "intentframe-edge",
 ]
 
 [project.optional-dependencies]
@@ -84,15 +86,13 @@ where = ["."]
 # NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
 # intentframe_bundle_sdk, executor_sdk, command_shield, intentframe_prompt_library,
 # intentframe_components, executor_client, executor, intentframe_server,
-# intentframe_native_kit, and the supervisor (now intentframe-supervisor) ship as
-# separate workspace distributions under packages/ and are pulled in as
-# dependencies above.
+# intentframe_native_kit, intentframe_proxy, intentframe_edge, and the supervisor
+# (now intentframe-supervisor) ship as separate workspace distributions under
+# packages/ and are pulled in as dependencies above.
 include = [
     "intentframe_dashboard*",
     "intentframe_gateway*",
     "intentframe_cli*",
-    "intentframe_edge*",
-    "intentframe_proxy*",
 ]
 
 [dependency-groups]
@@ -106,7 +106,6 @@ dev = [
 # distribution (packages/intentframe-supervisor) and reach PATH via that dep.
 intentframe-gateway-cli = "intentframe_cli.main:main"
 intentframe-gateway-backend = "intentframe_gateway.entry:backend_main"
-intentframe-edge = "intentframe_edge.__main__:main"
 
 
 [tool.pytest.ini_options]
@@ -131,6 +130,8 @@ members = [
     "packages/intentframe-runtime",
     "packages/intentframe-supervisor",
     "packages/intentframe-native-kit",
+    "packages/intentframe-proxy",
+    "packages/intentframe-edge",
     "jarvis_pa",
     "external_data_ingestion",
     "intentframe_credentials",
@@ -157,6 +158,8 @@ intentframe-server = { workspace = true }
 intentframe-runtime = { workspace = true }
 intentframe-supervisor = { workspace = true }
 intentframe-native-kit = { workspace = true }
+intentframe-proxy = { workspace = true }
+intentframe-edge = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev"]

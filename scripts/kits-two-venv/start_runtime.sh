@@ -6,7 +6,7 @@
 #   ./scripts/kits-two-venv/start_runtime.sh
 #
 # Supervisor env intentionally omits INTENTFRAME_*_URL — services use UDS in RUN_DIR.
-# Edge runs from repo source (PYTHONPATH=REPO_ROOT); kit supplies INTENTFRAME_EDGE_CONFIG.
+# Edge runs from the runtime venv; kit supplies INTENTFRAME_EDGE_CONFIG.
 # Pids: harness SUPERVISOR_PID_FILE / EDGE_PID_FILE; product also writes RUN_DIR/supervisor.pid.
 #
 set -euo pipefail
@@ -66,7 +66,6 @@ if [[ -f "${EDGE_PID_FILE}" ]] && kill -0 "$(cat "${EDGE_PID_FILE}")" 2>/dev/nul
 else
   echo "[start-runtime] starting edge on ${EDGE_BASE_URL}"
   nohup env \
-    PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}" \
     INTENTFRAME_EDGE_CONFIG="${INTENTFRAME_EDGE_CONFIG}" \
     INTENTFRAME_EDGE_HOST="${EDGE_HOST}" \
     INTENTFRAME_EDGE_PORT="${EDGE_PORT}" \
