@@ -1,6 +1,6 @@
 # Captured attack-suite output (reference)
 
-Supervisor profile env for these runs: `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`, `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md) and [README.md](README.md).
+Supervisor profile env for these runs: `INTENTFRAME_CORE_CONFIG=${KIT}/core.yaml` (resolve `KIT` from the installed package; see [README.md](README.md)), `EXECUTOR_CONFIG=demo/config/executor_attacks.yaml`. See [docs/plugin-profiles.md](../../docs/plugin-profiles.md) and [README.md](README.md).
 
 ---
 
@@ -8,7 +8,7 @@ Supervisor profile env for these runs: `INTENTFRAME_CORE_CONFIG=intentframe_nati
 
 ===============================================================================
   IntentFrame ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)
-  INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml
+  KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')" INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" EXECUTOR_CONFIG=demo/config/executor_attacks.yaml uv run python -m supervisor.main start --config "${KIT}/supervisor_profile.yaml"
 ===============================================================================
   Running attacks: [1, 2, 3, 4, 5, 6]
 ===============================================================================
@@ -111,7 +111,7 @@ Logging output to: /Users/prince/GitHub/orgs/intentframe/intentframe/demo/tests/
 
 ===============================================================================
   IntentFrame ADVANCED ATTACK TEST SUITE (Actor → Analysis → Guardian → Executor)
-  INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml
+  KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')" INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" EXECUTOR_CONFIG=demo/config/executor_attacks.yaml uv run python -m supervisor.main start --config "${KIT}/supervisor_profile.yaml"
 ===============================================================================
   Running attacks: [7, 8, 9, 10, 11, 12, 13, 14]
 ===============================================================================

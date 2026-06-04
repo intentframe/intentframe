@@ -20,7 +20,7 @@ production decisions.
 ## Architecture under test
 
 For a `RUN_COMMAND` intent the pipeline flow in
-[`intentframe_server/pipeline.py`](../../intentframe_server/pipeline.py) is:
+[`intentframe_server/pipeline.py`](../../packages/intentframe-server/intentframe_server/pipeline.py) is:
 
 ```
 raw command

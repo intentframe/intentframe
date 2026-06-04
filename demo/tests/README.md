@@ -80,21 +80,27 @@ Each suite expects a specific supervisor executor config. Start the supervisor *
 
 | Test file(s) | Required supervisor command |
 |---|---|
-| `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml EXECUTOR_CONFIG=demo/config/executor_attacks.yaml python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml` |
-| `root_demo/test_normal.py` and other `root_demo/*` suites | `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root python -m supervisor.main start --config intentframe_native_kit/supervisor_profile.yaml` for safe dry-run; `intentframe-gateway-cli --profile root` only for real root-capable executor validation (gateway passes the kit profile automatically) — see [`root_demo/README.md`](root_demo/README.md) |
+| `test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py` | `KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')" INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" EXECUTOR_CONFIG=demo/config/executor_attacks.yaml uv run python -m supervisor.main start --config "${KIT}/supervisor_profile.yaml"` |
+| `root_demo/test_normal.py` and other `root_demo/*` suites | `KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')" INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root uv run python -m supervisor.main start --config "${KIT}/supervisor_profile.yaml"` for safe dry-run; `intentframe-gateway-cli --profile root` only for real root-capable executor validation (gateway passes the kit profile automatically) — see [`root_demo/README.md`](root_demo/README.md) |
 
 ```bash
 # For the 24 attack suites:
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 
 # For the root-demo suite, safe default (no host command execution):
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 INTENTFRAME_EXECUTOR_MODE=dry_run INTENTFRAME_DRY_RUN_CONTEXT=root \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 
 # For real root-demo executor validation only
 # (after one-time `sudo bash intentframe_setup_root_demo.sh`):
@@ -330,8 +336,8 @@ export the kit profiles so the runtime starts `resource-registry` and the edge
 exposes `/workspaces` (the compose default is the minimal graph without them):
 
 ```bash
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="$(python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent / "supervisor_profile.yaml")')"
+export INTENTFRAME_EDGE_CONFIG="$(python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent / "edge_profile.yaml")')"
 ```
 
 On your Mac, set `INTENTFRAME_*_URL=http://localhost:8443` and run the harness as

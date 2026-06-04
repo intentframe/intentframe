@@ -555,9 +555,13 @@ The demo uses its own isolated executor config.
 (`INTENTFRAME_CORE_CONFIG` selects action bundles for core; `EXECUTOR_CONFIG` selects executor packs. See [docs/plugin-profiles.md](docs/plugin-profiles.md).)
 
 ```bash
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor.yaml \
-python -m supervisor.main start
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 **Terminal 2 — run the demo dashboard:**

@@ -70,8 +70,8 @@ export OPENAI_API_KEY=sk-...               # your actual key
 the supervisor starts `resource-registry` and the edge exposes `/workspaces`:
 
 ```bash
-export INTENTFRAME_SUPERVISOR_CONFIG=/app/intentframe_native_kit/supervisor_profile.yaml
-export INTENTFRAME_EDGE_CONFIG=/app/intentframe_native_kit/edge_profile.yaml
+export INTENTFRAME_SUPERVISOR_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/supervisor_profile.yaml"
+export INTENTFRAME_EDGE_CONFIG="/app/packages/intentframe-native-kit/intentframe_native_kit/edge_profile.yaml"
 ```
 
 Leave both unset for the minimal substrate (policy-registry + executor + core).
@@ -100,8 +100,8 @@ runtime. Watch the runtime logs — the expected sequence is:
 ```
 
 Then the supervisor brings up the services in its active profile (minimal
-default: policy-registry, executor, intentframe-core — plus resource-registry if
-you exported the kit profile), and once `intentframe-core` is healthy, the edge
+default: policy-registry, executor, intentframe-server — plus resource-registry if
+you exported the kit profile), and once `intentframe-server` is healthy, the edge
 container starts. The edge health probe takes up to ~90s from cold start.
 
 ---
@@ -115,7 +115,7 @@ curl -fsS http://localhost:8443/health
 Expected response (minimal default):
 
 ```json
-{"status":"ok","backends":{"policy-registry":true,"intentframe-core":true}}
+{"status":"ok","backends":{"policy-registry":true,"intentframe-server":true}}
 ```
 
 With the kit profiles enabled (Step 3) the summary also includes

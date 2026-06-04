@@ -13,7 +13,7 @@ responsibility.  Either:
   * ``intentframe-gateway-cli --profile root`` (see intentframe_cli/README.md;
     the gateway passes the kit profile automatically)
   * or a direct ``python -m supervisor.main start
-    --config intentframe_native_kit/supervisor_profile.yaml`` with
+    --config "${KIT}/supervisor_profile.yaml"`` with
     ``JARVIS_VARIANT=root``, ``EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml``,
     and ``INTENTFRAME_ESCALATION_ARMED=1`` when root-demo is installed
     (see ``docs/executor-root-mode.md``, section 2a).

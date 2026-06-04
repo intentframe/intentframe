@@ -53,7 +53,7 @@ def _supervisor_config_path() -> str:
     """Resolve the supervisor service-graph profile for first-party products.
 
     The gateway is a first-party product, so it defaults to the kit profile
-    (``intentframe_native_kit/supervisor_profile.yaml``) which includes the
+    (kit `supervisor_profile.yaml` in the installed package) which includes the
     resource-registry. ``INTENTFRAME_SUPERVISOR_CONFIG`` overrides this for
     deployments that ship their own graph.
     """

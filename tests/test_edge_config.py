@@ -6,9 +6,10 @@ import pytest
 
 from intentframe_edge.config import EdgeConfig, _load_config_file, load_edge_config
 
+import intentframe_native_kit
+
 _KIT_PROFILE = (
-    Path(__file__).resolve().parents[1]
-    / "intentframe_native_kit"
+    Path(intentframe_native_kit.__file__).resolve().parent
     / "edge_profile.yaml"
 )
 
@@ -25,7 +26,7 @@ def test_default_backends_exclude_resource_registry(
 
     config = load_edge_config()
 
-    assert _names(config) == {"policy-registry", "intentframe-core"}
+    assert _names(config) == {"policy-registry", "intentframe-server"}
     assert "resource-registry" not in _names(config)
 
 

@@ -198,7 +198,7 @@ A handful of references are kept inside the relevant module rather than in `docs
 | Executor implementation plan | [`../executor/plan.md`](../executor/plan.md) |
 | Command Shield contract and capability tags | [`../command_shield/README.md`](../command_shield/README.md) |
 | EDI design and configuration | [`../external_data_ingestion/README.md`](../external_data_ingestion/README.md) |
-| Credential vault API and backends | [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md) |
+| Credential vault API and backends | [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md) |
 | Gateway service architecture | [`../intentframe_gateway/README.md`](../intentframe_gateway/README.md) |
 | Jarvis assistant architecture | [`../jarvis_pa/README.md`](../jarvis_pa/README.md) |
 | macOS platform server | [`../macos-appkit-server/README.md`](../macos-appkit-server/README.md) |

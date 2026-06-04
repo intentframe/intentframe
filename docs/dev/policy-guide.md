@@ -26,7 +26,7 @@ The important pieces are:
   `~/.intentframe/policies/`.
 - `intentframe_gateway/bootstrap.py`: seeds Jarvis policy and workspace on
   gateway startup; validates seeded actions against bundles from
-  `resolve_core_config_path()` → `core.yaml` (same list `intentframe-core` loads).
+  `resolve_core_config_path()` → `core.yaml` (same list `intentframe-server` loads).
 - `intentframe_gateway/profiles.py`: shared gateway resolver for that core profile path.
 - `jarvis_pa/seed_policies.py`: development convenience script using the same
   loader as the gateway (requires `INTENTFRAME_CORE_CONFIG` when validating bundles).

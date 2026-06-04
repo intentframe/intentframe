@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-bundle-sdk"
+version = "0.1.0"
+description = "IntentFrame Bundle SDK — author action and domain bundles for the policy pipeline"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "sdk", "bundles"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "intentframe-core==0.1.0",
+    "intentframe-policy-registry==0.1.0",
+    "pydantic>=2.12.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intentframe_bundle_sdk"]
+exclude = ["intentframe_bundle_sdk/TODO", "intentframe_bundle_sdk/docs"]

@@ -6,12 +6,12 @@
 #   2. wait for vault /health
 #   3. exec supervisor          (services per the active profile — minimal by
 #                                default: policy-registry, executor,
-#                                intentframe-core; all UDS)
+#                                intentframe-server; all UDS)
 #
 # The supervisor inherits this process's environment, so OPENAI_API_KEY
 # (and anything else the services read) must be present here, as must
 # INTENTFRAME_SUPERVISOR_CONFIG when a non-default service graph is wanted, and
-# INTENTFRAME_CORE_CONFIG so intentframe-core knows which action bundles to load.
+# INTENTFRAME_CORE_CONFIG so intentframe-server knows which action bundles to load.
 # Vault is the bootstrap dependency: first up, last down.
 #
 set -euo pipefail

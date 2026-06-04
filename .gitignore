@@ -29,6 +29,13 @@ ENV/
 env.bak/
 venv.bak/
 .venv/
+.venv-runtime/
+
+# Kits two-venv harness artifacts
+.intentframe/kits/
+.intentframe/kits-build/
+.intentframe/kits-two-venv/
+.intentframe/runtime-constraints.txt
 
 # IDEs
 .vscode/

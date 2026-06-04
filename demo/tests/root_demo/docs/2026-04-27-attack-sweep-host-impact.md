@@ -73,7 +73,7 @@ host name.
 
 ## What The Core Log Says
 
-For the failed intents, `intentframe-core.log` shows a consistent pattern:
+For the failed intents, `intentframe-server.log` shows a consistent pattern:
 
 1. `COMMAND SHIELD` did not reject the command.
 2. `DETERMINISTIC GUARDIAN` returned `UNDECIDED`.

@@ -4,7 +4,7 @@
 
 The credentials vault is the single source of truth for every secret IntentFrame uses — your OpenAI API key, your IMAP/SMTP passwords, your Telegram bot token, OAuth tokens for adapter integrations. Other processes ask the vault for what they need; the vault decides whether to answer; secrets travel only as far as the requesting process and never get logged, serialized, or written to plaintext disk.
 
-This document covers the vault from a user / operator / integrator perspective. For the implementation reference (API surface, backend list, async client usage), see [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md).
+This document covers the vault from a user / operator / integrator perspective. For the implementation reference (API surface, backend list, async client usage), see [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md).
 
 ---
 
@@ -54,7 +54,7 @@ A standalone process that runs alongside the rest of IntentFrame, exposes a smal
 
 | Secret | Stored as | Used by | Delivery mode |
 |---|---|---|---|
-| OpenAI API key | `namespace="openai", key="api_key"` | `intentframe-core` (AE + Guardian), `jarvis` (agent reasoning) | `runtime_env` → `OPENAI_API_KEY` |
+| OpenAI API key | `namespace="openai", key="api_key"` | `intentframe-server` (AE + Guardian), `jarvis` (agent reasoning) | `runtime_env` → `OPENAI_API_KEY` |
 | IMAP/SMTP password | `namespace="email.<address>", key="password"` | `email-sync-daemon` | `executor_only` |
 | Telegram bot token | `namespace="telegram", key="bot_token"` | `jarvis-telegram` | `runtime_env` |
 | OAuth tokens (Slack, GitHub, etc.) | `namespace="<service>", key="token"` | `executor` adapters | `executor_only` |
@@ -73,16 +73,16 @@ There are two ways a credential gets from the vault into a process. The choice i
 The supervisor fetches the value at spawn time and injects it as an environment variable. The child process reads it from `os.environ` at startup.
 
 ```
-1. Supervisor about to spawn intentframe-core
+1. Supervisor about to spawn intentframe-server
 2. Supervisor calls vault.list_runtime_env()  → ["openai/api_key", ...]
 3. Supervisor calls vault.get("openai", "api_key")  → "sk-proj-..."
 4. Supervisor sets OPENAI_API_KEY in the spawned process's env
-5. intentframe-core reads os.environ["OPENAI_API_KEY"] at startup
+5. intentframe-server reads os.environ["OPENAI_API_KEY"] at startup
 6. The OpenAI client is built once with that key, in-process
 7. The vault is never re-queried for this credential
 ```
 
-Used for: OpenAI key (needed by `intentframe-core`, `jarvis`, `onboarding`), Telegram bot token (needed by `jarvis-telegram`).
+Used for: OpenAI key (needed by `intentframe-server`, `jarvis`, `onboarding`), Telegram bot token (needed by `jarvis-telegram`).
 
 ### `executor_only` — for trusted internal services
 
@@ -124,10 +124,10 @@ You run that command, restart, and the key is now in the OS keyring under `com.i
 
 ### 2. Dev-time, via the dev-server `.env`
 
-For development, you can pre-seed credentials by putting them in `intentframe_credentials/.env`. The dev-server reads that file at startup and loads them into an in-memory backend:
+For development, you can pre-seed credentials by putting them in `packages/intentframe-credentials/intentframe_credentials/.env`. The dev-server reads that file at startup and loads them into an in-memory backend:
 
 ```bash
-# intentframe_credentials/.env
+# packages/intentframe-credentials/intentframe_credentials/.env
 OPENAI_API_KEY=sk-proj-...
 EMAIL_WORK_ADDRESS=you@gmail.com
 EMAIL_WORK_PASSWORD=xxxx-xxxx-xxxx-xxxx
@@ -256,7 +256,7 @@ Source of truth: `intentframe_gateway/server.py` (lifespan, steps 1–6); `inten
 | `DELETE` | `/v1/credentials/{namespace}/{key}` | Delete | No |
 | `GET` | `/v1/runtime-env` | List `runtime_env` creds (metadata only, for supervisor) | No |
 
-For full client usage examples, see [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md).
+For full client usage examples, see [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md).
 
 ---
 
@@ -284,7 +284,7 @@ export VAULT_ROLE_ID=...        # AppRole, preferred for long-running services
 export VAULT_SECRET_ID=...
 ```
 
-Everything else — the UDS service, delivery modes, metadata DB, CLI, and the `service` backend used by consumers — is unchanged; only where the values physically live changes. The backend keeps its Vault token alive with a renewal loop (and re-logs in via AppRole when the token's max TTL is reached). Full setup, policy, and local Docker testing instructions are in the implementation README: [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md#hashicorp-headless--cloud--on-prem).
+Everything else — the UDS service, delivery modes, metadata DB, CLI, and the `service` backend used by consumers — is unchanged; only where the values physically live changes. The backend keeps its Vault token alive with a renewal loop (and re-logs in via AppRole when the token's max TTL is reached). Full setup, policy, and local Docker testing instructions are in the implementation README: [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md#hashicorp-headless--cloud--on-prem).
 
 #### Deployment wiring — where the config actually goes
 
@@ -349,7 +349,7 @@ You only flip the first. The `hashicorp` value also accepted by `executor.yaml`'
 
 ## Related documents
 
-- [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md) — Implementation reference: full API, backends, client usage, exception hierarchy, redaction
+- [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md) — Implementation reference: full API, backends, client usage, exception hierarchy, redaction
 - [processes.md](processes.md) — Where the vault sits in the process tree
 - [privacy.md](privacy.md) — Where each kind of secret lives and what scrubbing protects against
 - [executor.md § 5. Credential isolation](executor.md#5-credential-isolation) — Why the executor (which holds adapter credentials) is structurally separated from the rest of the pipeline

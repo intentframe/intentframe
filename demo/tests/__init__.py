@@ -26,7 +26,7 @@ Test infrastructure:
 Run from repo root (--config starts resource-registry for the attack workspace):
   EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
     python -m supervisor.main start \
-      --config intentframe_native_kit/supervisor_profile.yaml
+      --config "${KIT}/supervisor_profile.yaml"
   python demo/tests/test_attacks.py
   python demo/tests/test_redteam_attacks.py 15 17
 """

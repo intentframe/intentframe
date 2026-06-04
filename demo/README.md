@@ -33,10 +33,13 @@ invoice_bot → Actor SDK → Analysis Engine → Guardian → Executor → real
 `INTENTFRAME_CORE_CONFIG` and `EXECUTOR_CONFIG` point at the demo's `core.yaml` and `executor.yaml` profiles (which bundles and packs load). See [docs/plugin-profiles.md](../docs/plugin-profiles.md).
 
 ```bash
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor.yaml \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 The kit profile starts `resource-registry` so the dashboard can register workspaces.
@@ -71,10 +74,13 @@ Quick start (from **repo root**, with the attack supervisor running):
 
 ```bash
 # Start the supervisor with the attack executor profile + kit profile (workspaces)
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 
 # Foundation attacks (1-6)
 python demo/tests/test_attacks.py

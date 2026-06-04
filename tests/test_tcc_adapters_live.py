@@ -70,7 +70,7 @@ def require_platform_server() -> None:
             f"macos-appkit-server is not running at {_socket_path()}. "
             "Start it with the IntentFrame CLI ('intentframe-gateway-cli start' "
             "or 'python -m supervisor.main start --config "
-            "intentframe_native_kit/supervisor_profile.yaml') then re-run."
+            "${KIT}/supervisor_profile.yaml' after setting KIT from the installed package) then re-run."
         )
     except Exception as exc:
         pytest.xfail(f"Platform server health check failed unexpectedly: {exc}")

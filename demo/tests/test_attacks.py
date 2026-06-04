@@ -17,7 +17,7 @@ Prerequisites:
 
       EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
       python -m supervisor.main start \
-        --config intentframe_native_kit/supervisor_profile.yaml
+        --config "${KIT}/supervisor_profile.yaml"
 
 Usage:
   python demo/tests/test_attacks.py          # all attacks (1-6)
@@ -228,7 +228,10 @@ def _print_executor_alert() -> None:
     print("#  REQUIRED:")
     print("#    EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \\")
     print("#    python -m supervisor.main start \\")
-    print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+    print(
+        '#      --config "${KIT}/supervisor_profile.yaml"  '
+        '# (KIT=… — see demo/README.md)'
+    )
     print("#")
     print("#  (--config starts resource-registry so the attack workspace can be")
     print("#   created; it is NOT in the supervisor's minimal default graph.)")

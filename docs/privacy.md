@@ -10,7 +10,7 @@ For the process model that this document references, see [processes.md](processe
 
 ## Summary in one paragraph
 
-IntentFrame is local-first. All policy data, audit logs, runtime state, agent memory, and email mirrors live on your machine, under `~/.intentframe/`. The only IntentFrame-internal traffic that leaves your machine is **OpenAI API calls** (from `intentframe-core` for the Analysis Engine and Guardian, and from `jarvis` for the agent's own reasoning). The **email sync daemon (EDI)** also talks to your configured email provider over IMAP/SMTP. Everything else that goes out is the result of an agent intent that the IntentFrame pipeline already saw, audited, and Guardian approved — for example an `HTTP_GET` action to a URL the agent named, a `SEND_EMAIL` to a recipient the agent named. There is no telemetry, no analytics, no phone-home.
+IntentFrame is local-first. All policy data, audit logs, runtime state, agent memory, and email mirrors live on your machine, under `~/.intentframe/`. The only IntentFrame-internal traffic that leaves your machine is **OpenAI API calls** (from `intentframe-server` for the Analysis Engine and Guardian, and from `jarvis` for the agent's own reasoning). The **email sync daemon (EDI)** also talks to your configured email provider over IMAP/SMTP. Everything else that goes out is the result of an agent intent that the IntentFrame pipeline already saw, audited, and Guardian approved — for example an `HTTP_GET` action to a URL the agent named, a `SEND_EMAIL` to a recipient the agent named. There is no telemetry, no analytics, no phone-home.
 
 ---
 
@@ -36,7 +36,7 @@ All IntentFrame state lives under `~/.intentframe/` and `~/.intentframe-venvs/`.
 │   ├── policy-registry.log
 │   ├── resource-registry.log
 │   ├── executor.log
-│   ├── intentframe-core.log
+│   ├── intentframe-server.log
 │   ├── supervisor.log
 │   └── ... (per-process logs)
 │
@@ -107,16 +107,16 @@ The only outbound traffic that IntentFrame itself initiates without an agent int
 
 | Origin process | Calls OpenAI for | Endpoint |
 |---|---|---|
-| `intentframe-core` | Analysis Engine — semantic understanding of intents | `api.openai.com` |
-| `intentframe-core` | AI Guardian — final ALLOW/BLOCK judgment | `api.openai.com` |
-| `intentframe-core` | Onboarding engine — initial policy seeding | `api.openai.com` |
+| `intentframe-server` | Analysis Engine — semantic understanding of intents | `api.openai.com` |
+| `intentframe-server` | AI Guardian — final ALLOW/BLOCK judgment | `api.openai.com` |
+| `intentframe-server` | Onboarding engine — initial policy seeding | `api.openai.com` |
 | `jarvis` | Agent reasoning loop | `api.openai.com` |
 | `jarvis` | Conversation embeddings (sessions) | `api.openai.com` |
 | `jarvis` | Memory embeddings + semantic search | `api.openai.com` |
 
 What goes in the OpenAI calls:
 
-- **From `intentframe-core`** — the structured intent fields (action, target, data, reason), policy context, and analysis prompts. Your filesystem paths, email recipients, command strings, etc. that the agent is *trying to act on* are visible to OpenAI for the duration of the request. The Analysis Engine and Guardian do not get raw user data they didn't already need to evaluate.
+- **From `intentframe-server`** — the structured intent fields (action, target, data, reason), policy context, and analysis prompts. Your filesystem paths, email recipients, command strings, etc. that the agent is *trying to act on* are visible to OpenAI for the duration of the request. The Analysis Engine and Guardian do not get raw user data they didn't already need to evaluate.
 - **From `jarvis`** — the conversation context, retrieved memory snippets, and tool call results. Whatever you said to Jarvis, plus what it has remembered, can flow into the model.
 
 What does **not** go to OpenAI:
@@ -187,7 +187,7 @@ Properties:
 
 | Secret | Storage | Held in memory by |
 |---|---|---|
-| OpenAI API key | macOS Keychain (via `intentframe_credentials`) | `credential-vault`, `intentframe-core`, `jarvis` |
+| OpenAI API key | macOS Keychain (via `intentframe_credentials`) | `credential-vault`, `intentframe-server`, `jarvis` |
 | IMAP / SMTP password (per email account) | macOS Keychain | `credential-vault`, `email-sync-daemon` |
 | Telegram bot token | macOS Keychain | `credential-vault`, `jarvis-telegram` |
 | OAuth tokens for adapter integrations | macOS Keychain | `credential-vault`, `executor` (when used by an adapter) |
@@ -208,10 +208,10 @@ Boundary properties:
 | Question | Answer |
 |---|---|
 | Does IntentFrame send anything to the IntentFrame project's servers? | No. There is no IntentFrame-operated server. |
-| Does IntentFrame send anything to OpenAI? | Yes — only the AE/Guardian validation calls (in `intentframe-core`) and the agent's own LLM calls (in `jarvis`). |
+| Does IntentFrame send anything to OpenAI? | Yes — only the AE/Guardian validation calls (in `intentframe-server`) and the agent's own LLM calls (in `jarvis`). |
 | Does IntentFrame send my email content to OpenAI? | Only if the agent reads or summarizes a specific email and that email's body ends up in the LLM prompt. Background email sync is local-only. |
 | Does IntentFrame send my files to OpenAI? | Only if the agent reads or processes a specific file and that content ends up in the LLM prompt. |
-| Does the executor connect to OpenAI? | No. The executor never makes LLM calls. It receives validated intents from `intentframe-core` and executes them. |
+| Does the executor connect to OpenAI? | No. The executor never makes LLM calls. It receives validated intents from `intentframe-server` and executes them. |
 | Where is my audit log? | `~/.intentframe/audit/` — SQLite, hash-chained. |
 | Where is my email stored? | `~/.intentframe/email/emails.db` if EDI is enabled; otherwise nowhere (IntentFrame doesn't touch email). |
 | Where are my passwords stored? | macOS Keychain, accessed only via the credential-vault process. |
@@ -249,4 +249,4 @@ These are honest limitations, not hidden behaviors:
 - [threat-model.md](threat-model.md) — In-scope vs out-of-scope threats
 - [faq.md](faq.md) — Common objections answered
 - [`../external_data_ingestion/README.md`](../external_data_ingestion/README.md) — EDI's full design
-- [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md) — Credential vault details
+- [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md) — Credential vault details

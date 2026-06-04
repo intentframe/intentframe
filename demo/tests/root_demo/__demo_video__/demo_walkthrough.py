@@ -36,10 +36,12 @@ Usage
   python demo/tests/root_demo/__demo_video__/demo_walkthrough.py
 
 Or for safe rehearsal (no host I/O):
+  KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')" \\
+  INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \\
   INTENTFRAME_EXECUTOR_MODE=dry_run \\
   INTENTFRAME_DRY_RUN_CONTEXT=root \\
-  python -m supervisor.main start \\
-    --config intentframe_native_kit/supervisor_profile.yaml
+  uv run python -m supervisor.main start \\
+    --config "${KIT}/supervisor_profile.yaml"
   python demo/tests/root_demo/__demo_video__/demo_walkthrough.py
 
 Override policy:

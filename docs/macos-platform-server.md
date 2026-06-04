@@ -47,7 +47,7 @@ Each service is dispatched through a single `ServiceDispatcher.swift` that maps 
 Agent's intent: CREATE_EVENT
     │
     ▼
-intentframe-core pipeline (validates)
+intentframe-server pipeline (validates)
     │
     ▼
 executor (gateway) → CalendarAdapter (Python)

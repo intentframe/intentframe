@@ -2,6 +2,20 @@
 
 Utility scripts for local development setup.
 
+## PyPI release (`packages/` only)
+
+See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`) and pre-publish validation (`validate_publish.sh`: build, `twine check`, clean-room install from `dist/publish/`).
+
+## Kits two-venv harness (substrate + wheel, edge for tests)
+
+See [`kits-two-venv/README.md`](kits-two-venv/README.md) — bare `.venv-runtime`, constrained `uv pip install` of kit wheels from `.intentframe/kits/`, start supervisor + edge, run demo tests from `.venv` over HTTP. Per-script behavior: [Script internals](kits-two-venv/README.md#script-internals).
+
+```bash
+bash scripts/kits-two-venv/start_runtime.sh   # or: start via kits-two-venv README
+bash scripts/stop_runtime.sh                  # stop supervisor + edge
+bash scripts/cleanup_runtime.sh --full        # stop + reset harness (see kits-two-venv README)
+```
+
 ## Admin (reference)
 
 See [`admin/README.md`](admin/README.md) and [`docs/dev/policy-seeding.md`](../docs/dev/policy-seeding.md) for `seed_policy.py` — orchestrator pattern (load → validate bundles → POST), UDS or `INTENTFRAME_POLICY_URL`.

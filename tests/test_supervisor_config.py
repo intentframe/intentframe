@@ -12,9 +12,10 @@ from supervisor.config import (
     _packaged_default_config,
 )
 
+import intentframe_native_kit
+
 _KIT_PROFILE = (
-    Path(__file__).resolve().parents[1]
-    / "intentframe_native_kit"
+    Path(intentframe_native_kit.__file__).resolve().parent
     / "supervisor_profile.yaml"
 )
 
@@ -29,7 +30,7 @@ def test_supervisor_config_real_mode_starts_executor(monkeypatch: pytest.MonkeyP
     config = load_supervisor_config()
 
     assert _service(config, "executor") is not None
-    core = _service(config, "intentframe-core")
+    core = _service(config, "intentframe-server")
     assert core is not None
     assert "executor" in core.depends_on
 
@@ -43,7 +44,7 @@ def test_supervisor_config_default_excludes_resource_registry(
     config = load_supervisor_config()
 
     assert _service(config, "resource-registry") is None
-    core = _service(config, "intentframe-core")
+    core = _service(config, "intentframe-server")
     assert core is not None
     assert "resource-registry" not in core.depends_on
 
@@ -53,7 +54,7 @@ def test_kit_profile_includes_resource_registry() -> None:
     config = _load_config_file(_KIT_PROFILE)
 
     assert _service(config, "resource-registry") is not None
-    core = _service(config, "intentframe-core")
+    core = _service(config, "intentframe-server")
     assert core is not None
     assert {"policy-registry", "resource-registry", "executor"} <= set(core.depends_on)
 
@@ -64,7 +65,7 @@ def test_supervisor_config_dry_run_omits_executor(monkeypatch: pytest.MonkeyPatc
     config = load_supervisor_config()
 
     assert _service(config, "executor") is None
-    core = _service(config, "intentframe-core")
+    core = _service(config, "intentframe-server")
     assert core is not None
     assert "executor" not in core.depends_on
     assert {"policy-registry"} <= set(core.depends_on)
@@ -106,7 +107,7 @@ def test_supervisor_config_executor_mode_trimmed_and_lowercased(
 
 
 def test_apply_executor_mode_strips_executor_from_any_service() -> None:
-    """Regression: dep stripping must not be hardcoded to intentframe-core."""
+    """Regression: dep stripping must not be hardcoded to intentframe-server."""
     config = SupervisorConfig(
         services=[
             ServiceConfig(

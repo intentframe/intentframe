@@ -26,12 +26,12 @@ intentframe-gateway-cli                ← 1 entry-point process you launch
   │     │                                  kit profile, so 4 children here)
   │     │  Spawned by supervisor in dependency order from its service-graph
   │     │  profile (supervisor/config.py, supervisor/main.py). The gateway
-  │     │  selects intentframe_native_kit/supervisor_profile.yaml:
+  │     │  selects ${KIT}/supervisor_profile.yaml (installed package):
   │     │
   │     ├── policy-registry            (uvicorn, UDS)
   │     ├── resource-registry          (uvicorn, UDS — kit profile only)
   │     ├── executor                   (uvicorn, UDS — separate venv)
-  │     └── intentframe-core           (uvicorn, UDS)
+  │     └── intentframe-server         (uvicorn, UDS)
   │           depends_on: [policy-registry,
   │                        resource-registry,
   │                        executor]
@@ -68,14 +68,14 @@ The gateway is a thin orchestrator. It owns the *startup choreography* but does 
 | | |
 |---|---|
 | **What it is** | A Unix-socket server that backs the `intentframe_credentials` library. |
-| **Source** | `intentframe_credentials/intentframe_credentials/server.py` |
+| **Source** | `packages/intentframe-credentials/intentframe_credentials/server.py` |
 | **Job** | Returns secrets (OpenAI API key, IMAP passwords, Telegram tokens) on request. Backed by macOS Keychain (or env-overlay for dev). |
 | **Storage** | macOS Keychain via `keyring_backend.py`; no plaintext on disk |
 | **OpenAI calls** | No |
 | **Outbound network** | No |
 | **Lifecycle** | First service started; last service stopped |
 
-Other processes that need a secret call into the vault over the socket. Secrets travel into the requesting process's memory once, and adapters that need them (e.g. the OpenAI client in `intentframe-core`, IMAP connections in EDI) hold them as `pydantic.SecretStr` so tracebacks and logs show `**********` instead of plaintext.
+Other processes that need a secret call into the vault over the socket. Secrets travel into the requesting process's memory once, and adapters that need them (e.g. the OpenAI client in `intentframe-server`, IMAP connections in EDI) hold them as `pydantic.SecretStr` so tracebacks and logs show `**********` instead of plaintext.
 
 ### 3. `email-sync-daemon` (EDI) — IMAP/SMTP service
 
@@ -166,7 +166,7 @@ Together with policy-registry, this is the "configuration plane" — what the us
 
 This is the process the entire IntentFrame security model rests on. See [executor.md](executor.md) for the full conceptual treatment and [executor/architecture.md](executor/architecture.md) for the internal four-layer design.
 
-### 9. `intentframe-core` — pipeline, AE, and Guardian
+### 9. `intentframe-server` — pipeline, AE, and Guardian
 
 | | |
 |---|---|
@@ -195,14 +195,14 @@ what bundles or packs mean.
 |---|---|
 | **What it is** | The reference local-assistant agent built on top of IntentFrame. |
 | **Source** | `jarvis_pa/jarvis/` |
-| **Job** | Conversational agent loop, memory, tools. Runs its own LLM. Submits every action as an `IntentFrame` to `intentframe-core` via the Actor SDK. |
+| **Job** | Conversational agent loop, memory, tools. Runs its own LLM. Submits every action as an `IntentFrame` to `intentframe-server` via the Actor SDK. |
 | **Storage** | `~/.intentframe/jarvis/` (memory, conversation history) |
 | **OpenAI calls** | **Yes** — agent reasoning loop (`jarvis/agent.py`), session embeddings (`jarvis/session.py`), memory embeddings and search (`jarvis/memory.py`, `jarvis/memory_search.py`, `jarvis/memory_index.py`) |
 | **Outbound network** | **Only OpenAI API** for its own reasoning. Every other action it wants to take goes through the IntentFrame pipeline. |
 | **Holds credentials?** | OpenAI key only (passed via env from the gateway) |
 | **Lifecycle** | Optional. Started by the gateway in Step 8 if Jarvis is enabled. |
 
-The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-core` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`intentframe_native_kit.action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
+The important property: Jarvis can think freely (OpenAI calls happen in-process), but it cannot act freely. Every side effect — reading a file, sending an email, running a command — goes out through `actor.submit()` to `intentframe-server` for validation, and only then to the executor. Jarvis may run optional registry-backed pre-flight checks in `jarvis_pa/jarvis/tools.py` (`intentframe_native_kit.action_registry` taxonomy + domain payload slices) before submit; the Actor itself does not import the registry. Jarvis does not hold IMAP, calendar, or filesystem credentials. Those live in the executor.
 
 ### 11. `jarvis-telegram` — Telegram bridge (optional)
 
@@ -226,17 +226,17 @@ The IntentFrame *pipeline* (Agent → Actor → AE → Guardian → Executor) is
 |---|---|
 | Third-party agent / Jarvis | `jarvis` (or any other agent process) |
 | Actor SDK | The agent's process — Actor is a library, not a service |
-| Command Shield | `intentframe-core` (deterministic, no LLM) |
-| Deterministic Guardian | `intentframe-core` |
-| Analysis Engine | `intentframe-core` (LLM call to OpenAI) |
-| AI Guardian | `intentframe-core` (LLM call to OpenAI) |
+| Command Shield | `intentframe-server` (deterministic, no LLM) |
+| Deterministic Guardian | `intentframe-server` |
+| Analysis Engine | `intentframe-server` (LLM call to OpenAI) |
+| AI Guardian | `intentframe-server` (LLM call to OpenAI) |
 | Executor gateway, adapters, sandbox, audit, vault | `executor` |
 | Policy storage | `policy-registry` |
 | VFS / adapter registry | `resource-registry` |
 | Email IMAP/SMTP | `email-sync-daemon` (executor's mail adapter and Jarvis tools both call this) |
 | Calendar / Contacts / iMessage / Reminders | `platform-server` (executor adapters call this) |
 
-The two processes that hold the most weight: **`executor`** (the only one with credentials, the only one that touches resources) and **`intentframe-core`** (where the validation pipeline runs).
+The two processes that hold the most weight: **`executor`** (the only one with credentials, the only one that touches resources) and **`intentframe-server`** (where the validation pipeline runs).
 
 ---
 
@@ -251,7 +251,7 @@ All IPC uses Unix domain sockets in `~/.intentframe/run/`. Each socket is owned 
 ├── policy-registry.sock      ← policy-registry
 ├── resource-registry.sock    ← resource-registry
 ├── executor.sock             ← executor
-├── intentframe.sock          ← intentframe-core
+├── intentframe.sock          ← intentframe-server
 ├── platform-server.sock      ← platform-server (macOS only)
 ├── edi.sock                  ← email-sync-daemon (if running)
 ├── jarvis.sock               ← jarvis (if running)
@@ -315,7 +315,7 @@ START
                   ├─ supervisor starts policy-registry
                   ├─ supervisor starts resource-registry   [kit profile only]
                   ├─ supervisor starts executor
-                  └─ supervisor starts intentframe-core   [depends on above]
+                  └─ supervisor starts intentframe-server [depends on above]
        Step 7:  bootstrap (seed policies, register workspace)
        Step 8:  start jarvis                    [if Jarvis enabled]
        Step 9:  start jarvis-telegram           [if Telegram credentials present]
@@ -370,7 +370,7 @@ The process model above is the macOS / Jarvis deployment. Other deployments adju
 | **Linux core** | No platform-server (Swift binary is macOS-only); native adapters become "unavailable"; everything else identical |
 | **Cloud (planned)** | Transport changes from UDS to gRPC; platform-server replaced by cloud-equivalent adapters; credential vault may delegate to KMS / Vault |
 
-The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-core` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`intentframe_native_kit/supervisor_profile.yaml` + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile (see [plugin-profiles.md](plugin-profiles.md)). `intentframe-core`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
+The supervisor's service graph is an admin-owned profile, not hardcoded logic. The packaged minimal default (`supervisor/config/supervisor.yaml`) starts three services — `policy-registry`, `executor`, `intentframe-server` — and the edge exposes `/policies` + `/handshake`/`/process`/`/audit`. The `resource-registry` service (and the edge's `/workspaces` route) is opt-in: first-party products and the test stacks select the kit profiles (`${KIT}/supervisor_profile.yaml` (with `KIT` resolved from the installed package) + `edge_profile.yaml`, via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG` / `INTENTFRAME_EDGE_CONFIG`), which is why the gateway-managed deployment runs all four. Separately, `INTENTFRAME_CORE_CONFIG` selects the core bundle profile and `EXECUTOR_CONFIG` selects the executor pack profile (see [plugin-profiles.md](plugin-profiles.md)). `intentframe-server`, `policy-registry`, and the executor (in `real` mode) are present in every profile, but core will not start until a bundle profile is declared.
 
 ---
 

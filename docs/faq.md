@@ -213,7 +213,7 @@ What singletonness *gives* in return is the property no per-agent model gives: c
 
 ## Q12b. How do I load my own action bundles (not just the first-party kit)?
 
-Declare them in a **`core.yaml`** profile and point **`INTENTFRAME_CORE_CONFIG`** at that file before starting `intentframe-core` (or let the gateway set it when you use `intentframe-gateway-cli`). Each `bundles:` entry is either:
+Declare them in a **`core.yaml`** profile and point **`INTENTFRAME_CORE_CONFIG`** at that file before starting `intentframe-server` (or let the gateway set it when you use `intentframe-gateway-cli`). Each `bundles:` entry is either:
 
 - a short name from the `intentframe.bundles` entry-point group in your wheel's `pyproject.toml`, or
 - a dotted module path exposing `register_bundles(registry)`.

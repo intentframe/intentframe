@@ -6,7 +6,7 @@ IntentFrame has two **plugin hosts** that behave the same way conceptually:
 
 | Host process | Profile file | Env selector | List field | Registers |
 |--------------|--------------|--------------|------------|-----------|
-| **intentframe-core** | `core.yaml` | `INTENTFRAME_CORE_CONFIG` | `bundles:` | Action/domain bundles (Deterministic Guardian, policy validation) |
+| **intentframe-server** (`core.yaml`) | `core.yaml` | `INTENTFRAME_CORE_CONFIG` | `bundles:` | Action/domain bundles (Deterministic Guardian, policy validation) |
 | **executor** | `executor.yaml` | `EXECUTOR_CONFIG` | `packs:` | Transports, auth, storage, capability adapters |
 
 Nothing loads from `pyproject.toml` by itself. Entry points are a **discovery registry**; the profile YAML is the **explicit allowlist**. If a bundle or pack is not listed in the active profile, it does not run.
@@ -48,7 +48,7 @@ flowchart TB
 
 ## Profile files and environment variables
 
-### intentframe-core (`core.yaml`)
+### intentframe-server (`core.yaml`)
 
 | Field | Purpose |
 |-------|---------|
@@ -64,9 +64,9 @@ flowchart TB
 
 **Legacy overrides** (applied after YAML parse): `INTENTFRAME_EXECUTOR_MODE`, `INTENTFRAME_EXECUTOR_SOCKET`, `INTENTFRAME_DRY_RUN_CONTEXT`, `INTENTFRAME_VERBOSE`, `INTENTFRAME_SKIP_ONBOARDING`.
 
-Example and env mapping comments: [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml).
+Example and env mapping comments: [`intentframe_server/config/core.example.yaml`](../packages/intentframe-server/intentframe_server/config/core.example.yaml).
 
-First-party default profile: [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml).
+First-party default profile: [`intentframe_native_kit/core.yaml`](../packages/intentframe-native-kit/intentframe_native_kit/core.yaml).
 
 ### executor (`executor.yaml`)
 
@@ -160,7 +160,7 @@ The gateway is a first-party product launcher. It does not load bundles or packs
 | `resolve_core_config_path()` | `INTENTFRAME_CORE_CONFIG` on supervisor child env; bootstrap uses `core.yaml` `bundles:` with `validate_policy_with_bundles` after `load_policy_seed` |
 | `EXECUTOR_CONFIG` (env or default `jarvis_pa/executor.yaml`) | Executor child |
 
-`resolve_core_config_path()` treats a **missing or empty** `INTENTFRAME_CORE_CONFIG` as “use first-party kit `core.yaml`”. That normalization is **gateway-only**. `intentframe-core` itself still fails closed if started without a valid config path.
+`resolve_core_config_path()` treats a **missing or empty** `INTENTFRAME_CORE_CONFIG` as “use first-party kit `core.yaml`”. That normalization is **gateway-only**. `intentframe-server` process still fails closed if started without a valid config path.
 
 ---
 
@@ -231,9 +231,9 @@ For adapter-level detail, see [executor.md](executor.md) § extending the execut
 
 | Area | Role |
 |------|------|
-| [`intentframe_server/config.py`](../intentframe_server/config.py) | `load_core_config()`, fail-closed validation |
-| [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml) | Annotated template + legacy env mapping |
-| [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml) | First-party default profile |
+| [`intentframe_server/config.py`](../packages/intentframe-server/intentframe_server/config.py) | `load_core_config()`, fail-closed validation |
+| [`intentframe_server/config/core.example.yaml`](../packages/intentframe-server/intentframe_server/config/core.example.yaml) | Annotated template + legacy env mapping |
+| [`intentframe_native_kit/core.yaml`](../packages/intentframe-native-kit/intentframe_native_kit/core.yaml) | First-party default profile |
 | [`intentframe_bundle_sdk/loader.py`](../intentframe_bundle_sdk/loader.py) | `intentframe.bundles` entry-point + module resolution |
 | [`executor/server.py`](../executor/server.py) | `intentframe.executor_packs` pack loading |
 | [`intentframe_gateway/profiles.py`](../intentframe_gateway/profiles.py) | `resolve_core_config_path()` (gateway-only empty/missing → kit default) |
@@ -265,7 +265,7 @@ Example YAML shipped with the repo:
 
 | File | Role |
 |------|------|
-| [`intentframe_server/config/core.example.yaml`](../intentframe_server/config/core.example.yaml) | Annotated core profile template |
-| [`intentframe_native_kit/core.yaml`](../intentframe_native_kit/core.yaml) | First-party default `bundles:` |
+| [`intentframe_server/config/core.example.yaml`](../packages/intentframe-server/intentframe_server/config/core.example.yaml) | Annotated core profile template |
+| [`intentframe_native_kit/core.yaml`](../packages/intentframe-native-kit/intentframe_native_kit/core.yaml) | First-party default `bundles:` |
 | [`executor/config/executor.yaml`](../executor/config/executor.yaml) | Reference `packs:` and adapter wiring |
 | [`jarvis_pa/executor.yaml`](../jarvis_pa/executor.yaml) | Jarvis user-mode executor profile |

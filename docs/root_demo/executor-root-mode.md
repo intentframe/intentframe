@@ -87,10 +87,14 @@ So root is not the normal product value proposition. It is mainly useful as:
 For most root-demo development, start the supervisor with a synthetic executor:
 
 ```bash
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
 INTENTFRAME_EXECUTOR_MODE=dry_run \
 INTENTFRAME_DRY_RUN_CONTEXT=root \
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
-python -m supervisor.main start
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 Profile env vars (`INTENTFRAME_CORE_CONFIG`, `EXECUTOR_CONFIG`, entry points): [plugin-profiles.md](../plugin-profiles.md).
@@ -144,7 +148,7 @@ intentframe-gateway-cli --profile root
 The CLI translates that into:
 
 - `JARVIS_VARIANT=root`
-- `INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml`
+- `INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml"` (set `KIT` as in the supervisor blocks above)
 - `EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml` (only if the operator did not already set `EXECUTOR_CONFIG`)
 
 ### 2a. (Alternative) Launch supervisor directly (faster dev loop)
@@ -161,11 +165,15 @@ successfully on this machine — otherwise `pack_options.sandbox.escalate: sudo`
 `executor_root.yaml` will not have a working `sudo -n` path.
 
 ```bash
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
 JARVIS_VARIANT=root \
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \
 INTENTFRAME_ESCALATION_ARMED=1 \
-python -m supervisor.main start
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 The gateway normally injects `INTENTFRAME_ESCALATION_ARMED=0|1` on **each
@@ -285,7 +293,7 @@ This is read by `intentframe_server/server.py` at runtime startup:
 
 The supervisor also reads this value. In dry-run mode it does not start the
 standalone executor service and removes `executor` from
-`intentframe-core.depends_on`. Unknown values raise at startup. This is
+`intentframe-server` service graph / `depends_on`. Unknown values raise at startup. This is
 deliberate: typos must never silently fall back to a less-safe mode.
 
 ### `INTENTFRAME_DRY_RUN_CONTEXT`

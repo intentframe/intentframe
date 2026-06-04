@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "command-shield"
+version = "0.1.0"
+description = "Deterministic command and code security analysis — capability classification, structural decomposition, and pattern matching"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["security", "shell", "command", "static-analysis", "sandbox"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "bashlex>=0.18",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+]
+
+[project.optional-dependencies]
+# LLM-backed deep code review (lazy-imported in command_shield/review/reviewer.py)
+review = ["openai-agents>=0.7.0"]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["command_shield"]
+exclude = ["command_shield/tests"]

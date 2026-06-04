@@ -214,7 +214,10 @@ def _print_executor_alert() -> None:
         print("#    INTENTFRAME_EXECUTOR_MODE=dry_run \\")
         print("#    INTENTFRAME_DRY_RUN_CONTEXT=root \\")
         print("#    python -m supervisor.main start \\")
-        print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+        print(
+            '#      --config "${KIT}/supervisor_profile.yaml"  '
+            '# (KIT=… — see demo/README.md)'
+        )
         print("#")
         print("#  (--config starts resource-registry so root-demo workspaces seed;")
         print("#   it is NOT in the supervisor's minimal default graph.)")
@@ -235,13 +238,19 @@ def _print_executor_alert() -> None:
         print("#    EXECUTOR_CONFIG=jarvis_pa/executor_root.yaml \\")
         print("#    INTENTFRAME_ESCALATION_ARMED=1 \\")
         print("#    python -m supervisor.main start \\")
-        print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+        print(
+            '#      --config "${KIT}/supervisor_profile.yaml"  '
+            '# (KIT=… — see demo/README.md)'
+        )
         print("#")
         print("#  SAFER ALTERNATIVE — DRY-RUN (no host I/O):")
         print("#    INTENTFRAME_EXECUTOR_MODE=dry_run \\")
         print("#    INTENTFRAME_DRY_RUN_CONTEXT=root \\")
         print("#    python -m supervisor.main start \\")
-        print("#      --config intentframe_native_kit/supervisor_profile.yaml")
+        print(
+            '#      --config "${KIT}/supervisor_profile.yaml"  '
+            '# (KIT=… — see demo/README.md)'
+        )
         print("#")
         print("#  (gateway --profile root passes the kit profile automatically;")
         print("#   the direct launches above need --config for resource-registry.)")

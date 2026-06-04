@@ -339,7 +339,7 @@ adapter credentials = per-call dict, not the registry
 ## Where should I read next?
 
 - [`credentials-vault.md`](credentials-vault.md): vault service lifecycle, UDS API, delivery modes, and backend selection.
-- [`../intentframe_credentials/README.md`](../intentframe_credentials/README.md): package-level implementation details.
+- [`../packages/intentframe-credentials/README.md`](../packages/intentframe-credentials/README.md): package-level implementation details.
 - [`executor/architecture.md`](executor/architecture.md): executor registry pattern and pack loading.
 - [`executor.md`](executor.md): executor credential isolation and adapter execution flow.
 - [`plugin-profiles.md`](plugin-profiles.md): how `core.yaml` and `executor.yaml` load bundles and packs.

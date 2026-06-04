@@ -10,7 +10,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import executor
+import intentframe_native_kit
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
+_EXECUTOR_ROOT = Path(executor.__file__).resolve().parent
+_NATIVE_KIT_ROOT = Path(intentframe_native_kit.__file__).resolve().parent
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "intentframe_native_adapters",
@@ -21,7 +26,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
 )
 
 STRICT_ROOTS = (
-    REPO_ROOT / "executor",
+    _EXECUTOR_ROOT,
 )
 
 ALLOWLISTED_IMPORTS: dict[Path, frozenset[str]] = {}
@@ -32,9 +37,9 @@ PACK_FORBIDDEN_IMPORT_PREFIXES = (
     "intentframe_native_kit.intentframe_native_bundles",
 )
 PACK_STRICT_ROOTS = (
-    REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_posix",
-    REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_macos",
-    REPO_ROOT / "intentframe_native_kit" / "intentframe_executor_pack_console",
+    _NATIVE_KIT_ROOT / "intentframe_executor_pack_posix",
+    _NATIVE_KIT_ROOT / "intentframe_executor_pack_macos",
+    _NATIVE_KIT_ROOT / "intentframe_executor_pack_console",
 )
 
 

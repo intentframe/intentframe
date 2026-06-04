@@ -21,7 +21,7 @@ Prerequisites:
 
       EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
       python -m supervisor.main start \
-        --config intentframe_native_kit/supervisor_profile.yaml
+        --config "${KIT}/supervisor_profile.yaml"
 
   Over HTTP against ``deploy/dev/`` container: defense validation works without
   Mac/container filesystem sync; see ``deploy/dev/README.md`` §2c.

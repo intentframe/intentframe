@@ -45,6 +45,25 @@ dependencies = [
     "jarvis-telegram",
     "prompt-toolkit>=3.0",
     "rich>=13.0",
+    # Split workspace distributions (foundation + SDKs), see packages/
+    "intentframe-core",
+    "intentframe-policy-registry",
+    "intentframe-client",
+    "intentframe-actor",
+    "intentframe-bundle-sdk",
+    "intentframe-executor-sdk",
+    "command-shield",
+    # Split workspace distributions (runtime layer), see packages/
+    "intentframe-prompt-library",
+    "intentframe-components",
+    "intentframe-executor-client",
+    "intentframe-executor",
+    "intentframe-server",
+    "intentframe-runtime",
+    "intentframe-supervisor[native]",
+    "intentframe-native-kit",
+    "intentframe-proxy",
+    "intentframe-edge",
 ]
 
 [project.optional-dependencies]
@@ -58,47 +77,22 @@ Homepage = "https://github.com/intentframe/intentframe"
 Repository = "https://github.com/intentframe/intentframe"
 Issues = "https://github.com/intentframe/intentframe/issues"
 
-# Executor packs advertise themselves here so deployments (including other
-# orgs) can reference them by short name in executor.yaml `packs:`. Each value
-# points at the pack's module-level register_all() callable.
-[project.entry-points."intentframe.executor_packs"]
-console = "intentframe_native_kit.intentframe_executor_pack_console:register_all"
-posix = "intentframe_native_kit.intentframe_executor_pack_posix:register_all"
-macos = "intentframe_native_kit.intentframe_executor_pack_macos:register_all"
-
-[project.entry-points."intentframe.bundles"]
-native = "intentframe_native_kit.intentframe_native_bundles:register_bundles"
-
-[tool.setuptools.package-data]
-# Ship the supervisor's default service graph and the kit's first-party
-# profile so `--config` resolution works from an installed wheel, not just a
-# repo checkout.
-supervisor = ["config/*.yaml"]
-intentframe_server = ["config/*.yaml"]
-intentframe_native_kit = ["supervisor_profile.yaml", "edge_profile.yaml", "core.yaml"]
+# NOTE: the intentframe.executor_packs and intentframe.bundles entry points
+# now live in the intentframe-native-kit distribution under packages/, which
+# owns those modules and advertises them on install.
 
 [tool.setuptools.packages.find]
 where = ["."]
+# NOTE: intentframe_core, policy_registry, intentframe_client, intentframe_actor,
+# intentframe_bundle_sdk, executor_sdk, command_shield, intentframe_prompt_library,
+# intentframe_components, executor_client, executor, intentframe_server,
+# intentframe_native_kit, intentframe_proxy, intentframe_edge, intentframe_credentials,
+# and the supervisor (now intentframe-supervisor) ship as separate workspace distributions
+# under packages/ and are pulled in as dependencies above.
 include = [
-    "intentframe_native_kit*",
-    "intentframe_bundle_sdk*",
-    "intentframe_core*",
-    "intentframe_prompt_library*",
-    "intentframe_components*",
-    "intentframe_client*",
-    "intentframe_server*",
-    "intentframe_actor*",
     "intentframe_dashboard*",
-    "executor*",
-    "executor_client*",
-    "executor_sdk*",
-    "policy_registry*",
-    "command_shield*",
-    "supervisor*",
     "intentframe_gateway*",
     "intentframe_cli*",
-    "intentframe_edge*",
-    "intentframe_proxy*",
 ]
 
 [dependency-groups]
@@ -108,11 +102,10 @@ dev = [
 ]
 
 [project.scripts]
-intentframe = "supervisor.main:main"
-intentframe-backend = "supervisor.main:backend_main"
+# `intentframe` / `intentframe-backend` are owned by the intentframe-supervisor
+# distribution (packages/intentframe-supervisor) and reach PATH via that dep.
 intentframe-gateway-cli = "intentframe_cli.main:main"
 intentframe-gateway-backend = "intentframe_gateway.entry:backend_main"
-intentframe-edge = "intentframe_edge.__main__:main"
 
 
 [tool.pytest.ini_options]
@@ -121,13 +114,52 @@ asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 
 [tool.uv.workspace]
-members = ["jarvis_pa", "external_data_ingestion", "intentframe_credentials", "jarvis_telegram"]
+members = [
+    "packages/intentframe-core",
+    "packages/policy-registry",
+    "packages/intentframe-client",
+    "packages/intentframe-actor",
+    "packages/intentframe-bundle-sdk",
+    "packages/executor-sdk",
+    "packages/command-shield",
+    "packages/intentframe-prompt-library",
+    "packages/intentframe-components",
+    "packages/executor-client",
+    "packages/executor",
+    "packages/intentframe-server",
+    "packages/intentframe-runtime",
+    "packages/intentframe-supervisor",
+    "packages/intentframe-native-kit",
+    "packages/intentframe-proxy",
+    "packages/intentframe-edge",
+    "jarvis_pa",
+    "external_data_ingestion",
+    "packages/intentframe-credentials",
+    "jarvis_telegram",
+]
 
 [tool.uv.sources]
 jarvis-pa = { workspace = true }
 email-sync-service = { workspace = true }
 intentframe-credentials = { workspace = true }
 jarvis-telegram = { workspace = true }
+intentframe-core = { workspace = true }
+intentframe-policy-registry = { workspace = true }
+intentframe-client = { workspace = true }
+intentframe-actor = { workspace = true }
+intentframe-bundle-sdk = { workspace = true }
+intentframe-executor-sdk = { workspace = true }
+command-shield = { workspace = true }
+intentframe-prompt-library = { workspace = true }
+intentframe-components = { workspace = true }
+intentframe-executor-client = { workspace = true }
+intentframe-executor = { workspace = true }
+intentframe-server = { workspace = true }
+intentframe-runtime = { workspace = true }
+intentframe-supervisor = { workspace = true }
+intentframe-native-kit = { workspace = true }
+intentframe-proxy = { workspace = true }
+intentframe-edge = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev"]

@@ -31,7 +31,7 @@ IntentFrame separates three concerns:
   PolicyRegistryClient.set_user_policy()  ← POST /policies
       │
       ▼
-  intentframe-core GET /policies/{user}/{agent}  on each handshake/process
+  intentframe-server GET /policies/{user}/{agent}  on each handshake/process
 ```
 
 **Two validation kinds:**
@@ -57,10 +57,13 @@ It is the canonical “admin orchestrator” example: same pattern as `demo/test
 Supervisor running with `policy-registry` (kit profile for demos that need workspaces):
 
 ```bash
-INTENTFRAME_CORE_CONFIG=intentframe_native_kit/core.yaml \
+# First-party kit profiles live in the installed intentframe-native-kit package
+# (there is no intentframe_native_kit/ directory at the repo root).
+KIT="$(uv run python -c 'import intentframe_native_kit as k, pathlib; print(pathlib.Path(k.__file__).parent)')"
+INTENTFRAME_CORE_CONFIG="${KIT}/core.yaml" \
 EXECUTOR_CONFIG=demo/config/executor_attacks.yaml \
-python -m supervisor.main start \
-  --config intentframe_native_kit/supervisor_profile.yaml
+uv run python -m supervisor.main start \
+  --config "${KIT}/supervisor_profile.yaml"
 ```
 
 From repo root: `uv sync`.
@@ -134,7 +137,7 @@ No script changes — `PolicyRegistryClient` reads `INTENTFRAME_POLICY_URL` when
 | [`intentframe_gateway/bootstrap.py`](../../intentframe_gateway/bootstrap.py) | Gateway proxy HTTP | Yes (`core.yaml` bundles) | Yes |
 | [`jarvis_pa/seed_policies.py`](../../jarvis_pa/seed_policies.py) | Raw UDS `httpx` today | If `INTENTFRAME_CORE_CONFIG` set | Yes |
 | [`demo/tests/policy_loader.py`](../../demo/tests/policy_loader.py) | Via test `PolicyRegistryClient` | Yes | Via test helpers |
-| [`intentframe_server`](../../intentframe_server/) | GET only | N/A (reads store) | N/A |
+| [`intentframe_server`](../../packages/intentframe-server/intentframe_server/) | GET only | N/A (reads store) | N/A |
 
 ## Validate without posting
 

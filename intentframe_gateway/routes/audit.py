@@ -1,6 +1,6 @@
 """Audit proxy routes — /audit/*
 
-Proxies the audit endpoints from intentframe-core (intentframe.sock).
+Proxies the audit endpoints from intentframe-server (intentframe.sock).
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
-_BACKEND = "intentframe-core"
+_BACKEND = "intentframe-server"
 
 
 def _proxy(request: Request):

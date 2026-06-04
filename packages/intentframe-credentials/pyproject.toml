@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-credentials"
+version = "0.1.0"
+description = "IntentFrame credential vault — OS keyring-backed secret storage with UDS service API"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+authors = [{ name = "IntentFrame Contributors" }]
+keywords = ["ai", "agents", "security", "intentframe", "credentials", "vault"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "pydantic>=2.12.5",
+    "keyring",
+    "httpx>=0.28.1",
+    "fastapi",
+    "uvicorn[standard]",
+    "structlog>=25.5.0",
+    "aiosqlite>=0.21",
+]
+
+[project.optional-dependencies]
+hashicorp = [
+    "hvac>=2.0",
+]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=0.23",
+    "hvac>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/intentframe/intentframe"
+Repository = "https://github.com/intentframe/intentframe"
+Issues = "https://github.com/intentframe/intentframe/issues"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.hatch.build.targets.wheel]
+packages = ["intentframe_credentials"]
