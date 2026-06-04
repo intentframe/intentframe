@@ -19,9 +19,9 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-bundle-sdk",
-    "intentframe-executor-sdk",
-    "command-shield",
+    "intentframe-bundle-sdk==0.1.0",
+    "intentframe-executor-sdk==0.1.0",
+    "command-shield==0.1.0",
     "fastapi",
     "httpx>=0.28.1",
     "pydantic>=2.12.5",

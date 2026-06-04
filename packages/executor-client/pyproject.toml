@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-core",
+    "intentframe-core==0.1.0",
     "httpx>=0.28.1",
     "pydantic>=2.12.5",
 ]

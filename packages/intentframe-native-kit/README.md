@@ -23,11 +23,18 @@ pip install intentframe-native-kit
 
 `intentframe-native-kit` is distributed under the Apache License 2.0.
 
-## Email Integration
+## Email integration (optional)
 
-Email bundles and adapters use the product-side EDI `EmailClient` through lazy
-imports. `email-sync-service` is intentionally not declared as a package
-dependency because it is not published to PyPI. Non-email actions work with a
-normal `pip install intentframe-native-kit`; email actions require
-`external_data_ingestion` to be installed in the same runtime environment by the
-product or deployment.
+Email bundles and macOS mail adapters call the product-side EDI `EmailClient` via
+**lazy imports** — nothing email-related is imported at package install time.
+
+- `email-sync-service` (`external_data_ingestion`) is **not** on PyPI and is **not**
+  declared in this package’s dependencies.
+- A normal `pip install intentframe-native-kit` is enough for all non-email actions.
+- To use email actions, your deployment must also provide EDI (for example the
+  in-repo `external_data_ingestion` tree used by the IntentFrame product). Without
+  it, importing or running those code paths fails at **use time** with
+  `ImportError`, not at install time.
+
+See [docs/licensing.md](../../docs/licensing.md) for the publishable `packages/`
+surface vs product-facing modules.

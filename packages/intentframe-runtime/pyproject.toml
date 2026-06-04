@@ -26,9 +26,9 @@ classifiers = [
 # substrate. The resource-registry / native-kit "flavour" is deliberately NOT
 # here — that lives at the supervisor layer.
 dependencies = [
-    "intentframe-policy-registry",
-    "intentframe-executor",
-    "intentframe-server",
+    "intentframe-policy-registry==0.1.0",
+    "intentframe-executor==0.1.0",
+    "intentframe-server==0.1.0",
 ]
 
 [project.urls]

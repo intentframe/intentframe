@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-runtime",       # the 3-process substrate it spawns
+    "intentframe-runtime==0.1.0",       # the 3-process substrate it spawns
     "pydantic>=2.12.5",          # config.py schema
     "pyyaml>=6.0.3",             # profile loading
     "httpx>=0.28.1",             # health.py UDS polling
@@ -35,7 +35,7 @@ dependencies = [
 # INTENTFRAME_SUPERVISOR_CONFIG at the kit profile to start the resource-registry.
 # The supervisor itself never imports or auto-detects native-kit — installing this
 # extra only makes the module + profile present so the chosen profile can run.
-native = ["intentframe-native-kit"]
+native = ["intentframe-native-kit==0.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/intentframe/intentframe"

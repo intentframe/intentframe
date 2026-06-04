@@ -19,10 +19,10 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-core",
-    "intentframe-components",
-    "intentframe-policy-registry",
-    "intentframe-executor-client",
+    "intentframe-core==0.1.0",
+    "intentframe-components==0.1.0",
+    "intentframe-policy-registry==0.1.0",
+    "intentframe-executor-client==0.1.0",
     "fastapi",
     "uvicorn[standard]",
     "pydantic>=2.12.5",

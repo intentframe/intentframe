@@ -19,8 +19,8 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-core",
-    "intentframe-credentials",
+    "intentframe-core==0.1.0",
+    "intentframe-credentials==0.1.0",
     "pydantic>=2.12.5",
 ]
 

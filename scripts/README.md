@@ -2,6 +2,10 @@
 
 Utility scripts for local development setup.
 
+## PyPI release (`packages/` only)
+
+See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`) and pre-publish validation (`validate_publish.sh`: build, `twine check`, clean-room install from `dist/publish/`).
+
 ## Kits two-venv harness (substrate + wheel, edge for tests)
 
 See [`kits-two-venv/README.md`](kits-two-venv/README.md) — bare `.venv-runtime`, constrained `uv pip install` of kit wheels from `.intentframe/kits/`, start supervisor + edge, run demo tests from `.venv` over HTTP. Per-script behavior: [Script internals](kits-two-venv/README.md#script-internals).

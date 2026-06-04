@@ -19,8 +19,8 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-client",
-    "intentframe-core",
+    "intentframe-client==0.1.0",
+    "intentframe-core==0.1.0",
 ]
 
 [project.urls]

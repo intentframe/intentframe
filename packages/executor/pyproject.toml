@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-executor-sdk",
+    "intentframe-executor-sdk==0.1.0",
     "fastapi",
     "uvicorn[standard]",
     "pydantic>=2.12.5",
