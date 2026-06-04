@@ -1,0 +1,84 @@
+name: Release (packages/ → PyPI)
+
+# Manual-only. Trigger from the Actions tab ("Run workflow"), choose the target
+# index, and confirm. Nothing publishes automatically on push or tag.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Index to publish to"
+        type: choice
+        required: true
+        default: testpypi
+        options:
+          - testpypi
+          - pypi
+      version:
+        description: "Expected version (must match packages/, e.g. 0.1.0)"
+        type: string
+        required: true
+      confirm:
+        description: 'Type "publish" to confirm upload'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python 3.14
+        run: uv python install 3.14
+
+      - name: Verify lockstep version pins match requested version
+        run: python3 scripts/release/set_version.py "${{ inputs.version }}" --check
+
+      - name: Build, twine check, clean-room install
+        run: bash scripts/release/validate_publish.sh
+
+      - name: Upload built distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-publish
+          path: dist/publish/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to ${{ inputs.target }}
+    needs: build
+    runs-on: ubuntu-latest
+    # Requires the confirmation phrase. The environment gate (below) lets you
+    # add required reviewers in repo Settings → Environments for an extra
+    # manual approval step before any upload runs, and is where the API token
+    # secret lives.
+    if: ${{ inputs.confirm == 'publish' }}
+    environment: ${{ inputs.target }}
+    steps:
+      - name: Download built distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-publish
+          path: dist/publish
+
+      - name: Publish to TestPyPI
+        if: ${{ inputs.target == 'testpypi' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/publish
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+
+      - name: Publish to PyPI
+        if: ${{ inputs.target == 'pypi' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/publish
+          password: ${{ secrets.PYPI_API_TOKEN }}
