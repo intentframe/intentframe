@@ -2,6 +2,12 @@
 
 Utility scripts for local development setup.
 
+## GitHub release wheels
+
+See [`github-release/README.md`](github-release/README.md) for the manual release-assets runbook: build, upload `dist/publish/*.whl`, verify, and update future releases.
+
+See [`github-install/README.md`](github-install/README.md) for the consumer-side `uv` source template and install verifier.
+
 ## PyPI release (`packages/` only)
 
 See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`).

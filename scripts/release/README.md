@@ -2,6 +2,8 @@
 
 Only distributions under `packages/` are published. Product-facing code (root `intentframe`, gateway, Jarvis, EDI) stays out of scope. See [docs/licensing.md](../../docs/licensing.md) for AGPL vs Apache split.
 
+**Interim install from GitHub release wheels** (while PyPI new-project limits apply): build → upload `.whl` assets → verify. Full manual runbook: [`../github-release/README.md`](../github-release/README.md).
+
 ## Lockstep versioning
 
 All 18 packages share one version. Intra-workspace dependencies are pinned to `==<version>` so wheels resolve correctly off PyPI (workspace sources are dev-only).
@@ -140,13 +142,26 @@ Auth: `TEST_PYPI_API_TOKEN` / `PYPI_API_TOKEN`, else `TWINE_PASSWORD`, else `~/.
 
 When rate-limited on production, use **`--no-build`** and **one selector per command** so a `429` on the second package does not roll back the first.
 
+## GitHub release wheels (interim)
+
+Before or in parallel with PyPI, you can ship the same `dist/publish/*.whl` files as **GitHub release assets** so other repos install by URL (`uv` `[tool.uv.sources]`). Full release steps: [`../github-release/README.md`](../github-release/README.md). Consumer `pyproject.toml` and verifier: [`../github-install/README.md`](../github-install/README.md).
+
+```bash
+./scripts/release/validate_publish.sh
+gh release upload v0.1.0 dist/publish/*.whl    # after creating the release tag
+./scripts/github-install/verify_release_install.sh --tag v0.1.0
+```
+
+Use **wheels only** for this path; sdists on the release are optional. Tag version must match wheel versions (`v0.1.0` → `*-0.1.0-*.whl`).
+
 ## Suggested release order
 
 1. `set_version.py <version>` → `uv sync` → run tests
 2. `./scripts/release/validate_publish.sh`
-3. **TestPyPI:** workflow `group=all` or `publish.py --all --target testpypi`; verify `pip install` from TestPyPI
-4. **PyPI (first time):** groups `1` → `2` → `3` via workflow or local `publish.py`, spaced if rate-limited; then `all` only when every name already exists
-5. `git tag v<version> && git push --tags`
+3. **GitHub release (optional, interim):** create tag → `gh release upload v<version> dist/publish/*.whl` → `verify_release_install.sh --tag v<version>`
+4. **TestPyPI:** workflow `group=all` or `publish.py --all --target testpypi`; verify `pip install` from TestPyPI
+5. **PyPI (first time):** groups `1` → `2` → `3` via workflow or local `publish.py`, spaced if rate-limited; then `all` only when every name already exists
+6. `git tag v<version> && git push --tags` (if not already tagged for the GitHub release)
 
 ## Troubleshooting
 
