@@ -3,9 +3,10 @@ name: Release (packages/ → PyPI)
 # Manual-only. Trigger from the Actions tab ("Run workflow"), choose target,
 # package group, and confirm. Nothing publishes automatically on push or tag.
 #
-# PyPI limits how many *new* project names an account can register per window.
-# For first-time production releases, run groups 1 → 2 → 3 (hours apart if needed)
-# instead of "all". Re-runs are safe: skip-existing ignores already-uploaded files.
+# Full docs: scripts/release/README.md (PyPI 429 limits, dist/publish vs dist/upload).
+# First-time production PyPI: run groups 1 → 2 → 3 (hours apart if needed), not "all".
+# Build validates all 18 packages; publish uploads only the staged group in dist/upload/.
+# Re-runs are safe: skip-existing ignores already-uploaded files.
 on:
   workflow_dispatch:
     inputs:

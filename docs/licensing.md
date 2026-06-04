@@ -1,6 +1,6 @@
 # Licensing
 
-IntentFrame uses a split license model across publishable workspace packages (`packages/`).
+IntentFrame uses a split license model across publishable workspace packages (`packages/`). Publishing to PyPI (groups, rate limits, CI vs local): [`scripts/release/README.md`](../scripts/release/README.md).
 
 ## AGPL-3.0 (runtime stack)
 

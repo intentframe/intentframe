@@ -4,7 +4,7 @@ Utility scripts for local development setup.
 
 ## PyPI release (`packages/` only)
 
-See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), and terminal uploads (`publish.py`).
+See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`).
 
 ## Kits two-venv harness (substrate + wheel, edge for tests)
 
