@@ -14,7 +14,7 @@ These packages implement the running policy pipeline and three-process substrate
 | `intentframe-components` | `packages/intentframe-components` |
 | `intentframe-runtime` | `packages/intentframe-runtime` |
 
-Each ships with the repository root `LICENSE` (GNU AGPL v3) referenced in its package metadata.
+Each includes a `LICENSE` file (copy of the repository root GNU AGPL v3 text) and declares `license-files = ["LICENSE"]` in `pyproject.toml` so wheels and sdists ship the full license.
 
 ## Apache-2.0 (SDKs, ingress, kit, vault)
 

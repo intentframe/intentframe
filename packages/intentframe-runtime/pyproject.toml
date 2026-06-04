@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "IntentFrame runtime — the three-process substrate (policy-registry, executor, server) the supervisor spawns"
 readme = "README.md"
 license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
 authors = [{ name = "IntentFrame Contributors" }]
 keywords = ["ai", "agents", "security", "intentframe", "runtime"]
