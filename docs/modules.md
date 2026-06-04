@@ -448,7 +448,7 @@ Product/agent code outside substrate; demonstrate Actor-only integration.
 
 **Runtime stack** (workspace): `intentframe-runtime` → `intentframe-supervisor` → optional `[native]` → `intentframe-native-kit`. Substrate services live in `packages/intentframe-server`, `packages/executor`, `packages/policy-registry`, etc. Network ingress is `packages/intentframe-edge` (depends on `packages/intentframe-proxy`); the two-venv harness installs both into `.venv-runtime` and pins them in `runtime-constraints.txt`.
 
-**Separate workspace members** (`[tool.uv.workspace]`): all `packages/*` (including `intentframe-credentials`) plus `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion` — each with its own `pyproject.toml`.
+**Separate workspace members** (`[tool.uv.workspace]`): all `packages/*` (including `intentframe-credentials`) plus `jarvis_pa`, `jarvis_telegram`, `external_data_ingestion` — each with its own `pyproject.toml`. License split: AGPL substrate core vs Apache-2.0 SDKs/kit/ingress — see [licensing.md](licensing.md).
 
 **Not Python packages:** `macos-appkit-server/` (Swift), `demo/`, `deploy/`, `docs/`, `tests/`, `scripts/`.
 

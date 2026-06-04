@@ -7,7 +7,8 @@ name = "command-shield"
 version = "0.1.0"
 description = "Deterministic command and code security analysis — capability classification, structural decomposition, and pattern matching"
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
 authors = [{ name = "IntentFrame Contributors" }]
 keywords = ["security", "shell", "command", "static-analysis", "sandbox"]
