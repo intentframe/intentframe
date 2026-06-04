@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20Apache--2.0-blue.svg" alt="License: AGPL-3.0 + Apache-2.0">
   <img src="https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.14+">
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
   <img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha">
@@ -457,6 +457,8 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
 | An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/executor.md`](docs/executor.md) → [`docs/executor/standalone-product.md`](docs/executor/standalone-product.md) |
 | Shipping custom action bundles or executor packs | [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/dev/action-family-wiring.md`](docs/dev/action-family-wiring.md) |
+| Installing package wheels from a release | [`scripts/github-install/README.md`](scripts/github-install/README.md) → [`scripts/github-release/README.md`](scripts/github-release/README.md) |
+| Checking package licensing | [`docs/licensing.md`](docs/licensing.md) |
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
 | Looking for common objections answered | [`docs/faq.md`](docs/faq.md) |
@@ -607,7 +609,7 @@ Honest about it. The architecture is settled, the core pipeline is stable, the t
 - **Security reports:** email [`intentframe@gmail.com`](mailto:intentframe@gmail.com) and do not open a public issue.
 - **Updates:** follow [`@intent_frame`](https://x.com/intent_frame) on X/Twitter.
 
-IntentFrame is AGPL-3.0-only for open-source use. Commercial licensing is available for organizations that want to use or embed IntentFrame without AGPL obligations.
+The root product code remains AGPL-3.0 for open-source use. Publishable packages under `packages/` use a documented AGPL/Apache split; see [`docs/licensing.md`](docs/licensing.md). Commercial licensing is available for organizations that want to use or embed AGPL-covered parts without AGPL obligations.
 
 ---
 
@@ -616,7 +618,7 @@ IntentFrame is AGPL-3.0-only for open-source use. Commercial licensing is availa
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Support: [`SUPPORT.md`](SUPPORT.md)
 - Reporting a vulnerability: [`SECURITY.md`](SECURITY.md) — please don't open a public issue for security findings
-- License: Copyright (c) 2026 IntentFrame Contributors. AGPL-3.0-only ([`LICENSE`](LICENSE)). Commercial licensing available for organizations that don't want AGPL terms.
+- License: Copyright (c) 2026 IntentFrame Contributors. Root product code is AGPL-3.0-only ([`LICENSE`](LICENSE)); package-level licenses are listed in [`docs/licensing.md`](docs/licensing.md). Commercial licensing is available for organizations that don't want AGPL terms.
 
 ---
 

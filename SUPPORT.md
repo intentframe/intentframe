@@ -31,7 +31,7 @@ Email **intentframe@gmail.com** and follow the process in [`SECURITY.md`](SECURI
 
 ## Commercial Licensing and Partnerships
 
-IntentFrame is AGPL-3.0-only for open-source use. Commercial licensing is available for organizations that want to use or embed IntentFrame without AGPL obligations.
+Root product/runtime code is AGPL-3.0 for open-source use. Some publishable packages are Apache-2.0; see [`docs/licensing.md`](docs/licensing.md) for the package-by-package split. Commercial licensing is available for organizations that want to use or embed AGPL-covered parts without AGPL obligations.
 
 Email **intentframe@gmail.com** for:
 
