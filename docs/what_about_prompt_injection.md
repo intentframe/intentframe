@@ -142,34 +142,6 @@ This is why separating the agent from the judge matters for prompt injection. Th
 
 ---
 
-## The Compounding Chain
-
-Why is injecting the agent, AE, and Guardian **simultaneously** the hard part? Because each stage must succeed for the attack to pay out, and each stage has a different job.
-
-In the simplest case, the agent knows nothing about IntentFrame. Its system prompt only hardens its own generic `trusted_context` / boundary protocol — there is no mention of an Analysis Engine, Guardian, or IntentFrame's schema or tokens. (For example, the return-agent experiment's Build A system prompt references only developer-controlled `trusted_context` and the customer email thread, never any downstream judge.)
-
-Walk the stages:
-
-| Stage | What must happen | Why it is hard |
-|---|---|---|
-| **0 — Blind attacker** | The payload author writes into a customer email thread (or similar). | They do not know a judge exists, let alone its two system prompts, its schema, or its per-request random boundary tokens. |
-| **1 — Inject the agent** | The thread must manipulate the agent into proposing the malicious action. | Achievable via social engineering (the return-agent experiment showed this). But injecting the agent to misbehave ≠ injecting it to author a working IntentFrame payload — it does not know the target's format. |
-| **2 — Agent emits an AE-facing payload** | The agent must submit `reason` / `target` / `data` that carries a second-stage payload for the AE. | That content lands in the AE's **untrusted slot**. Boundary forgery fails (random per-request token). Instruction-like text is supposed to become a flag, not a command. |
-| **3 — AE emits a poisoned report** | The AE must produce a misleading `AnalysisReport`. | The AE has **no decision field**, enums are sanitized, and free-text is capped. The best case for the attacker is bounded misleading prose — not direct authorization. |
-| **4 — Guardian is also fooled** | The Guardian must return `ALLOW` despite its separate role and policy context. | It must be influenced by content that already survived stages 1–3, while also seeing the raw untrusted fields independently. |
-
-A single payload string would have to be **simultaneously**:
-
-- persuasive enough to manipulate the agent,
-- effective as a jailbreak against the AE as a describer,
-- and effective as a jailbreak against the Guardian as an enforcer,
-
-while often not knowing two of the three system prompts or the random tokens. Each stage has success probability less than 1, and they largely **multiply**.
-
-In the **white-box** case, the attacker knows IntentFrame exists and may know the open-source prompts. That improves tuning on the semantic frontier (stages 3–4) but does not give structural control over slot placement or the per-request boundary token. The chain still has to complete; white-box knowledge makes the lie sharper, not the architecture disappear.
-
----
-
 ## Why the AE Is Not an Authorization Oracle
 
 The Analysis Engine is deliberately limited. It answers: what will this action do?
