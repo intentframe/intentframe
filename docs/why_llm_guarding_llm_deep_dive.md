@@ -68,7 +68,7 @@ It is not:
 
 It is:
 
-> The Agent is untrusted. The Guardian is a bounded semantic reviewer. Deterministic controls provide a hard floor. The executor is the final enforcement point.
+> The Agent is untrusted. The Guardian is a bounded semantic reviewer. Deterministic controls provide a hard floor where the action/policy surface supports mechanical enforcement. The executor is the final enforcement point.
 
 ---
 
@@ -195,13 +195,13 @@ If analysis and policy decision were combined in one prompt, the policy could bi
 - the Guardian applies policy and default safety rules on top of those facts
 - deterministic checks can still block independently
 
-This means IntentFrame still has a baseline of safety even when the user has written very little policy.
+This means IntentFrame still has a baseline of safety on action surfaces where structural signals, default risk assessment, and default policy instructions apply, even when the user has written very little policy.
 
 That baseline behavior is a product property, not just an implementation detail. If someone forgets to configure detailed policy, IntentFrame does not reduce to "raw agent command goes straight to execution." The command analyzer still emits structural signals, the risk analyzer still judges risk and reversibility, and the Guardian still has default instructions to block elevated risk, hidden behavior, and scope mismatch.
 
 The honest version of the claim is:
 
-> IntentFrame provides baseline containment even with little or no user-written policy because the Analysis Engine independently assesses every action's risk, reversibility, and hidden behavior using its own semantic knowledge plus deterministic structural signals. User-written policy strengthens containment by giving the Guardian explicit criteria, but the policy-blind factual report is always on.
+> IntentFrame provides baseline semantic review even with little or no user-written policy because the Analysis Engine independently assesses every action's risk, reversibility, and hidden behavior using its own semantic knowledge plus any available deterministic structural signals. User-written policy strengthens containment by giving the Guardian explicit criteria. This is measured resistance, not a deterministic guarantee for every business case.
 
 ---
 
@@ -478,7 +478,7 @@ Two honest caveats on the sandbox claim, repeated from [docs/evidence.md § Exec
 
 The deterministic surface has also been hardened beyond a few ad hoc string checks. The command analyzer uses a capability taxonomy, capability tags, classifier tests, and mirrored deny sets in policy/bootstrap paths. That matters because taxonomy gaps are one of the main ways the asymmetric-evidence story can weaken: if the deterministic layer fails to name a behavior, the risk analyzer and Guardian receive less useful evidence.
 
-The Analysis Engine's free-text outputs are bounded by an `AEFieldLimit` enum (`maxLength` 300–600 chars per field, `maxItems` 10–15 per list) enforced by Pydantic's structured output. A `_detect_overflow()` backstop flags `ae_output_anomaly` if any field exceeds its bound — Guardian then treats the report as elevated risk. This is what closes the transitive-injection path (Agent → AE → Guardian): no single AE field can carry a complete jailbreak payload (typical requirement: 800–1500+ chars; largest field: 600 chars).
+The Analysis Engine's free-text outputs are bounded by an `AEFieldLimit` enum (`maxLength` 300–600 chars per field, `maxItems` 10–15 per list) enforced by Pydantic's structured output. A `_detect_overflow()` backstop flags `ae_output_anomaly` if any field exceeds its bound — Guardian then treats the report as elevated risk. This constrains the transitive-injection path (Agent → AE → Guardian): no single AE field can carry a typical full jailbreak payload (often 800–1500+ chars; largest field: 600 chars). It reduces bandwidth and blast radius; it does not make AE poisoning impossible.
 
 ---
 

@@ -44,11 +44,11 @@ Before the structural details, the foundational design choice: IntentFrame **pre
 | Prevention model (IntentFrame) | Containment model (traditional sandboxing) |
 |---|---|
 | Understand → Block if dangerous → Execute if safe | Let action through → Restrict what it can do |
-| Everything reaching the executor is guaranteed safe | Executor must restrict every action |
+| Everything reaching the executor has passed the configured boundary | Executor must restrict every action |
 | Executor runs with full privileges | Executor runs with limited privileges |
 | Agent has effective root access — through the pipeline | Agent has restricted access — limited by sandbox |
 
-This is what makes the pipeline depth justified — five layers of deterministic and semantic checks before any action runs — and what makes full executor capability (including root-level shell access in the [root demo](root_demo/PROOF.md)) safe. Everything that reaches the executor has already been judged safe; the kernel sandbox under `RUN_COMMAND` is a non-negotiable safety net, not the primary boundary.
+This is what makes the pipeline depth justified — deterministic and semantic checks before any action runs — and what makes full executor capability (including root-level shell access in the [root demo](root_demo/PROOF.md)) bounded by the runtime boundary. Everything that reaches the executor has already been judged safe by the configured policy and review layers, but semantic judgement is not a mathematical proof. The kernel sandbox under `RUN_COMMAND` is a non-negotiable safety net, not the primary boundary.
 
 For the principle in full, see [principles.md § 2 — Prevention before containment](principles.md#2-prevention-before-containment). For the philosophy applied to `RUN_COMMAND` specifically, see [executor/security-model.md](executor/security-model.md#the-philosophy-prevention-not-containment).
 
@@ -149,7 +149,7 @@ This is the L0–L4 numbering used by the code (`intentframe_components/guardian
 
 ### The "five deterministic layers" referenced elsewhere
 
-When other docs say *"five deterministic layers cannot be prompt-injected"*, they mean: L0 (`command_shield`), L1 (terminal bundle system floor), L2 (AE catastrophic path), L3a (`DeterministicGuardian`, including bundle constraint enforcement), and L4 (adapter `quick_check()`) from View B. L3b (the AIGuardian) is the only AI-decision point in the deterministic stack.
+When other docs say *"five deterministic layers cannot be prompt-injected"*, they mean: L0 (`command_shield`), L1 (terminal bundle system floor), L2 (AE catastrophic path), L3a (`DeterministicGuardian`, including bundle constraint enforcement), and L4 (adapter `quick_check()`) from View B. L3b (the AIGuardian) is the only AI-decision point in the deterministic stack. These deterministic layers are strongest where the action surface has mechanical structure to inspect or constraints to enforce; semantic-only business policies still rely on AI/context-aware judgment.
 
 ### Why `command_shield` and adapter `quick_check()` are listed as separate layers
 
