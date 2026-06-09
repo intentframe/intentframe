@@ -10,7 +10,9 @@ The defensible claim is narrower:
 
 That is a real reduction in risk. It is not a formal guarantee.
 
-### Can you guarantee it? — No. Here's the honest claim instead.
+---
+
+## Can you guarantee Intentframe is Injection-Proof? — No. Here's the honest claim instead.
 You cannot guarantee an LLM is injection-proof. LLMs are statistical; "we wrote a strong system prompt" is never a proof. Anyone who tells you the AE cannot be injected is overclaiming.
 
 What we can defensibly claim at the AI layer is narrower and stronger-sounding because it's true:
@@ -20,15 +22,32 @@ What we can defensibly claim at the AI layer is narrower and stronger-sounding b
 * The empirical surface (23/24 defended; live 39/43 where the 4 are hand-crafted-past-the-AE or missing-context, not prose injections) supports "very hard," not "impossible."
 The part that converts "very hard" into an actual guarantee is precisely the deterministic floor + executor caps. That's why they exist: the AI layer's job is accuracy and catching semantic attacks; the floor's job is to bound the worst case regardless of how the dice land on the models. Remove the floor and the honest word is "multiplicatively unlikely and bandwidth-bounded," not "guaranteed."
 
-### The compounding chain — why injecting agent + AE + Guardian simultaneously is the hard part
-Walk the stages, noting that the agent knows nothing about IntentFrame. Its system prompt only hardens its own generic trusted_context/boundary protocol — there's no mention of an Analysis Engine, Guardian, or IntentFrame's schema/tokens.
-For example:
-* Stage 0 — blind attacker. The payload author is writing into a customer email thread. They don't know a judge exists, let alone its two system prompts, its schema, or its per-request random boundary tokens.
-* Stage 1 — inject the agent. Achievable (this is what the return-agent experiment demonstrated via social engineering). But injecting the agent to misbehave ≠ injecting it to author a working IntentFrame payload — it doesn't know the target's format.
-* Stage 2 — agent must emit an AE-injecting payload through reason/target/data. Lands in the AE's untrusted slot; boundary forgery fails (random per-request token); instruction-like text becomes a flag (#1 above).
-* Stage 3 — AE must emit a poisoned report — but with no decision field, sanitized enums, and tight caps (#2–#3), the best case is bounded misleading prose.
-* Stage 4 — Guardian must also be injected, independently, by content that already survived stages 1–3.
-A single payload string would have to be simultaneously: persuasive-to-the-agent, jailbreak-to-the-AE-as-describer, and jailbreak-to-the-Guardian-as-enforcer — while not knowing two of the three system prompts or the random tokens. Each stage has success probability < 1, and they largely multiply.
+## The Compounding Chain
+
+Why is injecting the agent, AE, and Guardian **simultaneously** the hard part? Because each stage must succeed for the attack to pay out, and each stage has a different job.
+
+In the simplest case, the agent knows nothing about IntentFrame. Its system prompt only hardens its own generic `trusted_context` / boundary protocol — there is no mention of an Analysis Engine, Guardian, or IntentFrame's schema or tokens. (For example, the return-agent experiment's Build A system prompt references only developer-controlled `trusted_context` and the customer email thread, never any downstream judge.)
+
+Walk the stages:
+
+| Stage | What must happen | Why it is hard |
+|---|---|---|
+| **0 — Blind attacker** | The payload author writes into a customer email thread (or similar). | They do not know a judge exists, let alone its two system prompts, its schema, or its per-request random boundary tokens. |
+| **1 — Inject the agent** | The thread must manipulate the agent into proposing the malicious action. | Achievable via social engineering (the return-agent experiment showed this). But injecting the agent to misbehave ≠ injecting it to author a working IntentFrame payload — it does not know the target's format. |
+| **2 — Agent emits an AE-facing payload** | The agent must submit `reason` / `target` / `data` that carries a second-stage payload for the AE. | That content lands in the AE's **untrusted slot**. Boundary forgery fails (random per-request token). Instruction-like text is supposed to become a flag, not a command. |
+| **3 — AE emits a poisoned report** | The AE must produce a misleading `AnalysisReport`. | The AE has **no decision field**, enums are sanitized, and free-text is capped. The best case for the attacker is bounded misleading prose — not direct authorization. |
+| **4 — Guardian is also fooled** | The Guardian must return `ALLOW` despite its separate role and policy context. | It must be influenced by content that already survived stages 1–3, while also seeing the raw untrusted fields independently. |
+
+A single payload string would have to be **simultaneously**:
+
+- persuasive enough to manipulate the agent,
+- effective as a jailbreak against the AE as a describer,
+- and effective as a jailbreak against the Guardian as an enforcer,
+
+while often not knowing two of the three system prompts or the random tokens. Each stage has success probability less than 1, and they largely **multiply**.
+
+In the **white-box** case(see below), the attacker knows IntentFrame exists and may know the open-source prompts. That improves tuning on the semantic frontier (stages 3–4) but does not give structural control over slot placement or the per-request boundary token. The chain still has to complete; white-box knowledge makes the lie sharper, not the architecture disappear.
+
 
 ---
 
