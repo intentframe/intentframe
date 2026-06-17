@@ -39,7 +39,9 @@ jobs:
           pytest tests/ \
             --ignore=tests/test_sandbox.py \
             --ignore=tests/test_tcc_adapters_live.py \
-            --ignore=tests/test_executor_action_matrix.py
+            --ignore=tests/test_executor_action_matrix.py \
+            --ignore=tests/test_hardened_prompts_parity.py \
+            -k "not test_allows_safe_command and not test_allows_dev_null_redirect"
 
       - name: Run package tests
         run: |

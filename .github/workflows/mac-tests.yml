@@ -33,6 +33,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --extra hashicorp
 
+      - name: Provision executor sandbox venv
+        run: |
+          uv venv --python 3.14 --seed "$HOME/.intentframe-venvs/executor"
+          "$HOME/.intentframe-venvs/executor/bin/python3" --version
+
       - name: Run root tests
         run: |
           source .venv/bin/activate
