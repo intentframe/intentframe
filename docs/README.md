@@ -12,10 +12,11 @@ If you're new to IntentFrame, read in this order:
 
 1. **[autonomy.md](autonomy.md)** — what IntentFrame is for: delegatable autonomy for AI agents, the licensing-shape thesis
 2. **[mental-models.md](mental-models.md)** — pick the analogy that fits how you already think (pharmacy, contractor, kernel, fire, licensed professional, accountant/CFO, financial advisor)
-3. **[quickstart.md](quickstart.md)** — install, first run, demo commands
-4. **[architecture.md](architecture.md)** — the full pipeline (agent → actor → analysis engine → guardian → executor)
-5. **[principles.md](principles.md)** — the structural invariants that implement the autonomy thesis
-6. **[evidence.md](evidence.md)** — test results, root demo, failure reports
+3. **[package-consumers.md](package-consumers.md)** — install SDK/runtime packages from PyPI (third-party projects)
+4. **[quickstart.md](quickstart.md)** — clone, install, first run, demo commands
+5. **[architecture.md](architecture.md)** — the full pipeline (agent → actor → analysis engine → guardian → executor)
+6. **[principles.md](principles.md)** — the structural invariants that implement the autonomy thesis
+7. **[evidence.md](evidence.md)** — test results, root demo, failure reports
 
 > **Not technical?** Start with [mental-models.md](mental-models.md). It explains IntentFrame using everyday analogies — the pharmacy, the contractor in your office, the accountant and CFO — before any code or architecture.
 
@@ -23,19 +24,20 @@ If you're new to IntentFrame, read in this order:
 
 ## By question
 
-### "How do I install and run it?"
+### "How do I install packages from PyPI?"
 
-- [quickstart.md](quickstart.md) — install, configure OpenAI key, run the gateway, run the demo
+- [package-consumers.md](package-consumers.md) — install the 18 `packages/` distributions into another `uv` / `pip` project (**primary**)
+- [../scripts/github-install/example-pyproject-pypi.toml](../scripts/github-install/example-pyproject-pypi.toml) — minimal consumer `pyproject.toml`
+- [../scripts/github-install/README.md](../scripts/github-install/README.md) — GitHub wheel fallback and install verifier
+- [../scripts/github-release/README.md](../scripts/github-release/README.md) — optional release-asset mirror
+- [../scripts/release/README.md](../scripts/release/README.md) — maintainer PyPI/TestPyPI publishing
+- [licensing.md](licensing.md) — package-by-package AGPL/Apache split
+
+### "How do I install and run the full product?"
+
+- [quickstart.md](quickstart.md) — clone, setup, configure OpenAI key, run the gateway, run the demo
 - [processes.md](processes.md) — what processes will be running on your machine after startup
 - [faq.md](faq.md) — common setup and operational questions
-
-### "How do I install packages from a release?"
-
-- [package-consumers.md](package-consumers.md) — install IntentFrame packages into another `uv` project from release wheels
-- [../scripts/github-install/README.md](../scripts/github-install/README.md) — template `pyproject.toml` and install verifier details
-- [../scripts/github-release/README.md](../scripts/github-release/README.md) — manual release-asset publishing and verification runbook
-- [../scripts/release/README.md](../scripts/release/README.md) — PyPI/TestPyPI publishing, lockstep versioning, and rate-limit playbook
-- [licensing.md](licensing.md) — package-by-package AGPL/Apache split
 
 ### "What is this for, conceptually?"
 
@@ -194,11 +196,11 @@ If you're new to IntentFrame, read in this order:
 | [dev/README.md](dev/README.md) | Index of maintainer-facing developer docs |
 | [plugin-profiles.md](plugin-profiles.md) | Plugin hosts: `bundles:` / `packs:`, profile env vars, entry-point discovery |
 | [dev/action-family-wiring.md](dev/action-family-wiring.md) | How to wire a new action family end-to-end |
-| [dev/package-release-guide.md](dev/package-release-guide.md) | Package boundaries, lockstep releases, GitHub wheels, PyPI staging, and license checks |
-| [package-consumers.md](package-consumers.md) | Consumer-facing install guide for third-party projects |
+| [dev/package-release-guide.md](dev/package-release-guide.md) | Package boundaries, lockstep releases, PyPI publishing, GitHub wheel mirror, license checks |
+| [package-consumers.md](package-consumers.md) | Consumer-facing install guide (PyPI primary) |
 | [licensing.md](licensing.md) | Package-level AGPL/Apache split for publishable `packages/` distributions |
 | [../scripts/release/README.md](../scripts/release/README.md) | Lockstep package versioning and PyPI/TestPyPI release process |
-| [../scripts/github-install/README.md](../scripts/github-install/README.md) | GitHub release wheel install pattern for third-party `uv` projects |
+| [../scripts/github-install/README.md](../scripts/github-install/README.md) | GitHub wheel fallback and install verification |
 
 ---
 

@@ -6,6 +6,18 @@ Common questions from skeptical readers, security engineers, and developers eval
 
 ---
 
+## Q0. Can I `pip install` IntentFrame?
+
+**Packages — yes.** All **18** distributions under `packages/` are on [PyPI](https://pypi.org/) at **`0.1.0`** (Python **3.14+**). See [`package-consumers.md`](package-consumers.md).
+
+```bash
+pip install intentframe-actor==0.1.0 intentframe-bundle-sdk==0.1.0
+```
+
+**Full product (Jarvis, gateway CLI, macOS platform server) — no.** That code is AGPL product workspace, not published to PyPI. Clone the repo and follow [`quickstart.md`](quickstart.md).
+
+---
+
 ## Q1. Is this just AI guarding AI?
 
 The honest answer: yes, for the slice of decisions that reach the AI layer.
@@ -32,7 +44,7 @@ A compromised agent can inject any text into `reason`, `data`, and `target` fiel
 
 1. **Five deterministic layers cannot be prompt-injected** — `command_shield`, `DeterministicGuardian` (including bundle constraint enforcement), terminal bundle system floor, AE catastrophic path, adapter `quick_check()`. Each is pure code/regex/AST with no AI component.
 
-2. **AE field bounds close the transitive path** — all AE free-text fields have `maxLength`/`maxItems` constraints (largest: 600 chars). No single field can carry a complete jailbreak payload (typical requirement: 800–1500+ chars). `_detect_overflow()` flags anomalies.
+2. **AE field bounds constrain the transitive path** — all AE free-text fields have `maxLength`/`maxItems` constraints (largest: 600 chars). No single field can carry a typical full jailbreak payload (often 800–1500+ chars). `_detect_overflow()` flags anomalies. This limits bandwidth and blast radius; it does not make AE poisoning impossible.
 
 3. **Prompt hardening** — per-request randomized 32-hex boundary tokens mark untrusted content, immutable role anchoring refuses identity rewriting, sandwich-pattern closing reinforcement. The AI actively converts injection attempts into detection signals.
 
@@ -40,9 +52,9 @@ A compromised agent can inject any text into `reason`, `data`, and `target` fiel
 
 5. **Fail-closed parsing** — anything not literally `"ALLOW"` (case-insensitive) maps to BLOCK. There is no "APPROVE", "YES", "PERMITTED" — only `ALLOW` passes.
 
-A successful injection must fool the AE AND the Guardian AND produce valid Pydantic output in both cases AND not trigger any deterministic layer. Each layer is independent.
+A successful injection must fool the AE AND the Guardian AND produce valid Pydantic output in both cases AND not trigger any deterministic layer that applies to that action/policy surface. The deterministic layers are independent in the strong sense. The AI layers are separated by prompt, role, objective, and schema, but they are not formally independent; shared model-family failure modes remain possible and have to be measured.
 
-Empirically: the 24-attack invoice suite (`demo/tests/test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py`) defends **23/24, with 0 bypassed and 1 awaiting a planned cumulative-policy feature** (Attack 16 / salami slicing — see [docs/evidence.md § About the "1 Known Gap"](evidence.md#about-the-1-known-gap--attack-16-salami-slicing)). The 43-case transitive injection suite passes 39/43, with the 4 "failures" requiring pre-compromised AE state that is production-unreachable. Attack 2 (semantic-only defense) reproduces 10/10 BLOCK on consecutive runs.
+Empirically: the 24-attack invoice suite (`demo/tests/test_attacks.py`, `test_advanced_attacks.py`, `test_redteam_attacks.py`) defends **23/24, with 0 bypassed and 1 awaiting a planned cumulative-policy feature** (Attack 16 / salami slicing — see [docs/evidence.md § About the "1 Known Gap"](evidence.md#about-the-1-known-gap--attack-16-salami-slicing)). The 43-case transitive injection suite passes 39/43, with the 4 "failures" requiring pre-compromised AE state. These are evidence for covered scenarios, not a measured probability against adaptive white-box prompt injection.
 
 ---
 

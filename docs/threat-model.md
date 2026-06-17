@@ -197,9 +197,11 @@ These are the strongest parts of the system. If these gates block, the AI does n
 | 4 | Analysis Engine catastrophic path | `_try_catastrophic_report()` substring matching | No — hardcoded patterns |
 | 5 | Adapter `quick_check()` | Last-resort pattern match at execution boundary, after Guardian approval, before invoking the underlying tool | No — pure regex |
 
-A compromised agent can only attack the AI layers. Every deterministic layer holds regardless of what the agent puts in any field.
+A compromised agent can only attack the AI layers. Every applicable deterministic layer holds regardless of what the agent puts in any field; if a business policy has no mechanical expression, that portion remains a semantic AI judgment.
 
 > The pipeline-stage layer numbering (Agent → Actor → AE → Guardian → Executor as L1–L5) shown in [docs/architecture.md § The Pipeline](architecture.md#the-pipeline) is a different cut of the same system: it groups by *role*, not by *deterministic-vs-AI*. The 5 deterministic layers above all live inside Layers 3, 4, and 5 of that pipeline view. See [docs/architecture.md § Layer Reference](architecture.md#layer-reference) for the full mapping.
+
+These deterministic layers are strongest where the action surface has mechanical structure to inspect or constraints to enforce. Not every business policy has a deterministic floor. Semantic policies such as "refund only for a genuine manufacturing defect" or "do not approve a request contaminated by fake policy pressure" rely on the AI/context-aware layer. In those cases IntentFrame is an external semantic judge, not a proof system.
 
 ---
 
@@ -264,7 +266,7 @@ See [docs/why-not-injection-shield.md](why-not-injection-shield.md) for the full
 
 ### The probability chain
 
-A successful injection must: fool the AE's hardened prompt (random boundaries + immutable role + sandwich reinforcement + field bounds) AND fool the Guardian's separately-prompted evaluation AND produce valid Pydantic output in both cases AND not trigger any of the deterministic layers.
+A successful injection must: fool the AE's hardened prompt (random boundaries + immutable role + sandwich reinforcement + field bounds) AND fool the Guardian's separately-prompted evaluation AND produce valid Pydantic output in both cases AND not trigger any deterministic layer that applies to that action/policy surface.
 
 What "independent" means here is worth being precise about:
 
@@ -272,6 +274,8 @@ What "independent" means here is worth being precise about:
 - The two **AI layers** (Analysis Engine and Guardian) are independent in prompt, role, objective, and Pydantic output schema. They currently use models from the same provider family (OpenAI), so residual model-correlated failure modes are possible and must be measured rather than assumed away. The Guardian uses a reasoning model and the AE uses a non-reasoning model with `temperature=0`, which reduces but does not eliminate correlation. See [docs/why_llm_guarding_llm_deep_dive.md](why_llm_guarding_llm_deep_dive.md) for the full treatment of the independence assumption.
 
 The conjunction of all of the above makes complete bypass empirically rare on the tested attack categories. It is not a formal probability bound, and the documentation does not claim it as one.
+
+For adaptive white-box prompt injection — an attacker who knows IntentFrame is in the path, knows the open-source prompts, targets the agent, AE, and Guardian together, and can use a compromised agent as a fetch-proxy — the AI-layer defense is probabilistic and currently unmeasured as a standalone probability. The right claim is strong resistance on covered tests, not a guaranteed percentage.
 
 ---
 

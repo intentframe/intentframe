@@ -6,6 +6,14 @@ This is the developer-facing companion to [architecture.md](architecture.md). Th
 
 For the Actor's source, see [`../intentframe_actor/actor.py`](../intentframe_actor/actor.py). For a complete reference integration, see [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py).
 
+## Install (PyPI)
+
+```bash
+pip install intentframe-actor==0.1.0 intentframe-client==0.1.0
+```
+
+Transitive deps resolve from PyPI. Full consumer guide: [`package-consumers.md`](package-consumers.md). License: **Apache-2.0** ([`licensing.md`](licensing.md)).
+
 ---
 
 ## What this frees you from

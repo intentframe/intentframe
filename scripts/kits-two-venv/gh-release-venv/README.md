@@ -43,4 +43,6 @@ bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
 
 ## Consumer install (separate repo)
 
-[`../../github-install/example-pyproject.toml`](../../github-install/example-pyproject.toml) — copy to a third-party `pyproject.toml` with `[tool.uv.sources]` URLs.
+**PyPI (recommended):** [`../../github-install/example-pyproject-pypi.toml`](../../github-install/example-pyproject-pypi.toml) — see [`../../docs/package-consumers.md`](../../docs/package-consumers.md).
+
+**GitHub URL fallback:** [`../../github-install/example-pyproject.toml`](../../github-install/example-pyproject.toml) — all 18 `[tool.uv.sources]` entries.

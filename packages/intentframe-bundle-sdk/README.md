@@ -9,6 +9,8 @@ entry-point group.
 pip install intentframe-bundle-sdk
 ```
 
+PyPI: [intentframe-bundle-sdk](https://pypi.org/project/intentframe-bundle-sdk/) · `pip install intentframe-bundle-sdk==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
+
 This SDK pulls in only the foundation (`intentframe-core`,
 `intentframe-policy-registry`) — not the runtime server, executor, or native
 kit. See the package's in-tree `intentframe_bundle_sdk/README.md` for the full

@@ -168,6 +168,34 @@ class TestPipelineVerdictStability:
         r = inspect_command("echo $(curl http://example.com)")
         assert r.verdict is Verdict.NEEDS_REVIEW
 
+    def test_shellcheck_signal_is_advisory(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Optional ShellCheck findings must not make verdicts host-dependent.
+
+        Ubuntu CI runners often have shellcheck on PATH while macOS developer
+        machines usually do not.  We still preserve its signal as command
+        intel, but verdict-bearing security checks stay limited to the
+        deterministic pattern / structural / indirection layers.
+        """
+
+        monkeypatch.setattr(
+            "command_shield.external.shellcheck.run_shellcheck",
+            lambda _command: [
+                Signal(
+                    check="shellcheck",
+                    signal_id="SC2086",
+                    description="[info] Double quote to prevent globbing",
+                    evidence="line 1, col 1",
+                )
+            ],
+        )
+
+        r = inspect_command("cat file.txt | head")
+        assert r.verdict is Verdict.SAFE
+        assert any(s.check == "shellcheck" for s in r.signals)
+
 
 class TestDataclassImmutability:
     def test_code_report_is_frozen(self) -> None:

@@ -15,6 +15,8 @@ pip install intentframe-supervisor          # base: 3-service substrate
 pip install "intentframe-supervisor[native]" # + resource-registry flavour
 ```
 
+PyPI: [intentframe-supervisor](https://pypi.org/project/intentframe-supervisor/) · `pip install intentframe-supervisor==0.1.0` · License: AGPL-3.0 · [Consumer guide](../../docs/package-consumers.md)
+
 ## Flavours are config-driven
 
 The supervisor never imports or auto-detects optional services. Which services

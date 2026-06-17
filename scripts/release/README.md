@@ -2,7 +2,9 @@
 
 Only distributions under `packages/` are published. Product-facing code (root `intentframe`, gateway, Jarvis, EDI) stays out of scope. See [docs/licensing.md](../../docs/licensing.md) for AGPL vs Apache split.
 
-**Interim install from GitHub release wheels** (while PyPI new-project limits apply): build → upload `.whl` assets → verify. Full manual runbook: [`../github-release/README.md`](../github-release/README.md).
+**Status:** all **18** packages for **`0.1.0`** are on [PyPI](https://pypi.org/). Consumer install guide: [docs/package-consumers.md](../../docs/package-consumers.md).
+
+**Optional mirror:** same wheels as [GitHub release assets](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) — [`../github-release/README.md`](../github-release/README.md), [`../github-install/README.md`](../github-install/README.md).
 
 ## Lockstep versioning
 
@@ -54,6 +56,10 @@ Practical notes:
 - If limits persist after waiting, open [pypi/support](https://github.com/pypi/support/issues/new/choose) (same class of issue as [pypi/support#10572](https://github.com/pypi/support/issues/10572)).
 
 ### First-time production PyPI playbook
+
+Used for **`0.1.0`** (all project names now exist on PyPI). For **subsequent** lockstep releases, uploading new **versions** to existing projects rarely hits new-project limits — `group=all` or `--all` is usually fine.
+
+Historical first-time steps:
 
 1. Run full validation and publish **all 18** to **TestPyPI** first (`group=all` is fine there).
 2. On **production PyPI**, use groups **`1` → `2` → `3`** (six packages each), not `all`, until every project name exists.
@@ -142,9 +148,9 @@ Auth: `TEST_PYPI_API_TOKEN` / `PYPI_API_TOKEN`, else `TWINE_PASSWORD`, else `~/.
 
 When rate-limited on production, use **`--no-build`** and **one selector per command** so a `429` on the second package does not roll back the first.
 
-## GitHub release wheels (interim)
+## GitHub release wheels (optional mirror)
 
-Before or in parallel with PyPI, you can ship the same `dist/publish/*.whl` files as **GitHub release assets** so other repos install by URL (`uv` `[tool.uv.sources]`). Full release steps: [`../github-release/README.md`](../github-release/README.md). Consumer `pyproject.toml` and verifier: [`../github-install/README.md`](../github-install/README.md).
+Ship the same `dist/publish/*.whl` files as **GitHub release assets** for URL-pinned installs or verification. Full steps: [`../github-release/README.md`](../github-release/README.md). Consumer templates: [`../github-install/example-pyproject-pypi.toml`](../github-install/example-pyproject-pypi.toml) (PyPI) and [`../github-install/example-pyproject.toml`](../github-install/example-pyproject.toml) (GitHub URLs).
 
 ```bash
 ./scripts/release/validate_publish.sh
@@ -160,7 +166,7 @@ Use **wheels only** for this path; sdists on the release are optional. Tag versi
 
 1. `set_version.py <version>` → `uv sync` → run tests
 2. `./scripts/release/validate_publish.sh`
-3. **GitHub release (optional, interim):** create tag → `gh release upload v<version> dist/publish/*.whl` → `verify_release_install.sh` → optional `gh-release-venv/start_runtime_from_release.sh` → `stop_runtime.sh`
+3. **GitHub release (optional mirror):** create tag → `gh release upload v<version> dist/publish/*.whl` → `verify_release_install.sh` → optional `gh-release-venv/start_runtime_from_release.sh` → `stop_runtime.sh`
 4. **TestPyPI:** workflow `group=all` or `publish.py --all --target testpypi`; verify `pip install` from TestPyPI
 5. **PyPI (first time):** groups `1` → `2` → `3` via workflow or local `publish.py`, spaced if rate-limited; then `all` only when every name already exists
 6. `git tag v<version> && git push --tags` (if not already tagged for the GitHub release)
@@ -170,7 +176,7 @@ Use **wheels only** for this path; sdists on the release are optional. Tag versi
 | Symptom | Likely cause | What to do |
 |---------|--------------|------------|
 | `429 Too many new projects created` | New-project quota (user and/or IP) | Stop retrying for 24h; upload one name locally with `--no-build`; file [pypi/support](https://github.com/pypi/support/issues/new/choose) if still blocked |
-| `pip install` missing `intentframe-core` | Dependency not on PyPI yet | Publish `core` and `policy-registry` first |
+| `pip install` missing `intentframe-core` | Old partial publish or wrong version pin | Confirm package exists on PyPI; pin `==0.1.0`; see [package-consumers.md](../../docs/package-consumers.md) |
 | Workflow uploaded wrong subset | Wrong `group` or staging skipped | Confirm **Stage upload group** ran and `packages-dir` is `dist/upload` |
 | `confirm` set but no publish job | `confirm` ≠ `publish` | Re-run with `confirm=publish` |
 | Partial CI success | `twine` fail-fast after first hard error | Re-run same `group`; `skip-existing` skips completed files |

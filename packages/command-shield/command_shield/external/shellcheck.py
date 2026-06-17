@@ -2,6 +2,11 @@
 
 Invokes shellcheck as a subprocess, parses JSON output, and returns
 Signal objects.  Degrades gracefully if the binary is not installed.
+
+ShellCheck findings are advisory command intel, not verdict-bearing security
+signals.  The binary is optional and commonly present on Linux CI but absent on
+macOS developer machines; letting it affect verdicts would make classification
+depend on host PATH instead of the command itself.
 """
 
 from __future__ import annotations

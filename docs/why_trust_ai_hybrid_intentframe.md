@@ -14,13 +14,14 @@ That is the first thing many technical people will ask. Their mental objection w
 
 The answer:
 
-**IntentFrame is not 'AI guarding AI.' It is a hybrid control system guarding agent actions. The AI layers help understand ambiguous intent, but they are not the root of trust. The root of trust is policy, deterministic gates, typed actions, constraints, executor boundaries, and auditability.**
+**IntentFrame is not merely 'AI guarding AI.' It is a hybrid control system guarding agent actions. The AI layers help understand ambiguous intent, but they are not treated as perfectly safe. The strongest root of trust comes from policy, typed actions, deterministic gates where the policy can be expressed mechanically, executor boundaries, and auditability. For semantic-only business policies, the AI layer is a bounded external judge, not a proof system.**
 
 The clean framing:
 
 > The agent is untrusted.  
 > The AI review layers are bounded interpreters.  
-> The deterministic policy layer is the authority.  
+> Deterministic policy is authoritative where it exists.  
+> Semantic AI review handles the cases deterministic policy cannot express.  
 > The executor is the enforcement point.
 
 Key arguments:
@@ -29,7 +30,7 @@ Key arguments:
    IntentFrame moves the trust boundary from "trust the agent" to "verify every action before execution."
 
 2. **The AI layers do not hold unlimited authority.**  
-   AE explains what the intent means. Guardian evaluates it against policy. But hard constraints like allowed actions, allowed paths, max amount, denied capabilities, and executor sandboxing can block regardless of what any LLM says.
+   AE explains what the intent means. Guardian evaluates it against policy. Hard constraints like allowed actions, allowed paths, max amount, denied capabilities, and executor sandboxing can block regardless of what any LLM says. Some business policies, however, are semantic rather than mechanical; in those cases the Guardian is load-bearing and the right claim is measured resistance, not a deterministic guarantee.
 
 3. **The AI layers receive structured, bounded inputs.**  
    IntentFrame does not hand them an open-ended chat transcript and hope. Inputs are typed: action, target, reason, data, user policy, analysis report. Prompt hardening separates trusted and untrusted fields.
@@ -46,20 +47,20 @@ Key arguments:
 A: No. It is policy and deterministic enforcement guarding an AI agent, with AI used only where semantic judgment is needed. The LLM is not the root of trust.
 
 **Q: What if the Guardian LLM gets prompt-injected too?**  
-A: IntentFrame treats untrusted intent content as data, not instruction. It uses prompt hardening, role anchoring, trusted/untrusted boundaries, structured outputs, field limits, and deterministic gates. Even if semantic review fails, policy gates still block many dangerous actions.
+A: IntentFrame treats untrusted intent content as data, not instruction. It uses prompt hardening, role anchoring, trusted/untrusted boundaries, structured outputs, field limits, and deterministic gates where available. But the AI layer is not guaranteed against adaptive white-box prompt injection; if a business policy is purely semantic, defense is probabilistic and should be measured for that attack class.
 
 **Q: Why use an LLM at all? Why not only rules?**  
 A: Rules catch structural violations: path traversal, denied actions, spending caps. But rules alone miss semantic deception: "record $49.99" while data says `$4,999`, or hiding exfiltrated data in a vendor field. The AI layer is useful for meaning, mismatch, deception, and hidden behavior.
 
 **Q: Is the AI layer trusted?**  
-A: It is trusted only within a bounded role. It can influence decisions, but it cannot override deterministic policy. It is more like a fraud analyst inside a bank control system, not a superuser.
+A: It is trusted only within a bounded role. It can influence decisions, and for semantic-only cases it may be the deciding reviewer, but it cannot override deterministic policy when deterministic policy has blocked. It is more like a fraud analyst inside a bank control system, not a superuser.
 
 **Q: What does IntentFrame actually prove?**  
 A: It proves that actions routed through the boundary can be constrained by policy before they touch the user's world. It does not prove the agent cannot be tricked. It proves tricked agents do not automatically get unchecked execution.
 
 ## Thesis
 
-> IntentFrame is not "an LLM supervising an LLM"; it is a policy-enforced runtime boundary where deterministic controls make the final authority, and AI is used as a bounded semantic reviewer for cases rules cannot understand alone.
+> IntentFrame is not "an LLM supervising an LLM"; it is a policy-enforced runtime boundary where deterministic controls are authoritative when available, and AI is used as a bounded semantic reviewer for cases rules cannot understand alone.
 
 
 ## Code Grounding

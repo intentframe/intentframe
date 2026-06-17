@@ -1,15 +1,15 @@
 # GitHub release wheel publishing
 
-This is the manual release path for making IntentFrame packages installable from
-GitHub release assets while PyPI publishing is blocked, delayed, or being staged.
+Optional mirror of the same wheels published on [PyPI](https://pypi.org/) for **`0.1.0`**. Use when you need URL-pinned installs, offline verification, or release-asset boot tests — not as the primary consumer path.
 
-It does **not** create a PyPI index. Consumers install direct wheel URLs with
-`uv` or `pip`.
+**Primary install:** [`../../docs/package-consumers.md`](../../docs/package-consumers.md) and [`../github-install/example-pyproject-pypi.toml`](../github-install/example-pyproject-pypi.toml).
+
+This does **not** create a PyPI index. GitHub consumers install direct wheel URLs with `uv` or `pip`.
 
 Related docs:
 
 - Build, validation, and PyPI publishing: [`../release/README.md`](../release/README.md)
-- Install verification and consumer TOML template: [`../github-install/README.md`](../github-install/README.md)
+- Install verification and consumer TOML templates: [`../github-install/README.md`](../github-install/README.md)
 - Package licensing split: [`../../docs/licensing.md`](../../docs/licensing.md)
 
 ## Scripts (by directory)
@@ -196,11 +196,11 @@ SUCCESS: all IntentFrame release wheels installed and importable
 
 ### 6. Update Consumer Template
 
-For each new public GitHub-wheel release, update the example TOML if you want it
-to point to the newest release:
+For each new public release, update both consumer templates if the docs should point at the newest version:
 
 ```text
-scripts/github-install/example-pyproject.toml
+scripts/github-install/example-pyproject-pypi.toml   # PyPI (primary)
+scripts/github-install/example-pyproject.toml        # GitHub URL fallback
 ```
 
 Replace both:
@@ -235,8 +235,7 @@ They should edit:
 - `project.version`
 - `[project].dependencies` to include only the IntentFrame packages they import directly
 
-They should keep all IntentFrame entries in `[tool.uv.sources]` until PyPI is
-available, because transitive IntentFrame dependencies also need release URLs.
+They must keep all **18** IntentFrame entries in `[tool.uv.sources]` on this path, because transitive IntentFrame dependencies also need release URLs. For normal projects, prefer PyPI via [`example-pyproject-pypi.toml`](../github-install/example-pyproject-pypi.toml) instead.
 
 Then:
 
@@ -274,8 +273,8 @@ For a normal future release:
 5. Create GitHub release tag `v<version>`.
 6. Upload `dist/publish/*.whl`.
 7. Run `verify_release_install.sh --tag v<version>`, then `gh-release-venv/start_runtime_from_release.sh` (and `stop_runtime.sh`).
-8. Update `example-pyproject.toml` if the docs should point at the newest release.
-9. Continue PyPI/TestPyPI publishing separately when available.
+8. Update `example-pyproject.toml` and `example-pyproject-pypi.toml` if the docs should point at the newest release.
+9. Publish new versions to PyPI/TestPyPI via [`../release/README.md`](../release/README.md) (primary consumer path).
 
 If adding, removing, or renaming a package:
 
@@ -300,7 +299,7 @@ If a wheel stops being `py3-none-any`:
 |---------|--------|-----|
 | Tag version differs from wheel version | URL 404 in consumer TOML / verifier | Keep tag and package version aligned, or add a separate version flag to the verifier. |
 | Upload only sdists | Slower installs, possible build failures | Upload wheels. |
-| Forget a transitive package in `[tool.uv.sources]` | uv tries PyPI and fails until PyPI is ready | Keep all IntentFrame sources in the template. |
+| Forget a transitive package in `[tool.uv.sources]` | uv may resolve a missing IntentFrame dep from PyPI at the wrong version, or fail | Keep all 18 sources in the GitHub template, or use PyPI ([`example-pyproject-pypi.toml`](../github-install/example-pyproject-pypi.toml)). |
 | Replace assets after announcement | Reproducibility risk | Publish a new version instead. |
 | Use GitHub Actions artifacts as install URLs | Expiry/auth problems | Use GitHub release assets. |
 | Private repo release assets | Consumers need auth | Keep repo public or use an authenticated package/index solution. |
@@ -349,11 +348,8 @@ Notes:
   stack, which is what a release consumer experiences.
 - Requires `uv`, network access to the release + PyPI, and Python 3.14.
 
-## When PyPI Is Ready
+## PyPI consumers
 
-Once all packages are available on PyPI:
+All **18** `packages/` distributions are on PyPI @ **`0.1.0`**. Third-party projects: [`docs/package-consumers.md`](../../docs/package-consumers.md). GitHub release wheels remain an optional URL-pinned fallback.
 
-- Consumers can remove `[tool.uv.sources]`.
-- Keep normal `[project].dependencies` version pins.
-- Keep this GitHub release flow as a fallback/manual verification path if useful.
-
+## Maintainer checklist

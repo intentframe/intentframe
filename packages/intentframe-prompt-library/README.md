@@ -11,3 +11,5 @@ ship. It has no first-party dependencies and is consumed by
 ```bash
 pip install intentframe-prompt-library
 ```
+
+PyPI: [intentframe-prompt-library](https://pypi.org/project/intentframe-prompt-library/) · `pip install intentframe-prompt-library==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)

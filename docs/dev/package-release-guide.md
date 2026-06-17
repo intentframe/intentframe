@@ -78,9 +78,7 @@ Validation should produce wheels and sdists in `dist/publish/`.
 
 ## GitHub Release Wheels
 
-GitHub release wheels are the interim distribution path while PyPI first-project creation is staged.
-
-After creating the GitHub release with the matching tag:
+Optional mirror of the same wheels published on PyPI — upload after creating the GitHub release tag:
 
 ```bash
 gh release upload v0.1.0 dist/publish/*.whl
@@ -95,27 +93,19 @@ bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v
 bash scripts/kits-two-venv/stop_runtime.sh
 ```
 
-Use wheels for consumer installs. Sdists are optional on the GitHub release page.
+Use wheels for GitHub URL installs. Sdists are optional on the release page; both ship on PyPI.
 
 ## PyPI Publishing
 
-For a first production PyPI release, do not publish all 18 new project names in one production batch. Use the documented groups:
+All **18** project names exist on production PyPI for **`0.1.0`**. For **subsequent** lockstep versions, `--all` / `group=all` is usually fine (new **versions**, not new projects).
 
-```bash
-python scripts/release/publish.py --group 1 --target pypi
-python scripts/release/publish.py --group 2 --target pypi
-python scripts/release/publish.py --group 3 --target pypi
-```
-
-If PyPI returns `429 Too many new projects created`, stop retrying the same batch. Wait, then resume with smaller local uploads using `--no-build` and one package selector at a time.
-
-TestPyPI can usually use `--all`, but production PyPI should use groups until all project names exist.
+First-time registration (historical): use groups `1` → `2` → `3` or one-package local uploads if you see `429 Too many new projects created`.
 
 ## Consumer Docs Checklist
 
 When publishing a new lockstep version:
 
-- Update [`../../scripts/github-install/example-pyproject.toml`](../../scripts/github-install/example-pyproject.toml) if the public template should point to the newest release.
+- Update [`../../scripts/github-install/example-pyproject-pypi.toml`](../../scripts/github-install/example-pyproject-pypi.toml) and [`example-pyproject.toml`](../../scripts/github-install/example-pyproject.toml) for new versions.
 - Update [`../package-consumers.md`](../package-consumers.md) if package recommendations or release mechanics changed.
 - Update [`../licensing.md`](../licensing.md) if package boundaries or licenses changed.
 - Update [`../../CHANGELOG.md`](../../CHANGELOG.md) with the public release summary.
@@ -129,7 +119,7 @@ When adding, removing, or renaming a distribution:
 2. Update publish groups in `.github/workflows/release.yml` and `scripts/release/publish.py`.
 3. Update `scripts/github-install/verify_release_install.sh`.
 4. Update `scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh`.
-5. Update `scripts/github-install/example-pyproject.toml`.
+5. Update `scripts/github-install/example-pyproject.toml` and `example-pyproject-pypi.toml`.
 6. Update `docs/package-consumers.md` and `docs/licensing.md`.
 7. Run `validate_publish.sh` and the release install verifier.
 
@@ -139,9 +129,9 @@ When adding, removing, or renaming a distribution:
 |---------|--------|-----|
 | Tag version differs from wheel version | Consumer URLs 404 | Keep tag, package, and wheel versions aligned |
 | Apache package imports AGPL package | Permissive dependency chain is broken | Move shared contracts into an Apache package |
-| New package missing from consumer sources | `uv` falls back to PyPI and fails while staging | Update `example-pyproject.toml` and `docs/package-consumers.md` |
+| New package missing from GitHub wheel template | URL install fails for transitive dep | Update both `example-pyproject*.toml` and `docs/package-consumers.md` |
 | Replacing release assets after announcement | Users lose reproducibility | Publish a new tag/version instead |
-| Publishing all new names to production PyPI at once | PyPI 429 rate limit | Use groups or one-package local uploads |
+| Publishing many **new** PyPI project names at once | PyPI 429 rate limit | Use groups or one-package local uploads (first-time only) |
 
 ## Source Of Truth
 

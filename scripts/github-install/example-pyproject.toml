@@ -1,7 +1,10 @@
-# Copy this file to a third-party repo as pyproject.toml, then edit:
+# GitHub release wheel URLs (fallback when you need URL-pinned installs).
+# For normal installs use example-pyproject-pypi.toml (PyPI resolution).
+#
+# Copy to a third-party repo as pyproject.toml, then edit:
 # - project.name / project.version
 # - [project].dependencies: keep only the IntentFrame packages your app imports directly
-# - [tool.uv.sources]: keep all IntentFrame entries until PyPI is available, so transitive deps resolve
+# - [tool.uv.sources]: keep all 18 IntentFrame entries so transitive deps resolve
 #
 # For future releases, replace both the release tag and wheel version:
 #   v0.1.0 + 0.1.0 -> v0.2.0 + 0.2.0

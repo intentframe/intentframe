@@ -1,24 +1,42 @@
 # Package Consumer Guide
 
-This guide is for people installing IntentFrame packages into another Python project.
+This guide is for people installing IntentFrame **packages** into another Python project.
 
-IntentFrame `v0.1.0` ships 18 lockstep-versioned wheels as GitHub release assets while PyPI publishing is staged. You do not need a custom package index. A consumer project can point `uv` at the release wheel URLs until the same packages are available on PyPI.
+All **18** lockstep-versioned distributions for **`0.1.0`** are on [PyPI](https://pypi.org/). Use normal `pip` / `uv` resolution — no custom index and no GitHub wheel URLs unless you need URL-pinned installs.
 
-## Current Distribution Path
+The **full product** (Jarvis, gateway CLI, macOS platform server, demos) is **not** on PyPI. Clone the repo and follow [`quickstart.md`](quickstart.md) for that path.
+
+Release tag (GitHub assets mirror): [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0)
+
+## Distribution channels
 
 | Channel | Status | Use when |
 |---------|--------|----------|
-| GitHub release wheels | Available for `v0.1.0` | You need packages before PyPI publishing is complete |
-| PyPI | Staged | Use once all required IntentFrame package names exist on PyPI |
-| Source clone | Available | You are contributing to IntentFrame itself or running the full product workspace |
+| **PyPI** | **Primary** — all 18 packages @ `0.1.0` | Normal third-party projects (recommended) |
+| GitHub release wheels | Available for `v0.1.0` | Air-gapped URL pins, reproducible wheel hashes, or PyPI unavailable |
+| Source clone | Available | Contributing to IntentFrame or running the full product workspace |
 
-Release: [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0)
+## Install from PyPI
 
-## Pick Packages
+**Python 3.14+** is required (`requires-python = ">=3.14"` on every package).
 
-For a normal third-party agent or plugin, start with the author-facing SDKs:
+### Quick ad-hoc install
+
+```bash
+pip install intentframe-actor==0.1.0 intentframe-bundle-sdk==0.1.0 intentframe-executor-sdk==0.1.0
+```
+
+Transitive IntentFrame dependencies resolve from PyPI automatically.
+
+### `uv` project (recommended)
+
+Copy [`../scripts/github-install/example-pyproject-pypi.toml`](../scripts/github-install/example-pyproject-pypi.toml) into your repo as `pyproject.toml`, edit `project.name` / `project.version`, and keep only the IntentFrame packages you import directly:
 
 ```toml
+[project]
+name = "my-intentframe-agent"
+version = "0.1.0"
+requires-python = ">=3.14"
 dependencies = [
   "intentframe-actor==0.1.0",
   "intentframe-bundle-sdk==0.1.0",
@@ -26,105 +44,63 @@ dependencies = [
 ]
 ```
 
-Add other packages only if your project imports them directly:
-
-| Package | Use it when |
-|---------|-------------|
-| `intentframe-actor` | Your agent submits intents to an IntentFrame runtime |
-| `intentframe-bundle-sdk` | You author action bundles for the policy pipeline |
-| `intentframe-executor-sdk` | You author executor packs/adapters |
-| `intentframe-client` | You call the IntentFrame server API directly |
-| `intentframe-core` | You need shared DTOs/contracts |
-| `command-shield` | You need shell command capability analysis |
-| `intentframe-credentials` | You integrate with the credential vault client/backends |
-| `intentframe-native-kit` | You want the first-party native bundles, executor packs, and profiles |
-| `intentframe-runtime`, `intentframe-supervisor`, `intentframe-edge` | You are booting a runtime stack from packages |
-
-See [`licensing.md`](licensing.md) before embedding runtime packages. Some packages are Apache-2.0; runtime stack packages are AGPL-3.0.
-
-## Install With `uv`
-
-Copy [`../scripts/github-install/example-pyproject.toml`](../scripts/github-install/example-pyproject.toml) into your project and edit:
-
-- `project.name`
-- `project.version`
-- `[project].dependencies`, keeping only the IntentFrame packages your project imports directly
-
-Keep all IntentFrame entries in `[tool.uv.sources]` while installing from GitHub release assets. `uv` applies those sources to the whole dependency resolution, including transitive IntentFrame dependencies.
-
-Then run:
-
 ```bash
 uv sync
 ```
 
-## Why All Sources Are Listed
+No `[tool.uv.sources]` block is needed when installing from PyPI.
 
-IntentFrame packages depend on each other. If your project depends on `intentframe-actor`, `uv` may still need `intentframe-core`, `intentframe-client`, or other IntentFrame packages through transitive dependencies.
+## Pick packages
 
-Until PyPI has every required package, `[tool.uv.sources]` tells `uv` where to find each IntentFrame distribution. Your direct dependency list should stay small; the source map can include all 18 packages.
+For a normal third-party agent or plugin, start with the author-facing SDKs:
 
-## Ad-Hoc Install
+| Package | PyPI | Use it when |
+|---------|------|-------------|
+| `intentframe-actor` | [pypi](https://pypi.org/project/intentframe-actor/) | Your agent submits intents to an IntentFrame runtime |
+| `intentframe-bundle-sdk` | [pypi](https://pypi.org/project/intentframe-bundle-sdk/) | You author action bundles for the policy pipeline |
+| `intentframe-executor-sdk` | [pypi](https://pypi.org/project/intentframe-executor-sdk/) | You author executor packs/adapters |
+| `intentframe-client` | [pypi](https://pypi.org/project/intentframe-client/) | You call the IntentFrame server API directly |
+| `intentframe-core` | [pypi](https://pypi.org/project/intentframe-core/) | You need shared DTOs/contracts |
+| `command-shield` | [pypi](https://pypi.org/project/command-shield/) | You need shell command capability analysis |
+| `intentframe-credentials` | [pypi](https://pypi.org/project/intentframe-credentials/) | You integrate with the credential vault |
+| `intentframe-native-kit` | [pypi](https://pypi.org/project/intentframe-native-kit/) | First-party native bundles, executor packs, profiles |
+| `intentframe-runtime` | [pypi](https://pypi.org/project/intentframe-runtime/) | Meta-package: policy-registry + executor + server |
+| `intentframe-supervisor` | [pypi](https://pypi.org/project/intentframe-supervisor/) | Boot the runtime stack (`intentframe` CLI) |
+| `intentframe-edge` | [pypi](https://pypi.org/project/intentframe-edge/) | HTTP/TLS ingress to the runtime |
+| `intentframe-proxy` | [pypi](https://pypi.org/project/intentframe-proxy/) | UDS proxy helper (edge/gateway) |
+| `intentframe-server` | [pypi](https://pypi.org/project/intentframe-server/) | Policy pipeline service (substrate) |
+| `intentframe-executor` | [pypi](https://pypi.org/project/intentframe-executor/) | Executor host (substrate) |
+| `intentframe-components` | [pypi](https://pypi.org/project/intentframe-components/) | AE / Guardian / onboarding (substrate) |
+| `intentframe-policy-registry` | [pypi](https://pypi.org/project/intentframe-policy-registry/) | Policy service |
+| `intentframe-prompt-library` | [pypi](https://pypi.org/project/intentframe-prompt-library/) | Default AE/Guardian prompts |
+| `intentframe-executor-client` | [pypi](https://pypi.org/project/intentframe-executor-client/) | Core → executor client |
 
-For quick experiments, you can install wheel URLs directly, but you must include every IntentFrame package in the dependency closure. While PyPI is staged, the simplest ad-hoc rule is: install all 18 IntentFrame wheel URLs, not only the packages you import directly.
+See [`licensing.md`](licensing.md) before embedding runtime packages. SDKs and neutral libraries are **Apache-2.0**; the running substrate stack is **AGPL-3.0**.
+
+## Fallback: GitHub release wheels
+
+If you must pin exact wheel URLs (or PyPI is unreachable), use [`../scripts/github-install/example-pyproject.toml`](../scripts/github-install/example-pyproject.toml) with all 18 `[tool.uv.sources]` entries. See [`../scripts/github-install/README.md`](../scripts/github-install/README.md).
+
+Verify a release tag installs cleanly:
 
 ```bash
-uv pip install \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/command_shield-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_actor-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_bundle_sdk-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_client-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_components-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_core-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_credentials-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_edge-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor_client-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor_sdk-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_native_kit-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_policy_registry-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_prompt_library-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_proxy-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_runtime-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_server-0.1.0-py3-none-any.whl \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_supervisor-0.1.0-py3-none-any.whl
+./scripts/github-install/verify_release_install.sh --tag v0.1.0
 ```
-
-For real projects, prefer `pyproject.toml` so installs are reproducible.
-
-## Python Version
-
-The `v0.1.0` package set declares Python 3.14+.
-
-```toml
-requires-python = ">=3.14"
-```
-
-If your project targets an older Python version, do not depend on this package set yet.
-
-## Moving to PyPI
-
-Once all required IntentFrame packages are published to PyPI:
-
-1. Remove the `[tool.uv.sources]` block.
-2. Keep normal `[project.dependencies]` pins, such as `intentframe-actor==0.1.0`.
-3. Run `uv sync` again.
-
-No import changes should be required.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `uv` tries PyPI and cannot find an IntentFrame package | Missing `[tool.uv.sources]` entry for a transitive package | Start from [`example-pyproject.toml`](../scripts/github-install/example-pyproject.toml) and keep all 18 source entries |
-| Wheel URL returns 404 | Tag/version mismatch or filename typo | Use the exact filenames from the GitHub release assets |
-| Python version resolution fails | Project uses Python below 3.14 | Use Python 3.14+ |
-| License obligations are unclear | Mixing Apache SDKs with AGPL runtime packages | Read [`licensing.md`](licensing.md) and use only the packages your project actually needs |
+| `No matching distribution found` for an IntentFrame package | Typo in name, wrong version, or Python &lt; 3.14 | Use `==0.1.0` and Python 3.14+ |
+| Transitive IntentFrame dep missing (GitHub wheel path only) | Incomplete `[tool.uv.sources]` | Use [`example-pyproject.toml`](../scripts/github-install/example-pyproject.toml) with all 18 sources, or switch to PyPI |
+| Wheel URL returns 404 | Tag/version mismatch | Match filenames on the [GitHub release](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) |
+| License obligations unclear | Mixing Apache SDKs with AGPL runtime | Read [`licensing.md`](licensing.md); depend only on what you need |
+| Expected Jarvis / gateway on PyPI | Product code is not published | Clone repo → [`quickstart.md`](quickstart.md) |
 
-## Related Docs
+## Related docs
 
 - [`actor-sdk.md`](actor-sdk.md) — integrate an external agent through `actor.submit(...)`
 - [`plugin-profiles.md`](plugin-profiles.md) — bundles, executor packs, and profile loading
 - [`licensing.md`](licensing.md) — package-by-package licenses
-- [`../scripts/github-install/README.md`](../scripts/github-install/README.md) — install verification and template details
-- [`../scripts/github-release/README.md`](../scripts/github-release/README.md) — release asset publishing runbook
+- [`../scripts/release/README.md`](../scripts/release/README.md) — maintainer publishing
+- [`../scripts/github-install/README.md`](../scripts/github-install/README.md) — GitHub wheel fallback and verifier

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>IntentFrame removes direct execution from LLM tool calls: agents propose actions, policy validates intent, and a separate Executor performs approved actions.</strong>
+  <strong>IntentFrame is an AI governance and security runtime for controlled agent tool use: agents propose actions, policy validates intent, and a separate Executor performs approved actions.</strong>
 </p>
 
 <p align="center">
@@ -31,19 +31,53 @@
   <img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20Apache--2.0-blue.svg" alt="License: AGPL-3.0 + Apache-2.0">
   <img src="https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.14+">
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
-  <img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha">
+  <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-brightgreen.svg" alt="Release: v0.1.0"></a>
+  <a href="docs/package-consumers.md"><img src="https://img.shields.io/badge/PyPI-18%20packages%20%400.1.0-blue.svg" alt="PyPI: 18 packages at 0.1.0"></a>
+  <a href="https://github.com/intentframe/intentframe/actions/workflows/mac-tests.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/mac-tests.yml/badge.svg" alt="Mac Tests"></a>
+  <a href="https://github.com/intentframe/intentframe/actions/workflows/linux-tests.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/linux-tests.yml/badge.svg" alt="Linux Tests"></a>
+  <a href="https://github.com/intentframe/intentframe/actions/workflows/repo-hygiene.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/repo-hygiene.yml/badge.svg" alt="Repo Hygiene"></a>
   <img src="https://img.shields.io/badge/runtime-AI%20security-red.svg" alt="AI Security Runtime">
   <a href="https://github.com/intentframe/intentframe/stargazers"><img src="https://img.shields.io/github/stars/intentframe/intentframe?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
   <a href="docs/quickstart.md">Quickstart</a> •
+  <a href="docs/package-consumers.md">Packages (PyPI)</a> •
   <a href="docs/autonomy.md">Why this exists</a> •
   <a href="docs/evidence.md">Proof</a> •
   <a href="docs/threat-model.md">Threat model</a> •
   <a href="docs/faq.md">FAQ</a> •
   <a href="https://x.com/intent_frame">X/Twitter</a>
 </p>
+
+<p align="center">
+  <sub>
+    AI governance · agentic AI governance · AI agent security · secure AI agent deployment · runtime enforcement · AI guardrails · tool-use authorization · policy-as-code · approval workflows · agent audit logs · prompt-injection defense · human-in-the-loop alternatives · LangChain / AutoGen / OpenAI Agents SDK security · agent runtime
+  </sub>
+</p>
+
+<p align="center">
+  Public release: <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.0"><code>v0.1.0</code></a> ·
+  18 packages on <a href="docs/package-consumers.md">PyPI</a> ·
+  GitHub release wheels available as an install fallback
+</p>
+
+---
+
+## Who Is This For?
+
+| If you are... | Problem it solves |
+|---|---|
+| Building a customer-facing AI agent | Your agent can take money, send messages, or write data — IntentFrame means it can't do those things without intent matching policy |
+| Deploying agents for enterprise clients | Security review requires audit evidence; IntentFrame produces it deterministically |
+| A CISO evaluating agent security | You get one policy surface, one audit chain, and fail-closed enforcement — not per-agent prompt rules |
+| A developer integrating LangChain / AutoGen / OpenAI Agents SDK | One method (`actor.submit`) is the only seam; the runtime handles the rest |
+
+## Real-World Scenarios
+
+- **Refund-processing agent:** policy blocks any payment over $500 without explicit user confirmation.
+- **DevOps agent:** allowed to read logs and summarize incidents, but blocked from modifying infrastructure unless policy permits the exact action.
+- **Support agent:** can draft replies and prepare account updates, but cannot send messages or change customer state without approval.
 
 ---
 
@@ -203,6 +237,8 @@ The strongest cases are attacks 15 and 17. Both are structurally valid and would
 ## 🔌 Bring Your Own Agent
 
 IntentFrame is **agent-agnostic**. Build with any LLM, any framework, any agent SDK — OpenAI Agents SDK, LangChain, AutoGen, Anthropic tool-use, a hand-rolled loop, whatever you reach for. The runtime doesn't care how your agent thinks. It cares what your agent tries to *do*.
+
+That includes agents using MCP (Model Context Protocol) tools: IntentFrame sits at the action boundary where MCP calls become real file, shell, API, account, or data changes, giving those calls policy enforcement and audit instead of raw execution.
 
 **IntentFrame validates OUTCOMES, not IMPLEMENTATIONS.**
 
@@ -457,7 +493,8 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
 | An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/executor.md`](docs/executor.md) → [`docs/executor/standalone-product.md`](docs/executor/standalone-product.md) |
 | Shipping custom action bundles or executor packs | [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/dev/action-family-wiring.md`](docs/dev/action-family-wiring.md) |
-| Installing package wheels from a release | [`scripts/github-install/README.md`](scripts/github-install/README.md) → [`scripts/github-release/README.md`](scripts/github-release/README.md) |
+| Installing packages into another Python project (PyPI) | [`docs/package-consumers.md`](docs/package-consumers.md) |
+| GitHub release wheel fallback / verify | [`scripts/github-install/README.md`](scripts/github-install/README.md) → [`scripts/github-release/README.md`](scripts/github-release/README.md) |
 | Checking package licensing | [`docs/licensing.md`](docs/licensing.md) |
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |
@@ -592,9 +629,19 @@ IntentFrame supports two filesystem tool families: workspace/VFS tools (`READ_FI
 
 ---
 
-## 🚧 Project Status: Alpha
+## 🚧 Project Status: Public v0.1.0
 
-Honest about it. The architecture is settled, the core pipeline is stable, the test suite is real, and the failure reports are in the repo. What's not done: independent third-party audit, Linux support, the gateway proxy mode, stateful multi-intent tracking, broader command coverage. Those are roadmap items, not blockers for trying it out.
+IntentFrame has a public [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) release. All 18 package distributions are published on PyPI and mirrored as GitHub release wheels. The core architecture, package split, plugin substrate, native kit, test suite, and failure reports are in place.
+
+What's next:
+
+- **Independent third-party audit** — move the evidence package from first-party reproducibility to external validation.
+- **Linux support** — extend the executor and sandbox story beyond macOS Apple Silicon.
+- **Local model support** — add Ollama / llama.cpp paths for teams that cannot send action descriptions to hosted models.
+- **Stateful multi-intent tracking** — catch cumulative abuse patterns where each individual action looks acceptable.
+- **Broader command and integration coverage** — expand action bundles, executor packs, and policy-management tooling.
+
+Those are roadmap items, not blockers for trying the package release.
 
 ---
 

@@ -2,11 +2,13 @@
 
 All notable public changes to IntentFrame will be documented in this file.
 
-This project follows semantic versioning where practical. While IntentFrame is in alpha, breaking changes may still occur between minor releases.
+IntentFrame follows semantic versioning where practical. During early `0.x` releases, breaking changes may still occur between minor releases.
 
 ## [Unreleased]
 
-No public changes yet.
+### Changed
+
+- Documentation: PyPI is the primary install path for all 18 `packages/` distributions @ `0.1.0`; GitHub release wheels documented as optional mirror ([`docs/package-consumers.md`](docs/package-consumers.md)).
 
 ## [0.1.0] - 2026-06-04
 
@@ -17,7 +19,8 @@ No public changes yet.
 - **`intentframe-supervisor`** workspace package — supervisor code, default `supervisor.yaml`, console scripts `intentframe` / `intentframe-backend`; depends on `intentframe-runtime`; optional **`[native]`** extra pulls `intentframe-native-kit` (4-service kit profile is still selected via `--config` / `INTENTFRAME_SUPERVISOR_CONFIG`, not auto-detected).
 - Config-driven core, supervisor, edge, bundle, and executor-pack profiles.
 - First-party native kit packaging for native bundles, executor packs, resource registry wiring, and profile YAML files.
-- GitHub release wheel install path for third-party `uv` projects while PyPI first-project registration is staged.
+- GitHub release wheel install path for third-party `uv` projects (URL-pinned fallback; PyPI is primary for `0.1.0`).
+- All **18** packages published to [PyPI](https://pypi.org/) at **`0.1.0`**.
 - Package-level AGPL/Apache licensing split, documented in [`docs/licensing.md`](docs/licensing.md).
 
 ### Changed
@@ -45,7 +48,6 @@ No public changes yet.
 
 - Full native assistant stack still targets macOS on Apple Silicon.
 - Python 3.14+ is expected for the package set.
-- PyPI availability may lag the GitHub release while first-time package registration limits clear.
 - No independent third-party security audit yet.
 - Stateful cumulative-abuse detection remains roadmap work.
 
@@ -75,7 +77,7 @@ No public changes yet.
 - macOS on Apple Silicon only.
 - Python 3.14+ required.
 - No independent third-party audit yet.
-- No PyPI or Homebrew install yet.
+- No Homebrew install for the full product yet. SDK/runtime packages install from PyPI (`docs/package-consumers.md`); Jarvis and the gateway still require a repo clone.
 - Policy editing still requires source-level changes.
 - Stateful multi-intent tracking is on the roadmap.
 

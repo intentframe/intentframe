@@ -1,0 +1,49 @@
+name: Mac Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: macOS full suite + command-shield
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python 3.14
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --locked --extra hashicorp
+
+      - name: Provision executor sandbox venv
+        run: |
+          uv venv --python 3.14 --seed "$HOME/.intentframe-venvs/executor"
+          "$HOME/.intentframe-venvs/executor/bin/python3" --version
+
+      - name: Run root tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/ --ignore=tests/test_executor_action_matrix.py
+
+      - name: Run command-shield tests
+        run: |
+          source .venv/bin/activate
+          pytest packages/command-shield/command_shield/tests
