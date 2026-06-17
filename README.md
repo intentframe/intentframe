@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>IntentFrame removes direct execution from LLM tool calls: agents propose actions, policy validates intent, and a separate Executor performs approved actions.</strong>
+  <strong>IntentFrame is an AI governance and security runtime for controlled agent tool use: agents propose actions, policy validates intent, and a separate Executor performs approved actions.</strong>
 </p>
 
 <p align="center">
@@ -44,6 +44,12 @@
   <a href="docs/threat-model.md">Threat model</a> •
   <a href="docs/faq.md">FAQ</a> •
   <a href="https://x.com/intent_frame">X/Twitter</a>
+</p>
+
+<p align="center">
+  <sub>
+    AI governance · agentic AI governance · AI agent security · secure AI agent deployment · runtime enforcement · AI guardrails · tool-use authorization · policy-as-code · approval workflows · agent audit logs · prompt-injection defense · human-in-the-loop alternatives · LangChain / AutoGen / OpenAI Agents SDK security · agent runtime
+  </sub>
 </p>
 
 ---
