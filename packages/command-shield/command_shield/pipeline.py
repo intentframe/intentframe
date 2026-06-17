@@ -378,7 +378,7 @@ def _scan_patterns(command: str, normalized: str) -> tuple[bool, list[Signal]]:
 
 
 _VERDICT_BEARING_CHECKS: frozenset[str] = frozenset({
-    "pattern", "structural", "indirection", "shellcheck",
+    "pattern", "structural", "indirection",
 })
 
 
@@ -386,7 +386,9 @@ def _final_verdict(signals: list[Signal]) -> Verdict:
     """SAFE or NEEDS_REVIEW from fixed-system checks only.
 
     CATASTROPHIC is handled by early-return paths above.  Config-driven
-    signals never change the verdict.
+    signals never change the verdict.  ShellCheck is intentionally advisory:
+    it is an optional external binary and would otherwise make classification
+    depend on host PATH rather than command content.
     """
     for s in signals:
         if s.check in _VERDICT_BEARING_CHECKS:
