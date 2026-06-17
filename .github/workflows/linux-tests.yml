@@ -1,0 +1,48 @@
+name: Linux Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest-linux:
+    name: Linux root subset + packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python 3.14
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --locked --extra hashicorp
+
+      - name: Run root tests without macOS enforcement tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/ \
+            --ignore=tests/test_sandbox.py \
+            --ignore=tests/test_tcc_adapters_live.py \
+            --ignore=tests/test_executor_action_matrix.py
+
+      - name: Run package tests
+        run: |
+          source .venv/bin/activate
+          pytest packages/command-shield/command_shield/tests
+          pytest packages/intentframe-credentials/tests

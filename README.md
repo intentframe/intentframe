@@ -33,6 +33,8 @@
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
   <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-brightgreen.svg" alt="Release: v0.1.0"></a>
   <a href="docs/package-consumers.md"><img src="https://img.shields.io/badge/PyPI-18%20packages%20%400.1.0-blue.svg" alt="PyPI: 18 packages at 0.1.0"></a>
+  <a href="https://github.com/intentframe/intentframe/actions/workflows/mac-tests.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/mac-tests.yml/badge.svg" alt="Mac Tests"></a>
+  <a href="https://github.com/intentframe/intentframe/actions/workflows/linux-tests.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/linux-tests.yml/badge.svg" alt="Linux Tests"></a>
   <a href="https://github.com/intentframe/intentframe/actions/workflows/repo-hygiene.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/repo-hygiene.yml/badge.svg" alt="Repo Hygiene"></a>
   <img src="https://img.shields.io/badge/runtime-AI%20security-red.svg" alt="AI Security Runtime">
   <a href="https://github.com/intentframe/intentframe/stargazers"><img src="https://img.shields.io/github/stars/intentframe/intentframe?style=social" alt="GitHub stars"></a>
