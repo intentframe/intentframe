@@ -2,7 +2,7 @@
 
 All notable public changes to IntentFrame will be documented in this file.
 
-This project follows semantic versioning where practical. While IntentFrame is in alpha, breaking changes may still occur between minor releases.
+IntentFrame follows semantic versioning where practical. During early `0.x` releases, breaking changes may still occur between minor releases.
 
 ## [Unreleased]
 
