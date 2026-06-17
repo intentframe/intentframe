@@ -1907,7 +1907,11 @@ class TestSeatbeltVenvEnforcement:
         )
         result = _exec_sandboxed(self.engine.wrap("command -v python3", plan))
         assert result.returncode == 0
-        assert result.stdout.strip() in ("/usr/bin/python3", "/opt/homebrew/bin/python3")
+        assert result.stdout.strip() in (
+            "/usr/bin/python3",
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3",
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

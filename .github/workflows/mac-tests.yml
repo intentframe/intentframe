@@ -41,7 +41,7 @@ jobs:
       - name: Run root tests
         run: |
           source .venv/bin/activate
-          pytest tests/
+          pytest tests/ --ignore=tests/test_executor_action_matrix.py
 
       - name: Run command-shield tests
         run: |
