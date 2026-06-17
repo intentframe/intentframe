@@ -110,7 +110,7 @@ uv pip install \
 |----------|---------|
 | **Full deps** | Kit `Requires-Dist` (e.g. `command-shield`, `boto3`, …) are resolved and installed |
 | **Constraints** | Cannot upgrade/downgrade packages already pinned in the runtime freeze (`pydantic`, `intentframe-server`, …) |
-| **`--find-links`** | Workspace-only deps ship as extra wheels in `INTENTFRAME_KITS_DIR` (not on PyPI) |
+| **`--find-links`** | Local harness wheelhouse in `INTENTFRAME_KITS_DIR` for offline / workspace-only test installs |
 | **`--strict`** | Fails if the environment has missing or inconsistent dependencies after install |
 
 ### When failures show up

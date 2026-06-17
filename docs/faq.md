@@ -6,6 +6,18 @@ Common questions from skeptical readers, security engineers, and developers eval
 
 ---
 
+## Q0. Can I `pip install` IntentFrame?
+
+**Packages — yes.** All **18** distributions under `packages/` are on [PyPI](https://pypi.org/) at **`0.1.0`** (Python **3.14+**). See [`package-consumers.md`](package-consumers.md).
+
+```bash
+pip install intentframe-actor==0.1.0 intentframe-bundle-sdk==0.1.0
+```
+
+**Full product (Jarvis, gateway CLI, macOS platform server) — no.** That code is AGPL product workspace, not published to PyPI. Clone the repo and follow [`quickstart.md`](quickstart.md).
+
+---
+
 ## Q1. Is this just AI guarding AI?
 
 The honest answer: yes, for the slice of decisions that reach the AI layer.

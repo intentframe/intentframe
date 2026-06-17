@@ -19,6 +19,8 @@ package is installed. Built on `intentframe-bundle-sdk`,
 pip install intentframe-native-kit
 ```
 
+PyPI: [intentframe-native-kit](https://pypi.org/project/intentframe-native-kit/) · `pip install intentframe-native-kit==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
+
 ## License
 
 `intentframe-native-kit` is distributed under the Apache License 2.0.

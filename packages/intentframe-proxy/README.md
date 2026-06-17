@@ -9,3 +9,4 @@ gateway and the network edge so both paths share the same forwarding behavior.
 ```python
 from intentframe_proxy import UDSProxy, proxy_websocket
 ```
+PyPI: [intentframe-proxy](https://pypi.org/project/intentframe-proxy/) · `pip install intentframe-proxy==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)

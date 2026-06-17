@@ -12,3 +12,5 @@ this package transitively.
 ```bash
 pip install intentframe-core
 ```
+
+PyPI: [intentframe-core](https://pypi.org/project/intentframe-core/) · `pip install intentframe-core==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)

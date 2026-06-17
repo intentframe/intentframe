@@ -2,6 +2,8 @@
 
 Get IntentFrame running locally from a fresh clone.
 
+> **Packages only (PyPI):** the 18 distributions under `packages/` install with `pip` / `uv` from [PyPI](https://pypi.org/) — see [`package-consumers.md`](package-consumers.md). This guide is for the **full product** (Jarvis, gateway, macOS integrations).
+
 ---
 
 ## Requirements

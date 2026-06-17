@@ -1,8 +1,10 @@
-# GitHub release wheels (interim install)
+# GitHub release wheels (fallback install)
 
-Install IntentFrame packages from **GitHub release assets** while PyPI first-project registration is still in progress. Wheels are ordinary `.whl` files attached to a release tag (e.g. [v0.1.0](https://github.com/intentframe/intentframe/releases/tag/v0.1.0)); no separate index server is required.
+Install IntentFrame packages from **GitHub release assets** when you need URL-pinned wheels or PyPI is unavailable. For normal projects, install from **PyPI** instead — see [`../../docs/package-consumers.md`](../../docs/package-consumers.md) and [`example-pyproject-pypi.toml`](example-pyproject-pypi.toml).
 
-Manual GitHub release publishing runbook: [`../github-release/README.md`](../github-release/README.md). PyPI publishing, validation, and rate limits: [`../release/README.md`](../release/README.md). Licensing per package: [`../../docs/licensing.md`](../../docs/licensing.md).
+Wheels are ordinary `.whl` files attached to a release tag (e.g. [v0.1.0](https://github.com/intentframe/intentframe/releases/tag/v0.1.0)). The same artifacts are published on [PyPI](https://pypi.org/) for `0.1.0`.
+
+Manual GitHub release publishing runbook: [`../github-release/README.md`](../github-release/README.md). PyPI publishing and rate limits: [`../release/README.md`](../release/README.md). Licensing: [`../../docs/licensing.md`](../../docs/licensing.md).
 
 ## Publisher workflow
 
@@ -63,11 +65,11 @@ Pass `--tag` for any lockstep release where:
 
 The script does **not** support tags whose version string differs from wheel versions (e.g. tag `v0.1.0-alpha.6` with wheels still `*-0.1.0-*`). Add a package or rename a distribution → update `WHEELS` and the embedded Python lists in [`verify_release_install.sh`](verify_release_install.sh) and [`../kits-two-venv/gh-release-venv/start_runtime_from_release.sh`](../kits-two-venv/gh-release-venv/start_runtime_from_release.sh).
 
-## Consumer install (`uv` in another repo)
+## Consumer install (`uv`, GitHub URLs)
 
-`uv` applies `[tool.uv.sources]` for the **whole** resolution, including transitive IntentFrame deps. List every IntentFrame package in your dependency closure (simplest: all 18). Third-party deps (`fastapi`, `httpx`, …) still come from PyPI.
+**Prefer PyPI:** copy [`example-pyproject-pypi.toml`](example-pyproject-pypi.toml) — no `[tool.uv.sources]` needed.
 
-Copy/edit template: [`example-pyproject.toml`](example-pyproject.toml) (all 18 `[tool.uv.sources]` URLs; default direct deps are actor + bundle-sdk + executor-sdk — uncomment others as needed).
+**URL-pinned wheels:** copy [`example-pyproject.toml`](example-pyproject.toml). `uv` applies `[tool.uv.sources]` for the **whole** resolution, including transitive IntentFrame deps. List every IntentFrame package (simplest: all 18). Third-party deps (`fastapi`, `httpx`, …) still come from PyPI.
 
 Then:
 
@@ -77,27 +79,15 @@ uv sync
 
 For a new lockstep version, replace `v0.1.0` and `0.1.0` in every URL. Confirm filenames with `ls dist/publish/` after build.
 
-**Ad-hoc** (same closure, no `pyproject.toml`):
-
-```bash
-uv pip install \
-  https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_native_kit-0.1.0-py3-none-any.whl \
-  # … every other IntentFrame wheel URL in the transitive closure
-```
-
-### When PyPI is available
-
-Remove the entire `[tool.uv.sources]` block and keep `[project.dependencies]` (or use plain version pins). Resolution falls back to PyPI with no other changes.
-
 ## Wheels vs source distributions
 
 | Artifact | Role |
 |----------|------|
-| `.whl` | Pre-built; use these for GitHub release assets and `[tool.uv.sources]` URLs. |
-| `.tar.gz` sdist | Optional on the release; uv can build from source but slower. Not required for the URL install path. |
+| `.whl` | Pre-built; use for GitHub release assets and `[tool.uv.sources]` URLs. |
+| `.tar.gz` sdist | Optional on the release; slower to install from source. Both ship on PyPI for `0.1.0`. |
 
 ## Limitations
 
 - **Public repo only** — release asset URLs work without auth on public repositories.
-- **No upload API** — attach files to the GitHub release manually (or your own automation); there is no PyPI-style `twine upload` to GitHub releases.
+- **No upload API** — attach files to the GitHub release manually (or your own automation).
 - **18-package lockstep** — all packages share one version; intra-org deps are pinned `==<version>`.

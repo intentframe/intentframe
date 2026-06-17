@@ -12,3 +12,5 @@ only; the first-party native kit supplies an optional profile that also exposes
 python -m intentframe_edge --host 0.0.0.0 --port 8443
 intentframe-edge --config "${KIT}/edge_profile.yaml"
 ```
+
+PyPI: [intentframe-edge](https://pypi.org/project/intentframe-edge/) · `pip install intentframe-edge==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)

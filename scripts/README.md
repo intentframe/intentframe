@@ -2,13 +2,17 @@
 
 Utility scripts for local development setup.
 
-## GitHub release wheels (interim, before PyPI)
+## PyPI release (`packages/` only)
+
+See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`). All **18** packages for **`0.1.0`** are on [PyPI](https://pypi.org/); consumers: [`../docs/package-consumers.md`](../docs/package-consumers.md).
+
+## GitHub release wheels (optional mirror)
 
 | Directory | Role |
 |-----------|------|
-| [`github-release/`](github-release/README.md) | Publish runbook: version pins, build, upload wheels to a GitHub release, consumer notes |
-| [`github-install/`](github-install/README.md) | Install-only verify (`verify_release_install.sh`) + [`example-pyproject.toml`](github-install/example-pyproject.toml) for third-party `uv` projects |
-| [`kits-two-venv/gh-release-venv/`](kits-two-venv/gh-release-venv/README.md) | Boot supervisor + edge from release wheels (`.venv-release`); stop/tests via [`kits-two-venv/`](kits-two-venv/README.md) |
+| [`github-release/`](github-release/README.md) | Publish runbook: version pins, build, upload wheels to a GitHub release |
+| [`github-install/`](github-install/README.md) | Install verify (`verify_release_install.sh`); [`example-pyproject-pypi.toml`](github-install/example-pyproject-pypi.toml) (PyPI) and [`example-pyproject.toml`](github-install/example-pyproject.toml) (URL fallback) |
+| [`kits-two-venv/gh-release-venv/`](kits-two-venv/gh-release-venv/README.md) | Boot supervisor + edge from release wheels (`.venv-release`) |
 
 Suggested verification after uploading wheels to a release:
 
@@ -19,10 +23,6 @@ bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v
 bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
 bash scripts/kits-two-venv/stop_runtime.sh
 ```
-
-## PyPI release (`packages/` only)
-
-See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`).
 
 ## Kits two-venv harness (substrate + wheel, edge for tests)
 

@@ -38,6 +38,7 @@
 
 <p align="center">
   <a href="docs/quickstart.md">Quickstart</a> •
+  <a href="docs/package-consumers.md">Packages (PyPI)</a> •
   <a href="docs/autonomy.md">Why this exists</a> •
   <a href="docs/evidence.md">Proof</a> •
   <a href="docs/threat-model.md">Threat model</a> •
@@ -457,7 +458,8 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Looking for the analogy that lands | [`docs/mental-models.md`](docs/mental-models.md) |
 | An engineer evaluating the design | [`docs/principles.md`](docs/principles.md) → [`docs/architecture.md`](docs/architecture.md) → [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/executor.md`](docs/executor.md) → [`docs/executor/standalone-product.md`](docs/executor/standalone-product.md) |
 | Shipping custom action bundles or executor packs | [`docs/plugin-profiles.md`](docs/plugin-profiles.md) → [`docs/dev/action-family-wiring.md`](docs/dev/action-family-wiring.md) |
-| Installing package wheels from a release | [`scripts/github-install/README.md`](scripts/github-install/README.md) → [`scripts/github-release/README.md`](scripts/github-release/README.md) |
+| Installing packages into another Python project (PyPI) | [`docs/package-consumers.md`](docs/package-consumers.md) |
+| GitHub release wheel fallback / verify | [`scripts/github-install/README.md`](scripts/github-install/README.md) → [`scripts/github-release/README.md`](scripts/github-release/README.md) |
 | Checking package licensing | [`docs/licensing.md`](docs/licensing.md) |
 | Worried about privacy / what leaves the machine | [`docs/privacy.md`](docs/privacy.md) → [`docs/processes.md`](docs/processes.md) |
 | Wondering "why no injection detector?" | [`docs/why-not-injection-shield.md`](docs/why-not-injection-shield.md) |

@@ -20,3 +20,5 @@ This package contains no source code. The resource-registry / native-kit
 ```bash
 pip install intentframe-runtime
 ```
+
+PyPI: [intentframe-runtime](https://pypi.org/project/intentframe-runtime/) · `pip install intentframe-runtime==0.1.0` · License: AGPL-3.0 · [Consumer guide](../../docs/package-consumers.md)

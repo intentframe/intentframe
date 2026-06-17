@@ -23,7 +23,7 @@ fi
 BUILD_DIR="${REPO_ROOT}/.intentframe/kits-build"
 mkdir -p "${BUILD_DIR}" "${INTENTFRAME_KITS_DIR}"
 
-# Workspace packages the kit declares that are not on PyPI (wheelhouse for offline/find-links).
+# Extra wheels for the local harness wheelhouse (offline / find-links installs).
 WHEELHOUSE_PACKAGES=(
   intentframe-native-kit
   command-shield

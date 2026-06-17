@@ -37,12 +37,9 @@ uv run pytest demo/tests/               # security demo tests (needs OpenAI key)
 ## Project Structure
 
 IntentFrame is a `uv` workspace. The root `pyproject.toml` defines the main
-product package; publishable packages live under `packages/`, and product
-workspace members (`jarvis_pa`, `external_data_ingestion`, `jarvis_telegram`)
-have their own `pyproject.toml` files linked via `[tool.uv.sources]`.
+product package; **18 publishable packages** under `packages/` are on [PyPI](https://pypi.org/) (see [`docs/package-consumers.md`](docs/package-consumers.md)). Product workspace members (`jarvis_pa`, `external_data_ingestion`, `jarvis_telegram`) are not on PyPI.
 
-Do **not** install workspace members with `pip install -e .` individually —
-use `uv sync` from the root.
+Do **not** install workspace members with `pip install -e .` individually — use `uv sync` from the root.
 
 ## Making Changes
 

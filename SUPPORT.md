@@ -10,6 +10,7 @@ Use [GitHub Discussions](https://github.com/intentframe/intentframe/discussions)
 - design questions
 - "can IntentFrame handle this use case?" questions
 - agent integration questions
+- installing `packages/` from PyPI ([`docs/package-consumers.md`](docs/package-consumers.md))
 - feedback on docs or roadmap direction
 
 ## Bugs and Documentation Issues
