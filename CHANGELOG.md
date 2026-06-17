@@ -6,8 +6,15 @@ IntentFrame follows semantic versioning where practical. During early `0.x` rele
 
 ## [Unreleased]
 
+### Added
+
+- CI: **Mac Tests** workflow (`mac-tests.yml`) — full root `tests/` plus `command-shield` on `macos-14`, with executor sandbox venv provisioning for fresh runners.
+- CI: **Linux Tests** workflow (`linux-tests.yml`) — portable root subset (skips macOS sandbox/TCC/action-matrix tests) plus `command-shield` and `intentframe-credentials` package tests on `ubuntu-latest`.
+- README badges for Mac Tests and Linux Tests.
+
 ### Changed
 
+- **`command-shield`**: ShellCheck findings are advisory command intel only; they no longer promote verdicts to `NEEDS_REVIEW`. Fixes non-deterministic classification when the optional `shellcheck` binary is present on PATH (common on Linux CI, uncommon on macOS dev machines). PyPI consumers on `0.1.0` are unchanged until the next lockstep release.
 - Documentation: PyPI is the primary install path for all 18 `packages/` distributions @ `0.1.0`; GitHub release wheels documented as optional mirror ([`docs/package-consumers.md`](docs/package-consumers.md)).
 
 ## [0.1.0] - 2026-06-04
