@@ -4,7 +4,7 @@
 
 This is the developer-facing companion to [architecture.md](architecture.md). The architecture doc explains *what the runtime does*; this doc explains *what an agent developer has to do* to use it. The answer is small enough to fit on a postcard, which is the whole point.
 
-For the Actor's source, see [`../intentframe_actor/actor.py`](../intentframe_actor/actor.py). For a complete reference integration, see [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py).
+For the Actor's source, see [`../intentframe_actor/actor.py`](../intentframe_actor/actor.py). For complete reference integrations, see [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py) (full Actor SDK path) and [`../external_agents/return_agent/`](../external_agents/return_agent/) (approve-then-guard with in-process AE/Guardian pipeline).
 
 ## Install (PyPI)
 
@@ -197,12 +197,13 @@ For the full pipeline reference, see [architecture.md](architecture.md). For wha
 
 ## Reference integrations
 
-Two complete agents in this repo, both built on the Actor SDK:
+Two complete agents in this repo, both built on the Actor SDK, plus one controlled experiment:
 
 | Agent | Framework | What it does | Where |
 |---|---|---|---|
 | **Jarvis** | OpenAI Agents SDK | Personal assistant — email, calendar, files, shell, git, ~60 tools, sub-agent delegation, hybrid RAG memory | [`../jarvis_pa/`](../jarvis_pa/) — see [jarvis.md](jarvis.md) |
 | **Invoice bot** | OpenAI Agents SDK | Processes a directory of invoice files, deduplicates, asks the user when uncertain, writes to an expense tracker | [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py) |
+| **Return agent** | OpenAI Chat Completions (Build A) + in-process IntentFrame pipeline (Build B) | Returns/refund chatbot experiment: hardened DIY agent vs external semantic limits on the same policy; approve-then-guard when Build A decides `APPROVE` | [`../external_agents/return_agent/`](../external_agents/return_agent/) — see [evidence.md § Suite 4](evidence.md#suite-4-return-agent-experiment) |
 
 Both follow the same shape:
 
@@ -212,6 +213,8 @@ Both follow the same shape:
 4. Run the agent loop in your framework of choice.
 
 **Jarvis** additionally imports `intentframe_native_kit.action_registry` in its tool layer for optional pre-flight validation (taxonomy + domain payload slices) before `actor.submit()`. The invoice bot does not — it relies on per-tool Pydantic models and server-side enforcement only. Both patterns are valid; the Actor stays registry-agnostic either way.
+
+The **return agent** is not a third production integration — it is a head-to-head experiment. Build A runs without IntentFrame; Build B runs the in-process AE → Guardian pipeline (or the end-to-end driver chains them). It demonstrates the approve-then-guard shape: the orchestrator sets `action`, never reads refund `target` from the agent, and only sends intents to IntentFrame when the agent would have executed.
 
 You can paste either agent into a new project and replace the framework with LangChain, AutoGen, or a raw OpenAI tool-call loop, and the integration with IntentFrame would not change. The Actor SDK is the only seam.
 
@@ -330,6 +333,7 @@ Three audiences, in increasing order of independence:
 - [`../intentframe_actor/actor.py`](../intentframe_actor/actor.py) — Actor SDK source (one class, ~200 lines)
 - [`../intentframe_actor/__init__.py`](../intentframe_actor/__init__.py) — Public API surface
 - [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py) — Reference integration (OpenAI Agents SDK + Actor SDK)
+- [`../external_agents/return_agent/`](../external_agents/return_agent/) — Returns/refund approve-then-guard experiment (hardened DIY vs IntentFrame)
 - [`../jarvis_pa/jarvis/tools.py`](../jarvis_pa/jarvis/tools.py) — ~60 tool examples in production use
 - [architecture.md](architecture.md) — The full pipeline `submit()` triggers
 - [executor.md](executor.md) — Where credentials live (not in your agent)

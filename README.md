@@ -75,7 +75,7 @@
 
 ## Real-World Scenarios
 
-- **Refund-processing agent:** policy blocks any payment over $500 without explicit user confirmation.
+- **Refund-processing agent:** semantic refund rules (defect-only eligibility, no contaminated-thread auto-approve, original payment method only) enforced outside the agent — see [`external_agents/return_agent/`](external_agents/return_agent/) for a 51-run comparison against a hardened DIY baseline.
 - **DevOps agent:** allowed to read logs and summarize incidents, but blocked from modifying infrastructure unless policy permits the exact action.
 - **Support agent:** can draft replies and prepare account updates, but cannot send messages or change customer state without approval.
 
@@ -476,7 +476,7 @@ For the full pipeline, see [`docs/architecture.md`](docs/architecture.md).
 
 The agent in the diagram above is *your* agent — any LLM, any framework. The seam between it and the IntentFrame runtime is one method: `actor.submit(...)`. Every tool body calls it; nothing else changes. The runtime owns credentials, validation, audit, and execution; your agent keeps reasoning, business logic, UI, and framework choice.
 
-Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-sdk.md). Why all agents share one runtime / one executor / one policy surface: [`docs/single-runtime.md`](docs/single-runtime.md). Reference integrations: [`jarvis_pa/`](jarvis_pa/) and [`external_agents/invoice_bot/`](external_agents/invoice_bot/).
+Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-sdk.md). Why all agents share one runtime / one executor / one policy surface: [`docs/single-runtime.md`](docs/single-runtime.md). Reference integrations: [`jarvis_pa/`](jarvis_pa/), [`external_agents/invoice_bot/`](external_agents/invoice_bot/), and [`external_agents/return_agent/`](external_agents/return_agent/) (returns/refund approve-then-guard experiment).
 
 ---
 

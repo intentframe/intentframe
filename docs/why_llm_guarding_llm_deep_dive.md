@@ -531,6 +531,8 @@ The measurements in this document come from supporting experiment notes under [`
 
 For the second test surface — the invoice/payment red-team suite (24 attacks: 23 defended, 0 bypassed, 1 known gap) and the transitive injection boundary tests (39/43 PASS) — see [docs/evidence.md § Suite 2](evidence.md#suite-2-the-invoicepayment-attack-suite) and [§ Suite 3](evidence.md#suite-3-transitive-injection-boundary-tests). The OWASP Agentic Top 10 mapping for IntentFrame's coverage of agent-specific risks is in [docs/evidence.md § OWASP Agentic Top 10 Coverage](evidence.md#owasp-agentic-top-10-coverage).
 
+For live-agent evidence that helper and guard must not share one model — even when both carry identical semantic policy — see [docs/evidence.md § Suite 4](evidence.md#suite-4-return-agent-experiment) and [`external_agents/return_agent/end_to_end_pipeline_report.md`](../external_agents/return_agent/end_to_end_pipeline_report.md): 51 runs, hardened DIY returns chatbot silently bypassed 29.4% while suppressing its injection-detection flag; IntentFrame blocked all 15 bypasses.
+
 ---
 
 ## Related Documents

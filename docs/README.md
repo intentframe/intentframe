@@ -50,6 +50,7 @@ If you're new to IntentFrame, read in this order:
 
 - [threat-model.md](threat-model.md) — what's in scope, what's out of scope
 - [evidence.md](evidence.md) — verified test results, including a failure report and remediation
+- [`../external_agents/return_agent/`](../external_agents/return_agent/) — live-agent comparison: hardened DIY returns chatbot vs IntentFrame on semantic refund policy (51 runs)
 - [why_trust_ai_hybrid_intentframe.md](why_trust_ai_hybrid_intentframe.md) — why a hybrid AI/deterministic model is trustworthy
 - [why_llm_guarding_llm_deep_dive.md](why_llm_guarding_llm_deep_dive.md) — the deep version of "isn't this just one LLM watching another?"
 - [why-not-injection-shield.md](why-not-injection-shield.md) — why no dedicated prompt-injection detector
@@ -101,6 +102,7 @@ If you're new to IntentFrame, read in this order:
 
 - [actor-sdk.md](actor-sdk.md) — the developer-facing positioning + integration guide; bring any LLM, any framework, route tool I/O through `actor.submit(...)`
 - [`../external_agents/invoice_bot/agent.py`](../external_agents/invoice_bot/agent.py) — reference integration (OpenAI Agents SDK + Actor SDK)
+- [`../external_agents/return_agent/`](../external_agents/return_agent/) — returns/refund experiment: approve-then-guard pattern with live LLM agent + IntentFrame semantic limits
 - [jarvis.md](jarvis.md) — the larger reference assistant built on the same SDK
 
 ### "I want to extend IntentFrame"

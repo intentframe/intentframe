@@ -203,6 +203,8 @@ A compromised agent can only attack the AI layers. Every applicable deterministi
 
 These deterministic layers are strongest where the action surface has mechanical structure to inspect or constraints to enforce. Not every business policy has a deterministic floor. Semantic policies such as "refund only for a genuine manufacturing defect" or "do not approve a request contaminated by fake policy pressure" rely on the AI/context-aware layer. In those cases IntentFrame is an external semantic judge, not a proof system.
 
+The return agent experiment ([docs/evidence.md § Suite 4](evidence.md#suite-4-return-agent-experiment)) measures this directly: a hardened DIY returns chatbot carrying four semantic refund rules in its prompt silently approved 29.4% of contaminated threads (15/51) while suppressing its own injection-detection flag; the same rules enforced externally by IntentFrame blocked all 15 bypasses (0% end-to-end leakage).
+
 ---
 
 ## Where AI Is Load-Bearing

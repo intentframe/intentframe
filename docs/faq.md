@@ -112,7 +112,7 @@ The added cost is often <20% of the agent's own cost (agent uses big model × bi
 
 Not yet. Current evidence is first-party tests and code-level validation. Independent audit is a future milestone before enterprise security claims.
 
-What exists today: 220-intent root-demo test suite (100 attacks, 100 benign, 20 gray-area), 24-attack invoice/payment red-team suite, 43-case transitive injection test suite, prompt hardening unit tests, and the 2026-04-27 failure report with remediation. All results are publicly available in the repository.
+What exists today: 220-intent root-demo test suite (100 attacks, 100 benign, 20 gray-area), 24-attack invoice/payment red-team suite, 43-case transitive injection test suite, 51-run return-agent live comparison (hardened DIY agent vs IntentFrame on semantic refund policy — 29.4% agent-only bypass → 0% end-to-end leakage), prompt hardening unit tests, and the 2026-04-27 failure report with remediation. All results are publicly available in the repository. See [docs/evidence.md § Suite 4](evidence.md#suite-4-return-agent-experiment) for the return-agent scorecard.
 
 ---
 
@@ -315,6 +315,8 @@ The principle in `principles.md` is: *thought must not directly become action*. 
 **The clean way to state it**: a limit in the agent is in the same trust domain as the thing being limited. A limit outside the agent — in code the agent cannot influence, in policy the agent cannot rewrite — is in a different trust domain. Only the second one is *enforcement*. The first is *request*. The distinction is structural, not stylistic, and applies to every security domain, not just AI.
 
 So: yes you can put limits in the agent, and many teams do, and that is exactly why incidents like Replit Agent dropping the prod database happen. The limit was "in the agent." It was followed usually. Then once, it wasn't. There was nothing else.
+
+Empirical proof on semantic refund policy: the [return agent experiment](../external_agents/return_agent/) runs a **hardened** single-LLM returns chatbot (Build A) against IntentFrame carrying the **same four semantic rules**. On a quiet chat attack, Build A silently approved 15/51 contaminated threads (29.4%) — every time with `pressure_or_injection_detected: false`. IntentFrame blocked all 15 (0% end-to-end leakage). See [docs/evidence.md § Suite 4](evidence.md#suite-4-return-agent-experiment).
 
 ---
 
