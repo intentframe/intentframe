@@ -219,7 +219,7 @@ Generic orchestration — replaceable with Docker Compose, systemd, etc. No doma
 |--------|------|
 | [`jarvis_pa/`](../jarvis_pa/) | Reference macOS assistant; uses Actor SDK only toward IntentFrame. |
 | [`jarvis_telegram/`](../jarvis_telegram/) | Telegram bridge to Jarvis. |
-| [`external_agents/`](../external_agents/) | Third-party agent examples (`invoice_bot`). |
+| [`external_agents/`](../external_agents/) | Third-party agent examples (`invoice_bot`, `return_agent`). |
 | [`intentframe_cli/`](../intentframe_cli/) | Terminal REPL frontend → gateway socket. |
 | [`intentframe_dashboard/`](../intentframe_dashboard/) | Programmatic admin / demo control plane. |
 
@@ -438,7 +438,7 @@ Agent SDK — sole intended import for agent code talking to IntentFrame.
 
 ### `jarvis_pa/`, `jarvis_telegram/`, `external_agents/`
 
-Product/agent code outside substrate; demonstrate Actor-only integration.
+Product/agent code outside substrate; demonstrate Actor-only integration. `return_agent/` is a controlled experiment (hardened DIY returns chatbot vs IntentFrame on the same semantic refund rules) — see [evidence.md § Suite 4](evidence.md#suite-4-return-agent-experiment).
 
 ---
 

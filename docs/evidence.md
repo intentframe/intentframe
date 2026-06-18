@@ -14,6 +14,8 @@ Two parallel suites stress-test IntentFrame from different angles. Both matter, 
 
 The root demo proves containment under hostile execution conditions. The attack suite proves resistance under hostile reasoning conditions. Together they cover the two failure modes: "agent gets compromised and submits destructive commands" and "agent gets cleverly tricked into structurally-valid but malicious actions."
 
+A fourth evidence package — the **return agent experiment** ([Suite 4](#suite-4-return-agent-experiment)) — answers a different question: when semantic refund policy lives entirely in a hardened agent's prompt, does moving the same rules to an external IntentFrame judge actually change outcomes? It uses a live LLM agent, not stub fixtures.
+
 ---
 
 ## Suite 1: The Root Demo
@@ -258,6 +260,56 @@ This informs model selection: raw capability is not the only axis. The trusted-b
 
 ---
 
+## Suite 4: Return Agent Experiment
+
+### What it is
+
+A controlled comparison between a **hardened DIY return-support agent** (Build A) and the same agent guarded by **IntentFrame** (Build B). The scenario is a customer-facing returns chatbot: the attacker controls only customer messages; trusted order context comes from internal systems and is assumed clean.
+
+Unlike Suites 2 and 3, this suite uses a **live LLM agent** that reads the chat and returns a structured decision — not pre-written `IntentFrame` fixtures submitted through a stub harness. Build A carries four semantic refund rules in its system prompt (manufacturing-defect-only, no auto-approve on contaminated threads, refund-to-original-destination, no self-approved goodwill). Build B enforces the **same four rules** as `intent_limits` in the Analysis Engine → Guardian pipeline. The experiment isolates whether **where** enforcement lives matters when the policy text is identical.
+
+The end-to-end driver (`external_agents/return_agent/run_build_a_to_intentframe.py`) runs Build A unchanged, then — only when Build A decides `APPROVE` — builds an `ISSUE_REFUND` intent and sends it to IntentFrame. Refund destination is never read from the agent; `target` is left empty and would be resolved from trusted order records at execution time.
+
+### Attack
+
+The default attack (`build_a/real_world_user_prompt.py`) is a **quiet chat attack**: plausible defect story, closed-card refund story, fake FAQ quote, alternate card number, reframed prior agent commitment. No jailbreak phrases, no forged manager email, no emotional pressure. This measures whether a competently hardened prompt holds against attacks that look like normal customer behavior.
+
+### Results (51 runs, intent limits ON)
+
+| Stage | Outcome | Count | Rate |
+|---|---|---:|---:|
+| Build A ESCALATE / DENY (self-refused) | caught before guard | 36 | 70.6% |
+| Build A APPROVE (silent bypass) | contaminated thread approved | 15 | 29.4% |
+| IntentFrame BLOCK (of the 15 approvals) | guard caught agent failure | 15 | **100%** |
+| IntentFrame ALLOW (leak) | — | 0 | 0% |
+
+Every silent bypass reported `pressure_or_injection_detected: false` while approving — the agent suppressed its own detection flag to stay in helper mode. Every IntentFrame BLOCK cited `contaminated-thread-no-autoapprove`; most also cited `refund-original-destination`.
+
+### End-to-end outcome
+
+| | Build A alone | Build A → IntentFrame |
+|---|---:|---:|
+| Contaminated approvals reaching an executor | 15 / 51 (**29.4%**) | **0 / 51 (0%)** |
+| Caught (escalated, denied, or blocked) | 36 / 51 | **51 / 51 (100%)** |
+
+### What it proves
+
+1. **The failure is architectural, not a capability gap.** Build A and the IntentFrame guardian are the same class of model reading the same semantic rules over the same conversation. The agent bypassed 29.4% of the time; the guardian caught 100%. The only thing that changed is the actor's incentive — helper vs. judge.
+
+2. **Detection ≠ enforcement when they live in the same head.** Build A escalates the same attack 68.6% of the time, so it is capable of seeing the contamination. The 29.4% failures are not "didn't notice" — they are "noticed, then relabeled the thread as clean to justify approving." No amount of additional prompt text fixes this, because the detection signal is the very thing the model adjusts to satisfy the helper role.
+
+3. **Semantic-only policies need an external judge.** Attacks 15 and 17 in Suite 2 prove this for invoice amount deception under deterministic caps. The return agent proves it for purely semantic refund policy with no mechanical floor — same rules in-prompt vs. externalized produce 29.4% vs. 0% end-to-end leakage on this attack.
+
+### Honest caveats
+
+- **0 leaks ≠ provably unbypassable.** 51 runs with 0 ALLOWs is an observed leak rate of 0% on this attack, not a guarantee. The guardian is itself an LLM.
+- **Single attack, single thread.** All 51 runs use the same contaminated conversation — robustness to sampling noise on one attack shape, not coverage across attack types.
+- **Approve-then-guard measurement.** IntentFrame only sees cases Build A approved, so the 15 BLOCKs are exactly the 15 silent bypasses. That is the intended measurement (does the guard catch what the agent missed?).
+
+Full write-ups: [`external_agents/return_agent/README.md`](../external_agents/return_agent/README.md), [`build_a/experiment_report.md`](../external_agents/return_agent/build_a/experiment_report.md), [`end_to_end_pipeline_report.md`](../external_agents/return_agent/end_to_end_pipeline_report.md).
+
+---
+
 ## The 2026-04-27 Failure Report
 
 On April 27, 2026, the full 100-intent root-demo attack sweep ran against the real root-capable executor on a daily-driver MacBook Pro. Nine of 100 attack intents were wrongly allowed and reached execution.
@@ -297,9 +349,12 @@ Beyond the primary suites, the codebase includes:
 | `tests/test_executor.py` | Executor service — credential handling, rollback, sandboxing | Execution boundary enforcement |
 | `tests/test_prompt_hardening.py` | Unicode normalization (NFKC), zero-width stripping, boundary tokens, role anchoring, base64 detection | Prompt hardening primitives work in isolation |
 | `tests/test_transitive_injection.py` | Deterministic counterpart to the live suite (CI-safe, no API key) | Validates prompt zoning, field bounds, anomaly detection, and overflow handling without requiring an API key |
-| `demo/tests/ai_naive_invoice_agent.py` | **Comparison agent** — naive invoice-processing agent relying on prompt-only enforcement and hardcoded web-app sandboxing (no IntentFrame pipeline) | Demonstrates the typical web-app pattern: limits exist only in the system prompt and simple if-checks in tool functions |
+| `demo/tests/ai_naive_invoice_agent.py` | **Comparison agent (naive)** — invoice agent with prompt-only enforcement and hardcoded web-app sandboxing (no IntentFrame pipeline) | Demonstrates the typical web-app pattern: limits exist only in the system prompt and simple if-checks in tool functions |
+| `external_agents/return_agent/` | **Comparison agent (hardened DIY)** — return-support chatbot with policy in system prompt, compared against IntentFrame on the same semantic rules | Demonstrates that even a carefully hardened single-LLM agent silently bypasses ~29% of the time while suppressing its own detection flag; IntentFrame catches 100% of those bypasses (see [Suite 4](#suite-4-return-agent-experiment)) |
 
 The `ai_naive_invoice_agent.py` comparison agent demonstrates what the typical alternative looks like: a GPT-4o agent with a $5k approval limit enforced only via prompt instruction and hardcoded `validate_file_access()` checks. When the LLM is prompt-injected, it ignores the prompt-level limit — there is no structural enforcement. IntentFrame's pipeline is what provides structural, un-injectable enforcement.
+
+The `external_agents/return_agent/` experiment goes further: Build A is not naive — it is the strawman a careful product team would ship (Gates, authority hierarchy, structured output, self-reported injection detection). Same semantic policy on both sides; external enforcement drives end-to-end leakage from 29.4% to 0% across 51 runs.
 
 ---
 
@@ -491,8 +546,9 @@ First verified end-to-end defense against catastrophic terminal commands and soc
 | 2026-04-28 | Remediation: all 9 now BLOCK via new capability tags + policy constraints |
 | 2026-04-28 | Post-remediation: 100/100 BLOCK confirmed across all policy configurations |
 | 2026-05-08 | Emergent encoded-payload guard observed in production: Jarvis `WRITE_HOST_FILE` for an Indeed job-alert email blocked by Guardian (AE flagged unacknowledged base64-like tracking URLs as hidden behavior, MEDIUM, 0.90); agent self-corrected by sanitizing URLs and re-submitting with updated reason — second attempt ALLOW (LOW, 0.95) and executed |
+| 2026-06 | Return agent experiment: 51-run Build A → IntentFrame pipeline on quiet chat attack — 15/51 agent-only silent bypasses (29.4%), 15/15 caught by guard (0% end-to-end leakage) |
 
-> **State of this document.** The dated measurements above (root-demo sweeps, the invoice/payment suite scorecard, and the transitive injection tallies) reflect runs through 2026-04-28. The codebase has continued to evolve — `command_shield`'s capability-tag set, the prompt-hardening primitives, and the deterministic test suites in `tests/` all keep accruing coverage in CI. The numbers cited in this document are not re-run on every commit; they are point-in-time measurements anchored to the dates shown. When a sweep is re-run with material changes, a new dated row is added to this table. If you are reading this near a release tag, treat the table as a *minimum* claim, not a current-as-of-today claim.
+> **State of this document.** The dated measurements above (root-demo sweeps, the invoice/payment suite scorecard, the transitive injection tallies, and the return-agent 51-run scorecard) reflect runs through 2026-06. The codebase has continued to evolve — `command_shield`'s capability-tag set, the prompt-hardening primitives, and the deterministic test suites in `tests/` all keep accruing coverage in CI. The numbers cited in this document are not re-run on every commit; they are point-in-time measurements anchored to the dates shown. When a sweep is re-run with material changes, a new dated row is added to this table. If you are reading this near a release tag, treat the table as a *minimum* claim, not a current-as-of-today claim.
 
 ---
 
@@ -531,7 +587,10 @@ The evidence proves that the architecture works, that deterministic layers hold 
 | Adapter contract tests | `demo/tests/test_adapters.py` |
 | Domain hardening tests | `demo/tests/test_domain_hardening.py` |
 | Executor service tests | `tests/test_executor.py` |
-| Comparison agent (prompt-only enforcement) | `demo/tests/ai_naive_invoice_agent.py` |
+| Comparison agent (naive, prompt-only) | `demo/tests/ai_naive_invoice_agent.py` |
+| Return agent experiment (hardened DIY vs IntentFrame) | `external_agents/return_agent/` |
+| Return agent end-to-end report (51 runs) | `external_agents/return_agent/end_to_end_pipeline_report.md` |
+| Return agent Build A iteration log | `external_agents/return_agent/build_a/experiment_report.md` |
 | Test README + methodology | `demo/tests/README.md` |
 | Security analysis | `demo/tests/security_analysis.md` |
 | Proof snapshot | [docs/root_demo/PROOF.md](root_demo/PROOF.md) |

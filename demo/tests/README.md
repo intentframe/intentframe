@@ -319,6 +319,10 @@ demo/tests/
 ├── test_domain_hardening.py           # Domain constraint tests
 └── ai_naive_invoice_agent.py          # Naive agent (no IntentFrame) for comparison
 
+For a **hardened** DIY baseline (not naive) on semantic refund policy, see
+``external_agents/return_agent/`` — live LLM returns chatbot compared against
+IntentFrame on identical ``intent_limits`` ([docs/evidence.md § Suite 4](../../docs/evidence.md#suite-4-return-agent-experiment)).
+
 Executor pipeline coverage moved to repo root: ``tests/test_executor.py``
 (uses in-process bridge helper ``tests/_bridge.py``).
 ```
