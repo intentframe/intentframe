@@ -579,6 +579,7 @@ distilled from:
 | [executor/security-model.md](executor/security-model.md) | The prevention-first philosophy, the three-tier execution model, sandbox templates as safety net, why rich adapters reduce attack surface |
 | [executor/why-foundation.md](executor/why-foundation.md) | The structural argument that the Executor — not Guardian — is the foundation of agent safety |
 | [executor/standalone-product.md](executor/standalone-product.md) | The Executor as a novel piece of infrastructure, the gap in the current ecosystem, comparison to MCP / Composio / n8n / Open Interpreter |
+| [executor/do-i-have-to-rewrite-tools.md](executor/do-i-have-to-rewrite-tools.md) | Practical B2B adoption guide: when to keep tools in-process, when to use validate-only, and when Executor packs are worth the migration |
 
 Implementation references (in the codebase, not in `docs/`):
 
