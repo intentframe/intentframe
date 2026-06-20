@@ -221,6 +221,8 @@ What we ship to make the trade-off honest:
 
 What singletonness *gives* in return is the property no per-agent model gives: credentials, audit, and policy are unified at the device, not replicated across n agents that each have to be vetted independently. See [single-runtime.md](single-runtime.md) for the full development of this trade-off, including the migration friction sizing for retrofitting existing OSS agents.
 
+That runtime dependency does **not** mean rewriting every LangChain / OpenAI / CrewAI tool as an Executor adapter on day one. See [Q12c](#q12c-do-i-have-to-rewrite-all-my-tool-calls).
+
 ---
 
 ## Q12b. How do I load my own action bundles (not just the first-party kit)?
@@ -235,6 +237,47 @@ There is **no** `INTENTFRAME_BUNDLES` comma-separated env shortcut — same rule
 Gateway policy seeding validates against the same bundle list when a core profile is configured, so seeded policies cannot reference actions your bundles do not register.
 
 Full checklist: [plugin-profiles.md](plugin-profiles.md).
+
+---
+
+## Q12c. Do I have to rewrite all my tool calls?
+
+**No.** IntentFrame adoption should be incremental, not an all-or-nothing tool rewrite.
+
+The practical B2B pattern is the **privileged path**: keep ordinary low-risk helpers in-process, and route only consequential actions through IntentFrame first — refunds, payments, production writes, customer-facing comms, IAM changes, outbound HTTP that can exfiltrate data, and other actions where a mistake would alter business or system state.
+
+| Integration level | What changes | When to use it |
+|---|---|---|
+| **Level 0 — no IntentFrame** | Nothing | Deterministic helpers, local parsing, low-risk internal logic |
+| **Level 1 — `actor.submit()`** | Tool body submits a structured intent with `action`, `target`, `data`, `reason` | IntentFrame should judge *and* execute through real adapters |
+| **Level 2 — validate-only** | IntentFrame judges; your app executes | First-party cloud agents that already own service code and credentials |
+| **Level 3 — Executor adapter** | Action implemented in an Executor pack (~50–100 lines) | Highest-liability actions where IntentFrame should own credentials, audit, rollback, and execution |
+| **Level 4 — full substrate** | All agent I/O through IntentFrame | Local-first assistants, multi-agent runtimes, regulated deployments |
+
+You do **not** need an Executor pack for every tool. You need one when IntentFrame should actually perform the action with credential isolation and canonical execution audit. You need only the Actor SDK seam when you mainly want policy and semantic judgment before your existing service code runs.
+
+**Important caveat:** "read-only" is not always safe. An ungoverned in-process read plus an ungoverned outbound HTTP tool can still exfiltrate data. In hybrid deployments, govern privileged writes **and** external communication channels, not just database mutations.
+
+### What exists today
+
+- **`actor.submit()`** runs the full pipeline. `BLOCK` returns without executor side effects. `ALLOW` always reaches an executor.
+- There is **no first-class `actor.validate()` yet**. The desired shape is: run Deterministic Guardian → Analysis Engine → AI Guardian, return `ALLOW` / `BLOCK`, and set `executed: false`.
+- **Current bridge:** a noop Executor adapter (or deployment-level `DryRunExecutor`) that returns synthetic success after ALLOW. This works for hybrid adoption but is not ideal — audit may say `executed: true`, and ALLOW is implicit as `success=True` rather than a first-class verdict.
+
+The return-agent experiment shows the intended hybrid shape today: Build B runs an in-process AE → Guardian pipeline for guard-only decisions while the application keeps execution. See [`external_agents/return_agent/build_b/`](../external_agents/return_agent/build_b/) and [actor-sdk.md](actor-sdk.md).
+
+### Recommended migration playbook
+
+1. Inventory tools by consequence, not by count.
+2. Pick the top 3–5 risky actions first.
+3. Require structured `reason` on those actions.
+4. Route only those actions through IntentFrame.
+5. Use real Executor adapters where IntentFrame should own execution; use validate-only (or the noop bridge until it ships) where your app should keep execution.
+6. Expand adapter coverage only where it buys clear risk reduction.
+
+**Bottom line:** rewrite the **privileged path**, not every tool. Executor packs are a strong boundary for high-value execution, not a mandatory migration tax for every helper function.
+
+Full guide: [executor/do-i-have-to-rewrite-tools.md](executor/do-i-have-to-rewrite-tools.md).
 
 ---
 
@@ -255,6 +298,8 @@ Where inline validation fails structurally:
 The analogy: inline validation is to the separate executor what client-side `if (user.isAdmin) deleteUser()` is to a server-side authorization check. Both look identical until an attacker calls the underlying primitive directly.
 
 If your threat model includes prompt injection, compromised dependencies, or supply-chain attacks on the agent process, inline validation is insufficient regardless of how carefully tool authors write code.
+
+That does **not** mean every team must move all execution into a separate Executor process on day one. For incremental B2B adoption, a validate-only path — IntentFrame judges, the application executes — is a valid first step for privileged actions. Separate-process execution remains the stronger model when IntentFrame should own credentials, canonical audit of the real side effect, and rollback metadata. See [Q12c](#q12c-do-i-have-to-rewrite-all-my-tool-calls) and [executor/do-i-have-to-rewrite-tools.md](executor/do-i-have-to-rewrite-tools.md).
 
 ---
 
@@ -604,5 +649,6 @@ See [docs/autonomy.md](autonomy.md) for the delegatable-autonomy argument and [d
 - [docs/why-trust-ai-hybrid-intentframe.md](why_trust_ai_hybrid_intentframe.md) — the AI hybrid argument in depth
 - [docs/why-not-injection-shield.md](why-not-injection-shield.md) — injection shield decision record
 - [docs/single-runtime.md](single-runtime.md) — one runtime per machine; the singletonness property and its honest trade-offs
+- [docs/executor/do-i-have-to-rewrite-tools.md](executor/do-i-have-to-rewrite-tools.md) — when to keep tools in-process, when to use validate-only, and when Executor packs are worth the migration (Q12c)
 - [docs/autonomy.md](autonomy.md) — the delegatable-autonomy thesis behind Q21 and Q23
 - [docs/why_intentframe_needs_reason.md](why_intentframe_needs_reason.md) — why the SDK requires a `reason` field on every intent (Q22)
