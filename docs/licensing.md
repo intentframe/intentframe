@@ -2,7 +2,7 @@
 
 IntentFrame uses a split license model across publishable workspace packages (`packages/`). The root product code remains AGPL-3.0-only, while package-level metadata and included `LICENSE` files define the license for each published distribution.
 
-Current package release: [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) on GitHub; all **18** distributions are also on [PyPI](https://pypi.org/) at **`0.1.0`**. Consumer install (PyPI): [`docs/package-consumers.md`](package-consumers.md). Maintainer publishing: [`scripts/release/README.md`](../scripts/release/README.md). GitHub wheel fallback: [`scripts/github-release/README.md`](../scripts/github-release/README.md), [`scripts/github-install/README.md`](../scripts/github-install/README.md).
+Current package release: [`v0.1.1`](https://github.com/intentframe/intentframe/releases/tag/v0.1.1) on GitHub; all **18** distributions are also on [PyPI](https://pypi.org/) at **`0.1.1`**. Consumer install (PyPI): [`docs/package-consumers.md`](package-consumers.md). Maintainer publishing: [`scripts/release/README.md`](../scripts/release/README.md). GitHub wheel fallback: [`scripts/github-release/README.md`](../scripts/github-release/README.md), [`scripts/github-install/README.md`](../scripts/github-install/README.md).
 
 ## AGPL-3.0 (runtime stack)
 

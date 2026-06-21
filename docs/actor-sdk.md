@@ -9,7 +9,7 @@ For the Actor's source, see [`../intentframe_actor/actor.py`](../intentframe_act
 ## Install (PyPI)
 
 ```bash
-pip install intentframe-actor==0.1.0 intentframe-client==0.1.0
+pip install intentframe-actor==0.1.1 intentframe-client==0.1.1
 ```
 
 Transitive deps resolve from PyPI. Full consumer guide: [`package-consumers.md`](package-consumers.md). License: **Apache-2.0** ([`licensing.md`](licensing.md)).

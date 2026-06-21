@@ -11,12 +11,12 @@ Use this as the developer-facing overview. The scripts still own the exact comma
 
 ## Release Shape
 
-IntentFrame `v0.1.0` publishes 18 Python distributions from `packages/`. They are lockstep-versioned: one release tag, one package version, one dependency pin version.
+IntentFrame **`v0.1.1`** publishes 18 Python distributions from `packages/`. They are lockstep-versioned: one release tag, one package version, one dependency pin version.
 
 ```text
-Git tag:          v0.1.0
-Package version:  0.1.0
-Wheel version:    intentframe_core-0.1.0-py3-none-any.whl
+Git tag:          v0.1.1
+Package version:  0.1.1
+Wheel version:    intentframe_core-0.1.1-py3-none-any.whl
 ```
 
 Do not create a release tag whose version differs from the package versions unless the install and verification scripts are updated to support separate tag/package versions.
@@ -57,8 +57,8 @@ Update [`../licensing.md`](../licensing.md) and package `pyproject.toml` metadat
 2. Set the lockstep version:
 
    ```bash
-   python scripts/release/set_version.py 0.1.0
-   python scripts/release/set_version.py 0.1.0 --check
+   python scripts/release/set_version.py 0.1.1
+   python scripts/release/set_version.py 0.1.1 --check
    ```
 
 3. Review the diff, especially:
@@ -81,15 +81,15 @@ Validation should produce wheels and sdists in `dist/publish/`.
 Optional mirror of the same wheels published on PyPI — upload after creating the GitHub release tag:
 
 ```bash
-gh release upload v0.1.0 dist/publish/*.whl
-./scripts/github-install/verify_release_install.sh --tag v0.1.0
+gh release upload v0.1.1 dist/publish/*.whl
+./scripts/github-install/verify_release_install.sh --tag v0.1.1
 ```
 
 Optional runtime boot smoke test:
 
 ```bash
 export OPENAI_API_KEY=sk-...
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
 bash scripts/kits-two-venv/stop_runtime.sh
 ```
 
@@ -97,7 +97,7 @@ Use wheels for GitHub URL installs. Sdists are optional on the release page; bot
 
 ## PyPI Publishing
 
-All **18** project names exist on production PyPI for **`0.1.0`**. For **subsequent** lockstep versions, `--all` / `group=all` is usually fine (new **versions**, not new projects).
+All **18** project names exist on production PyPI. **`0.1.1`** is the current lockstep release. For **subsequent** lockstep versions, `--all` / `group=all` is usually fine (new **versions**, not new projects).
 
 First-time registration (historical): use groups `1` → `2` → `3` or one-package local uploads if you see `429 Too many new projects created`.
 

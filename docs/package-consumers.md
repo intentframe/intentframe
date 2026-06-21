@@ -2,18 +2,18 @@
 
 This guide is for people installing IntentFrame **packages** into another Python project.
 
-All **18** lockstep-versioned distributions for **`0.1.0`** are on [PyPI](https://pypi.org/). Use normal `pip` / `uv` resolution — no custom index and no GitHub wheel URLs unless you need URL-pinned installs.
+All **18** lockstep-versioned distributions for **`0.1.1`** are on [PyPI](https://pypi.org/). Use normal `pip` / `uv` resolution — no custom index and no GitHub wheel URLs unless you need URL-pinned installs.
 
 The **full product** (Jarvis, gateway CLI, macOS platform server, demos) is **not** on PyPI. Clone the repo and follow [`quickstart.md`](quickstart.md) for that path.
 
-Release tag (GitHub assets mirror): [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0)
+Release tag (GitHub assets mirror): [`v0.1.1`](https://github.com/intentframe/intentframe/releases/tag/v0.1.1)
 
 ## Distribution channels
 
 | Channel | Status | Use when |
 |---------|--------|----------|
-| **PyPI** | **Primary** — all 18 packages @ `0.1.0` | Normal third-party projects (recommended) |
-| GitHub release wheels | Available for `v0.1.0` | Air-gapped URL pins, reproducible wheel hashes, or PyPI unavailable |
+| **PyPI** | **Primary** — all 18 packages @ `0.1.1` | Normal third-party projects (recommended) |
+| GitHub release wheels | Available for `v0.1.1` | Air-gapped URL pins, reproducible wheel hashes, or PyPI unavailable |
 | Source clone | Available | Contributing to IntentFrame or running the full product workspace |
 
 ## Install from PyPI
@@ -23,7 +23,7 @@ Release tag (GitHub assets mirror): [`v0.1.0`](https://github.com/intentframe/in
 ### Quick ad-hoc install
 
 ```bash
-pip install intentframe-actor==0.1.0 intentframe-bundle-sdk==0.1.0 intentframe-executor-sdk==0.1.0
+pip install intentframe-actor==0.1.1 intentframe-bundle-sdk==0.1.1 intentframe-executor-sdk==0.1.1
 ```
 
 Transitive IntentFrame dependencies resolve from PyPI automatically.
@@ -38,9 +38,9 @@ name = "my-intentframe-agent"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-  "intentframe-actor==0.1.0",
-  "intentframe-bundle-sdk==0.1.0",
-  "intentframe-executor-sdk==0.1.0",
+  "intentframe-actor==0.1.1",
+  "intentframe-bundle-sdk==0.1.1",
+  "intentframe-executor-sdk==0.1.1",
 ]
 ```
 
@@ -84,16 +84,16 @@ If you must pin exact wheel URLs (or PyPI is unreachable), use [`../scripts/gith
 Verify a release tag installs cleanly:
 
 ```bash
-./scripts/github-install/verify_release_install.sh --tag v0.1.0
+./scripts/github-install/verify_release_install.sh --tag v0.1.1
 ```
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `No matching distribution found` for an IntentFrame package | Typo in name, wrong version, or Python &lt; 3.14 | Use `==0.1.0` and Python 3.14+ |
+| `No matching distribution found` for an IntentFrame package | Typo in name, wrong version, or Python &lt; 3.14 | Use `==0.1.1` and Python 3.14+ |
 | Transitive IntentFrame dep missing (GitHub wheel path only) | Incomplete `[tool.uv.sources]` | Use [`example-pyproject.toml`](../scripts/github-install/example-pyproject.toml) with all 18 sources, or switch to PyPI |
-| Wheel URL returns 404 | Tag/version mismatch | Match filenames on the [GitHub release](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) |
+| Wheel URL returns 404 | Tag/version mismatch | Match filenames on the [GitHub release](https://github.com/intentframe/intentframe/releases/tag/v0.1.1) |
 | License obligations unclear | Mixing Apache SDKs with AGPL runtime | Read [`licensing.md`](licensing.md); depend only on what you need |
 | Expected Jarvis / gateway on PyPI | Product code is not published | Clone repo → [`quickstart.md`](quickstart.md) |
 

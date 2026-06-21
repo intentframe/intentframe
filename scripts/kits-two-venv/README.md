@@ -51,7 +51,7 @@ Prove the **published** wheels boot supervisor + edge (install into `.venv-relea
 
 ```bash
 export OPENAI_API_KEY=sk-...
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
 bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
 bash scripts/kits-two-venv/stop_runtime.sh
 ```

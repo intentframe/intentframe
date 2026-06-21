@@ -102,7 +102,7 @@ uvicorn intentframe_credentials.server:app \
     --uds ~/.intentframe/run/credential-vault.sock
 ```
 
-PyPI: [intentframe-credentials](https://pypi.org/project/intentframe-credentials/) · `pip install intentframe-credentials==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
+PyPI: [intentframe-credentials](https://pypi.org/project/intentframe-credentials/) · `pip install intentframe-credentials==0.1.1` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
 
 `INTENTFRAME_DATA_DIR` controls where `credentials.db` is written (default: `~/.intentframe/data/`).
 

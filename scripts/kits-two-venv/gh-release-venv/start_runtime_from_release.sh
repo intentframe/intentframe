@@ -7,7 +7,7 @@
 # kits-two-venv harness (default ~/.intentframe/run and ~/.intentframe/logs).
 #
 #   export OPENAI_API_KEY=sk-...
-#   bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+#   bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
 #
 #   bash scripts/kits-two-venv/stop_runtime.sh
 #   bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
@@ -20,7 +20,7 @@ source "${SCRIPT_DIR}/../common.sh"
 _kits_require_repo
 
 REPO="intentframe/intentframe"
-TAG="v0.1.0"
+TAG="v0.1.1"
 
 while [ $# -gt 0 ]; do
   case "$1" in

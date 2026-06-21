@@ -16,7 +16,7 @@ Part of the release verification stack documented in [`../../github-release/READ
 
 ```bash
 export OPENAI_API_KEY=sk-...
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
 ```
 
 Options: `--tag`, `--repo` (default `intentframe/intentframe`). Override `RELEASE_VENV`, `EXECUTOR_CONFIG`, `INTENTFRAME_EDGE_PORT` via env (see [`../common.sh`](../common.sh)).

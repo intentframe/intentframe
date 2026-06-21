@@ -5,15 +5,15 @@
 #
 # Usage:
 #   ./scripts/github-install/verify_release_install.sh
-#   ./scripts/github-install/verify_release_install.sh --tag v0.1.0
-#   ./scripts/github-install/verify_release_install.sh --tag v0.1.0 --keep-dir /tmp/if-verify
+#   ./scripts/github-install/verify_release_install.sh --tag v0.1.1
+#   ./scripts/github-install/verify_release_install.sh --tag v0.1.1 --keep-dir /tmp/if-verify
 #
 # Docs: scripts/github-install/README.md
 # Boot test (supervisor + edge): scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh
 set -euo pipefail
 
 REPO="intentframe/intentframe"
-TAG="v0.1.0"
+TAG="v0.1.1"
 PY_VERSION="3.14"
 KEEP_DIR=""
 
@@ -21,7 +21,7 @@ usage() {
   cat <<'EOF'
 Usage: verify_release_install.sh [--tag TAG] [--repo OWNER/NAME] [--python VERSION] [--keep-dir PATH]
 
-  --tag TAG       GitHub release tag (default: v0.1.0)
+  --tag TAG       GitHub release tag (default: v0.1.1)
   --repo REPO     GitHub owner/repo (default: intentframe/intentframe)
   --python VER    Python for the temp venv (default: 3.14)
   --keep-dir PATH Reuse/create venv at PATH instead of mktemp (for debugging)
@@ -43,7 +43,7 @@ done
 VERSION="${TAG#v}"
 BASE="https://github.com/${REPO}/releases/download/${TAG}"
 
-# Wheel basenames for lockstep 0.1.0-style releases (underscore dist names).
+# Wheel basenames for lockstep 0.1.1-style releases (underscore dist names).
 WHEELS=(
   "command_shield-${VERSION}-py3-none-any.whl"
   "intentframe_actor-${VERSION}-py3-none-any.whl"

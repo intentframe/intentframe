@@ -7,7 +7,7 @@
 # - [tool.uv.sources]: keep all 18 IntentFrame entries so transitive deps resolve
 #
 # For future releases, replace both the release tag and wheel version:
-#   v0.1.0 + 0.1.0 -> v0.2.0 + 0.2.0
+#   v0.1.1 + 0.1.1 -> v0.2.0 + 0.2.0
 #
 # Requires Python 3.14+ because the IntentFrame package set declares that floor.
 
@@ -20,44 +20,44 @@ dependencies = [
   # uv will use [tool.uv.sources] below for these and their transitive deps.
 
   # Common SDK defaults for third-party agents / plugins:
-  "intentframe-actor==0.1.0",
-  "intentframe-bundle-sdk==0.1.0",
-  "intentframe-executor-sdk==0.1.0",
+  "intentframe-actor==0.1.1",
+  "intentframe-bundle-sdk==0.1.1",
+  "intentframe-executor-sdk==0.1.1",
 
   # Other IntentFrame packages you can uncomment if your project imports them:
-  # "command-shield==0.1.0",
-  # "intentframe-client==0.1.0",
-  # "intentframe-components==0.1.0",
-  # "intentframe-core==0.1.0",
-  # "intentframe-credentials==0.1.0",
-  # "intentframe-edge==0.1.0",
-  # "intentframe-executor==0.1.0",
-  # "intentframe-executor-client==0.1.0",
-  # "intentframe-native-kit==0.1.0",
-  # "intentframe-policy-registry==0.1.0",
-  # "intentframe-prompt-library==0.1.0",
-  # "intentframe-proxy==0.1.0",
-  # "intentframe-runtime==0.1.0",
-  # "intentframe-server==0.1.0",
-  # "intentframe-supervisor==0.1.0",
+  # "command-shield==0.1.1",
+  # "intentframe-client==0.1.1",
+  # "intentframe-components==0.1.1",
+  # "intentframe-core==0.1.1",
+  # "intentframe-credentials==0.1.1",
+  # "intentframe-edge==0.1.1",
+  # "intentframe-executor==0.1.1",
+  # "intentframe-executor-client==0.1.1",
+  # "intentframe-native-kit==0.1.1",
+  # "intentframe-policy-registry==0.1.1",
+  # "intentframe-prompt-library==0.1.1",
+  # "intentframe-proxy==0.1.1",
+  # "intentframe-runtime==0.1.1",
+  # "intentframe-server==0.1.1",
+  # "intentframe-supervisor==0.1.1",
 ]
 
 [tool.uv.sources]
-command-shield = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/command_shield-0.1.0-py3-none-any.whl" }
-intentframe-actor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_actor-0.1.0-py3-none-any.whl" }
-intentframe-bundle-sdk = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_bundle_sdk-0.1.0-py3-none-any.whl" }
-intentframe-client = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_client-0.1.0-py3-none-any.whl" }
-intentframe-components = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_components-0.1.0-py3-none-any.whl" }
-intentframe-core = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_core-0.1.0-py3-none-any.whl" }
-intentframe-credentials = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_credentials-0.1.0-py3-none-any.whl" }
-intentframe-edge = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_edge-0.1.0-py3-none-any.whl" }
-intentframe-executor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor-0.1.0-py3-none-any.whl" }
-intentframe-executor-client = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor_client-0.1.0-py3-none-any.whl" }
-intentframe-executor-sdk = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_executor_sdk-0.1.0-py3-none-any.whl" }
-intentframe-native-kit = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_native_kit-0.1.0-py3-none-any.whl" }
-intentframe-policy-registry = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_policy_registry-0.1.0-py3-none-any.whl" }
-intentframe-prompt-library = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_prompt_library-0.1.0-py3-none-any.whl" }
-intentframe-proxy = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_proxy-0.1.0-py3-none-any.whl" }
-intentframe-runtime = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_runtime-0.1.0-py3-none-any.whl" }
-intentframe-server = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_server-0.1.0-py3-none-any.whl" }
-intentframe-supervisor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_supervisor-0.1.0-py3-none-any.whl" }
+command-shield = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/command_shield-0.1.1-py3-none-any.whl" }
+intentframe-actor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_actor-0.1.1-py3-none-any.whl" }
+intentframe-bundle-sdk = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_bundle_sdk-0.1.1-py3-none-any.whl" }
+intentframe-client = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_client-0.1.1-py3-none-any.whl" }
+intentframe-components = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_components-0.1.1-py3-none-any.whl" }
+intentframe-core = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_core-0.1.1-py3-none-any.whl" }
+intentframe-credentials = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_credentials-0.1.1-py3-none-any.whl" }
+intentframe-edge = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_edge-0.1.1-py3-none-any.whl" }
+intentframe-executor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_executor-0.1.1-py3-none-any.whl" }
+intentframe-executor-client = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_executor_client-0.1.1-py3-none-any.whl" }
+intentframe-executor-sdk = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_executor_sdk-0.1.1-py3-none-any.whl" }
+intentframe-native-kit = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_native_kit-0.1.1-py3-none-any.whl" }
+intentframe-policy-registry = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_policy_registry-0.1.1-py3-none-any.whl" }
+intentframe-prompt-library = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_prompt_library-0.1.1-py3-none-any.whl" }
+intentframe-proxy = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_proxy-0.1.1-py3-none-any.whl" }
+intentframe-runtime = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_runtime-0.1.1-py3-none-any.whl" }
+intentframe-server = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_server-0.1.1-py3-none-any.whl" }
+intentframe-supervisor = { url = "https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_supervisor-0.1.1-py3-none-any.whl" }
