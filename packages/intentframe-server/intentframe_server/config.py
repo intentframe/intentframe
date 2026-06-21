@@ -39,6 +39,14 @@ class CoreExecutorConfig(BaseModel):
         default=None,
         description="Optional dry-run context label, e.g. root for root-demo tests.",
     )
+    hmac_key: str | None = Field(
+        default=None,
+        description=(
+            "Shared HMAC secret for signing /execute requests to the executor. "
+            "Must match executor.yaml auth.options.secret_key. "
+            "When unset, the demo key is used."
+        ),
+    )
 
 
 class CoreRuntimeConfig(BaseModel):
@@ -136,6 +144,8 @@ def _overlay_legacy_env(config: CoreConfig) -> None:
         config.executor.mode = mode.strip().lower()
     if socket := os.environ.get("INTENTFRAME_EXECUTOR_SOCKET"):
         config.executor.socket_path = socket
+    if hmac_key := os.environ.get("INTENTFRAME_EXECUTOR_HMAC_KEY"):
+        config.executor.hmac_key = hmac_key
     if context := os.environ.get("INTENTFRAME_DRY_RUN_CONTEXT"):
         config.executor.dry_run_context = context
     if verbose := os.environ.get("INTENTFRAME_VERBOSE"):

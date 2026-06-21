@@ -62,7 +62,10 @@ def _create_runtime() -> IntentFrameRuntime:
         from executor_client.http_client import ExecutorHTTPClient
 
         executor_socket = core_config.executor.socket_path
-        executor = ExecutorHTTPClient(socket_path=executor_socket)
+        executor_kwargs: dict[str, str] = {"socket_path": executor_socket}
+        if core_config.executor.hmac_key is not None:
+            executor_kwargs["hmac_key"] = core_config.executor.hmac_key
+        executor = ExecutorHTTPClient(**executor_kwargs)
         logger.info("Executor mode: real (socket=%s)", executor_socket)
     elif executor_mode == "dry_run":
         from intentframe_server.dry_run_executor import DryRunExecutor

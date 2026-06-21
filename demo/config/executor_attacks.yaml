@@ -21,7 +21,7 @@ transport:
 auth:
   type: guardian_hmac
   options:
-    secret_key: "intentframe_demo_secret_key_do_not_use_in_production"
+    secret_key: "intentframe_demo_attacks_secret_key_do_not_use_in_production"
 
 credentials:
   backend: service

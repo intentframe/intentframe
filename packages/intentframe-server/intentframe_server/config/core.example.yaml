@@ -8,6 +8,7 @@
 #   INTENTFRAME_CORE_CONFIG      -> path to this file (required selector)
 #   INTENTFRAME_EXECUTOR_MODE    -> executor.mode override (legacy/env override)
 #   INTENTFRAME_EXECUTOR_SOCKET  -> executor.socket_path override
+#   INTENTFRAME_EXECUTOR_HMAC_KEY -> executor.hmac_key override (secrets)
 #   INTENTFRAME_DRY_RUN_CONTEXT  -> executor.dry_run_context override
 #   INTENTFRAME_VERBOSE          -> runtime.verbose override ("1" = true)
 #   INTENTFRAME_SKIP_ONBOARDING  -> runtime.skip_onboarding override ("1" = true)
@@ -30,6 +31,9 @@ executor:
   # dry_run -> core uses the in-process synthetic executor
   mode: real
   socket_path: ~/.intentframe/run/executor.sock
+  # Must match executor.yaml auth.options.secret_key (or secret_key_ref resolution).
+  # Omit to use the built-in demo key (dev only).
+  # hmac_key: "your-shared-secret"
   # Set to root for root-demo dry-run sweeps.
   dry_run_context: null
 
