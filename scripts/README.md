@@ -4,7 +4,7 @@ Utility scripts for local development setup.
 
 ## PyPI release (`packages/` only)
 
-See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`). All **18** packages for **`0.1.0`** are on [PyPI](https://pypi.org/); consumers: [`../docs/package-consumers.md`](../docs/package-consumers.md).
+See [`release/README.md`](release/README.md) — lockstep versioning (`set_version.py`), validation (`validate_publish.sh`), grouped GitHub workflow ([`release.yml`](../.github/workflows/release.yml)), terminal uploads (`publish.py`), CI staging (`dist/publish` → `dist/upload`), and PyPI **new-project** rate limits (`429`). All **18** packages for **`0.1.1`** are on [PyPI](https://pypi.org/); consumers: [`../docs/package-consumers.md`](../docs/package-consumers.md).
 
 ## GitHub release wheels (optional mirror)
 
@@ -17,9 +17,9 @@ See [`release/README.md`](release/README.md) — lockstep versioning (`set_versi
 Suggested verification after uploading wheels to a release:
 
 ```bash
-./scripts/github-install/verify_release_install.sh --tag v0.1.0
+./scripts/github-install/verify_release_install.sh --tag v0.1.1
 export OPENAI_API_KEY=sk-...
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
 bash scripts/kits-two-venv/run_demo_tests.sh demo/tests/test_attacks.py 1 2 3
 bash scripts/kits-two-venv/stop_runtime.sh
 ```
@@ -30,7 +30,7 @@ See [`kits-two-venv/README.md`](kits-two-venv/README.md) — bare `.venv-runtime
 
 ```bash
 bash scripts/kits-two-venv/start_runtime.sh              # workspace runtime + kit wheelhouse
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0  # release wheels
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1  # release wheels
 bash scripts/stop_runtime.sh                             # stops either start path (+ product UDS)
 bash scripts/cleanup_runtime.sh --full                     # stop + reset harness (see kits-two-venv README)
 ```

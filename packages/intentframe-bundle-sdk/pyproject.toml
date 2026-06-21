@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "intentframe-bundle-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "IntentFrame Bundle SDK — author action and domain bundles for the policy pipeline"
 readme = "README.md"
 license = "Apache-2.0"
@@ -19,8 +19,8 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-core==0.1.0",
-    "intentframe-policy-registry==0.1.0",
+    "intentframe-core==0.1.1",
+    "intentframe-policy-registry==0.1.1",
     "pydantic>=2.12.5",
 ]
 

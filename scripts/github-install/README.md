@@ -2,7 +2,7 @@
 
 Install IntentFrame packages from **GitHub release assets** when you need URL-pinned wheels or PyPI is unavailable. For normal projects, install from **PyPI** instead — see [`../../docs/package-consumers.md`](../../docs/package-consumers.md) and [`example-pyproject-pypi.toml`](example-pyproject-pypi.toml).
 
-Wheels are ordinary `.whl` files attached to a release tag (e.g. [v0.1.0](https://github.com/intentframe/intentframe/releases/tag/v0.1.0)). The same artifacts are published on [PyPI](https://pypi.org/) for `0.1.0`.
+Wheels are ordinary `.whl` files attached to a release tag (e.g. [v0.1.1](https://github.com/intentframe/intentframe/releases/tag/v0.1.1)). The same artifacts are published on [PyPI](https://pypi.org/) for `0.1.1`.
 
 Manual GitHub release publishing runbook: [`../github-release/README.md`](../github-release/README.md). PyPI publishing and rate limits: [`../release/README.md`](../release/README.md). Licensing: [`../../docs/licensing.md`](../../docs/licensing.md).
 
@@ -14,12 +14,12 @@ Manual GitHub release publishing runbook: [`../github-release/README.md`](../git
    ./scripts/release/validate_publish.sh
    ```
 
-2. Create a GitHub release for the lockstep version (tag must match package pins, e.g. `v0.1.0`).
+2. Create a GitHub release for the lockstep version (tag must match package pins, e.g. `v0.1.1`).
 
 3. Upload **wheels only** (sdists optional; wheels are what consumers need):
 
    ```bash
-   gh release upload v0.1.0 dist/publish/*.whl
+   gh release upload v0.1.1 dist/publish/*.whl
    ```
 
    Re-upload with `--clobber` if replacing files on an existing release.
@@ -27,14 +27,14 @@ Manual GitHub release publishing runbook: [`../github-release/README.md`](../git
 4. Verify wheels install (disposable venv):
 
    ```bash
-   ./scripts/github-install/verify_release_install.sh --tag v0.1.0
+   ./scripts/github-install/verify_release_install.sh --tag v0.1.1
    ```
 
 5. Optional — verify the wheels **boot** supervisor + edge (uses `.venv-release`, same stop/tests as kits-two-venv):
 
    ```bash
    export OPENAI_API_KEY=sk-...
-   bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+   bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
    bash scripts/kits-two-venv/stop_runtime.sh
    ```
 
@@ -50,7 +50,7 @@ chmod +x scripts/github-install/verify_release_install.sh
 ./scripts/github-install/verify_release_install.sh
 ./scripts/github-install/verify_release_install.sh --tag v0.2.0
 ./scripts/github-install/verify_release_install.sh --repo intentframe/intentframe --python 3.14
-./scripts/github-install/verify_release_install.sh --tag v0.1.0 --keep-dir /tmp/if-github-install-test
+./scripts/github-install/verify_release_install.sh --tag v0.1.1 --keep-dir /tmp/if-github-install-test
 ```
 
 Requires `uv` on PATH and network access to GitHub + PyPI (third-party transitive deps).
@@ -77,14 +77,14 @@ Then:
 uv sync
 ```
 
-For a new lockstep version, replace `v0.1.0` and `0.1.0` in every URL. Confirm filenames with `ls dist/publish/` after build.
+For a new lockstep version, replace `v0.1.1` and `0.1.1` in every URL. Confirm filenames with `ls dist/publish/` after build.
 
 ## Wheels vs source distributions
 
 | Artifact | Role |
 |----------|------|
 | `.whl` | Pre-built; use for GitHub release assets and `[tool.uv.sources]` URLs. |
-| `.tar.gz` sdist | Optional on the release; slower to install from source. Both ship on PyPI for `0.1.0`. |
+| `.tar.gz` sdist | Optional on the release; slower to install from source. Both ship on PyPI for `0.1.1`. |
 
 ## Limitations
 

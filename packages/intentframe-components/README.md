@@ -12,4 +12,4 @@ depend on `intentframe-core`, `intentframe-bundle-sdk`,
 pip install intentframe-components
 ```
 
-PyPI: [intentframe-components](https://pypi.org/project/intentframe-components/) · `pip install intentframe-components==0.1.0` · License: AGPL-3.0 · [Consumer guide](../../docs/package-consumers.md)
+PyPI: [intentframe-components](https://pypi.org/project/intentframe-components/) · `pip install intentframe-components==0.1.1` · License: AGPL-3.0 · [Consumer guide](../../docs/package-consumers.md)

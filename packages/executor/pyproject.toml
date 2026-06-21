@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "intentframe-executor"
-version = "0.1.0"
+version = "0.1.1"
 description = "IntentFrame executor service — dispatches approved actions to capability adapters"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-executor-sdk==0.1.0",
+    "intentframe-executor-sdk==0.1.1",
     "fastapi",
     "uvicorn[standard]",
     "pydantic>=2.12.5",

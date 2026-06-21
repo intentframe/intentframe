@@ -8,6 +8,6 @@ the YAML seed loader.
 pip install intentframe-policy-registry
 ```
 
-PyPI: [intentframe-policy-registry](https://pypi.org/project/intentframe-policy-registry/) · `pip install intentframe-policy-registry==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
+PyPI: [intentframe-policy-registry](https://pypi.org/project/intentframe-policy-registry/) · `pip install intentframe-policy-registry==0.1.1` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
 
 Imports as `policy_registry`.

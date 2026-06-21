@@ -3,7 +3,7 @@
 
 Usage:
   python scripts/release/set_version.py 0.2.0
-  python scripts/release/set_version.py 0.1.0 --check   # CI: exit 1 if drifted
+  python scripts/release/set_version.py 0.1.1 --check   # CI: exit 1 if drifted
 """
 from __future__ import annotations
 

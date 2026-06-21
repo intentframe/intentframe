@@ -8,7 +8,7 @@ Jarvis reasons via LLM, manages its own memory and skills, runs proactive backgr
 
 Jarvis is a **normal Python application**. It is its own project with its own config, its own data directory (`~/.jarvis/`), and its own identity. It doesn't live inside any framework.
 
-The only external dependency worth noting is the **IntentFrame Actor SDK** (`intentframe-actor` on [PyPI](https://pypi.org/project/intentframe-actor/)) — a small library that Jarvis calls when it needs to touch the real world (read a file, send an email, run a command). In this repo Jarvis is a workspace member installed via `uv sync`; external projects can `pip install intentframe-actor==0.1.0` — see [`docs/package-consumers.md`](../docs/package-consumers.md).
+The only external dependency worth noting is the **IntentFrame Actor SDK** (`intentframe-actor` on [PyPI](https://pypi.org/project/intentframe-actor/)) — a small library that Jarvis calls when it needs to touch the real world (read a file, send an email, run a command). In this repo Jarvis is a workspace member installed via `uv sync`; external projects can `pip install intentframe-actor==0.1.1` — see [`docs/package-consumers.md`](../docs/package-consumers.md).
 
 ```
 You type a message

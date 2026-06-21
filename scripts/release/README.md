@@ -2,9 +2,9 @@
 
 Only distributions under `packages/` are published. Product-facing code (root `intentframe`, gateway, Jarvis, EDI) stays out of scope. See [docs/licensing.md](../../docs/licensing.md) for AGPL vs Apache split.
 
-**Status:** all **18** packages for **`0.1.0`** are on [PyPI](https://pypi.org/). Consumer install guide: [docs/package-consumers.md](../../docs/package-consumers.md).
+**Status:** all **18** packages for **`0.1.1`** are on [PyPI](https://pypi.org/). Consumer install guide: [docs/package-consumers.md](../../docs/package-consumers.md).
 
-**Optional mirror:** same wheels as [GitHub release assets](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) — [`../github-release/README.md`](../github-release/README.md), [`../github-install/README.md`](../github-install/README.md).
+**Optional mirror:** same wheels as [GitHub release assets](https://github.com/intentframe/intentframe/releases/tag/v0.1.1) — [`../github-release/README.md`](../github-release/README.md), [`../github-install/README.md`](../github-install/README.md).
 
 ## Lockstep versioning
 
@@ -12,10 +12,10 @@ All 18 packages share one version. Intra-workspace dependencies are pinned to `=
 
 ```bash
 # Apply pins for a release (review git diff, then commit)
-python scripts/release/set_version.py 0.1.0
+python scripts/release/set_version.py 0.1.1
 
 # CI guard: fail if any package drifted
-python scripts/release/set_version.py 0.1.0 --check
+python scripts/release/set_version.py 0.1.1 --check
 ```
 
 ## Pre-publish validation
@@ -107,7 +107,7 @@ Workflow: [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
 3. Inputs:
    - `target` — `testpypi` or `pypi`
    - `group` — `1`, `2`, `3`, or `all` (use `1`/`2`/`3` for first production release)
-   - `version` — must match lockstep pins (e.g. `0.1.0`)
+   - `version` — must match lockstep pins (e.g. `0.1.1`)
    - `confirm` — must be exactly `publish`
 
 The build job always validates all 18 packages. The publish job uploads only the staged group. Uploads use **`skip-existing`** so partial runs are safe to retry (already-uploaded files are skipped; `429` still aborts the rest of that run).
@@ -115,7 +115,7 @@ The build job always validates all 18 packages. The publish job uploads only the
 ```bash
 # Example: production group 2
 gh workflow run release.yml --ref main \
-  -f target=pypi -f group=2 -f version=0.1.0 -f confirm=publish
+  -f target=pypi -f group=2 -f version=0.1.1 -f confirm=publish
 ```
 
 Avoid re-running `group=all` on production PyPI while new names are still being registered; it maximizes new-project creations per job and worsens `429` behavior on shared CI IPs.
@@ -154,13 +154,13 @@ Ship the same `dist/publish/*.whl` files as **GitHub release assets** for URL-pi
 
 ```bash
 ./scripts/release/validate_publish.sh
-gh release upload v0.1.0 dist/publish/*.whl    # after creating the release tag
-./scripts/github-install/verify_release_install.sh --tag v0.1.0
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0   # optional boot test
+gh release upload v0.1.1 dist/publish/*.whl    # after creating the release tag
+./scripts/github-install/verify_release_install.sh --tag v0.1.1
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1   # optional boot test
 bash scripts/kits-two-venv/stop_runtime.sh
 ```
 
-Use **wheels only** for this path; sdists on the release are optional. Tag version must match wheel versions (`v0.1.0` → `*-0.1.0-*.whl`). Boot test details: [`../github-release/README.md`](../github-release/README.md).
+Use **wheels only** for this path; sdists on the release are optional. Tag version must match wheel versions (`v0.1.1` → `*-0.1.1-*.whl`). Boot test details: [`../github-release/README.md`](../github-release/README.md).
 
 ## Suggested release order
 
@@ -176,7 +176,7 @@ Use **wheels only** for this path; sdists on the release are optional. Tag versi
 | Symptom | Likely cause | What to do |
 |---------|--------------|------------|
 | `429 Too many new projects created` | New-project quota (user and/or IP) | Stop retrying for 24h; upload one name locally with `--no-build`; file [pypi/support](https://github.com/pypi/support/issues/new/choose) if still blocked |
-| `pip install` missing `intentframe-core` | Old partial publish or wrong version pin | Confirm package exists on PyPI; pin `==0.1.0`; see [package-consumers.md](../../docs/package-consumers.md) |
+| `pip install` missing `intentframe-core` | Old partial publish or wrong version pin | Confirm package exists on PyPI; pin `==0.1.1`; see [package-consumers.md](../../docs/package-consumers.md) |
 | Workflow uploaded wrong subset | Wrong `group` or staging skipped | Confirm **Stage upload group** ran and `packages-dir` is `dist/upload` |
 | `confirm` set but no publish job | `confirm` ≠ `publish` | Re-run with `confirm=publish` |
 | Partial CI success | `twine` fail-fast after first hard error | Re-run same `group`; `skip-existing` skips completed files |

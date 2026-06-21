@@ -9,7 +9,7 @@ the IntentFrame security pipeline.
 pip install intentframe-actor
 ```
 
-PyPI: [intentframe-actor](https://pypi.org/project/intentframe-actor/) · `pip install intentframe-actor==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
+PyPI: [intentframe-actor](https://pypi.org/project/intentframe-actor/) · `pip install intentframe-actor==0.1.1` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
 
 ```python
 from intentframe_actor import Actor

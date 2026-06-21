@@ -6,16 +6,20 @@ IntentFrame follows semantic versioning where practical. During early `0.x` rele
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-21
+
 ### Added
 
 - CI: **Mac Tests** workflow (`mac-tests.yml`) — full root `tests/` plus `command-shield` on `macos-14`, with executor sandbox venv provisioning for fresh runners.
 - CI: **Linux Tests** workflow (`linux-tests.yml`) — portable root subset (skips macOS sandbox/TCC/action-matrix tests) plus `command-shield` and `intentframe-credentials` package tests on `ubuntu-latest`.
 - README badges for Mac Tests and Linux Tests.
+- **`intentframe-server`**: configurable Guardian HMAC signing via `core.yaml` `executor.hmac_key` and `INTENTFRAME_EXECUTOR_HMAC_KEY` env override (must match executor `auth.options.secret_key`).
 
 ### Changed
 
-- **`command-shield`**: ShellCheck findings are advisory command intel only; they no longer promote verdicts to `NEEDS_REVIEW`. Fixes non-deterministic classification when the optional `shellcheck` binary is present on PATH (common on Linux CI, uncommon on macOS dev machines). PyPI consumers on `0.1.0` are unchanged until the next lockstep release.
-- Documentation: PyPI is the primary install path for all 18 `packages/` distributions @ `0.1.0`; GitHub release wheels documented as optional mirror ([`docs/package-consumers.md`](docs/package-consumers.md)).
+- **`command-shield`**: ShellCheck findings are advisory command intel only; they no longer promote verdicts to `NEEDS_REVIEW`. Fixes non-deterministic classification when the optional `shellcheck` binary is present on PATH (common on Linux CI, uncommon on macOS dev machines).
+- Documentation: PyPI is the primary install path for all 18 `packages/` distributions; GitHub release wheels documented as optional mirror ([`docs/package-consumers.md`](docs/package-consumers.md)).
+- All **18** packages republished to [PyPI](https://pypi.org/) at **`0.1.1`**.
 
 ## [0.1.0] - 2026-06-04
 
@@ -88,7 +92,8 @@ IntentFrame follows semantic versioning where practical. During early `0.x` rele
 - Policy editing still requires source-level changes.
 - Stateful multi-intent tracking is on the roadmap.
 
-[Unreleased]: https://github.com/intentframe/intentframe/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/intentframe/intentframe/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/intentframe/intentframe/releases/tag/v0.1.1
 [0.1.0]: https://github.com/intentframe/intentframe/releases/tag/v0.1.0
 [0.1.0-alpha.2]: https://github.com/intentframe/intentframe/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/intentframe/intentframe/releases/tag/v0.1.0-alpha.1

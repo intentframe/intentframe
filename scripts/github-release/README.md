@@ -1,6 +1,6 @@
 # GitHub release wheel publishing
 
-Optional mirror of the same wheels published on [PyPI](https://pypi.org/) for **`0.1.0`**. Use when you need URL-pinned installs, offline verification, or release-asset boot tests — not as the primary consumer path.
+Optional mirror of the same wheels published on [PyPI](https://pypi.org/) for **`0.1.1`**. Use when you need URL-pinned installs, offline verification, or release-asset boot tests — not as the primary consumer path.
 
 **Primary install:** [`../../docs/package-consumers.md`](../../docs/package-consumers.md) and [`../github-install/example-pyproject-pypi.toml`](../github-install/example-pyproject-pypi.toml).
 
@@ -32,10 +32,10 @@ After uploading wheels to a release, run in order:
 
 Publish the **wheel** files from `dist/publish/` as GitHub release assets.
 
-For `v0.1.0`, the install URLs look like:
+For `v0.1.1`, the install URLs look like:
 
 ```text
-https://github.com/intentframe/intentframe/releases/download/v0.1.0/intentframe_core-0.1.0-py3-none-any.whl
+https://github.com/intentframe/intentframe/releases/download/v0.1.1/intentframe_core-0.1.1-py3-none-any.whl
 ```
 
 Important:
@@ -206,8 +206,8 @@ scripts/github-install/example-pyproject.toml        # GitHub URL fallback
 Replace both:
 
 ```text
-v0.1.0  -> v0.2.0
-0.1.0   -> 0.2.0
+v0.1.1  -> v0.2.0
+0.1.1   -> 0.2.0
 ```
 
 Then validate syntax:
@@ -311,7 +311,7 @@ spawned services + edge — not just that they install.
 
 ```bash
 export OPENAI_API_KEY=sk-...
-bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.0
+bash scripts/kits-two-venv/gh-release-venv/start_runtime_from_release.sh --tag v0.1.1
 ```
 
 What it does:
@@ -350,6 +350,6 @@ Notes:
 
 ## PyPI consumers
 
-All **18** `packages/` distributions are on PyPI @ **`0.1.0`**. Third-party projects: [`docs/package-consumers.md`](../../docs/package-consumers.md). GitHub release wheels remain an optional URL-pinned fallback.
+All **18** `packages/` distributions are on PyPI @ **`0.1.1`**. Third-party projects: [`docs/package-consumers.md`](../../docs/package-consumers.md). GitHub release wheels remain an optional URL-pinned fallback.
 
 ## Maintainer checklist

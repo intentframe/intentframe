@@ -31,8 +31,8 @@
   <img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20Apache--2.0-blue.svg" alt="License: AGPL-3.0 + Apache-2.0">
   <img src="https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.14+">
   <img src="https://img.shields.io/badge/macOS-14–26-000000.svg?logo=apple&logoColor=white" alt="macOS 14–26">
-  <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-brightgreen.svg" alt="Release: v0.1.0"></a>
-  <a href="docs/package-consumers.md"><img src="https://img.shields.io/badge/PyPI-18%20packages%20%400.1.0-blue.svg" alt="PyPI: 18 packages at 0.1.0"></a>
+  <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.1"><img src="https://img.shields.io/badge/release-v0.1.1-brightgreen.svg" alt="Release: v0.1.1"></a>
+  <a href="docs/package-consumers.md"><img src="https://img.shields.io/badge/PyPI-18%20packages%20%400.1.1-blue.svg" alt="PyPI: 18 packages at 0.1.1"></a>
   <a href="https://github.com/intentframe/intentframe/actions/workflows/mac-tests.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/mac-tests.yml/badge.svg" alt="Mac Tests"></a>
   <a href="https://github.com/intentframe/intentframe/actions/workflows/linux-tests.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/linux-tests.yml/badge.svg" alt="Linux Tests"></a>
   <a href="https://github.com/intentframe/intentframe/actions/workflows/repo-hygiene.yml"><img src="https://github.com/intentframe/intentframe/actions/workflows/repo-hygiene.yml/badge.svg" alt="Repo Hygiene"></a>
@@ -57,7 +57,7 @@
 </p>
 
 <p align="center">
-  Public release: <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.0"><code>v0.1.0</code></a> ·
+  Public release: <a href="https://github.com/intentframe/intentframe/releases/tag/v0.1.1"><code>v0.1.1</code></a> ·
   18 packages on <a href="docs/package-consumers.md">PyPI</a> ·
   GitHub release wheels available as an install fallback
 </p>
@@ -629,9 +629,9 @@ IntentFrame supports two filesystem tool families: workspace/VFS tools (`READ_FI
 
 ---
 
-## 🚧 Project Status: Public v0.1.0
+## 🚧 Project Status: Public v0.1.1
 
-IntentFrame has a public [`v0.1.0`](https://github.com/intentframe/intentframe/releases/tag/v0.1.0) release. All 18 package distributions are published on PyPI and mirrored as GitHub release wheels. The core architecture, package split, plugin substrate, native kit, test suite, and failure reports are in place.
+IntentFrame has a public [`v0.1.1`](https://github.com/intentframe/intentframe/releases/tag/v0.1.1) release. All 18 package distributions are published on PyPI and mirrored as GitHub release wheels. The core architecture, package split, plugin substrate, native kit, test suite, and failure reports are in place.
 
 What's next:
 

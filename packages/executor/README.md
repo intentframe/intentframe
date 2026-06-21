@@ -13,4 +13,4 @@ without modifying this service. Built on `intentframe-executor-sdk`.
 pip install intentframe-executor
 ```
 
-PyPI: [intentframe-executor](https://pypi.org/project/intentframe-executor/) · `pip install intentframe-executor==0.1.0` · License: AGPL-3.0 · [Consumer guide](../../docs/package-consumers.md)
+PyPI: [intentframe-executor](https://pypi.org/project/intentframe-executor/) · `pip install intentframe-executor==0.1.1` · License: AGPL-3.0 · [Consumer guide](../../docs/package-consumers.md)

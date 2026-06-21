@@ -11,4 +11,4 @@ Agent developers usually want the higher-level `intentframe-actor` wrapper.
 pip install intentframe-client
 ```
 
-PyPI: [intentframe-client](https://pypi.org/project/intentframe-client/) · `pip install intentframe-client==0.1.0` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
+PyPI: [intentframe-client](https://pypi.org/project/intentframe-client/) · `pip install intentframe-client==0.1.1` · License: Apache-2.0 · [Consumer guide](../../docs/package-consumers.md)
