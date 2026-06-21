@@ -45,3 +45,36 @@ def test_core_config_legacy_env_overrides(tmp_path: Path, monkeypatch: pytest.Mo
 
     assert config.executor.mode == "dry_run"
     assert config.runtime.skip_onboarding is True
+
+
+def test_core_config_loads_hmac_key_from_yaml(tmp_path: Path) -> None:
+    path = tmp_path / "core.yaml"
+    path.write_text(
+        "bundles:\n"
+        "  - acme\n"
+        "executor:\n"
+        "  mode: real\n"
+        "  hmac_key: my-shared-secret\n",
+        encoding="utf-8",
+    )
+
+    config = load_core_config(path)
+
+    assert config.executor.hmac_key == "my-shared-secret"
+
+
+def test_core_config_hmac_key_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "core.yaml"
+    path.write_text(
+        "bundles:\n"
+        "  - acme\n"
+        "executor:\n"
+        "  mode: real\n"
+        "  hmac_key: yaml-secret\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("INTENTFRAME_EXECUTOR_HMAC_KEY", "env-secret")
+
+    config = load_core_config(path)
+
+    assert config.executor.hmac_key == "env-secret"

@@ -55,6 +55,7 @@ flowchart TB
 | `bundles:` | **Required.** Non-empty list of bundle refs to load at startup. |
 | `executor.mode` | `real` (UDS to executor) or `dry_run` (in-process synthetic executor). |
 | `executor.socket_path` | UDS path when `mode: real`. |
+| `executor.hmac_key` | Shared HMAC secret for signing `/execute` requests. Must match `executor.yaml` `auth.options.secret_key`. Omit to use the built-in demo key (dev only). |
 | `executor.dry_run_context` | Optional label for dry-run demos (e.g. `root`). |
 | `runtime.verbose` | Pipeline logging. |
 | `runtime.skip_onboarding` | Skip onboarding engine when true. |
@@ -62,7 +63,7 @@ flowchart TB
 
 **Selector:** `INTENTFRAME_CORE_CONFIG` must point at a readable `core.yaml` when starting core directly (tests, supervisor child). There is **no** `INTENTFRAME_BUNDLES` env shortcut — same strictness as executor has for packs.
 
-**Legacy overrides** (applied after YAML parse): `INTENTFRAME_EXECUTOR_MODE`, `INTENTFRAME_EXECUTOR_SOCKET`, `INTENTFRAME_DRY_RUN_CONTEXT`, `INTENTFRAME_VERBOSE`, `INTENTFRAME_SKIP_ONBOARDING`.
+**Legacy overrides** (applied after YAML parse): `INTENTFRAME_EXECUTOR_MODE`, `INTENTFRAME_EXECUTOR_SOCKET`, `INTENTFRAME_EXECUTOR_HMAC_KEY`, `INTENTFRAME_DRY_RUN_CONTEXT`, `INTENTFRAME_VERBOSE`, `INTENTFRAME_SKIP_ONBOARDING`.
 
 Example and env mapping comments: [`intentframe_server/config/core.example.yaml`](../packages/intentframe-server/intentframe_server/config/core.example.yaml).
 
