@@ -4,8 +4,6 @@ All notable public changes to IntentFrame will be documented in this file.
 
 IntentFrame follows semantic versioning where practical. During early `0.x` releases, breaking changes may still occur between minor releases.
 
-## [Unreleased]
-
 ## [0.1.1] - 2026-06-21
 
 ### Added
