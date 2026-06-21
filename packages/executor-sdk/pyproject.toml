@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "intentframe-executor-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "IntentFrame Executor SDK — author executor packs and capability adapters"
 readme = "README.md"
 license = "Apache-2.0"
@@ -19,8 +19,8 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-core==0.1.0",
-    "intentframe-credentials==0.1.0",
+    "intentframe-core==0.1.1",
+    "intentframe-credentials==0.1.1",
     "pydantic>=2.12.5",
 ]
 

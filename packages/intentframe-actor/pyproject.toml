@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "intentframe-actor"
-version = "0.1.0"
+version = "0.1.1"
 description = "IntentFrame Actor SDK — agent-side client for routing tool calls through the policy pipeline"
 readme = "README.md"
 license = "Apache-2.0"
@@ -19,8 +19,8 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "intentframe-client==0.1.0",
-    "intentframe-core==0.1.0",
+    "intentframe-client==0.1.1",
+    "intentframe-core==0.1.1",
 ]
 
 [project.urls]

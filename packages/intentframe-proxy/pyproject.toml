@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "intentframe-proxy"
-version = "0.1.0"
+version = "0.1.1"
 description = "Shared HTTP and WebSocket proxy primitives for IntentFrame Unix domain socket services"
 readme = "README.md"
 license = "Apache-2.0"

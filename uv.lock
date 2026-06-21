@@ -328,7 +328,7 @@ wheels = [
 
 [[package]]
 name = "command-shield"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/command-shield" }
 dependencies = [
     { name = "bashlex" },
@@ -913,7 +913,7 @@ dev = [
 
 [[package]]
 name = "intentframe-actor"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-actor" }
 dependencies = [
     { name = "intentframe-client" },
@@ -928,7 +928,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-bundle-sdk"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-bundle-sdk" }
 dependencies = [
     { name = "intentframe-core" },
@@ -945,7 +945,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-client"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-client" }
 dependencies = [
     { name = "httpx" },
@@ -960,7 +960,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-components"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-components" }
 dependencies = [
     { name = "intentframe-bundle-sdk" },
@@ -983,7 +983,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-core" }
 dependencies = [
     { name = "pydantic" },
@@ -994,7 +994,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.12.5" }]
 
 [[package]]
 name = "intentframe-credentials"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-credentials" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1034,7 +1034,7 @@ provides-extras = ["hashicorp", "dev"]
 
 [[package]]
 name = "intentframe-edge"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-edge" }
 dependencies = [
     { name = "fastapi" },
@@ -1055,7 +1055,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-executor"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/executor" }
 dependencies = [
     { name = "fastapi" },
@@ -1076,7 +1076,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-executor-client"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/executor-client" }
 dependencies = [
     { name = "httpx" },
@@ -1093,7 +1093,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-executor-sdk"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/executor-sdk" }
 dependencies = [
     { name = "intentframe-core" },
@@ -1110,7 +1110,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-native-kit"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-native-kit" }
 dependencies = [
     { name = "command-shield" },
@@ -1133,7 +1133,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-policy-registry"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/policy-registry" }
 dependencies = [
     { name = "fastapi" },
@@ -1156,12 +1156,12 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-prompt-library"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-prompt-library" }
 
 [[package]]
 name = "intentframe-proxy"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-proxy" }
 dependencies = [
     { name = "fastapi" },
@@ -1178,7 +1178,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-runtime"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-runtime" }
 dependencies = [
     { name = "intentframe-executor" },
@@ -1195,7 +1195,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-server"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-server" }
 dependencies = [
     { name = "fastapi" },
@@ -1222,7 +1222,7 @@ requires-dist = [
 
 [[package]]
 name = "intentframe-supervisor"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/intentframe-supervisor" }
 dependencies = [
     { name = "httpx" },
