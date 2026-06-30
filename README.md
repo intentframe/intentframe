@@ -240,6 +240,8 @@ IntentFrame is **agent-agnostic**. Build with any LLM, any framework, any agent 
 
 That includes agents using MCP (Model Context Protocol) tools: IntentFrame sits at the action boundary where MCP calls become real file, shell, API, account, or data changes, giving those calls policy enforcement and audit instead of raw execution.
 
+**Shipped integration:** [Hermes Agent](https://github.com/NousResearch/hermes-agent) + IntentFrame lives in [`intentframe/agent-integrations`](https://github.com/intentframe/agent-integrations). Hermes proposes tool calls; IntentFrame validates them before execution (validate-only; no fork required).
+
 **IntentFrame validates OUTCOMES, not IMPLEMENTATIONS.**
 
 ---
@@ -476,7 +478,7 @@ For the full pipeline, see [`docs/architecture.md`](docs/architecture.md).
 
 The agent in the diagram above is *your* agent — any LLM, any framework. The seam between it and the IntentFrame runtime is one method: `actor.submit(...)`. Every tool body calls it; nothing else changes. The runtime owns credentials, validation, audit, and execution; your agent keeps reasoning, business logic, UI, and framework choice.
 
-Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-sdk.md). Why all agents share one runtime / one executor / one policy surface: [`docs/single-runtime.md`](docs/single-runtime.md). Reference integrations: [`jarvis_pa/`](jarvis_pa/), [`external_agents/invoice_bot/`](external_agents/invoice_bot/), and [`external_agents/return_agent/`](external_agents/return_agent/) (returns/refund approve-then-guard experiment).
+Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-sdk.md). Why all agents share one runtime / one executor / one policy surface: [`docs/single-runtime.md`](docs/single-runtime.md). Reference integrations: [`jarvis_pa/`](jarvis_pa/), [`external_agents/invoice_bot/`](external_agents/invoice_bot/), [`external_agents/return_agent/`](external_agents/return_agent/) (returns/refund approve-then-guard experiment), and **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — external validate-only gate for terminal, code, file writes, and cron ([install guide](https://github.com/intentframe/agent-integrations#install-intentframe-into-hermes) in [`agent-integrations`](https://github.com/intentframe/agent-integrations)).
 
 ---
 
@@ -487,6 +489,7 @@ Full integration guide and framework patterns: [`docs/actor-sdk.md`](docs/actor-
 | Curious and want to try it | [`docs/quickstart.md`](docs/quickstart.md) → run Jarvis |
 | Wondering what Jarvis actually is | [`docs/jarvis.md`](docs/jarvis.md) → and [`docs/jarvis-telegram.md`](docs/jarvis-telegram.md) for the phone bridge |
 | Building your own agent on IntentFrame | [`docs/actor-sdk.md`](docs/actor-sdk.md) — bring any LLM/framework, integrate via `actor.submit(...)` |
+| Using [Hermes Agent](https://github.com/NousResearch/hermes-agent) with IntentFrame governance | [`agent-integrations`](https://github.com/intentframe/agent-integrations) — plugin, policy, control plane (:9720), [one-line install](https://github.com/intentframe/agent-integrations#install-intentframe-into-hermes) |
 | Wondering why there is one runtime / one executor | [`docs/single-runtime.md`](docs/single-runtime.md) — one door for every agent action on the machine |
 | Wondering "what is this really for?" | [`docs/autonomy.md`](docs/autonomy.md) (the delegatable-autonomy thesis) |
 | A skeptic who wants to break it | [`docs/threat-model.md`](docs/threat-model.md) → [`docs/evidence.md`](docs/evidence.md) |
