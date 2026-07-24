@@ -72,7 +72,7 @@ async def list_directory(ctx: RunContextWrapper[AgentContext], path: str, reason
     })
     
     if result.success:
-        files = result.data.get("files", [])
+        files = result.data.get("entries", result.data.get("files", []))
         agent_ctx.files_discovered += len(files)
         return f"Files found: {files}"
     else:
