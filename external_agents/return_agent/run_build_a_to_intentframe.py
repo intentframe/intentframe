@@ -45,6 +45,7 @@ from terminal import (  # noqa: E402
     fenced_block,
     headline,
     intentframe,
+    run_footer,
     section,
     verdict_box,
     warn,
@@ -195,6 +196,7 @@ def main() -> int:
             agent_value=color_build_a_decision(decision),
             guard_value=dim("not invoked — agent did not approve"),
         )
+        run_footer("AGENT SELF-STOPPED  ·  NO REVIEW NEEDED")
         return 0
 
     print(f"\n  {build_a('▸ [2] Refund Agent')}  {dim('approved — forwarding intent…')}\n")
@@ -210,6 +212,12 @@ def main() -> int:
         guard_label="INTENTFRAME",
         guard_value=color_intentframe_decision(result.decision.value),
         reason=result.message,
+    )
+    guard = result.decision.value.upper()
+    run_footer(
+        "AGENT MISSED IT  ·  INTENTFRAME BLOCKED"
+        if guard == "BLOCK"
+        else f"AGENT APPROVED  ·  INTENTFRAME {guard}"
     )
     return 0
 

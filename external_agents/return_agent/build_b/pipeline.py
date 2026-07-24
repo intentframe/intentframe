@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
+from pathlib import Path
 
 from intentframe_core import IntentFrame, UserContext
 from intentframe_components.analysis import AIAnalysisEngine
@@ -32,6 +34,11 @@ from intentframe_core.types import ValidationResult
 from policy_registry.models import ActionPermission
 
 from return_intent_limits import RETURN_INTENT_LIMITS
+
+_RETURN_AGENT_DIR = Path(__file__).resolve().parent.parent
+if str(_RETURN_AGENT_DIR) not in sys.path:
+    sys.path.insert(0, str(_RETURN_AGENT_DIR))
+from terminal import intentframe  # noqa: E402
 
 AE_MODEL = "gpt-4o-mini"
 GUARDIAN_MODEL = "gpt-5-mini-2025-08-07"
@@ -84,7 +91,12 @@ async def process_intent_async(
     active_domains = _active_domains(user_context) if limits else None
 
     if verbose and limits:
-        print(f"    │  Intent limits: {len(limits)} active domains={sorted(active_domains or [])}")
+        print(
+            intentframe(
+                f"    │  Intent limits: {len(limits)} active "
+                f"domains={sorted(active_domains or [])}"
+            )
+        )
 
     report = await analysis_engine.analyze(intent, active_domains=active_domains)
     result = await guardian.validate(

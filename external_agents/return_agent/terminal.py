@@ -113,6 +113,17 @@ def headline(text: str, subtitle: str = "", *, width: int = WIDTH) -> None:
     print("╚" + "═" * inner + "╝")
 
 
+def run_footer(text: str = "END OF RUN", *, width: int = WIDTH) -> None:
+    """Clear, distinct end marker so repeated runs are easy to separate."""
+    label = f" {text} "
+    side = (width - _visible_len(label)) // 2
+    bar = "▁" * width
+    print()
+    print(dim("━" * side) + bold(label) + dim("━" * (width - side - _visible_len(label))))
+    print(dim(bar))
+    print("\n")
+
+
 def columns(left: str, right: str, *, colw: int = 42, gap: str = " │ ") -> str:
     lc = _pad(left, colw)
     rc = _pad(right, colw)
