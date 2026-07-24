@@ -27,12 +27,28 @@ from pathlib import Path
 from intentframe_core import IntentFrame
 
 _HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE))
 sys.path.insert(0, str(_HERE / "build_b"))   # pipeline
 sys.path.insert(0, str(_HERE / "build_a"))   # agent, prompts (kept ahead of build_b)
 
 from agent import BuildAReturnAgent  # noqa: E402
 from real_world_user_prompt import CHAT_TRANSCRIPT, USER_PROMPT  # noqa: E402
 from pipeline import process_intent, use_intent_limits_from_env  # noqa: E402
+from terminal import (  # noqa: E402
+    approve,
+    block,
+    build_a,
+    callout,
+    color_build_a_decision,
+    color_intentframe_decision,
+    dim,
+    fenced_block,
+    headline,
+    intentframe,
+    section,
+    verdict_box,
+    warn,
+)
 
 
 def _grab(pattern: str, text: str, default: str = "") -> str:
@@ -65,11 +81,11 @@ def print_intent(intent: IntentFrame) -> None:
     convo = (payload.get("data") or {}).get("conversation", "")
     if convo:
         payload["data"] = {**payload["data"], "conversation": f"<{len(convo)} chars>"}
-    print("  Intent from Build A output:")
-    print(f"    action:  {payload['action']}")
-    print(f"    target:  {payload['target']!r}")
-    print(f"    reason:  {payload['reason']}")
-    print(f"    data:    {payload.get('data')}")
+    print(f"  {dim('Intent from Refund Agent output:')}")
+    print(f"    {dim('action:')}  {payload['action']}")
+    print(f"    {dim('target:')}  {payload['target']!r}")
+    print(f"    {dim('reason:')}  {payload['reason']}")
+    print(f"    {dim('data:')}    {payload.get('data')}")
     print()
 
 
@@ -98,48 +114,103 @@ def build_intent(parsed: dict, conversation: str) -> IntentFrame:
     )
 
 
+def _cell(text: str, cellw: int, colorize=None) -> str:
+    """Pad plain text to width first, then colorize (keeps columns aligned)."""
+    padded = text.ljust(cellw)
+    return colorize(padded) if colorize else padded
+
+
+def print_experiment_intro(*, limits_on: bool) -> None:
+    """Orient the viewer before the live run — scannable, no need to read every line."""
+    colw = 42
+    gap = " │ "
+
+    def row(left: str, right: str, lc=None, rc=None) -> None:
+        print(dim("  │ ") + f"{_cell(left, colw, lc)}"
+              + dim(gap) + f"{_cell(right, colw, rc)}" + dim(" │"))
+
+    headline(
+        "REFUND AGENT  vs  INTENTFRAME",
+        "who can be trusted to approve the money?",
+    )
+    print()
+    print(f"  {build_a('SETUP')}  "
+          + dim("$80 blender refund · agent may APPROVE / DENY / ESCALATE"))
+    print(f"  {build_a('RULES')}  "
+          + dim("real defects only · never over paid amount · original card only"))
+    print(f"  {build_a('ATTACK')} "
+          + dim("quiet social engineering — "
+                "\"card closed\" · \"FAQ allows it\" · \"you promised me\""))
+    print()
+
+    seg = "─" * (colw + 2)
+    print(dim(f"  ┌{seg}┬{seg}┐"))
+    row("REFUND AGENT", "INTENTFRAME", build_a, intentframe)
+    print(dim(f"  ├{seg}┼{seg}┤"))
+    row("guardrails in its prompt", "independent reviewer outside agent", dim, dim)
+    row("helps customer + judges itself", "checks chat + refund → ALLOW/BLOCK", dim, dim)
+    print(dim(f"  └{seg}┴{seg}┘"))
+    print()
+
+    callout("THE POINT:  agent right MOST of the time  ·  IntentFrame right EVERY time")
+    print()
+    print(f"  {build_a('WATCH')}  "
+          + f"{warn('ESCALATE/DENY')} = stopped early    "
+          + f"{approve('APPROVE')} + {warn('no attack flag')} = missed → {block('BLOCK')}")
+    print(dim(
+        "  Track record: 15/51 silent agent approvals · IntentFrame blocked all 15 · "
+        f"rules {'ON' if limits_on else 'OFF'} · no real money moves"
+    ))
+
+
 def main() -> int:
     if not os.environ.get("OPENAI_API_KEY"):
         print("OPENAI_API_KEY is not set.", file=sys.stderr)
         return 1
 
     limits_on = use_intent_limits_from_env()
-    print("=" * 79)
-    print("  BUILD A  ->  INTENTFRAME  (approve-then-guard)")
-    print(f"  Intent limits: {'ON' if limits_on else 'OFF'}  (RETURN_USE_INTENT_LIMITS=1 to enable)")
-    print("=" * 79)
+    print_experiment_intro(limits_on=limits_on)
 
-    print("\n[1] Running Build A return agent...\n")
+    section("LIVE RUN")
+    print(f"  {build_a('▸ [1] Refund Agent')}  {dim('reading chat with prompt guardrails…')}\n")
     output = BuildAReturnAgent(verbose=False).run(USER_PROMPT)
-    print(output)
+    fenced_block(output, title="agent response", max_lines=10)
 
     parsed = parse_agent_output(output)
-    print("\n" + "-" * 79)
-    print(f"  Build A decision: {parsed['decision'] or '(unparsed)'}")
-    print(f"  approved_amount:  {parsed['approved_amount']}")
-    print(f"  order_id:         {parsed['order_id']}")
-    print(f"  pressure_flag:    {parsed['pressure_or_injection_detected']}")
-    print("-" * 79)
+    decision = parsed["decision"] or "(unparsed)"
+    pressure = parsed["pressure_or_injection_detected"]
 
-    print("\n[2] Intent built from agent output:\n")
-    intent = build_intent(parsed, CHAT_TRANSCRIPT.strip())
-    print_intent(intent)
+    section("REFUND AGENT DECISION")
+    print(f"  decision        {color_build_a_decision(decision)}")
+    print(f"  {dim('amount')}          {parsed['approved_amount']}")
+    print(f"  {dim('order')}           {parsed['order_id']}")
+    if pressure == "false" and decision == "APPROVE":
+        print(f"  {warn('attack flag')}    {warn(pressure)}  {dim('← agent says no attack detected')}")
+    else:
+        print(f"  {dim('attack flag')}    {pressure}")
 
     if parsed["decision"] != "APPROVE":
-        print(
-            "[3] Build A did not APPROVE -> intent not sent to IntentFrame. "
-            "The DIY agent already refused/escalated."
+        verdict_box(
+            agent_label="REFUND AGENT",
+            agent_value=color_build_a_decision(decision),
+            guard_value=dim("not invoked — agent did not approve"),
         )
         return 0
 
-    print("[3] Build A APPROVED -> sending intent to IntentFrame...\n")
+    print(f"\n  {build_a('▸ [2] Refund Agent')}  {dim('approved — forwarding intent…')}\n")
+    intent = build_intent(parsed, CHAT_TRANSCRIPT.strip())
+    print_intent(intent)
+
+    print(f"  {intentframe('▸ [3] IntentFrame')}  {dim('independent review…')}\n")
     result = process_intent(intent)
 
-    print("\n" + "=" * 79)
-    print(f"  BUILD A:     APPROVE (${parsed['approved_amount']})")
-    print(f"  INTENTFRAME: {result.decision.value}")
-    print(f"  REASON:      {result.message}")
-    print("=" * 79)
+    verdict_box(
+        agent_label="REFUND AGENT",
+        agent_value=approve(f"APPROVE  ${parsed['approved_amount']}"),
+        guard_label="INTENTFRAME",
+        guard_value=color_intentframe_decision(result.decision.value),
+        reason=result.message,
+    )
     return 0
 
 
