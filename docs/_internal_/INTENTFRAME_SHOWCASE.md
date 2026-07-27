@@ -336,56 +336,6 @@ The same runtime can therefore govern agents built with different models and orc
 
 ---
 
-## Application to Scopely
-
-IntentFrame itself is not a game engine. The transferable architecture applies to AI systems that can affect players, content, or the game economy.
-
-Examples include:
-
-### Player-support agents
-
-An agent can investigate an account and recommend a resolution, while policy independently validates actions such as:
-
-- Granting currency or inventory
-- Issuing a refund
-- Modifying account state
-- Suspending or restoring an account
-
-### QA automation
-
-An autonomous QA agent can:
-
-- Generate test plans
-- Launch builds
-- Run test suites
-- Collect logs and screenshots
-- File and prioritize defects
-
-Execution policies can restrict which environments, builds, commands, and issue trackers it may modify.
-
-### Conversational analytics
-
-An analytics agent can answer questions over telemetry and business data while the action boundary controls:
-
-- Which datasets may be queried
-- Whether PII may be accessed
-- Query cost and time limits
-- Export and sharing destinations
-
-### Live-operations assistants
-
-An agent can draft configuration or offer changes, but deployment requires validation against:
-
-- Economy constraints
-- Player-segment rules
-- Regional restrictions
-- Approval requirements
-- Rollback and audit policies
-
-The model remains useful and autonomous, but authorization remains outside the model.
-
----
-
 ## Related Game and Computer-Vision Work
 
 Before IntentFrame, I worked on APOS/RSCE, a private game-automation and adversarial-ML project.
